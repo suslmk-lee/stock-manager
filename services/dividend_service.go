@@ -1,0 +1,298 @@
+package services
+
+import (
+	"errors"
+	"fmt"
+	"stock-manager/database"
+	"stock-manager/models"
+	"time"
+
+	"gorm.io/gorm"
+)
+
+type DividendService struct {
+	db *gorm.DB
+}
+
+func NewDividendService() *DividendService {
+	return &DividendService{
+		db: database.GetDB(),
+	}
+}
+
+type CreateDividendRequest struct {
+	AccountID  uint
+	AssetID    uint
+	Date       time.Time
+	Amount     float64
+	Currency   string
+	Tax        float64
+	IsReceived bool
+	Notes      string
+}
+
+type MonthlyDividend struct {
+	Year     int     `json:"year"`
+	Month    int     `json:"month"`
+	TotalUSD float64 `json:"total_usd"`
+	TotalKRW float64 `json:"total_krw"`
+	Count    int64   `json:"count"`
+	Label    string  `json:"label"`
+}
+
+type DividendStats struct {
+	TotalDividendsUSD float64 `json:"total_dividends_usd"`
+	TotalDividendsKRW float64 `json:"total_dividends_krw"`
+	TotalTaxUSD       float64 `json:"total_tax_usd"`
+	TotalTaxKRW       float64 `json:"total_tax_krw"`
+	ReceivedCount     int64   `json:"received_count"`
+	PendingCount      int64   `json:"pending_count"`
+}
+
+func (s *DividendService) CreateDividend(req CreateDividendRequest) (*models.Dividend, error) {
+	if req.Amount <= 0 {
+		return nil, errors.New("dividend amount must be greater than 0")
+	}
+	if req.Tax < 0 {
+		return nil, errors.New("tax cannot be negative")
+	}
+
+	var account models.Account
+	if err := s.db.First(&account, req.AccountID).Error; err != nil {
+		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	var asset models.Asset
+	if err := s.db.First(&asset, req.AssetID).Error; err != nil {
+		return nil, fmt.Errorf("asset not found: %w", err)
+	}
+
+	if req.Currency == "" {
+		req.Currency = account.Currency
+	}
+
+	dividend := &models.Dividend{
+		AccountID:  req.AccountID,
+		AssetID:    req.AssetID,
+		Date:       req.Date,
+		Amount:     req.Amount,
+		Currency:   req.Currency,
+		Tax:        req.Tax,
+		IsReceived: req.IsReceived,
+		Notes:      req.Notes,
+	}
+
+	if err := s.db.Create(dividend).Error; err != nil {
+		return nil, fmt.Errorf("failed to create dividend: %w", err)
+	}
+
+	return dividend, nil
+}
+
+func (s *DividendService) GetDividendsByAccount(accountID uint) ([]models.Dividend, error) {
+	var dividends []models.Dividend
+	err := s.db.Where("account_id = ?", accountID).
+		Preload("Asset").
+		Order("date DESC, created_at DESC").
+		Find(&dividends).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dividends: %w", err)
+	}
+
+	fmt.Printf("GetDividendsByAccount: accountID=%d, found %d dividends\n", accountID, len(dividends))
+	for i, d := range dividends {
+		fmt.Printf("  [%d] ID=%d, AccountID=%d, AssetID=%d, Amount=%.2f, Date=%s\n",
+			i, d.ID, d.AccountID, d.AssetID, d.Amount, d.Date)
+	}
+
+	return dividends, nil
+}
+
+func (s *DividendService) GetDividendsByAsset(assetID uint) ([]models.Dividend, error) {
+	var dividends []models.Dividend
+	err := s.db.Where("asset_id = ?", assetID).
+		Preload("Account").
+		Order("date DESC, created_at DESC").
+		Find(&dividends).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dividends: %w", err)
+	}
+
+	return dividends, nil
+}
+
+func (s *DividendService) GetMonthlyDividends(startDate, endDate time.Time) ([]MonthlyDividend, error) {
+	var results []MonthlyDividend
+
+	rows, err := s.db.Raw(`
+		SELECT 
+			strftime('%Y', date) as year,
+			strftime('%m', date) as month,
+			SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END) as total_usd,
+			SUM(CASE WHEN currency = 'KRW' THEN amount ELSE 0 END) as total_krw,
+			COUNT(*) as count
+		FROM dividends
+		WHERE date BETWEEN ? AND ?
+		AND deleted_at IS NULL
+		GROUP BY strftime('%Y-%m', date)
+		ORDER BY year, month
+	`, startDate, endDate).Rows()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get monthly dividends: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var yearStr, monthStr string
+		var md MonthlyDividend
+
+		if err := rows.Scan(&yearStr, &monthStr, &md.TotalUSD, &md.TotalKRW, &md.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		fmt.Sscanf(yearStr, "%d", &md.Year)
+		fmt.Sscanf(monthStr, "%d", &md.Month)
+		md.Label = fmt.Sprintf("%d-%02d", md.Year, md.Month)
+
+		results = append(results, md)
+	}
+
+	return results, nil
+}
+
+func (s *DividendService) GetMonthlyDividendsByAccount(accountID uint, startDate, endDate time.Time) ([]MonthlyDividend, error) {
+	var results []MonthlyDividend
+
+	rows, err := s.db.Raw(`
+		SELECT 
+			strftime('%Y', date) as year,
+			strftime('%m', date) as month,
+			SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END) as total_usd,
+			SUM(CASE WHEN currency = 'KRW' THEN amount ELSE 0 END) as total_krw,
+			COUNT(*) as count
+		FROM dividends
+		WHERE account_id = ?
+		AND date BETWEEN ? AND ?
+		AND deleted_at IS NULL
+		GROUP BY strftime('%Y-%m', date)
+		ORDER BY year, month
+	`, accountID, startDate, endDate).Rows()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get monthly dividends: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var yearStr, monthStr string
+		var md MonthlyDividend
+
+		if err := rows.Scan(&yearStr, &monthStr, &md.TotalUSD, &md.TotalKRW, &md.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		fmt.Sscanf(yearStr, "%d", &md.Year)
+		fmt.Sscanf(monthStr, "%d", &md.Month)
+		md.Label = fmt.Sprintf("%d-%02d", md.Year, md.Month)
+
+		results = append(results, md)
+	}
+
+	return results, nil
+}
+
+func (s *DividendService) GetDividendStats() (*DividendStats, error) {
+	var stats DividendStats
+
+	var totalAmountUSD, totalAmountKRW, totalTaxUSD, totalTaxKRW float64
+	var receivedCount, pendingCount int64
+
+	// USD 배당금 및 세금
+	s.db.Model(&models.Dividend{}).
+		Select("COALESCE(SUM(amount), 0)").
+		Where("currency = ?", "USD").
+		Scan(&totalAmountUSD)
+
+	s.db.Model(&models.Dividend{}).
+		Select("COALESCE(SUM(tax), 0)").
+		Where("currency = ?", "USD").
+		Scan(&totalTaxUSD)
+
+	// KRW 배당금 및 세금
+	s.db.Model(&models.Dividend{}).
+		Select("COALESCE(SUM(amount), 0)").
+		Where("currency = ?", "KRW").
+		Scan(&totalAmountKRW)
+
+	s.db.Model(&models.Dividend{}).
+		Select("COALESCE(SUM(tax), 0)").
+		Where("currency = ?", "KRW").
+		Scan(&totalTaxKRW)
+
+	// 건수
+	s.db.Model(&models.Dividend{}).Where("is_received = ?", true).Count(&receivedCount)
+	s.db.Model(&models.Dividend{}).Where("is_received = ?", false).Count(&pendingCount)
+
+	stats.TotalDividendsUSD = totalAmountUSD
+	stats.TotalDividendsKRW = totalAmountKRW
+	stats.TotalTaxUSD = totalTaxUSD
+	stats.TotalTaxKRW = totalTaxKRW
+	stats.ReceivedCount = receivedCount
+	stats.PendingCount = pendingCount
+
+	return &stats, nil
+}
+
+func (s *DividendService) UpdateDividend(id uint, req CreateDividendRequest) (*models.Dividend, error) {
+	var dividend models.Dividend
+	if err := s.db.First(&dividend, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("dividend not found")
+		}
+		return nil, fmt.Errorf("failed to find dividend: %w", err)
+	}
+
+	// 계좌 존재 확인
+	var account models.Account
+	if err := s.db.First(&account, req.AccountID).Error; err != nil {
+		return nil, errors.New("account not found")
+	}
+
+	// 자산 존재 확인
+	var asset models.Asset
+	if err := s.db.First(&asset, req.AssetID).Error; err != nil {
+		return nil, errors.New("asset not found")
+	}
+
+	// 배당금 정보 업데이트
+	dividend.AccountID = req.AccountID
+	dividend.AssetID = req.AssetID
+	dividend.Date = req.Date
+	dividend.Amount = req.Amount
+	dividend.Currency = req.Currency
+	dividend.Tax = req.Tax
+	dividend.IsReceived = req.IsReceived
+	dividend.Notes = req.Notes
+
+	if err := s.db.Save(&dividend).Error; err != nil {
+		return nil, fmt.Errorf("failed to update dividend: %w", err)
+	}
+
+	return &dividend, nil
+}
+
+func (s *DividendService) DeleteDividend(id uint) error {
+	result := s.db.Delete(&models.Dividend{}, id)
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete dividend: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return errors.New("dividend not found")
+	}
+
+	return nil
+}
