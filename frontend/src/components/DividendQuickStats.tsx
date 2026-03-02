@@ -254,8 +254,16 @@ export default function DividendQuickStats({ accountId }: DividendQuickStatsProp
                         {index + 1}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-white">{asset.ticker}</p>
-                        <p className="text-xs text-slate-400">{asset.assetName} · {asset.count}건</p>
+                        <p className="text-sm font-medium text-white">
+                          {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ') 
+                            ? asset.assetName 
+                            : asset.ticker}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ')
+                            ? `${asset.ticker} · ${asset.count}건`
+                            : `${asset.assetName} · ${asset.count}건`}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">
