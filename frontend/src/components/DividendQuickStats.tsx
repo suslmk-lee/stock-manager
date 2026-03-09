@@ -327,7 +327,7 @@ export default function DividendQuickStats({ accountId }: DividendQuickStatsProp
                           opacity="0.8"
                           className="hover:opacity-100 transition-opacity cursor-pointer"
                         >
-                          <title>{`${asset.ticker}: ${percentage.toFixed(1)}%`}</title>
+                          <title>{`${asset.ticker.includes('.KS') || asset.ticker.includes('.KQ') ? asset.assetName : asset.ticker}: ${percentage.toFixed(1)}%`}</title>
                         </path>
                       );
                     });
@@ -351,7 +351,9 @@ export default function DividendQuickStats({ accountId }: DividendQuickStatsProp
                         style={{ backgroundColor: colors[index % colors.length] }}
                       />
                       <span className="text-xs text-slate-300 truncate">
-                        {asset.ticker} ({percentage.toFixed(1)}%)
+                        {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ') 
+                          ? asset.assetName 
+                          : asset.ticker} ({percentage.toFixed(1)}%)
                       </span>
                     </div>
                   );

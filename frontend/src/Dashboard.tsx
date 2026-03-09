@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Wallet, TrendingUp, DollarSign, BarChart3 } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, BarChart3, Calendar } from 'lucide-react';
 import App from './App';
 import AssetManager from './components/AssetManager';
 import DividendManager from './components/DividendManager';
 import DividendDashboard from './pages/DividendDashboard';
+import DividendYearlyOverview from './components/DividendYearlyOverview';
 
-type TabType = 'accounts' | 'assets' | 'dividends' | 'stats';
+type TabType = 'accounts' | 'assets' | 'dividends' | 'stats' | 'yearly';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('accounts');
@@ -16,6 +17,7 @@ export default function Dashboard() {
     { id: 'assets' as TabType, label: '주식/ETF', icon: TrendingUp },
     { id: 'dividends' as TabType, label: '배당금', icon: DollarSign },
     { id: 'stats' as TabType, label: '통계', icon: BarChart3 },
+    { id: 'yearly' as TabType, label: '연간 현황', icon: Calendar },
   ];
 
   return (
@@ -57,6 +59,7 @@ export default function Dashboard() {
         {activeTab === 'assets' && <AssetManager />}
         {activeTab === 'dividends' && <DividendManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}
         {activeTab === 'stats' && <DividendDashboard />}
+        {activeTab === 'yearly' && <DividendYearlyOverview />}
       </div>
     </div>
   );
