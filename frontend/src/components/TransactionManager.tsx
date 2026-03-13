@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetAllAccounts, GetAllAssets, CreateTransaction, GetTransactionsByAccount } from '../../wailsjs/go/main/App';
+import { apiClient } from '../api/client';
 import { Account, Asset, Transaction } from '../types/models';
 import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp } from 'lucide-react';
 
@@ -48,8 +48,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       setLoading(true);
       setError(null);
       const [accountsData, assetsData] = await Promise.all([
-        GetAllAccounts(),
-        GetAllAssets(),
+        apiClient.GetAllAccounts(),
+        apiClient.GetAllAssets()
       ]);
       setAccounts(accountsData as Account[]);
       setAssets(assetsData as Asset[]);
@@ -73,8 +73,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
 
   const loadTransactions = async (accountId: number) => {
     try {
-      const data = await GetTransactionsByAccount(accountId);
-      setTransactions(data as Transaction[]);
+      const transactionsData = await apiClient.GetTransactionsByAccount(accountId);
+      setTransactions(transactionsData as Transaction[]);
     } catch (err) {
       console.error('Failed to load transactions:', err);
     }
@@ -83,7 +83,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
   const handleCreateTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await CreateTransaction(
+      await apiClient.CreateTransaction(
         formData.accountId,
         formData.assetId,
         formData.type,

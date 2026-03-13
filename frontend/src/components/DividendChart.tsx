@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { GetMonthlyDividends, GetMonthlyDividendsByAccount, GetUSDToKRW } from '../../wailsjs/go/main/App';
+import { apiClient } from '../api/client';
 import { TrendingUp, Calendar } from 'lucide-react';
 
 interface MonthlyDividend {
@@ -34,8 +34,6 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
       setError(null);
 
       // Get exchange rate
-      const rate = await GetUSDToKRW();
-
       const endDate = new Date();
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - months);
@@ -43,11 +41,16 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
       const startStr = startDate.toISOString().split('T')[0];
       const endStr = endDate.toISOString().split('T')[0];
 
+      const [allData, rate] = await Promise.all([
+        apiClient.GetMonthlyDividends(startStr, endStr),
+        apiClient.GetUSDToKRW()
+      ]);
+
       let result: MonthlyDividend[];
       if (accountId) {
-        result = await GetMonthlyDividendsByAccount(accountId, startStr, endStr) as MonthlyDividend[];
+        result = await apiClient.GetMonthlyDividendsByAccount(accountId, startStr, endStr) as MonthlyDividend[];
       } else {
-        result = await GetMonthlyDividends(startStr, endStr) as MonthlyDividend[];
+        result = allData as MonthlyDividend[];
       }
 
       // Convert to KRW: USD * rate + KRW

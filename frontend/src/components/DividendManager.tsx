@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetAllAccounts, GetAllAssets, CreateDividend, UpdateDividend, GetDividendsByAccount, GetUSDToKRW } from '../../wailsjs/go/main/App';
+import { apiClient } from '../api/client';
 import { Account, Asset, Dividend } from '../types/models';
 import { Plus, DollarSign, Calendar, Edit2, ChevronRight } from 'lucide-react';
 import DividendQuickStats from './DividendQuickStats';
@@ -55,9 +55,9 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       setLoading(true);
       setError(null);
       const [accountsData, assetsData, rate] = await Promise.all([
-        GetAllAccounts(),
-        GetAllAssets(),
-        GetUSDToKRW(),
+        apiClient.GetAllAccounts(),
+        apiClient.GetAllAssets(),
+        apiClient.GetUSDToKRW(),
       ]);
       setAccounts(accountsData as Account[]);
       setAssets(assetsData as Asset[]);
@@ -83,9 +83,9 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
   const loadDividends = async (accountId: number) => {
     try {
       console.log('Loading dividends for account:', accountId);
-      const data = await GetDividendsByAccount(accountId);
-      console.log('Loaded dividends:', data);
-      setDividends(data as Dividend[]);
+      const dividendsData = await apiClient.GetDividendsByAccount(accountId);
+      console.log('Loaded dividends:', dividendsData);
+      setDividends(dividendsData as Dividend[]);
     } catch (err) {
       console.error('Failed to load dividends:', err);
     }
@@ -95,26 +95,26 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
     e.preventDefault();
     try {
       if (editingDividend) {
-        await UpdateDividend(
+        await apiClient.UpdateDividend(
           editingDividend.id,
           formData.accountId,
           formData.assetId,
           formData.date,
           parseFloat(formData.amount),
-          parseFloat(formData.tax || '0'),
+          parseFloat(formData.tax),
           formData.currency,
-          formData.isReceived,
+          true,
           formData.notes
         );
       } else {
-        await CreateDividend(
+        await apiClient.CreateDividend(
           formData.accountId,
           formData.assetId,
           formData.date,
           parseFloat(formData.amount),
-          parseFloat(formData.tax || '0'),
+          parseFloat(formData.tax),
           formData.currency,
-          formData.isReceived,
+          true,
           formData.notes
         );
       }
@@ -194,9 +194,9 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold text-white">배당금 관리</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-white">배당금 관리</h2>
           <select
             value={selectedAccount}
             onChange={(e) => {
@@ -206,7 +206,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 onAccountChange(accountId);
               }
             }}
-            className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="w-full sm:w-auto bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
           >
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -232,7 +232,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
             }
             setShowForm(!showForm);
           }}
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors w-full sm:w-auto"
         >
           <Plus className="w-5 h-5" />
           배당금 기록

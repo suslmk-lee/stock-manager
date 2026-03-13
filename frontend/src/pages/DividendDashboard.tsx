@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetAllAccounts } from '../../wailsjs/go/main/App';
+import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import DividendChart from '../components/DividendChart';
 import DividendStatistics from '../components/DividendStatistics';
@@ -19,7 +19,7 @@ export default function DividendDashboard() {
 
   const loadAccounts = async () => {
     try {
-      const data = await GetAllAccounts();
+      const data = await apiClient.GetAllAccounts();
       setAccounts(data as Account[]);
     } catch (err) {
       console.error('Failed to load accounts:', err);
@@ -36,17 +36,17 @@ export default function DividendDashboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <DollarSign className="w-10 h-10 text-green-400" />
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+          <DollarSign className="w-8 h-8 sm:w-10 sm:h-10 text-green-400" />
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
             배당금 대시보드
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
               showFilters ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
             }`}
           >
@@ -57,7 +57,7 @@ export default function DividendDashboard() {
             <button
               key={months}
               onClick={() => setSelectedPeriod(months)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
                 selectedPeriod === months
                   ? 'bg-green-600 text-white'
                   : 'bg-slate-700 text-slate-300 hover:bg-slate-600'

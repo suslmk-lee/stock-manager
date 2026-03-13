@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetAllAssets, GetAllAccounts, CreateAsset, UpdateAsset, DeleteAsset, GetTickerInfo, GetCurrentPrice, GetUSDToKRW, CreateHolding, UpdateHolding, DeleteHolding } from '../../wailsjs/go/main/App';
+import { apiClient } from '../api/client';
 import { Asset, Account, TickerInfo, Holding } from '../types/models';
 import { Plus, Trash2, TrendingUp, Search, Edit2 } from 'lucide-react';
 
@@ -61,10 +61,10 @@ export default function AssetManager() {
     try {
       setLoading(true);
       setError(null);
-      const [assetsData, accountsData, rate] = await Promise.all([
-        GetAllAssets(),
-        GetAllAccounts(),
-        GetUSDToKRW(),
+      const [accountsData, assetsData, rate] = await Promise.all([
+        apiClient.GetAllAccounts(),
+        apiClient.GetAllAssets(),
+        apiClient.GetUSDToKRW(),
       ]);
       
       const assetsArray = assetsData as Asset[];
@@ -74,7 +74,7 @@ export default function AssetManager() {
       const assetsWithPrices = await Promise.all(
         assetsArray.map(async (asset) => {
           try {
-            const priceData = await GetCurrentPrice(asset.ticker);
+            const priceData = await apiClient.GetCurrentPrice(asset.ticker);
             const price = priceData as any;
             
             // 모든 holdings의 수량 합산
@@ -120,7 +120,7 @@ export default function AssetManager() {
     try {
       setSearching(true);
       setError(null);
-      const data = await GetTickerInfo(formData.ticker.toUpperCase());
+      const data = await apiClient.GetTickerInfo(formData.ticker.toUpperCase());
       const info = data as TickerInfo;
       
       setFormData(prev => ({
@@ -142,7 +142,7 @@ export default function AssetManager() {
     e.preventDefault();
     try {
       if (editingAsset) {
-        await UpdateAsset(
+        await apiClient.UpdateAsset(
           editingAsset.id,
           formData.name,
           formData.type,
@@ -157,7 +157,7 @@ export default function AssetManager() {
           accountId: formData.accountId,
           quantity: parseFloat(formData.quantity || '0'),
         });
-        await CreateAsset(
+        await apiClient.CreateAsset(
           formData.ticker.toUpperCase(),
           formData.name,
           formData.type,
@@ -216,7 +216,7 @@ export default function AssetManager() {
     if (!confirm('정말로 이 자산을 삭제하시겠습니까?')) return;
     
     try {
-      await DeleteAsset(id);
+      await apiClient.DeleteAsset(id);
       await loadAssets();
     } catch (err) {
       setError(err instanceof Error ? err.message : '자산 삭제에 실패했습니다.');
@@ -234,7 +234,7 @@ export default function AssetManager() {
 
   const handleUpdateHolding = async (holdingId: number, quantity: number, averagePrice: number) => {
     try {
-      await UpdateHolding(holdingId, quantity, averagePrice);
+      await apiClient.UpdateHolding(holdingId, quantity, averagePrice);
       setEditingHolding(null);
       await loadAssets();
     } catch (err) {
@@ -247,7 +247,7 @@ export default function AssetManager() {
     if (!confirm('정말로 이 보유 내역을 삭제하시겠습니까?')) return;
     
     try {
-      await DeleteHolding(holdingId);
+      await apiClient.DeleteHolding(holdingId);
       await loadAssets();
     } catch (err) {
       setError(err instanceof Error ? err.message : '보유 내역 삭제에 실패했습니다.');
@@ -266,7 +266,7 @@ export default function AssetManager() {
     }
 
     try {
-      await CreateHolding(
+      await apiClient.CreateHolding(
         newHoldingData.accountId,
         assetId,
         parseFloat(newHoldingData.quantity),
@@ -534,21 +534,19 @@ export default function AssetManager() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* 자산 목록 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {filteredAssets.length === 0 ? (
-          searchQuery ? (
-            <div className="col-span-full text-center py-12 text-slate-400">
-              <Search className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">'{searchQuery}'에 대한 검색 결과가 없습니다.</p>
-              <p className="text-sm mt-2">다른 검색어를 입력해보세요.</p>
-            </div>
-          ) : assets.length === 0 ? (
           <div className="col-span-full text-center py-12 text-slate-400">
-            <TrendingUp className="w-16 h-16 mx-auto mb-4 opacity-50" />
-            <p className="text-lg">등록된 자산이 없습니다.</p>
-            <p className="text-sm mt-2">위의 "자산 추가" 버튼을 눌러 주식/ETF를 등록하세요.</p>
+            <TrendingUp className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 opacity-50" />
+            <p className="text-base sm:text-lg">등록된 자산이 없습니다.</p>
+            {searchQuery ? (
+              <p className="text-xs sm:text-sm mt-2">검색 조건을 변경해보세요.</p>
+            ) : (
+              <p className="text-xs sm:text-sm mt-2">위의 "자산 추가" 버튼을 눌러 주식/ETF를 등록하세요.</p>
+            )}
           </div>
-        ) : null) : (
+        ) : (
           filteredAssets.map((asset) => (
             <div
               key={asset.id}

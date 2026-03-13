@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetDividendStats, GetAllAccounts, GetUSDToKRW } from '../../wailsjs/go/main/App';
+import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import { TrendingUp, DollarSign, Calendar, PieChart } from 'lucide-react';
 
@@ -32,9 +32,9 @@ export default function DividendStatistics({ accountId, marketType, months = 12 
     try {
       setLoading(true);
       const [statsData, accountsData, rate] = await Promise.all([
-        GetDividendStats(),
-        GetAllAccounts(),
-        GetUSDToKRW(),
+        apiClient.GetDividendStats(),
+        apiClient.GetAllAccounts(),
+        apiClient.GetUSDToKRW()
       ]);
       
       setStats(statsData as DividendStats);

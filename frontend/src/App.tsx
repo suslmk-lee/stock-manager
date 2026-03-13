@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetAllAccounts, CreateAccount, DeleteAccount } from '../wailsjs/go/main/App';
+import { apiClient } from './api/client';
 import { Account } from './types/models';
 import { Plus, Trash2, Wallet } from 'lucide-react';
 
@@ -49,7 +49,7 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const data = await GetAllAccounts();
+      const data = await apiClient.GetAllAccounts();
       setAccounts(data as Account[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : '계좌 목록을 불러오는데 실패했습니다.');
@@ -62,7 +62,7 @@ function App() {
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await CreateAccount(
+      await apiClient.CreateAccount(
         formData.name,
         formData.broker,
         formData.accountNumber,
@@ -90,7 +90,7 @@ function App() {
     if (!confirm('정말로 이 계좌를 삭제하시겠습니까?')) return;
     
     try {
-      await DeleteAccount(id);
+      await apiClient.DeleteAccount(id);
       await loadAccounts();
     } catch (err) {
       setError(err instanceof Error ? err.message : '계좌 삭제에 실패했습니다.');
@@ -230,22 +230,22 @@ function App() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {accounts.length === 0 ? (
             <div className="col-span-full text-center py-12 text-slate-400">
-              <Wallet className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">등록된 계좌가 없습니다.</p>
-              <p className="text-sm mt-2">위의 "계좌 추가" 버튼을 눌러 새 계좌를 생성하세요.</p>
+              <Wallet className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 opacity-50" />
+              <p className="text-base sm:text-lg">등록된 계좌가 없습니다.</p>
+              <p className="text-xs sm:text-sm mt-2">위의 "계좌 추가" 버튼을 눌러 새 계좌를 생성하세요.</p>
             </div>
           ) : (
             accounts.map((account) => (
               <div
                 key={account.id}
-                className="bg-slate-800 rounded-xl p-6 border border-slate-700 hover:border-blue-500 transition-colors"
+                className="bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-700 hover:border-blue-500 transition-colors"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-36 h-12 rounded-lg flex items-center justify-center overflow-hidden ${
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+                    <div className={`w-28 h-10 sm:w-36 sm:h-12 rounded-lg flex items-center justify-center overflow-hidden shrink-0 ${
                       ['메리츠증권', '토스증권', '카카오증권', '한국투자증권', '삼성증권', '신한투자증권', '대신증권', 'NH투자증권', '미래에셋증권', 'KB증권'].includes(account.broker)
                         ? 'bg-white' 
                         : 'bg-gradient-to-br from-blue-500 to-purple-500'

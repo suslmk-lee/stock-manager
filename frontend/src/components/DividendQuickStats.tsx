@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetDividendsByAccount, GetUSDToKRW } from '../../wailsjs/go/main/App';
+import { apiClient } from '../api/client';
 import { Dividend } from '../types/models';
 import { DollarSign, TrendingUp, Calendar, PieChart } from 'lucide-react';
 
@@ -37,8 +37,8 @@ export default function DividendQuickStats({ accountId }: DividendQuickStatsProp
     try {
       setLoading(true);
       const [dividendsData, rate] = await Promise.all([
-        GetDividendsByAccount(accountId),
-        GetUSDToKRW(),
+        apiClient.GetDividendsByAccount(accountId),
+        apiClient.GetUSDToKRW(),
       ]);
 
       const dividends = dividendsData as Dividend[];
@@ -159,38 +159,38 @@ export default function DividendQuickStats({ accountId }: DividendQuickStatsProp
   return (
     <div className="space-y-6">
       {/* 주요 통계 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* 총 배당금 */}
-        <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-6 border border-green-500/30">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-green-400" />
+        <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-4 sm:p-6 border border-green-500/30">
+          <div className="flex items-center gap-2 sm:gap-3 mb-2">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+              <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
             </div>
-            <p className="text-sm text-slate-400">총 배당금</p>
+            <p className="text-xs sm:text-sm text-slate-400">총 배당금</p>
           </div>
-          <p className="text-2xl font-bold text-white">{formatCurrency(totalDividend)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-white">{formatCurrency(totalDividend)}</p>
         </div>
 
         {/* 올해 배당금 */}
-        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl p-6 border border-blue-500/30">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-blue-400" />
+        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl p-4 sm:p-6 border border-blue-500/30">
+          <div className="flex items-center gap-2 sm:gap-3 mb-2">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
             </div>
-            <p className="text-sm text-slate-400">{new Date().getFullYear()}년 배당금</p>
+            <p className="text-xs sm:text-sm text-slate-400">{new Date().getFullYear()}년 배당금</p>
           </div>
-          <p className="text-2xl font-bold text-white">{formatCurrency(yearlyTotal)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-white">{formatCurrency(yearlyTotal)}</p>
         </div>
 
         {/* 평균 배당금 */}
-        <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-6 border border-purple-500/30">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-purple-400" />
+        <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-4 sm:p-6 border border-purple-500/30">
+          <div className="flex items-center gap-2 sm:gap-3 mb-2">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
             </div>
-            <p className="text-sm text-slate-400">월평균 배당금</p>
+            <p className="text-xs sm:text-sm text-slate-400">월평균 배당금</p>
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className="text-xl sm:text-2xl font-bold text-white">
             {formatCurrency(monthlyStats.length > 0 ? yearlyTotal / (new Date().getMonth() + 1) : 0)}
           </p>
         </div>

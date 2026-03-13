@@ -21,6 +21,9 @@ func main() {
 
 	app := NewApp()
 
+	// 백그라운드에서 API 서버 실행
+	go StartAPIServer(app)
+
 	err := wails.Run(&options.App{
 		Title:  "Stock Manager",
 		Width:  1280,

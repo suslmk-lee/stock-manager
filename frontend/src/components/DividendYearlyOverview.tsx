@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetAllAccounts, GetDividendsByAccount, GetUSDToKRW } from '../../wailsjs/go/main/App';
+import { apiClient } from '../api/client';
 import { Account, Dividend } from '../types/models';
 import { Calendar, X } from 'lucide-react';
 
@@ -40,8 +40,8 @@ export default function DividendYearlyOverview() {
     try {
       setLoading(true);
       const [accountsData, rate] = await Promise.all([
-        GetAllAccounts(),
-        GetUSDToKRW(),
+        apiClient.GetAllAccounts(),
+        apiClient.GetUSDToKRW(),
       ]);
 
       const accountsList = accountsData as Account[];
@@ -52,7 +52,7 @@ export default function DividendYearlyOverview() {
 
       // 각 계좌별로 배당금 데이터 로드
       for (const account of accountsList) {
-        const dividendsData = await GetDividendsByAccount(account.id);
+        const dividendsData = await apiClient.GetDividendsByAccount(account.id);
         const dividends = dividendsData as Dividend[];
 
         // 해당 연도의 배당금만 필터링
@@ -113,8 +113,8 @@ export default function DividendYearlyOverview() {
       setShowAssetModal(true);
 
       const [dividendsData, rate] = await Promise.all([
-        GetDividendsByAccount(account.id),
-        GetUSDToKRW(),
+        apiClient.GetDividendsByAccount(account.id),
+        apiClient.GetUSDToKRW(),
       ]);
 
       const dividends = dividendsData as Dividend[];

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetAllAssets, GetAllAccounts, GetCurrentPrice, GetUSDToKRW } from '../../wailsjs/go/main/App';
+import { apiClient } from '../api/client';
 import { Asset, Account } from '../types/models';
 import { TrendingUp, Wallet, Globe, Home } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
@@ -36,9 +36,9 @@ export default function AssetStatistics({ accountId, marketType = 'all' }: Asset
     try {
       setLoading(true);
       const [assetsData, accountsData, rate] = await Promise.all([
-        GetAllAssets(),
-        GetAllAccounts(),
-        GetUSDToKRW(),
+        apiClient.GetAllAssets(),
+        apiClient.GetAllAccounts(),
+        apiClient.GetUSDToKRW()
       ]);
 
       const assets = assetsData as Asset[];
@@ -52,7 +52,7 @@ export default function AssetStatistics({ accountId, marketType = 'all' }: Asset
         if (!asset.holdings || asset.holdings.length === 0) continue;
 
         try {
-          const priceData = await GetCurrentPrice(asset.ticker);
+          const priceData = await apiClient.GetCurrentPrice(asset.ticker);
           const price = priceData as any;
           
           const priceInKRW = price.currency === 'USD' 
