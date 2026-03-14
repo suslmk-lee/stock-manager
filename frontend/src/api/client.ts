@@ -5,8 +5,8 @@ import { Account, Asset, Holding, Transaction, Dividend } from '../types/models'
 // Wails 환경에서는 window.go 객체가 존재합니다.
 const isWeb = !(window as any).go;
 
-// 개발 중 웹 브라우저에서 접속할 API 서버 주소 (자신의 PC 로컬 IP로 변경하세요)
-const API_BASE_URL = 'http://localhost:8080/api';
+// API 서버 주소: 환경변수 VITE_API_URL이 설정되면 사용, 아니면 로컬 기본값
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 /**
  * HTTP 요청 헬퍼 함수

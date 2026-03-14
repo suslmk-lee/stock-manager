@@ -18,8 +18,31 @@ import (
 var DB *gorm.DB
 
 func InitDB() error {
-	// .env 파일 로드 (없으면 무시)
-	if err := godotenv.Load(); err != nil {
+	// .env 파일을 여러 경로에서 탐색 (현재 디렉토리, 실행파일 경로, 사용자 설정 디렉토리)
+	loaded := false
+	envPaths := []string{}
+
+	// 1. 현재 작업 디렉토리
+	envPaths = append(envPaths, ".env")
+
+	// 2. 실행파일이 위치한 디렉토리
+	if execPath, err := os.Executable(); err == nil {
+		envPaths = append(envPaths, filepath.Join(filepath.Dir(execPath), ".env"))
+	}
+
+	// 3. 사용자 설정 디렉토리 (AppData/StockManager)
+	if configDir, err := os.UserConfigDir(); err == nil {
+		envPaths = append(envPaths, filepath.Join(configDir, "StockManager", ".env"))
+	}
+
+	for _, p := range envPaths {
+		if err := godotenv.Load(p); err == nil {
+			log.Printf("Loaded .env from: %s", p)
+			loaded = true
+			break
+		}
+	}
+	if !loaded {
 		log.Println("No .env file found, using system environment variables")
 	}
 
@@ -76,7 +99,7 @@ func connectPostgres() (*gorm.DB, error) {
 		host, user, password, dbname, port, sslmode)
 
 	return gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(getGormLogMode()),
 	})
 }
 
@@ -92,8 +115,26 @@ func connectSQLite() (*gorm.DB, error) {
 	}
 
 	return gorm.Open(sqlite.Open(dbPath), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(getGormLogMode()),
 	})
+}
+
+func getGormLogMode() logger.LogLevel {
+	switch os.Getenv("DB_LOG_LEVEL") {
+	case "silent":
+		return logger.Silent
+	case "error":
+		return logger.Error
+	case "warn":
+		return logger.Warn
+	case "info":
+		return logger.Info
+	default:
+		if os.Getenv("GIN_MODE") == "release" {
+			return logger.Warn
+		}
+		return logger.Info
+	}
 }
 
 func runMigrations() error {
@@ -111,10 +152,10 @@ func getDBPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	appDataDir := filepath.Join(userConfigDir, "StockManager")
 	dbPath := filepath.Join(appDataDir, "dividend_app.db")
-	
+
 	return dbPath, nil
 }
 
