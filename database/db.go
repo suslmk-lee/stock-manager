@@ -163,6 +163,10 @@ func GetDB() *gorm.DB {
 	return DB
 }
 
+func IsPostgres() bool {
+	return os.Getenv("DB_TYPE") == "postgres"
+}
+
 func CloseDB() error {
 	if DB != nil {
 		sqlDB, err := DB.DB()

@@ -10,6 +10,39 @@ import (
 	"gorm.io/gorm"
 )
 
+func monthlyDividendQuery(withAccount bool) string {
+	var yearExpr, monthExpr, groupExpr string
+
+	if database.IsPostgres() {
+		yearExpr = "EXTRACT(YEAR FROM date)::int"
+		monthExpr = "EXTRACT(MONTH FROM date)::int"
+		groupExpr = "EXTRACT(YEAR FROM date), EXTRACT(MONTH FROM date)"
+	} else {
+		yearExpr = "CAST(strftime('%Y', date) AS INTEGER)"
+		monthExpr = "CAST(strftime('%m', date) AS INTEGER)"
+		groupExpr = "strftime('%Y-%m', date)"
+	}
+
+	accountFilter := ""
+	if withAccount {
+		accountFilter = "AND account_id = ?\n\t\t"
+	}
+
+	return fmt.Sprintf(`
+		SELECT 
+			%s as year,
+			%s as month,
+			SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END) as total_usd,
+			SUM(CASE WHEN currency = 'KRW' THEN amount ELSE 0 END) as total_krw,
+			COUNT(*) as count
+		FROM dividends
+		WHERE %sdate BETWEEN ? AND ?
+		AND deleted_at IS NULL
+		GROUP BY %s
+		ORDER BY year, month
+	`, yearExpr, monthExpr, accountFilter, groupExpr)
+}
+
 type DividendService struct {
 	db *gorm.DB
 }
@@ -126,19 +159,8 @@ func (s *DividendService) GetDividendsByAsset(assetID uint) ([]models.Dividend, 
 func (s *DividendService) GetMonthlyDividends(startDate, endDate time.Time) ([]MonthlyDividend, error) {
 	var results []MonthlyDividend
 
-	rows, err := s.db.Raw(`
-		SELECT 
-			strftime('%Y', date) as year,
-			strftime('%m', date) as month,
-			SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END) as total_usd,
-			SUM(CASE WHEN currency = 'KRW' THEN amount ELSE 0 END) as total_krw,
-			COUNT(*) as count
-		FROM dividends
-		WHERE date BETWEEN ? AND ?
-		AND deleted_at IS NULL
-		GROUP BY strftime('%Y-%m', date)
-		ORDER BY year, month
-	`, startDate, endDate).Rows()
+	query := monthlyDividendQuery(false)
+	rows, err := s.db.Raw(query, startDate, endDate).Rows()
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get monthly dividends: %w", err)
@@ -146,17 +168,13 @@ func (s *DividendService) GetMonthlyDividends(startDate, endDate time.Time) ([]M
 	defer rows.Close()
 
 	for rows.Next() {
-		var yearStr, monthStr string
 		var md MonthlyDividend
 
-		if err := rows.Scan(&yearStr, &monthStr, &md.TotalUSD, &md.TotalKRW, &md.Count); err != nil {
+		if err := rows.Scan(&md.Year, &md.Month, &md.TotalUSD, &md.TotalKRW, &md.Count); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 
-		fmt.Sscanf(yearStr, "%d", &md.Year)
-		fmt.Sscanf(monthStr, "%d", &md.Month)
 		md.Label = fmt.Sprintf("%d-%02d", md.Year, md.Month)
-
 		results = append(results, md)
 	}
 
@@ -166,20 +184,8 @@ func (s *DividendService) GetMonthlyDividends(startDate, endDate time.Time) ([]M
 func (s *DividendService) GetMonthlyDividendsByAccount(accountID uint, startDate, endDate time.Time) ([]MonthlyDividend, error) {
 	var results []MonthlyDividend
 
-	rows, err := s.db.Raw(`
-		SELECT 
-			strftime('%Y', date) as year,
-			strftime('%m', date) as month,
-			SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END) as total_usd,
-			SUM(CASE WHEN currency = 'KRW' THEN amount ELSE 0 END) as total_krw,
-			COUNT(*) as count
-		FROM dividends
-		WHERE account_id = ?
-		AND date BETWEEN ? AND ?
-		AND deleted_at IS NULL
-		GROUP BY strftime('%Y-%m', date)
-		ORDER BY year, month
-	`, accountID, startDate, endDate).Rows()
+	query := monthlyDividendQuery(true)
+	rows, err := s.db.Raw(query, accountID, startDate, endDate).Rows()
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get monthly dividends: %w", err)
@@ -187,17 +193,13 @@ func (s *DividendService) GetMonthlyDividendsByAccount(accountID uint, startDate
 	defer rows.Close()
 
 	for rows.Next() {
-		var yearStr, monthStr string
 		var md MonthlyDividend
 
-		if err := rows.Scan(&yearStr, &monthStr, &md.TotalUSD, &md.TotalKRW, &md.Count); err != nil {
+		if err := rows.Scan(&md.Year, &md.Month, &md.TotalUSD, &md.TotalKRW, &md.Count); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 
-		fmt.Sscanf(yearStr, "%d", &md.Year)
-		fmt.Sscanf(monthStr, "%d", &md.Month)
 		md.Label = fmt.Sprintf("%d-%02d", md.Year, md.Month)
-
 		results = append(results, md)
 	}
 
