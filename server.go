@@ -48,8 +48,8 @@ func StartAPIServer(app *App) {
 				var req struct {
 					Name          string `json:"name"`
 					Broker        string `json:"broker"`
-					AccountNumber string `json:"accountNumber"`
-					MarketType    string `json:"marketType"`
+					AccountNumber string `json:"account_number"`
+					MarketType    string `json:"market_type"`
 					Currency      string `json:"currency"`
 					Description   string `json:"description"`
 				}
@@ -70,8 +70,8 @@ func StartAPIServer(app *App) {
 				var req struct {
 					Name          string `json:"name"`
 					Broker        string `json:"broker"`
-					AccountNumber string `json:"accountNumber"`
-					MarketType    string `json:"marketType"`
+					AccountNumber string `json:"account_number"`
+					MarketType    string `json:"market_type"`
 					Currency      string `json:"currency"`
 					Description   string `json:"description"`
 				}
@@ -157,9 +157,9 @@ func StartAPIServer(app *App) {
 					Name         string  `json:"name"`
 					Type         string  `json:"type"`
 					Sector       string  `json:"sector"`
-					AccountID    uint    `json:"accountID"`
+					AccountID    uint    `json:"account_id"`
 					Quantity     float64 `json:"quantity"`
-					AveragePrice float64 `json:"averagePrice"`
+					AveragePrice float64 `json:"average_price"`
 				}
 				if err := c.ShouldBindJSON(&req); err != nil {
 					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -238,10 +238,10 @@ func StartAPIServer(app *App) {
 
 			holdings.POST("", func(c *gin.Context) {
 				var req struct {
-					AccountID    uint    `json:"accountID"`
-					AssetID      uint    `json:"assetID"`
+					AccountID    uint    `json:"account_id"`
+					AssetID      uint    `json:"asset_id"`
 					Quantity     float64 `json:"quantity"`
-					AveragePrice float64 `json:"averagePrice"`
+					AveragePrice float64 `json:"average_price"`
 				}
 				if err := c.ShouldBindJSON(&req); err != nil {
 					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -259,7 +259,7 @@ func StartAPIServer(app *App) {
 				id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 				var req struct {
 					Quantity     float64 `json:"quantity"`
-					AveragePrice float64 `json:"averagePrice"`
+					AveragePrice float64 `json:"average_price"`
 				}
 				if err := c.ShouldBindJSON(&req); err != nil {
 					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -290,8 +290,8 @@ func StartAPIServer(app *App) {
 		{
 			transactions.POST("", func(c *gin.Context) {
 				var req struct {
-					AccountID uint    `json:"accountID"`
-					AssetID   uint    `json:"assetID"`
+					AccountID uint    `json:"account_id"`
+					AssetID   uint    `json:"asset_id"`
 					Type      string  `json:"type"`
 					Date      string  `json:"date"`
 					Price     float64 `json:"price"`
@@ -319,13 +319,13 @@ func StartAPIServer(app *App) {
 		{
 			dividends.POST("", func(c *gin.Context) {
 				var req struct {
-					AccountID  uint    `json:"accountID"`
-					AssetID    uint    `json:"assetID"`
+					AccountID  uint    `json:"account_id"`
+					AssetID    uint    `json:"asset_id"`
 					Date       string  `json:"date"`
 					Amount     float64 `json:"amount"`
 					Tax        float64 `json:"tax"`
 					Currency   string  `json:"currency"`
-					IsReceived bool    `json:"isReceived"`
+					IsReceived bool    `json:"is_received"`
 					Notes      string  `json:"notes"`
 				}
 				if err := c.ShouldBindJSON(&req); err != nil {
@@ -343,13 +343,13 @@ func StartAPIServer(app *App) {
 			dividends.PUT("/:id", func(c *gin.Context) {
 				id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 				var req struct {
-					AccountID  uint    `json:"accountID"`
-					AssetID    uint    `json:"assetID"`
+					AccountID  uint    `json:"account_id"`
+					AssetID    uint    `json:"asset_id"`
 					Date       string  `json:"date"`
 					Amount     float64 `json:"amount"`
 					Tax        float64 `json:"tax"`
 					Currency   string  `json:"currency"`
-					IsReceived bool    `json:"isReceived"`
+					IsReceived bool    `json:"is_received"`
 					Notes      string  `json:"notes"`
 				}
 				if err := c.ShouldBindJSON(&req); err != nil {

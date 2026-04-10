@@ -1,7 +1,6 @@
 # Stock Manager - 배당금 & 주식 자산 관리
 
-Wails(Go + React) 기반 배당금 및 주식 자산 관리 애플리케이션.
-데스크톱(Wails)과 모바일/웹(Fly.io API) 두 가지 환경을 지원합니다.
+Wails(Go + React) 기반 배당금 및 주식 자산 관리 애플리케이션. 데스크톱(Wails)과 모바일/웹(Fly.io API) 두 가지 환경을 지원합니다.
 
 ---
 
@@ -30,7 +29,7 @@ Wails(Go + React) 기반 배당금 및 주식 자산 관리 애플리케이션.
 ```
 
 | 구성요소 | 기술 스택 | 호스팅 | 비용 |
-|---------|----------|-------|------|
+| --- | --- | --- | --- |
 | **프론트엔드** | React 18, TailwindCSS, Recharts | 로컬 (Wails 내장 / Vite dev) | $0 |
 | **백엔드** | Go 1.25, Gin, GORM | 로컬 (Wails 내장) / Fly.io | $0 (무료 티어) |
 | **데이터베이스** | PostgreSQL 15 | Supabase | $0 (무료 티어) |
@@ -136,6 +135,7 @@ wails build
 ```
 
 **작동 방식:**
+
 - Wails가 Go 백엔드와 React 프론트엔드를 하나의 데스크톱 앱으로 번들링
 - 프론트엔드는 Wails 바인딩을 통해 Go 메서드를 직접 호출
 - Go 백엔드가 `.env`의 `DB_TYPE`에 따라 Supabase 또는 SQLite에 연결
@@ -152,11 +152,13 @@ npm run dev
 ```
 
 `frontend/.env`:
+
 ```env
 VITE_API_URL=https://stock-manager-api-patient-cloud-8941.fly.dev/api
 ```
 
 **작동 방식:**
+
 - Vite 개발 서버가 `localhost:3000`에서 React 앱 실행
 - `window.go` 객체가 없으므로 자동으로 HTTP 모드 전환
 - `VITE_API_URL`에 지정된 Fly.io API로 모든 요청 전송
@@ -206,7 +208,7 @@ git add . && git commit -m "update" && git push
 #### fly.toml 주요 설정
 
 | 항목 | 값 | 설명 |
-|------|-----|------|
+| --- | --- | --- |
 | `GIN_MODE` | `release` | Gin 프로덕션 모드 |
 | `DB_TYPE` | `postgres` | PostgreSQL 사용 |
 | `DB_LOG_LEVEL` | `warn` | 운영 시 SQL 로그 최소화 |
@@ -261,7 +263,7 @@ X-API-Key: <API_KEY>
 ### 환경변수 관리
 
 | 변수 | 관리 방식 | 설명 |
-|------|----------|------|
+| --- | --- | --- |
 | `DB_PASSWORD` | `.env` (로컬), Fly Secrets (클라우드) | DB 비밀번호 |
 | `API_KEY` | Fly Secrets | API 인증 키 |
 | `CORS_ORIGINS` | Fly Secrets | 허용 Origin 목록 |
@@ -271,22 +273,27 @@ X-API-Key: <API_KEY>
 ## 데이터베이스 스키마
 
 ### Account (계좌)
+
 - 여러 개의 증권 계좌 관리
 - 통화(Currency), 시장구분(MarketType) 설정
 - 각 계좌별로 보유 종목, 거래 내역, 배당금 추적
 
 ### Asset (자산)
+
 - 주식(Stock) 또는 ETF 정보
 - Ticker 심볼로 고유 식별, 섹터(Sector) 분류
 
 ### Holding (보유 종목)
+
 - 계좌와 자산을 연결, 보유 수량 및 평균 매수가 관리
 
 ### Transaction (거래)
+
 - 매수(Buy) / 매도(Sell) 기록
 - 거래 일자, 가격, 수량, 수수료 추적
 
 ### Dividend (배당금)
+
 - 배당금 수령 내역, 세금 정보, 수령 여부 추적
 
 ### 주요 관계
@@ -301,11 +308,13 @@ Asset   1:N Dividend
 ```
 
 ### 인덱스 최적화
+
 - **Holding**: `idx_account_asset` (AccountID, AssetID 복합 인덱스)
 - **Transaction**: AccountID, AssetID, Date 인덱스
 - **Dividend**: AccountID, AssetID, Date 인덱스
 
 ### 데이터베이스 파일 위치 (SQLite 모드)
+
 - Windows: `%APPDATA%\StockManager\dividend_app.db`
 - macOS: `~/Library/Application Support/StockManager/dividend_app.db`
 - Linux: `~/.config/StockManager/dividend_app.db`
@@ -317,7 +326,7 @@ Asset   1:N Dividend
 자세한 API 문서는 [API_DOCS.md](./API_DOCS.md)를 참고하세요.
 
 | 메서드 | 경로 | 설명 |
-|--------|------|------|
+| --- | --- | --- |
 | GET | `/health` | 헬스체크 |
 | GET | `/api/accounts` | 전체 계좌 조회 |
 | POST | `/api/accounts` | 계좌 생성 |
@@ -340,16 +349,20 @@ Asset   1:N Dividend
 ## 트러블슈팅
 
 ### Supabase 연결 실패
+
 - **DNS 오류**: Direct Connection 대신 **Session Pooler** 호스트 사용 (IPv4 호환)
 - **비밀번호 특수문자**: `.env`에서 따옴표 없이 그대로 입력
 
 ### Wails 빌드 실행파일이 SQLite를 사용
+
 - `.env` 파일이 실행 경로에 없을 수 있음
 - `%APPDATA%\StockManager\.env`에 복사하면 해결
 
 ### Fly.io 배포 후 서버 미응답
+
 - DB Secrets 설정 확인: `flyctl secrets list`
 - 로그 확인: `flyctl logs --app <app-name>`
 
 ### flyctl 명령 미인식
+
 - PATH 미등록 상태 → 전체 경로 사용: `& "$env:USERPROFILE\.fly\bin\flyctl.exe"`

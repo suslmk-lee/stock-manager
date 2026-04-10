@@ -61,7 +61,16 @@ func (s *AssetService) CreateAsset(req CreateAssetRequest) (*models.Asset, error
 	}
 
 	var existing models.Asset
-	err := s.db.Where("ticker = ?", req.Ticker).First(&existing).Error
+	// Unscoped: 소프트삭제된 레코드도 포함해서 검색
+	err := s.db.Unscoped().Where("ticker = ?", req.Ticker).First(&existing).Error
+
+	// 소프트삭제된 자산이면 복구
+	if err == nil && existing.DeletedAt.Valid {
+		if restoreErr := s.db.Unscoped().Model(&existing).Update("deleted_at", nil).Error; restoreErr != nil {
+			return nil, fmt.Errorf("failed to restore asset: %w", restoreErr)
+		}
+		existing.DeletedAt = gorm.DeletedAt{Valid: false}
+	}
 
 	// 이미 존재하는 자산인 경우
 	if err == nil {
