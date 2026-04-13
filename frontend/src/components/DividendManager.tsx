@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Asset, Dividend } from '../types/models';
-import { Plus, DollarSign, Calendar, Edit2, ChevronRight } from 'lucide-react';
+import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight } from 'lucide-react';
 import DividendQuickStats from './DividendQuickStats';
 
 interface DividendManagerProps {
@@ -160,6 +160,20 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       notes: dividend.notes || '',
     });
     setShowForm(true);
+  };
+
+  const handleDeleteDividend = async (dividend: Dividend) => {
+    if (!window.confirm(`${dividend.asset?.name || ''} 배당금 (${new Date(dividend.date).toLocaleDateString('ko-KR')})을 삭제하시겠습니까?`)) {
+      return;
+    }
+    try {
+      await apiClient.DeleteDividend(dividend.id);
+      await loadDividends(selectedAccount);
+      setStatsKey(prev => prev + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '배당금 삭제에 실패했습니다.');
+      console.error('Failed to delete dividend:', err);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -572,6 +586,13 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                     title="수정"
                   >
                     <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteDividend(dividend)}
+                    className="text-red-400 hover:text-red-300 transition-colors"
+                    title="삭제"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
