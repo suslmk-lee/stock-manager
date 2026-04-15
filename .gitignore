@@ -27,7 +27,7 @@ build/linux/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
-frontend/package-lock.json.md5
+frontend/package.json.md5
 
 # Database files
 *.db
