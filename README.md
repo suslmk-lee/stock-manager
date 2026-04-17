@@ -69,7 +69,8 @@ stock-manager/
 │   │   ├── components/     # UI 컴포넌트
 │   │   ├── pages/          # 페이지 컴포넌트
 │   │   └── types/          # TypeScript 타입 정의
-│   ├── .env                # 프론트엔드 환경변수 (VITE_API_URL)
+│   ├── .env                # 프론트엔드 환경변수 (VITE_API_URL, VITE_API_KEY)
+│   ├── .env.example        # 프론트엔드 환경변수 템플릿
 │   └── package.json
 ├── Dockerfile              # 클라우드 배포용 Docker 이미지
 ├── fly.toml                # Fly.io 배포 설정
@@ -147,7 +148,7 @@ Fly.io 클라우드 백엔드에 연결하여 브라우저에서 사용:
 
 ```bash
 cd frontend
-# .env 파일에 VITE_API_URL이 설정되어 있으면 자동 적용
+# .env 파일에 VITE_API_URL / VITE_API_KEY 설정 시 자동 적용
 npm run dev
 ```
 
@@ -155,6 +156,7 @@ npm run dev
 
 ```env
 VITE_API_URL=https://stock-manager-api-patient-cloud-8941.fly.dev/api
+VITE_API_KEY=YOUR_API_KEY_HERE
 ```
 
 **작동 방식:**
@@ -162,6 +164,7 @@ VITE_API_URL=https://stock-manager-api-patient-cloud-8941.fly.dev/api
 - Vite 개발 서버가 `localhost:3000`에서 React 앱 실행
 - `window.go` 객체가 없으므로 자동으로 HTTP 모드 전환
 - `VITE_API_URL`에 지정된 Fly.io API로 모든 요청 전송
+- `VITE_API_KEY`가 있으면 `Authorization: Bearer <VITE_API_KEY>` 헤더 자동 첨부
 
 ---
 
@@ -267,6 +270,7 @@ X-API-Key: <API_KEY>
 | `DB_PASSWORD` | `.env` (로컬), Fly Secrets (클라우드) | DB 비밀번호 |
 | `API_KEY` | Fly Secrets | API 인증 키 |
 | `CORS_ORIGINS` | Fly Secrets | 허용 Origin 목록 |
+| `VITE_API_KEY` | `frontend/.env` | 웹 프론트에서 API 호출 시 Authorization 헤더용 키 |
 
 ---
 

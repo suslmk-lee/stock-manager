@@ -23,6 +23,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
   const [assetSearchQuery, setAssetSearchQuery] = useState('');
   const [showAssetDropdown, setShowAssetDropdown] = useState(false);
   const [statsKey, setStatsKey] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<Dividend | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState({
     accountId: 0,
     assetId: 0,
@@ -46,7 +48,9 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
 
   useEffect(() => {
     if (selectedAccount > 0) {
-      loadDividends(selectedAccount);
+      loadDividends(selectedAccount).catch((err) => {
+        setError(err instanceof Error ? err.message : '배당금 목록을 불러오는데 실패했습니다.');
+      });
     }
   }, [selectedAccount]);
 
@@ -88,6 +92,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       setDividends(dividendsData as Dividend[]);
     } catch (err) {
       console.error('Failed to load dividends:', err);
+      throw err;
     }
   };
 
@@ -162,17 +167,29 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
     setShowForm(true);
   };
 
-  const handleDeleteDividend = async (dividend: Dividend) => {
-    if (!window.confirm(`${dividend.asset?.name || ''} 배당금 (${new Date(dividend.date).toLocaleDateString('ko-KR')})을 삭제하시겠습니까?`)) {
+  const handleDeleteDividend = (dividend: Dividend, event?: React.MouseEvent<HTMLButtonElement>) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    setDeleteTarget(dividend);
+  };
+
+  const confirmDeleteDividend = async () => {
+    if (!deleteTarget || deleting) {
       return;
     }
+
     try {
-      await apiClient.DeleteDividend(dividend.id);
-      await loadDividends(selectedAccount);
+      setDeleting(true);
+      await apiClient.DeleteDividend(deleteTarget.id);
+      setDividends(prev => prev.filter(item => item.id !== deleteTarget.id));
+      await loadDividends(deleteTarget.account_id || selectedAccount);
       setStatsKey(prev => prev + 1);
+      setDeleteTarget(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : '배당금 삭제에 실패했습니다.');
       console.error('Failed to delete dividend:', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -581,6 +598,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                     )}
                   </div>
                   <button
+                    type="button"
                     onClick={() => handleEditDividend(dividend)}
                     className="text-blue-400 hover:text-blue-300 transition-colors"
                     title="수정"
@@ -588,7 +606,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleDeleteDividend(dividend)}
+                    type="button"
+                    onClick={(e) => handleDeleteDividend(dividend, e)}
                     className="text-red-400 hover:text-red-300 transition-colors"
                     title="삭제"
                   >
@@ -604,6 +623,41 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
           )}
         </div>
       </div>
+
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => !deleting && setDeleteTarget(null)}
+        >
+          <div
+            className="bg-slate-800 rounded-xl p-6 border border-slate-700 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-white mb-2">배당금 삭제</h3>
+            <p className="text-slate-300 mb-6">
+              {`${deleteTarget.asset?.name || ''} 배당금 (${new Date(deleteTarget.date).toLocaleDateString('ko-KR')})을 삭제하시겠습니까?`}
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-4 py-2 rounded-lg transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteDividend}
+                disabled={deleting}
+                className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 px-4 py-2 rounded-lg transition-colors"
+              >
+                {deleting ? '삭제 중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
