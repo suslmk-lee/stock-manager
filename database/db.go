@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"stock-manager/models"
 
@@ -99,7 +101,7 @@ func connectPostgres() (*gorm.DB, error) {
 		host, user, password, dbname, port, sslmode)
 
 	return gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(getGormLogMode()),
+		Logger: newGormLogger(),
 	})
 }
 
@@ -115,8 +117,20 @@ func connectSQLite() (*gorm.DB, error) {
 	}
 
 	return gorm.Open(sqlite.Open(dbPath), &gorm.Config{
-		Logger: logger.Default.LogMode(getGormLogMode()),
+		Logger: newGormLogger(),
 	})
+}
+
+func newGormLogger() logger.Interface {
+	return logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
+		logger.Config{
+			SlowThreshold:             getGormSlowThreshold(),
+			LogLevel:                  getGormLogMode(),
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  false,
+		},
+	)
 }
 
 func getGormLogMode() logger.LogLevel {
@@ -130,11 +144,22 @@ func getGormLogMode() logger.LogLevel {
 	case "info":
 		return logger.Info
 	default:
-		if os.Getenv("GIN_MODE") == "release" {
-			return logger.Warn
-		}
-		return logger.Info
+		return logger.Warn
 	}
+}
+
+func getGormSlowThreshold() time.Duration {
+	raw := os.Getenv("DB_SLOW_MS")
+	if raw == "" {
+		return 1000 * time.Millisecond
+	}
+
+	ms, err := strconv.Atoi(raw)
+	if err != nil || ms <= 0 {
+		return 1000 * time.Millisecond
+	}
+
+	return time.Duration(ms) * time.Millisecond
 }
 
 func runMigrations() error {
