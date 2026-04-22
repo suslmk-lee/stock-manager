@@ -239,6 +239,52 @@ git add . && git commit -m "update" && git push
 & "$env:USERPROFILE\.fly\bin\flyctl.exe" deploy
 ```
 
+#### 로컬에서 flyctl로 수동 배포 (macOS/Linux/WSL)
+
+Fly 앱은 로컬 `.env` 파일을 자동으로 읽지 않습니다. 배포 환경 변수는 `fly secrets`로 등록해야 합니다.
+
+```bash
+# 0) 앱명 설정
+APP="stock-manager-api-patient-cloud-8941"
+
+# 1) 로그인
+fly auth login
+
+# 2) 필수 시크릿 설정 (예시)
+fly secrets set \
+  DB_HOST="aws-0-ap-northeast-2.pooler.supabase.com" \
+  DB_PORT="5432" \
+  DB_USER="postgres.your-project-ref" \
+  DB_PASSWORD="YOUR_PASSWORD" \
+  DB_NAME="postgres" \
+  DB_SSLMODE="require" \
+  API_KEY="YOUR_RANDOM_API_KEY" \
+  -a "$APP"
+
+# 3) Google Sheets 연동 시 (권장: JSON 문자열을 secret으로 저장)
+# 서비스계정 JSON 파일을 1줄 JSON으로 변환
+GS_JSON="$(python3 - <<'PY'
+import json
+print(json.dumps(json.load(open('/absolute/path/service-account.json', encoding='utf-8')), separators=(',', ':')))
+PY
+)"
+
+fly secrets set \
+  GOOGLE_SHEETS_ENABLED=true \
+  GOOGLE_SHEETS_SPREADSHEET_ID="YOUR_SPREADSHEET_ID" \
+  GOOGLE_SHEETS_WORKSHEET="2026" \
+  GOOGLE_SHEETS_CREDENTIALS_JSON="$GS_JSON" \
+  -a "$APP"
+
+# 4) 배포
+fly deploy -a "$APP" --remote-only
+
+# 5) 확인
+fly releases -a "$APP"
+fly logs -a "$APP"
+curl -sS "https://$APP.fly.dev/health"
+```
+
 #### fly.toml 주요 설정
 
 | 항목 | 값 | 설명 |
