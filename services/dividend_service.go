@@ -144,12 +144,6 @@ func (s *DividendService) GetDividendsByAccount(accountID uint) ([]models.Divide
 		return nil, fmt.Errorf("failed to get dividends: %w", err)
 	}
 
-	fmt.Printf("GetDividendsByAccount: accountID=%d, found %d dividends\n", accountID, len(dividends))
-	for i, d := range dividends {
-		fmt.Printf("  [%d] ID=%d, AccountID=%d, AssetID=%d, Amount=%.2f, Date=%s\n",
-			i, d.ID, d.AccountID, d.AssetID, d.Amount, d.Date)
-	}
-
 	return dividends, nil
 }
 

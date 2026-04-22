@@ -37,10 +37,6 @@ type UpdateAssetRequest struct {
 }
 
 func (s *AssetService) CreateAsset(req CreateAssetRequest) (*models.Asset, error) {
-	// 디버깅: 받은 요청 로그
-	fmt.Printf("CreateAsset called with: Ticker=%s, Name=%s, AccountID=%d, Quantity=%f\n",
-		req.Ticker, req.Name, req.AccountID, req.Quantity)
-
 	if req.Ticker == "" {
 		return nil, errors.New("ticker is required")
 	}
