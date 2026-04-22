@@ -44,12 +44,21 @@ func monthlyDividendQuery(withAccount bool) string {
 }
 
 type DividendService struct {
-	db *gorm.DB
+	db         *gorm.DB
+	sheetsSync *GoogleSheetsDividendSync
 }
 
 func NewDividendService() *DividendService {
+	sheetsSync, err := NewGoogleSheetsDividendSyncFromEnv()
+	if err != nil {
+		fmt.Printf("[GSYNC][INIT] disabled: %v\n", err)
+	} else if sheetsSync != nil {
+		fmt.Printf("[GSYNC][INIT] enabled\n")
+	}
+
 	return &DividendService{
-		db: database.GetDB(),
+		db:         database.GetDB(),
+		sheetsSync: sheetsSync,
 	}
 }
 
@@ -118,6 +127,8 @@ func (s *DividendService) CreateDividend(req CreateDividendRequest) (*models.Div
 	if err := s.db.Create(dividend).Error; err != nil {
 		return nil, fmt.Errorf("failed to create dividend: %w", err)
 	}
+
+	s.syncDividendDelta(account, asset, req.Date, req.Amount, "create")
 
 	return dividend, nil
 }
@@ -257,6 +268,13 @@ func (s *DividendService) UpdateDividend(id uint, req CreateDividendRequest) (*m
 		return nil, fmt.Errorf("failed to find dividend: %w", err)
 	}
 
+	// 기존 배당 정보(시트 역보정용)
+	oldDividend := dividend
+	var oldAccount models.Account
+	oldAccountFound := s.db.First(&oldAccount, oldDividend.AccountID).Error == nil
+	var oldAsset models.Asset
+	oldAssetFound := s.db.First(&oldAsset, oldDividend.AssetID).Error == nil
+
 	// 계좌 존재 확인
 	var account models.Account
 	if err := s.db.First(&account, req.AccountID).Error; err != nil {
@@ -283,10 +301,24 @@ func (s *DividendService) UpdateDividend(id uint, req CreateDividendRequest) (*m
 		return nil, fmt.Errorf("failed to update dividend: %w", err)
 	}
 
+	// 기존 반영분 차감 후, 신규 반영분 가산
+	if oldAccountFound && oldAssetFound {
+		s.syncDividendDelta(oldAccount, oldAsset, oldDividend.Date, -oldDividend.Amount, "update-revert")
+	}
+	s.syncDividendDelta(account, asset, req.Date, req.Amount, "update-apply")
+
 	return &dividend, nil
 }
 
 func (s *DividendService) DeleteDividend(id uint) error {
+	var dividend models.Dividend
+	if err := s.db.First(&dividend, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("dividend not found")
+		}
+		return fmt.Errorf("failed to find dividend: %w", err)
+	}
+
 	result := s.db.Delete(&models.Dividend{}, id)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete dividend: %w", result.Error)
@@ -296,5 +328,55 @@ func (s *DividendService) DeleteDividend(id uint) error {
 		return errors.New("dividend not found")
 	}
 
+	var account models.Account
+	accountFound := s.db.First(&account, dividend.AccountID).Error == nil
+	var asset models.Asset
+	assetFound := s.db.First(&asset, dividend.AssetID).Error == nil
+	if accountFound && assetFound {
+		s.syncDividendDelta(account, asset, dividend.Date, -dividend.Amount, "delete")
+	}
+
 	return nil
+}
+
+func (s *DividendService) syncDividendDelta(account models.Account, asset models.Asset, date time.Time, delta float64, action string) {
+	if delta == 0 {
+		return
+	}
+
+	if s.sheetsSync == nil {
+		sync, err := NewGoogleSheetsDividendSyncFromEnv()
+		if err != nil {
+			if envBool("GOOGLE_SHEETS_ENABLED") {
+				fmt.Printf("[GSYNC][INIT][FAIL] action=%s err=%v\n", action, err)
+			}
+			return
+		}
+		if sync == nil {
+			return
+		}
+		s.sheetsSync = sync
+	}
+
+	if err := s.sheetsSync.ApplyDelta(account, asset, date, delta); err != nil {
+		fmt.Printf("[GSYNC][FAIL] action=%s account=%s ticker=%s amount=%.4f date=%s err=%v\n",
+			action,
+			account.Name,
+			asset.Ticker,
+			delta,
+			date.Format("2006-01-02"),
+			err,
+		)
+		return
+	}
+
+	if envBool("GOOGLE_SHEETS_DEBUG") {
+		fmt.Printf("[GSYNC][OK] action=%s account=%s ticker=%s amount=%.4f date=%s\n",
+			action,
+			account.Name,
+			asset.Ticker,
+			delta,
+			date.Format("2006-01-02"),
+		)
+	}
 }

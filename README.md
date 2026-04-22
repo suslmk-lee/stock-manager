@@ -104,9 +104,40 @@ DB_USER=postgres.your-project-ref
 DB_PASSWORD=YOUR_PASSWORD_HERE
 DB_NAME=postgres
 DB_SSLMODE=require
+DB_LOG_LEVEL=warn
+DB_SLOW_MS=1000
+
+# Google Sheets 연동 (선택)
+GOOGLE_SHEETS_ENABLED=false
+GOOGLE_SHEETS_SPREADSHEET_ID=
+GOOGLE_SHEETS_WORKSHEET=2026
+GOOGLE_SHEETS_CREDENTIALS_FILE=
+# 또는 JSON 문자열 직접 입력
+GOOGLE_SHEETS_CREDENTIALS_JSON=
+# 성공 로그까지 보고 싶으면 true
+GOOGLE_SHEETS_DEBUG=false
 ```
 
 > `.env` 파일은 `.gitignore`에 포함되어 있어 Git에 커밋되지 않습니다.
+
+### Google Sheets 연동 설정
+
+배당금 `생성/수정/삭제` 시 Google Sheet의 `1월~12월` 컬럼(`K~V`)만 자동 반영할 수 있습니다.
+
+1. Google Cloud에서 `Google Sheets API` 활성화
+2. 서비스 계정 생성 후 JSON 키 발급
+3. 대상 시트를 서비스 계정 이메일에 `편집자`로 공유
+4. `.env` 설정:
+   - `GOOGLE_SHEETS_ENABLED=true`
+   - `GOOGLE_SHEETS_SPREADSHEET_ID=<스프레드시트 ID>`
+   - `GOOGLE_SHEETS_WORKSHEET=<탭 이름, 예: 2026>`
+   - `GOOGLE_SHEETS_CREDENTIALS_FILE=<서비스계정 JSON 절대경로>`  
+     (또는 `GOOGLE_SHEETS_CREDENTIALS_JSON` 사용)
+
+주의:
+- 연동 로직은 월 컬럼(`1월~12월`)만 업데이트합니다.
+- 우측 합계/환산 컬럼은 시트 수식을 그대로 사용합니다.
+- 로그 필터: 콘솔에서 `[GSYNC]`로 검색하면 연동 로그만 빠르게 확인할 수 있습니다.
 
 ### .env 파일 탐색 순서 (Wails 빌드 실행파일)
 
@@ -271,6 +302,8 @@ X-API-Key: <API_KEY>
 | `API_KEY` | Fly Secrets | API 인증 키 |
 | `CORS_ORIGINS` | Fly Secrets | 허용 Origin 목록 |
 | `VITE_API_KEY` | `frontend/.env` | 웹 프론트에서 API 호출 시 Authorization 헤더용 키 |
+| `GOOGLE_SHEETS_CREDENTIALS_FILE` | 로컬 파일 경로 / 서버 파일 경로 | Google 서비스계정 JSON 파일 경로 |
+| `GOOGLE_SHEETS_CREDENTIALS_JSON` | Fly Secrets 또는 서버 환경변수 | 서비스계정 JSON 문자열 |
 
 ---
 
