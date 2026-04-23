@@ -184,8 +184,8 @@ func (s *sheetSnapshot) findRowCandidate(account models.Account, asset models.As
 		return nil, errors.New("worksheet has no data rows")
 	}
 
-	targetTicker := strings.ToUpper(strings.TrimSpace(asset.Ticker))
-	if targetTicker == "" {
+	targetTickers := buildTickerMatchValues(asset.Ticker)
+	if len(targetTickers) == 0 {
 		return nil, errors.New("asset ticker is empty")
 	}
 
@@ -196,7 +196,7 @@ func (s *sheetSnapshot) findRowCandidate(account models.Account, asset models.As
 	for idx := 1; idx < len(s.Rows); idx++ {
 		row := s.Rows[idx]
 		rowTicker := strings.ToUpper(strings.TrimSpace(cellText(row, s.TickerCol)))
-		if rowTicker == "" || rowTicker != targetTicker {
+		if rowTicker == "" || !tickerMatches(rowTicker, targetTickers) {
 			continue
 		}
 
@@ -253,7 +253,7 @@ func (s *sheetSnapshot) findRowCandidate(account models.Account, asset models.As
 		return &tickerMatches[bestIdx], nil
 	}
 
-	return nil, fmt.Errorf("ambiguous rows for ticker=%s (matches=%d)", targetTicker, len(tickerMatches))
+	return nil, fmt.Errorf("ambiguous rows for ticker=%s (matches=%d)", targetTickers[0], len(tickerMatches))
 }
 
 func (s *sheetSnapshot) effectiveCellText(rowIndex int, col int) string {
@@ -616,6 +616,82 @@ func normalizeCellValue(value string) string {
 		"]", "",
 	)
 	return replacer.Replace(value)
+}
+
+func normalizeTickerText(value string) string {
+	value = strings.ToUpper(strings.TrimSpace(value))
+	replacer := strings.NewReplacer(
+		" ", "",
+		"\t", "",
+		"-", "",
+		"_", "",
+		"/", "",
+		"\\", "",
+	)
+	return replacer.Replace(value)
+}
+
+func stripTickerSuffix(ticker string) string {
+	ticker = normalizeTickerText(ticker)
+	if ticker == "" {
+		return ""
+	}
+
+	switch {
+	case strings.HasSuffix(ticker, ".KS"):
+		return strings.TrimSuffix(ticker, ".KS")
+	case strings.HasSuffix(ticker, ".KQ"):
+		return strings.TrimSuffix(ticker, ".KQ")
+	default:
+		return ticker
+	}
+}
+
+func buildTickerMatchValues(ticker string) []string {
+	cleaned := normalizeTickerText(ticker)
+	if cleaned == "" {
+		return nil
+	}
+
+	seen := map[string]struct{}{}
+	result := []string{}
+	candidates := []string{cleaned}
+	if stripped := stripTickerSuffix(cleaned); stripped != "" && stripped != cleaned {
+		candidates = append(candidates, stripped)
+	}
+
+	for _, candidate := range candidates {
+		normalized := strings.ToLower(normalizeCellValue(candidate))
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
+	}
+
+	return result
+}
+
+func tickerMatches(rowTicker string, targetTickers []string) bool {
+	row := strings.ToLower(normalizeTickerText(rowTicker))
+	if row == "" {
+		return false
+	}
+
+	rowBase := strings.ToLower(normalizeCellValue(stripTickerSuffix(row)))
+	for _, target := range targetTickers {
+		if target == "" {
+			continue
+		}
+		if row == target || rowBase == target {
+			return true
+		}
+	}
+
+	return false
 }
 
 func cellText(row []interface{}, col int) string {
