@@ -191,7 +191,7 @@ func (s *sheetSnapshot) findRowCandidate(account models.Account, asset models.As
 
 	aliases := buildAccountAliases(account)
 	targetLabel := expectedTargetLabel(account)
-	var tickerMatches []sheetRowCandidate
+	var candidates []sheetRowCandidate
 
 	for idx := 1; idx < len(s.Rows); idx++ {
 		row := s.Rows[idx]
@@ -220,24 +220,24 @@ func (s *sheetSnapshot) findRowCandidate(account models.Account, asset models.As
 			}
 		}
 
-		tickerMatches = append(tickerMatches, sheetRowCandidate{
+		candidates = append(candidates, sheetRowCandidate{
 			RowIndex:    idx + 1,
 			Score:       score,
 			CurrentCell: cellNumber(row, monthCol),
 		})
 	}
 
-	if len(tickerMatches) == 0 {
-		return nil, fmt.Errorf("row not found for ticker=%s", targetTicker)
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("row not found for ticker=%s", targetTickers[0])
 	}
-	if len(tickerMatches) == 1 {
-		return &tickerMatches[0], nil
+	if len(candidates) == 1 {
+		return &candidates[0], nil
 	}
 
 	maxScore := -1
 	maxScoreCount := 0
 	bestIdx := -1
-	for i, c := range tickerMatches {
+	for i, c := range candidates {
 		if c.Score > maxScore {
 			maxScore = c.Score
 			maxScoreCount = 1
@@ -250,10 +250,10 @@ func (s *sheetSnapshot) findRowCandidate(account models.Account, asset models.As
 	}
 
 	if maxScore > 0 && maxScoreCount == 1 {
-		return &tickerMatches[bestIdx], nil
+		return &candidates[bestIdx], nil
 	}
 
-	return nil, fmt.Errorf("ambiguous rows for ticker=%s (matches=%d)", targetTickers[0], len(tickerMatches))
+	return nil, fmt.Errorf("ambiguous rows for ticker=%s (matches=%d)", targetTickers[0], len(candidates))
 }
 
 func (s *sheetSnapshot) effectiveCellText(rowIndex int, col int) string {
