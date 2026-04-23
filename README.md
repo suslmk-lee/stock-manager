@@ -106,6 +106,10 @@ DB_NAME=postgres
 DB_SSLMODE=require
 DB_LOG_LEVEL=warn
 DB_SLOW_MS=1000
+DB_MAX_OPEN_CONNS=8
+DB_MAX_IDLE_CONNS=4
+DB_CONN_MAX_LIFETIME_MIN=30
+DB_CONN_MAX_IDLE_TIME_MIN=10
 
 # Google Sheets 연동 (선택)
 GOOGLE_SHEETS_ENABLED=false
@@ -292,6 +296,8 @@ curl -sS "https://$APP.fly.dev/health"
 | `GIN_MODE` | `release` | Gin 프로덕션 모드 |
 | `DB_TYPE` | `postgres` | PostgreSQL 사용 |
 | `DB_LOG_LEVEL` | `warn` | 운영 시 SQL 로그 최소화 |
+| `DB_MAX_OPEN_CONNS` | `8` | DB 동시 연결 상한 (과도한 연결 방지) |
+| `DB_MAX_IDLE_CONNS` | `4` | 유휴 연결 유지 수 |
 | `PORT` | `8080` | API 서버 포트 |
 
 #### 헬스체크

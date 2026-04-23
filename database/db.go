@@ -100,9 +100,16 @@ func connectPostgres() (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		host, user, password, dbname, port, sslmode)
 
-	return gorm.Open(postgres.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: newGormLogger(),
 	})
+	if err != nil {
+		return nil, err
+	}
+	if err := configureConnectionPool(db, true); err != nil {
+		return nil, err
+	}
+	return db, nil
 }
 
 func connectSQLite() (*gorm.DB, error) {
@@ -116,9 +123,60 @@ func connectSQLite() (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
-	return gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
 		Logger: newGormLogger(),
 	})
+	if err != nil {
+		return nil, err
+	}
+	if err := configureConnectionPool(db, false); err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+func configureConnectionPool(db *gorm.DB, isPostgres bool) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+
+	maxOpen := getEnvInt("DB_MAX_OPEN_CONNS", 8)
+	maxIdle := getEnvInt("DB_MAX_IDLE_CONNS", 4)
+	maxLifetimeMin := getEnvInt("DB_CONN_MAX_LIFETIME_MIN", 30)
+	maxIdleTimeMin := getEnvInt("DB_CONN_MAX_IDLE_TIME_MIN", 10)
+
+	if !isPostgres {
+		// SQLite는 단일 프로세스/파일락 특성상 connection을 작게 유지
+		maxOpen = 1
+		maxIdle = 1
+	}
+	if maxIdle > maxOpen {
+		maxIdle = maxOpen
+	}
+
+	sqlDB.SetMaxOpenConns(maxOpen)
+	sqlDB.SetMaxIdleConns(maxIdle)
+	sqlDB.SetConnMaxLifetime(time.Duration(maxLifetimeMin) * time.Minute)
+	sqlDB.SetConnMaxIdleTime(time.Duration(maxIdleTimeMin) * time.Minute)
+
+	log.Printf(
+		"DB pool configured: max_open=%d max_idle=%d conn_lifetime=%dm conn_idle_time=%dm",
+		maxOpen, maxIdle, maxLifetimeMin, maxIdleTimeMin,
+	)
+	return nil
+}
+
+func getEnvInt(key string, fallback int) int {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v <= 0 {
+		return fallback
+	}
+	return v
 }
 
 func newGormLogger() logger.Interface {
