@@ -90,11 +90,6 @@ func (s *AccountService) GetAllAccounts() ([]models.Account, error) {
 		return nil, fmt.Errorf("failed to get accounts: %w", err)
 	}
 
-	fmt.Println("=== All Accounts ===")
-	for _, acc := range accounts {
-		fmt.Printf("  ID=%d, Name=%s, Broker=%s\n", acc.ID, acc.Name, acc.Broker)
-	}
-
 	return accounts, nil
 }
 

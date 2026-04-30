@@ -69,7 +69,8 @@ stock-manager/
 │   │   ├── components/     # UI 컴포넌트
 │   │   ├── pages/          # 페이지 컴포넌트
 │   │   └── types/          # TypeScript 타입 정의
-│   ├── .env                # 프론트엔드 환경변수 (VITE_API_URL)
+│   ├── .env                # 프론트엔드 환경변수 (VITE_API_URL, VITE_API_KEY)
+│   ├── .env.example        # 프론트엔드 환경변수 템플릿
 │   └── package.json
 ├── Dockerfile              # 클라우드 배포용 Docker 이미지
 ├── fly.toml                # Fly.io 배포 설정
@@ -103,9 +104,44 @@ DB_USER=postgres.your-project-ref
 DB_PASSWORD=YOUR_PASSWORD_HERE
 DB_NAME=postgres
 DB_SSLMODE=require
+DB_LOG_LEVEL=warn
+DB_SLOW_MS=1000
+DB_MAX_OPEN_CONNS=8
+DB_MAX_IDLE_CONNS=4
+DB_CONN_MAX_LIFETIME_MIN=30
+DB_CONN_MAX_IDLE_TIME_MIN=10
+
+# Google Sheets 연동 (선택)
+GOOGLE_SHEETS_ENABLED=false
+GOOGLE_SHEETS_SPREADSHEET_ID=
+GOOGLE_SHEETS_WORKSHEET=2026
+GOOGLE_SHEETS_CREDENTIALS_FILE=
+# 또는 JSON 문자열 직접 입력
+GOOGLE_SHEETS_CREDENTIALS_JSON=
+# 성공 로그까지 보고 싶으면 true
+GOOGLE_SHEETS_DEBUG=false
 ```
 
 > `.env` 파일은 `.gitignore`에 포함되어 있어 Git에 커밋되지 않습니다.
+
+### Google Sheets 연동 설정
+
+배당금 `생성/수정/삭제` 시 Google Sheet의 `1월~12월` 컬럼(`K~V`)만 자동 반영할 수 있습니다.
+
+1. Google Cloud에서 `Google Sheets API` 활성화
+2. 서비스 계정 생성 후 JSON 키 발급
+3. 대상 시트를 서비스 계정 이메일에 `편집자`로 공유
+4. `.env` 설정:
+   - `GOOGLE_SHEETS_ENABLED=true`
+   - `GOOGLE_SHEETS_SPREADSHEET_ID=<스프레드시트 ID>`
+   - `GOOGLE_SHEETS_WORKSHEET=<탭 이름, 예: 2026>`
+   - `GOOGLE_SHEETS_CREDENTIALS_FILE=<서비스계정 JSON 절대경로>`  
+     (또는 `GOOGLE_SHEETS_CREDENTIALS_JSON` 사용)
+
+주의:
+- 연동 로직은 월 컬럼(`1월~12월`)만 업데이트합니다.
+- 우측 합계/환산 컬럼은 시트 수식을 그대로 사용합니다.
+- 로그 필터: 콘솔에서 `[GSYNC]`로 검색하면 연동 로그만 빠르게 확인할 수 있습니다.
 
 ### .env 파일 탐색 순서 (Wails 빌드 실행파일)
 
@@ -147,7 +183,7 @@ Fly.io 클라우드 백엔드에 연결하여 브라우저에서 사용:
 
 ```bash
 cd frontend
-# .env 파일에 VITE_API_URL이 설정되어 있으면 자동 적용
+# .env 파일에 VITE_API_URL / VITE_API_KEY 설정 시 자동 적용
 npm run dev
 ```
 
@@ -155,6 +191,7 @@ npm run dev
 
 ```env
 VITE_API_URL=https://stock-manager-api-patient-cloud-8941.fly.dev/api
+VITE_API_KEY=YOUR_API_KEY_HERE
 ```
 
 **작동 방식:**
@@ -162,6 +199,7 @@ VITE_API_URL=https://stock-manager-api-patient-cloud-8941.fly.dev/api
 - Vite 개발 서버가 `localhost:3000`에서 React 앱 실행
 - `window.go` 객체가 없으므로 자동으로 HTTP 모드 전환
 - `VITE_API_URL`에 지정된 Fly.io API로 모든 요청 전송
+- `VITE_API_KEY`가 있으면 `Authorization: Bearer <VITE_API_KEY>` 헤더 자동 첨부
 
 ---
 
@@ -205,6 +243,52 @@ git add . && git commit -m "update" && git push
 & "$env:USERPROFILE\.fly\bin\flyctl.exe" deploy
 ```
 
+#### 로컬에서 flyctl로 수동 배포 (macOS/Linux/WSL)
+
+Fly 앱은 로컬 `.env` 파일을 자동으로 읽지 않습니다. 배포 환경 변수는 `fly secrets`로 등록해야 합니다.
+
+```bash
+# 0) 앱명 설정
+APP="stock-manager-api-patient-cloud-8941"
+
+# 1) 로그인
+fly auth login
+
+# 2) 필수 시크릿 설정 (예시)
+fly secrets set \
+  DB_HOST="aws-0-ap-northeast-2.pooler.supabase.com" \
+  DB_PORT="5432" \
+  DB_USER="postgres.your-project-ref" \
+  DB_PASSWORD="YOUR_PASSWORD" \
+  DB_NAME="postgres" \
+  DB_SSLMODE="require" \
+  API_KEY="YOUR_RANDOM_API_KEY" \
+  -a "$APP"
+
+# 3) Google Sheets 연동 시 (권장: JSON 문자열을 secret으로 저장)
+# 서비스계정 JSON 파일을 1줄 JSON으로 변환
+GS_JSON="$(python3 - <<'PY'
+import json
+print(json.dumps(json.load(open('/absolute/path/service-account.json', encoding='utf-8')), separators=(',', ':')))
+PY
+)"
+
+fly secrets set \
+  GOOGLE_SHEETS_ENABLED=true \
+  GOOGLE_SHEETS_SPREADSHEET_ID="YOUR_SPREADSHEET_ID" \
+  GOOGLE_SHEETS_WORKSHEET="2026" \
+  GOOGLE_SHEETS_CREDENTIALS_JSON="$GS_JSON" \
+  -a "$APP"
+
+# 4) 배포
+fly deploy -a "$APP" --remote-only
+
+# 5) 확인
+fly releases -a "$APP"
+fly logs -a "$APP"
+curl -sS "https://$APP.fly.dev/health"
+```
+
 #### fly.toml 주요 설정
 
 | 항목 | 값 | 설명 |
@@ -212,6 +296,8 @@ git add . && git commit -m "update" && git push
 | `GIN_MODE` | `release` | Gin 프로덕션 모드 |
 | `DB_TYPE` | `postgres` | PostgreSQL 사용 |
 | `DB_LOG_LEVEL` | `warn` | 운영 시 SQL 로그 최소화 |
+| `DB_MAX_OPEN_CONNS` | `8` | DB 동시 연결 상한 (과도한 연결 방지) |
+| `DB_MAX_IDLE_CONNS` | `4` | 유휴 연결 유지 수 |
 | `PORT` | `8080` | API 서버 포트 |
 
 #### 헬스체크
@@ -267,6 +353,9 @@ X-API-Key: <API_KEY>
 | `DB_PASSWORD` | `.env` (로컬), Fly Secrets (클라우드) | DB 비밀번호 |
 | `API_KEY` | Fly Secrets | API 인증 키 |
 | `CORS_ORIGINS` | Fly Secrets | 허용 Origin 목록 |
+| `VITE_API_KEY` | `frontend/.env` | 웹 프론트에서 API 호출 시 Authorization 헤더용 키 |
+| `GOOGLE_SHEETS_CREDENTIALS_FILE` | 로컬 파일 경로 / 서버 파일 경로 | Google 서비스계정 JSON 파일 경로 |
+| `GOOGLE_SHEETS_CREDENTIALS_JSON` | Fly Secrets 또는 서버 환경변수 | 서비스계정 JSON 문자열 |
 
 ---
 

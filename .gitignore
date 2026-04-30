@@ -54,6 +54,8 @@ logs/
 .env
 .env.local
 .env.*.local
+credentials/
+google-service-account*.json
 
 # Temporary files
 tmp/
@@ -66,3 +68,8 @@ wailsjs/
 
 # Go module cache
 go.sum.backup
+
+stockManager_Gsecret.json
+family-care-5553b-fb6310ced806.json
+
+

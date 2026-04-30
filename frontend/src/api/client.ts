@@ -7,18 +7,27 @@ const isWeb = !(window as any).go;
 
 // API 서버 주소: 환경변수 VITE_API_URL이 설정되면 사용, 아니면 로컬 기본값
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const API_KEY = (import.meta.env.VITE_API_KEY as string | undefined)?.trim();
 
 /**
  * HTTP 요청 헬퍼 함수
  */
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+  const headers = new Headers(options?.headers);
+
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  // 클라우드 API 인증 키가 설정된 경우 자동으로 Bearer 헤더를 첨부합니다.
+  if (API_KEY && !headers.has('Authorization') && !headers.has('X-API-Key')) {
+    headers.set('Authorization', `Bearer ${API_KEY}`);
+  }
+
   const response = await fetch(url, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -50,7 +59,7 @@ export const apiClient = {
     if (isWeb) {
       return fetchApi<Account>('/accounts', {
         method: 'POST',
-        body: JSON.stringify({ name, broker, accountNumber, marketType, currency, description }),
+        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description }),
       });
     }
     return WailsApp.CreateAccount(name, broker, accountNumber, marketType, currency, description);
@@ -60,7 +69,7 @@ export const apiClient = {
     if (isWeb) {
       return fetchApi<Account>(`/accounts/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name, broker, accountNumber, marketType, currency, description }),
+        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description }),
       });
     }
     return WailsApp.UpdateAccount(id, name, broker, accountNumber, marketType, currency, description);
@@ -91,7 +100,7 @@ export const apiClient = {
     if (isWeb) {
       return fetchApi<Asset>('/assets', {
         method: 'POST',
-        body: JSON.stringify({ ticker, name, type, sector, accountID, quantity, averagePrice }),
+        body: JSON.stringify({ ticker, name, type, sector, account_id: accountID, quantity, average_price: averagePrice }),
       });
     }
     return WailsApp.CreateAsset(ticker, name, type, sector, accountID, quantity, averagePrice);
@@ -132,7 +141,7 @@ export const apiClient = {
     if (isWeb) {
       return fetchApi<Holding>('/holdings', {
         method: 'POST',
-        body: JSON.stringify({ accountID, assetID, quantity, averagePrice }),
+        body: JSON.stringify({ account_id: accountID, asset_id: assetID, quantity, average_price: averagePrice }),
       });
     }
     return WailsApp.CreateHolding(accountID, assetID, quantity, averagePrice);
@@ -142,7 +151,7 @@ export const apiClient = {
     if (isWeb) {
       return fetchApi<Holding>(`/holdings/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ quantity, averagePrice }),
+        body: JSON.stringify({ quantity, average_price: averagePrice }),
       });
     }
     return WailsApp.UpdateHolding(id, quantity, averagePrice);
@@ -173,7 +182,7 @@ export const apiClient = {
     if (isWeb) {
       return fetchApi<Transaction>('/transactions', {
         method: 'POST',
-        body: JSON.stringify({ accountID, assetID, type, date, price, quantity, fee, notes }),
+        body: JSON.stringify({ account_id: accountID, asset_id: assetID, type, date, price, quantity, fee, notes }),
       });
     }
     return WailsApp.CreateTransaction(accountID, assetID, type, date, price, quantity, fee, notes);
@@ -191,7 +200,7 @@ export const apiClient = {
     if (isWeb) {
       return fetchApi<Dividend>('/dividends', {
         method: 'POST',
-        body: JSON.stringify({ accountID, assetID, date, amount, tax, currency, isReceived, notes }),
+        body: JSON.stringify({ account_id: accountID, asset_id: assetID, date, amount, tax, currency, is_received: isReceived, notes }),
       });
     }
     return WailsApp.CreateDividend(accountID, assetID, date, amount, tax, currency, isReceived, notes);
@@ -201,7 +210,7 @@ export const apiClient = {
     if (isWeb) {
       return fetchApi<Dividend>(`/dividends/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ accountID, assetID, date, amount, tax, currency, isReceived, notes }),
+        body: JSON.stringify({ account_id: accountID, asset_id: assetID, date, amount, tax, currency, is_received: isReceived, notes }),
       });
     }
     return WailsApp.UpdateDividend(id, accountID, assetID, date, amount, tax, currency, isReceived, notes);

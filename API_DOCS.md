@@ -3,6 +3,14 @@
 **Base URL**: `http://<서버IP>:8080/api`
 **Content-Type**: `application/json`
 
+`API_KEY`가 서버에 설정된 경우 인증 헤더가 필요합니다:
+
+```http
+Authorization: Bearer <API_KEY>
+# 또는
+X-API-Key: <API_KEY>
+```
+
 ---
 
 ## 1. 계좌 관리 (Accounts)
@@ -17,7 +25,7 @@
     "id": 1,
     "name": "미국 배당주",
     "broker": "토스증권",
-    "accountNumber": "123-45-67890",
+    "account_number": "123-45-67890",
     "market_type": "International", // "Domestic" | "International"
     "currency": "USD"
   }
@@ -32,8 +40,8 @@
 {
   "name": "미국 배당주",
   "broker": "토스증권",
-  "accountNumber": "123-45-67890",
-  "marketType": "International",
+  "account_number": "123-45-67890",
+  "market_type": "International",
   "currency": "USD",
   "description": "설명"
 }
@@ -97,9 +105,9 @@
   "name": "Apple Inc.",
   "type": "Stock",
   "sector": "Technology",
-  "accountID": 1, // 최초 생성 시 연결할 계좌 ID (선택)
+  "account_id": 1, // 최초 생성 시 연결할 계좌 ID (선택)
   "quantity": 10.5,
-  "averagePrice": 150.0
+  "average_price": 150.0
 }
 ```
 
@@ -122,17 +130,17 @@
 - **Request Body**:
 ```json
 {
-  "accountID": 1,
-  "assetID": 1,
+  "account_id": 1,
+  "asset_id": 1,
   "quantity": 10.5,
-  "averagePrice": 150.0
+  "average_price": 150.0
 }
 ```
 
 ### 3.2 보유 수량/단가 수정
 - **Method**: `PUT`
 - **Path**: `/holdings/:id`
-- **Request Body**: `{"quantity": 15.0, "averagePrice": 145.0}`
+- **Request Body**: `{"quantity": 15.0, "average_price": 145.0}`
 
 ### 3.3 보유 자산 삭제
 - **Method**: `DELETE`
@@ -156,8 +164,8 @@
 - **Request Body**:
 ```json
 {
-  "accountID": 1,
-  "assetID": 1,
+  "account_id": 1,
+  "asset_id": 1,
   "type": "Buy", // "Buy" | "Sell"
   "date": "2024-03-10",
   "price": 150.0,
@@ -177,13 +185,13 @@
 - **Request Body**:
 ```json
 {
-  "accountID": 1,
-  "assetID": 1,
+  "account_id": 1,
+  "asset_id": 1,
   "date": "2024-03-10",
   "amount": 15.50,
   "tax": 2.32,
   "currency": "USD",
-  "isReceived": true,
+  "is_received": true,
   "notes": "1분기 배당"
 }
 ```
