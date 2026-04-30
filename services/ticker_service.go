@@ -22,19 +22,20 @@ type TickerInfo struct {
 	Sector      string  `json:"sector"`
 	Currency    string  `json:"currency"`
 	Exchange    string  `json:"exchange"`
+	LogoURL     string  `json:"logo_url,omitempty"`
 	Price       float64 `json:"price"`
 	MarketCap   float64 `json:"market_cap"`
 	Description string  `json:"description"`
 }
 
 type CurrentPrice struct {
-	Symbol           string  `json:"symbol"`
-	Price            float64 `json:"price"`
-	Currency         string  `json:"currency"`
-	Change           float64 `json:"change"`
-	ChangePercent    float64 `json:"change_percent"`
-	PreviousClose    float64 `json:"previous_close"`
-	MarketState      string  `json:"market_state"`
+	Symbol        string  `json:"symbol"`
+	Price         float64 `json:"price"`
+	Currency      string  `json:"currency"`
+	Change        float64 `json:"change"`
+	ChangePercent float64 `json:"change_percent"`
+	PreviousClose float64 `json:"previous_close"`
+	MarketState   string  `json:"market_state"`
 }
 
 // Yahoo Finance API를 사용한 티커 정보 조회
@@ -78,15 +79,15 @@ func (s *TickerService) GetTickerInfo(ticker string) (*TickerInfo, error) {
 
 	var result struct {
 		Quotes []struct {
-			Symbol      string  `json:"symbol"`
-			ShortName   string  `json:"shortname"`
-			LongName    string  `json:"longname"`
-			QuoteType   string  `json:"quoteType"`
-			Sector      string  `json:"sector"`
-			Industry    string  `json:"industry"`
-			Exchange    string  `json:"exchange"`
-			Currency    string  `json:"currency"`
-			MarketCap   float64 `json:"marketCap"`
+			Symbol    string  `json:"symbol"`
+			ShortName string  `json:"shortname"`
+			LongName  string  `json:"longname"`
+			QuoteType string  `json:"quoteType"`
+			Sector    string  `json:"sector"`
+			Industry  string  `json:"industry"`
+			Exchange  string  `json:"exchange"`
+			Currency  string  `json:"currency"`
+			MarketCap float64 `json:"marketCap"`
 		} `json:"quotes"`
 	}
 
@@ -99,7 +100,7 @@ func (s *TickerService) GetTickerInfo(ticker string) (*TickerInfo, error) {
 	}
 
 	quote := result.Quotes[0]
-	
+
 	name := quote.LongName
 	if name == "" {
 		name = quote.ShortName
@@ -122,6 +123,7 @@ func (s *TickerService) GetTickerInfo(ticker string) (*TickerInfo, error) {
 		Sector:    sector,
 		Currency:  quote.Currency,
 		Exchange:  quote.Exchange,
+		LogoURL:   ResolveAssetLogoURL(quote.Symbol),
 		MarketCap: quote.MarketCap,
 	}, nil
 }
@@ -164,11 +166,11 @@ func (s *TickerService) GetCurrentPrice(ticker string) (*CurrentPrice, error) {
 		Chart struct {
 			Result []struct {
 				Meta struct {
-					Symbol                string  `json:"symbol"`
-					Currency              string  `json:"currency"`
-					RegularMarketPrice    float64 `json:"regularMarketPrice"`
-					PreviousClose         float64 `json:"previousClose"`
-					MarketState           string  `json:"marketState"`
+					Symbol             string  `json:"symbol"`
+					Currency           string  `json:"currency"`
+					RegularMarketPrice float64 `json:"regularMarketPrice"`
+					PreviousClose      float64 `json:"previousClose"`
+					MarketState        string  `json:"marketState"`
 				} `json:"meta"`
 			} `json:"result"`
 		} `json:"chart"`

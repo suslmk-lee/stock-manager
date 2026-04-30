@@ -25,15 +25,17 @@ type CreateAssetRequest struct {
 	Name         string
 	Type         models.AssetType
 	Sector       string
+	LogoURL      string
 	AccountID    uint
 	Quantity     float64
 	AveragePrice float64
 }
 
 type UpdateAssetRequest struct {
-	Name   string
-	Type   models.AssetType
-	Sector string
+	Name    string
+	Type    models.AssetType
+	Sector  string
+	LogoURL string
 }
 
 func (s *AssetService) CreateAsset(req CreateAssetRequest) (*models.Asset, error) {
@@ -45,6 +47,7 @@ func (s *AssetService) CreateAsset(req CreateAssetRequest) (*models.Asset, error
 	}
 
 	req.Ticker = strings.ToUpper(req.Ticker)
+	req.LogoURL = strings.TrimSpace(req.LogoURL)
 
 	// 한국 티커 자동 감지 (숫자 6자리이고 .KS/.KQ가 없는 경우)
 	if len(req.Ticker) == 6 && strings.IndexFunc(req.Ticker, func(r rune) bool {
@@ -54,6 +57,10 @@ func (s *AssetService) CreateAsset(req CreateAssetRequest) (*models.Asset, error
 		if !strings.HasSuffix(req.Ticker, ".KS") && !strings.HasSuffix(req.Ticker, ".KQ") {
 			req.Ticker = req.Ticker + ".KS"
 		}
+	}
+
+	if req.LogoURL == "" {
+		req.LogoURL = ResolveAssetLogoURL(req.Ticker)
 	}
 
 	var existing models.Asset
@@ -70,6 +77,11 @@ func (s *AssetService) CreateAsset(req CreateAssetRequest) (*models.Asset, error
 
 	// 이미 존재하는 자산인 경우
 	if err == nil {
+		if existing.LogoURL == "" && req.LogoURL != "" {
+			existing.LogoURL = req.LogoURL
+			_ = s.db.Model(&models.Asset{}).Where("id = ?", existing.ID).Update("logo_url", req.LogoURL).Error
+		}
+
 		// 보유 수량이 있는데 계좌가 선택되지 않은 경우
 		if req.Quantity > 0 && req.AccountID == 0 {
 			return nil, errors.New("보유 수량을 입력했습니다. 계좌를 선택해주세요")
@@ -114,10 +126,11 @@ func (s *AssetService) CreateAsset(req CreateAssetRequest) (*models.Asset, error
 	}
 
 	asset := &models.Asset{
-		Ticker: req.Ticker,
-		Name:   req.Name,
-		Type:   req.Type,
-		Sector: req.Sector,
+		Ticker:  req.Ticker,
+		Name:    req.Name,
+		Type:    req.Type,
+		Sector:  req.Sector,
+		LogoURL: req.LogoURL,
 	}
 
 	// 트랜잭션 시작
@@ -188,6 +201,20 @@ func (s *AssetService) GetAllAssets() ([]models.Asset, error) {
 		return nil, fmt.Errorf("failed to get assets: %w", err)
 	}
 
+	for i := range assets {
+		if strings.TrimSpace(assets[i].LogoURL) != "" {
+			continue
+		}
+		logoURL := ResolveAssetLogoURL(assets[i].Ticker)
+		if logoURL == "" {
+			continue
+		}
+		assets[i].LogoURL = logoURL
+		_ = s.db.Model(&models.Asset{}).
+			Where("id = ? AND (logo_url IS NULL OR logo_url = '')", assets[i].ID).
+			Update("logo_url", logoURL).Error
+	}
+
 	return assets, nil
 }
 
@@ -220,6 +247,12 @@ func (s *AssetService) UpdateAsset(id uint, req UpdateAssetRequest) (*models.Ass
 		asset.Type = req.Type
 	}
 	asset.Sector = req.Sector
+	if strings.TrimSpace(req.LogoURL) != "" {
+		asset.LogoURL = strings.TrimSpace(req.LogoURL)
+	}
+	if strings.TrimSpace(asset.LogoURL) == "" {
+		asset.LogoURL = ResolveAssetLogoURL(asset.Ticker)
+	}
 
 	if err := s.db.Save(&asset).Error; err != nil {
 		return nil, fmt.Errorf("failed to update asset: %w", err)

@@ -386,6 +386,7 @@ func setupAssetRoutes(api *gin.RouterGroup) {
 				Name         string  `json:"name"`
 				Type         string  `json:"type"`
 				Sector       string  `json:"sector"`
+				LogoURL      string  `json:"logo_url"`
 				AccountID    uint    `json:"account_id"`
 				Quantity     float64 `json:"quantity"`
 				AveragePrice float64 `json:"average_price"`
@@ -399,6 +400,7 @@ func setupAssetRoutes(api *gin.RouterGroup) {
 				Name:         req.Name,
 				Type:         models.AssetType(req.Type),
 				Sector:       req.Sector,
+				LogoURL:      req.LogoURL,
 				AccountID:    req.AccountID,
 				Quantity:     req.Quantity,
 				AveragePrice: req.AveragePrice,
@@ -413,18 +415,20 @@ func setupAssetRoutes(api *gin.RouterGroup) {
 		assets.PUT("/:id", func(c *gin.Context) {
 			id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 			var req struct {
-				Name   string `json:"name"`
-				Type   string `json:"type"`
-				Sector string `json:"sector"`
+				Name    string `json:"name"`
+				Type    string `json:"type"`
+				Sector  string `json:"sector"`
+				LogoURL string `json:"logo_url"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
 			res, err := assetService.UpdateAsset(uint(id), services.UpdateAssetRequest{
-				Name:   req.Name,
-				Type:   models.AssetType(req.Type),
-				Sector: req.Sector,
+				Name:    req.Name,
+				Type:    models.AssetType(req.Type),
+				Sector:  req.Sector,
+				LogoURL: req.LogoURL,
 			})
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
