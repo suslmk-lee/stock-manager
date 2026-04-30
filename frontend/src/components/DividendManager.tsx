@@ -271,8 +271,18 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       </div>
 
       {error && (
-        <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6">
-          {error}
+        <div className={`px-4 py-3 rounded-lg mb-6 flex items-start justify-between gap-2 ${
+          error.includes('Google Sheets') || error.includes('GSYNC')
+            ? 'bg-yellow-500/20 border border-yellow-500 text-yellow-200'
+            : 'bg-red-500/20 border border-red-500 text-red-200'
+        }`}>
+          <div>
+            {(error.includes('Google Sheets') || error.includes('GSYNC')) && (
+              <span className="font-semibold">[Sheets 동기화 실패] </span>
+            )}
+            {error}
+          </div>
+          <button onClick={() => setError(null)} className="text-current opacity-60 hover:opacity-100 shrink-0">✕</button>
         </div>
       )}
 

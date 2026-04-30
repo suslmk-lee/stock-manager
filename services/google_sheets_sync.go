@@ -591,7 +591,7 @@ func aliasMatch(target string, aliases []string) bool {
 		if target == alias {
 			return true
 		}
-		if runeLen(alias) >= 4 && strings.Contains(target, alias) {
+		if runeLen(alias) >= 2 && strings.Contains(target, alias) {
 			return true
 		}
 		if runeLen(target) >= 4 && strings.Contains(alias, target) {
@@ -606,6 +606,8 @@ func normalizeCellValue(value string) string {
 	replacer := strings.NewReplacer(
 		" ", "",
 		"\t", "",
+		"\n", "",
+		"\r", "",
 		"-", "",
 		"_", "",
 		"/", "",
@@ -614,6 +616,7 @@ func normalizeCellValue(value string) string {
 		")", "",
 		"[", "",
 		"]", "",
+		"*", "",
 	)
 	return replacer.Replace(value)
 }

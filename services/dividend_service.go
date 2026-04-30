@@ -124,12 +124,18 @@ func (s *DividendService) CreateDividend(req CreateDividendRequest) (*models.Div
 		Notes:      req.Notes,
 	}
 
-	if err := s.db.Create(dividend).Error; err != nil {
+	tx := s.db.Begin()
+	if err := tx.Create(dividend).Error; err != nil {
+		tx.Rollback()
 		return nil, fmt.Errorf("failed to create dividend: %w", err)
 	}
 
-	s.syncDividendDelta(account, asset, req.Date, req.Amount, "create")
+	if err := s.syncDividendDelta(account, asset, req.Date, req.Amount, "create"); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("[GSYNC] %w", err)
+	}
 
+	tx.Commit()
 	return dividend, nil
 }
 
@@ -291,16 +297,25 @@ func (s *DividendService) UpdateDividend(id uint, req CreateDividendRequest) (*m
 	dividend.IsReceived = req.IsReceived
 	dividend.Notes = req.Notes
 
-	if err := s.db.Save(&dividend).Error; err != nil {
+	tx := s.db.Begin()
+	if err := tx.Save(&dividend).Error; err != nil {
+		tx.Rollback()
 		return nil, fmt.Errorf("failed to update dividend: %w", err)
 	}
 
 	// 기존 반영분 차감 후, 신규 반영분 가산
 	if oldAccountFound && oldAssetFound {
-		s.syncDividendDelta(oldAccount, oldAsset, oldDividend.Date, -oldDividend.Amount, "update-revert")
+		if err := s.syncDividendDelta(oldAccount, oldAsset, oldDividend.Date, -oldDividend.Amount, "update-revert"); err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("[GSYNC] %w", err)
+		}
 	}
-	s.syncDividendDelta(account, asset, req.Date, req.Amount, "update-apply")
+	if err := s.syncDividendDelta(account, asset, req.Date, req.Amount, "update-apply"); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("[GSYNC] %w", err)
+	}
 
+	tx.Commit()
 	return &dividend, nil
 }
 
@@ -313,29 +328,36 @@ func (s *DividendService) DeleteDividend(id uint) error {
 		return fmt.Errorf("failed to find dividend: %w", err)
 	}
 
-	result := s.db.Delete(&models.Dividend{}, id)
-	if result.Error != nil {
-		return fmt.Errorf("failed to delete dividend: %w", result.Error)
-	}
-
-	if result.RowsAffected == 0 {
-		return errors.New("dividend not found")
-	}
-
 	var account models.Account
 	accountFound := s.db.First(&account, dividend.AccountID).Error == nil
 	var asset models.Asset
 	assetFound := s.db.First(&asset, dividend.AssetID).Error == nil
-	if accountFound && assetFound {
-		s.syncDividendDelta(account, asset, dividend.Date, -dividend.Amount, "delete")
+
+	tx := s.db.Begin()
+	result := tx.Delete(&models.Dividend{}, id)
+	if result.Error != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete dividend: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		tx.Rollback()
+		return errors.New("dividend not found")
 	}
 
+	if accountFound && assetFound {
+		if err := s.syncDividendDelta(account, asset, dividend.Date, -dividend.Amount, "delete"); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("[GSYNC] %w", err)
+		}
+	}
+
+	tx.Commit()
 	return nil
 }
 
-func (s *DividendService) syncDividendDelta(account models.Account, asset models.Asset, date time.Time, delta float64, action string) {
+func (s *DividendService) syncDividendDelta(account models.Account, asset models.Asset, date time.Time, delta float64, action string) error {
 	if delta == 0 {
-		return
+		return nil
 	}
 
 	if s.sheetsSync == nil {
@@ -343,11 +365,12 @@ func (s *DividendService) syncDividendDelta(account models.Account, asset models
 		if err != nil {
 			if envBool("GOOGLE_SHEETS_ENABLED") {
 				fmt.Printf("[GSYNC][INIT][FAIL] action=%s err=%v\n", action, err)
+				return fmt.Errorf("Google Sheets 연동 초기화 실패: %v", err)
 			}
-			return
+			return nil
 		}
 		if sync == nil {
-			return
+			return nil
 		}
 		s.sheetsSync = sync
 	}
@@ -361,7 +384,7 @@ func (s *DividendService) syncDividendDelta(account models.Account, asset models
 			date.Format("2006-01-02"),
 			err,
 		)
-		return
+		return fmt.Errorf("Google Sheets 동기화 실패 (%s/%s): %v", account.Name, asset.Ticker, err)
 	}
 
 	if envBool("GOOGLE_SHEETS_DEBUG") {
@@ -373,4 +396,5 @@ func (s *DividendService) syncDividendDelta(account models.Account, asset models
 			date.Format("2006-01-02"),
 		)
 	}
+	return nil
 }
