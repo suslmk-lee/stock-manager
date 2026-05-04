@@ -5,6 +5,8 @@ import { DollarSign, TrendingUp, Calendar, PieChart, Percent } from 'lucide-reac
 
 interface DividendQuickStatsProps {
   accountId: number;
+  children?: React.ReactNode;
+  refreshTrigger?: number;
 }
 
 interface MonthlyStats {
@@ -20,7 +22,7 @@ interface AssetDividendStats {
   count: number;
 }
 
-export default function DividendQuickStats({ accountId }: DividendQuickStatsProps) {
+export default function DividendQuickStats({ accountId, children, refreshTrigger = 0 }: DividendQuickStatsProps) {
   const [loading, setLoading] = useState(true);
   const [totalDividend, setTotalDividend] = useState(0);
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
@@ -36,7 +38,7 @@ export default function DividendQuickStats({ accountId }: DividendQuickStatsProp
     if (accountId > 0) {
       loadStats();
     }
-  }, [accountId]);
+  }, [accountId, refreshTrigger]);
 
   const loadStats = async () => {
     try {
@@ -326,9 +328,11 @@ export default function DividendQuickStats({ accountId }: DividendQuickStatsProp
         </div>
       </div>
 
+      {children}
+
       {/* 월별 배당금 통계 */}
       <div className="relative overflow-hidden bg-slate-800/90 rounded-2xl p-6 border border-slate-700/80">
-        <div className="absolute -top-24 -right-20 w-60 h-60 bg-emerald-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -top-40 -right-32 w-[28rem] h-[28rem] bg-emerald-500/10 blur-3xl pointer-events-none" />
         <div className="relative flex items-center justify-between gap-3 mb-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center">

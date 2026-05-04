@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Asset, Dividend } from '../types/models';
-import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight } from 'lucide-react';
+import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock } from 'lucide-react';
 import DividendQuickStats from './DividendQuickStats';
 
 interface DividendManagerProps {
@@ -25,6 +25,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
   const [statsKey, setStatsKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<Dividend | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
+  const timelineRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     accountId: 0,
     assetId: 0,
@@ -127,7 +129,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       // 배당금 목록 새로고침 (폼 닫기 전에)
       await loadDividends(selectedAccount);
       
-      // 통계 컴포넌트 강제 리렌더링
+      // 통계 컴포넌트 백그라운드 갱신 (리마운트 없이)
       setStatsKey(prev => prev + 1);
       
       // 폼 초기화 (날짜는 유지, 자산은 초기화)
@@ -182,7 +184,6 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       setDeleting(true);
       await apiClient.DeleteDividend(deleteTarget.id);
       setDividends(prev => prev.filter(item => item.id !== deleteTarget.id));
-      await loadDividends(deleteTarget.account_id || selectedAccount);
       setStatsKey(prev => prev + 1);
       setDeleteTarget(null);
     } catch (err) {
@@ -286,10 +287,236 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
         </div>
       )}
 
-      {/* 통계 섹션 */}
+      {/* 통계 섹션 (카드 → 최근 배당금 → 월별 차트 → Top10) */}
       {selectedAccount > 0 && (
         <div className="mb-6">
-          <DividendQuickStats key={`stats-${selectedAccount}-${statsKey}`} accountId={selectedAccount} />
+          <DividendQuickStats accountId={selectedAccount} refreshTrigger={statsKey}>
+            {/* 최근 배당금 — 통계 카드 아래, 월별 차트 위 */}
+            <div className="relative overflow-hidden bg-slate-800 rounded-xl p-6 border border-slate-700">
+              <div className="absolute -top-40 -right-32 w-[28rem] h-[28rem] bg-green-500/10 blur-3xl pointer-events-none" />
+              <div className="relative flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">최근 배당금 내역</h3>
+                <div className="flex items-center gap-2">
+                  {viewMode === 'list' && dividends.length > 3 && (
+                    <button
+                      onClick={() => setShowAllDividends(true)}
+                      className="flex items-center gap-1 text-sm text-green-400 hover:text-green-300 transition-colors"
+                    >
+                      전체 보기 ({dividends.length}건)
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
+                  <div className="flex bg-slate-700 rounded-lg p-0.5">
+                    <button
+                      onClick={() => setViewMode('timeline')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                        viewMode === 'timeline'
+                          ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      타임라인
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                        viewMode === 'list'
+                          ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <LayoutList className="w-3.5 h-3.5" />
+                      리스트
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {dividends.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <Calendar className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg">배당금 기록이 없습니다.</p>
+                  <p className="text-sm mt-2">위의 "배당금 기록" 버튼을 눌러 배당금을 기록하세요.</p>
+                </div>
+              ) : viewMode === 'timeline' ? (
+                /* ===== 타임라인 뷰 ===== */
+                <div className="relative">
+                  {/* 타임라인 선 */}
+                  <div className="absolute top-[52px] left-0 right-0 h-0.5 bg-gradient-to-r from-slate-700 via-green-500/40 to-green-500 z-0" />
+
+                  <div
+                    ref={timelineRef}
+                    className="grid grid-cols-6 gap-3 pt-2"
+                  >
+                    {[...dividends].slice(0, 6).reverse().map((dividend, idx) => {
+                      const divDate = new Date(dividend.date);
+                      const amountKRW = dividend.currency === 'USD'
+                        ? dividend.amount * exchangeRate
+                        : dividend.amount;
+
+                      return (
+                        <div
+                          key={dividend.id}
+                          className="flex flex-col items-center group"
+                          style={{
+                            animation: `timelineCardIn 0.4s ease-out ${idx * 0.06}s both`,
+                          }}
+                        >
+                          {/* 날짜 */}
+                          <p className="text-[11px] text-slate-400 mb-2 whitespace-nowrap">
+                            {divDate.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                          </p>
+
+                          {/* 도트 */}
+                          <div className="w-3 h-3 rounded-full bg-green-500 border-2 border-slate-800 z-10 mb-6 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+
+                          {/* 카드 */}
+                          <div className="w-full h-full bg-slate-700/60 backdrop-blur rounded-xl p-3 border border-slate-600/60 hover:border-green-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-1 cursor-pointer flex flex-col">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                dividend.is_received
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : 'bg-yellow-500/20 text-yellow-400'
+                              }`}>
+                                <DollarSign className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-white truncate">
+                                  {(dividend.asset?.ticker?.includes('.KS') || dividend.asset?.ticker?.includes('.KQ'))
+                                    ? (dividend.asset?.name || 'N/A')
+                                    : (dividend.asset?.ticker || 'N/A')}
+                                </p>
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {(dividend.asset?.ticker?.includes('.KS') || dividend.asset?.ticker?.includes('.KQ'))
+                                    ? (dividend.asset?.ticker || '')
+                                    : (dividend.asset?.name || 'N/A')}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-sm font-bold text-green-400 mb-1">
+                              ₩{amountKRW.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                            </p>
+                            {dividend.currency === 'USD' && (
+                              <p className="text-[10px] text-slate-500">
+                                ${dividend.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-1 mt-auto pt-2 border-t border-slate-600/40">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                dividend.is_received
+                                  ? 'bg-green-500/15 text-green-400'
+                                  : 'bg-yellow-500/15 text-yellow-400'
+                              }`}>
+                                {dividend.is_received ? '수령' : '예정'}
+                              </span>
+                              <div className="flex-1" />
+                              <button
+                                type="button"
+                                onClick={() => handleEditDividend(dividend)}
+                                className="text-slate-500 hover:text-blue-400 transition-colors p-0.5"
+                                title="수정"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteDividend(dividend, e)}
+                                className="text-slate-500 hover:text-red-400 transition-colors p-0.5"
+                                title="삭제"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {dividends.length > 6 && (
+                    <p className="text-xs text-slate-500 text-right mt-2">최근 6건 표시 중 (전체 {dividends.length}건)</p>
+                  )}
+                </div>
+              ) : (
+                /* ===== 리스트 뷰 ===== */
+                <div className="space-y-3">
+                  {dividends.slice(0, 3).map((dividend) => (
+                  <div
+                    key={dividend.id}
+                    className="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-green-500 transition-all duration-300 animate-[fadeSlideIn_0.3s_ease-out]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
+                          <DollarSign className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-semibold text-white">
+                              {dividend.asset?.name || 'N/A'}
+                            </h3>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              dividend.is_received 
+                                ? 'bg-green-500/20 text-green-300' 
+                                : 'bg-yellow-500/20 text-yellow-300'
+                            }`}>
+                              {dividend.is_received ? '수령완료' : '수령예정'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-400 mt-1">
+                            {dividend.asset?.ticker || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-green-400">
+                            ₩{(dividend.currency === 'USD' 
+                              ? dividend.amount * exchangeRate 
+                              : dividend.amount
+                            ).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                          </p>
+                          {dividend.tax > 0 && (
+                            <p className="text-xs text-slate-500">
+                              세금: ₩{(dividend.currency === 'USD' 
+                                ? dividend.tax * exchangeRate 
+                                : dividend.tax
+                              ).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                            </p>
+                          )}
+                          {dividend.currency === 'USD' && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              (USD ${dividend.amount.toLocaleString()})
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleEditDividend(dividend)}
+                          className="text-blue-400 hover:text-blue-300 transition-colors"
+                          title="수정"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteDividend(dividend, e)}
+                          className="text-red-400 hover:text-red-300 transition-colors"
+                          title="삭제"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    {dividend.notes && (
+                      <p className="text-sm text-slate-400 mt-3 pl-16">{dividend.notes}</p>
+                    )}
+                  </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DividendQuickStats>
         </div>
       )}
 
@@ -535,104 +762,97 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
         </div>
       )}
 
-      {/* 최근 배당금 리스트 */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">최근 배당금 내역</h3>
-          {dividends.length > 3 && (
-            <button
-              onClick={() => setShowAllDividends(!showAllDividends)}
-              className="flex items-center gap-1 text-sm text-green-400 hover:text-green-300 transition-colors"
-            >
-              {showAllDividends ? '접기' : `전체 보기 (${dividends.length}건)`}
-              <ChevronRight className={`w-4 h-4 transition-transform ${showAllDividends ? 'rotate-90' : ''}`} />
-            </button>
-          )}
-        </div>
-        <div className="space-y-3">
-          {dividends.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
-              <Calendar className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">배당금 기록이 없습니다.</p>
-              <p className="text-sm mt-2">위의 "배당금 기록" 버튼을 눌러 배당금을 기록하세요.</p>
+      {/* 전체 배당금 모달 */}
+      {showAllDividends && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowAllDividends(false)}
+        >
+          <div
+            className="relative bg-slate-800 rounded-xl border border-slate-700 max-w-3xl w-full max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-700">
+              <h3 className="text-lg font-semibold text-white">배당금 전체 내역 ({dividends.length}건)</h3>
+              <button
+                onClick={() => setShowAllDividends(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-          ) : (
-            (showAllDividends ? dividends : dividends.slice(0, 3)).map((dividend) => (
-            <div
-              key={dividend.id}
-              className="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-green-500 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
-                    <DollarSign className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-white">
-                        {dividend.asset?.name || 'N/A'}
-                      </h3>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        dividend.is_received 
-                          ? 'bg-green-500/20 text-green-300' 
-                          : 'bg-yellow-500/20 text-yellow-300'
-                      }`}>
-                        {dividend.is_received ? '수령완료' : '수령예정'}
-                      </span>
+            <div className="overflow-y-auto p-6 pt-4 space-y-3">
+              {dividends.map((dividend) => (
+                <div
+                  key={dividend.id}
+                  className="bg-slate-700/50 rounded-lg p-4 border border-slate-600/60 hover:border-green-500/50 transition-all duration-200"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
+                        <DollarSign className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-white">
+                            {dividend.asset?.name || 'N/A'}
+                          </h4>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            dividend.is_received
+                              ? 'bg-green-500/20 text-green-300'
+                              : 'bg-yellow-500/20 text-yellow-300'
+                          }`}>
+                            {dividend.is_received ? '수령완료' : '수령예정'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-400 mt-0.5">
+                          {dividend.asset?.ticker || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm text-slate-400 mt-1">
-                      {dividend.asset?.ticker || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-green-400">
+                          ₩{(dividend.currency === 'USD'
+                            ? dividend.amount * exchangeRate
+                            : dividend.amount
+                          ).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                        </p>
+                        {dividend.currency === 'USD' && (
+                          <p className="text-xs text-slate-500">
+                            (USD ${dividend.amount.toLocaleString()})
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setShowAllDividends(false); handleEditDividend(dividend); }}
+                        className="text-blue-400 hover:text-blue-300 transition-colors"
+                        title="수정"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { setShowAllDividends(false); handleDeleteDividend(dividend, e); }}
+                        className="text-red-400 hover:text-red-300 transition-colors"
+                        title="삭제"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
+                  {dividend.notes && (
+                    <p className="text-sm text-slate-400 mt-2 pl-14">{dividend.notes}</p>
+                  )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-green-400">
-                      ₩{(dividend.currency === 'USD' 
-                        ? dividend.amount * exchangeRate 
-                        : dividend.amount
-                      ).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
-                    </p>
-                    {dividend.tax > 0 && (
-                      <p className="text-xs text-slate-500">
-                        세금: ₩{(dividend.currency === 'USD' 
-                          ? dividend.tax * exchangeRate 
-                          : dividend.tax
-                        ).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
-                      </p>
-                    )}
-                    {dividend.currency === 'USD' && (
-                      <p className="text-xs text-slate-500 mt-1">
-                        (USD ${dividend.amount.toLocaleString()})
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleEditDividend(dividend)}
-                    className="text-blue-400 hover:text-blue-300 transition-colors"
-                    title="수정"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleDeleteDividend(dividend, e)}
-                    className="text-red-400 hover:text-red-300 transition-colors"
-                    title="삭제"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              {dividend.notes && (
-                <p className="text-sm text-slate-400 mt-3 pl-16">{dividend.notes}</p>
-              )}
+              ))}
             </div>
-            ))
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {deleteTarget && (
         <div
