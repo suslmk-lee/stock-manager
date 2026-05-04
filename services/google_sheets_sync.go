@@ -51,6 +51,8 @@ type sheetRowCandidate struct {
 	RowIndex    int
 	Score       int
 	CurrentCell float64
+	BrokerText  string
+	AccountText string
 }
 
 type sheetSnapshot struct {
@@ -201,33 +203,44 @@ func (s *sheetSnapshot) findRowCandidate(account models.Account, asset models.As
 		}
 
 		score := 0
+		if s.BrokerCol >= 0 {
+			brokerValue := normalizeCellValue(s.effectiveCellText(idx, s.BrokerCol))
+			if brokerValue != "" && aliasMatch(brokerValue, aliases) {
+				score += 4
+			}
+		}
 		if s.AccountCol >= 0 {
 			accountValue := normalizeCellValue(s.effectiveCellText(idx, s.AccountCol))
 			if accountValue != "" && aliasMatch(accountValue, aliases) {
 				score += 2
 			}
 		}
-		if s.BrokerCol >= 0 {
-			brokerValue := normalizeCellValue(s.effectiveCellText(idx, s.BrokerCol))
-			if brokerValue != "" && aliasMatch(brokerValue, aliases) {
-				score += 1
-			}
-		}
 		if targetLabel != "" && s.TargetCol >= 0 {
 			rowTarget := normalizeCellValue(s.effectiveCellText(idx, s.TargetCol))
 			if rowTarget == normalizeCellValue(targetLabel) {
-				score += 2
+				score += 1
 			}
 		}
 
+		brokerText := ""
+		if s.BrokerCol >= 0 {
+			brokerText = strings.TrimSpace(s.effectiveCellText(idx, s.BrokerCol))
+		}
+		accountText := ""
+		if s.AccountCol >= 0 {
+			accountText = strings.TrimSpace(s.effectiveCellText(idx, s.AccountCol))
+		}
 		candidates = append(candidates, sheetRowCandidate{
 			RowIndex:    idx + 1,
 			Score:       score,
 			CurrentCell: cellNumber(row, monthCol),
+			BrokerText:  brokerText,
+			AccountText: accountText,
 		})
 	}
 
 	if len(candidates) == 0 {
+		fmt.Printf("[GSYNC][DEBUG] row not found: ticker=%s aliases=%v\n", targetTickers[0], aliases)
 		return nil, fmt.Errorf("row not found for ticker=%s", targetTickers[0])
 	}
 	if len(candidates) == 1 {
@@ -253,6 +266,10 @@ func (s *sheetSnapshot) findRowCandidate(account models.Account, asset models.As
 		return &candidates[bestIdx], nil
 	}
 
+	for i, c := range candidates {
+		fmt.Printf("[GSYNC][DEBUG] ambiguous candidate[%d]: row=%d broker=%q account=%q score=%d\n",
+			i, c.RowIndex, c.BrokerText, c.AccountText, c.Score)
+	}
 	return nil, fmt.Errorf("ambiguous rows for ticker=%s (matches=%d)", targetTickers[0], len(candidates))
 }
 
@@ -678,18 +695,39 @@ func buildTickerMatchValues(ticker string) []string {
 	return result
 }
 
+func isKoreanNumericTicker(ticker string) bool {
+	clean := strings.TrimSuffix(strings.TrimSuffix(strings.ToUpper(ticker), ".KS"), ".KQ")
+	if len(clean) != 6 {
+		return false
+	}
+	for _, ch := range clean {
+		if ch < '0' || ch > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func tickerMatches(rowTicker string, targetTickers []string) bool {
 	row := strings.ToLower(normalizeTickerText(rowTicker))
 	if row == "" {
 		return false
 	}
 
-	rowBase := strings.ToLower(normalizeCellValue(stripTickerSuffix(row)))
+	rowBase := strings.ToLower(stripTickerSuffix(row))
 	for _, target := range targetTickers {
 		if target == "" {
 			continue
 		}
-		if row == target || rowBase == target {
+		// 6자리 숫자 한국 티커는 완전 일치만 허용
+		if isKoreanNumericTicker(target) {
+			targetBase := strings.ToLower(stripTickerSuffix(target))
+			if rowBase == targetBase {
+				return true
+			}
+			continue
+		}
+		if row == target || rowBase == strings.ToLower(normalizeCellValue(target)) {
 			return true
 		}
 	}
