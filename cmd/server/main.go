@@ -754,6 +754,17 @@ func setupUtilityRoutes(api *gin.RouterGroup) {
 		c.JSON(http.StatusOK, res)
 	})
 
+	api.GET("/ticker/prices", func(c *gin.Context) {
+		tickersParam := c.Query("tickers")
+		if tickersParam == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "tickers parameter is required"})
+			return
+		}
+		tickers := strings.Split(tickersParam, ",")
+		res := tickerService.GetCurrentPrices(tickers)
+		c.JSON(http.StatusOK, res)
+	})
+
 	api.GET("/exchange-rate/usd-krw", func(c *gin.Context) {
 		res, err := exchangeRateService.GetUSDToKRW()
 		if err != nil {

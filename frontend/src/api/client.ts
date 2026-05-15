@@ -257,6 +257,18 @@ export const apiClient = {
     return WailsApp.GetCurrentPrice(ticker);
   },
 
+  GetCurrentPrices: async (tickers: string[]) => {
+    if (isWeb) return fetchApi<Record<string, any>>(`/ticker/prices?tickers=${tickers.join(',')}`);
+    // Wails fallback: call individually
+    const result: Record<string, any> = {};
+    await Promise.all(tickers.map(async (t) => {
+      try {
+        result[t.toUpperCase()] = await WailsApp.GetCurrentPrice(t);
+      } catch { /* ignore */ }
+    }));
+    return result;
+  },
+
   GetUSDToKRW: async () => {
     if (isWeb) return fetchApi<number>('/exchange-rate/usd-krw');
     return WailsApp.GetUSDToKRW();

@@ -7,12 +7,42 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 )
 
-type TickerService struct{}
+type priceCacheEntry struct {
+	Price     *CurrentPrice
+	FetchedAt time.Time
+}
+
+type TickerService struct {
+	cacheMu    sync.RWMutex
+	priceCache map[string]priceCacheEntry
+	cacheTTL   time.Duration
+}
 
 func NewTickerService() *TickerService {
-	return &TickerService{}
+	return &TickerService{
+		priceCache: make(map[string]priceCacheEntry),
+		cacheTTL:   5 * time.Minute,
+	}
+}
+
+func (s *TickerService) getCached(ticker string) (*CurrentPrice, bool) {
+	s.cacheMu.RLock()
+	defer s.cacheMu.RUnlock()
+	entry, ok := s.priceCache[ticker]
+	if !ok || time.Since(entry.FetchedAt) > s.cacheTTL {
+		return nil, false
+	}
+	return entry.Price, true
+}
+
+func (s *TickerService) setCache(ticker string, price *CurrentPrice) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	s.priceCache[ticker] = priceCacheEntry{Price: price, FetchedAt: time.Now()}
 }
 
 type TickerInfo struct {
@@ -130,12 +160,70 @@ func (s *TickerService) GetTickerInfo(ticker string) (*TickerInfo, error) {
 
 // 간단한 티커 검색 (자동완성용)
 // GetCurrentPrice returns the current price for a ticker
+// GetCurrentPrices fetches prices for multiple tickers concurrently with caching
+func (s *TickerService) GetCurrentPrices(tickers []string) map[string]*CurrentPrice {
+	result := make(map[string]*CurrentPrice, len(tickers))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Semaphore to limit concurrent requests
+	sem := make(chan struct{}, 5)
+
+	for _, t := range tickers {
+		ticker := strings.TrimSpace(strings.ToUpper(t))
+		if ticker == "" {
+			continue
+		}
+
+		// Check cache first
+		if cached, ok := s.getCached(ticker); ok {
+			mu.Lock()
+			result[ticker] = cached
+			mu.Unlock()
+			continue
+		}
+
+		wg.Add(1)
+		go func(tk string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			price, err := s.fetchPrice(tk)
+			if err != nil {
+				return
+			}
+			s.setCache(tk, price)
+			mu.Lock()
+			result[tk] = price
+			mu.Unlock()
+		}(ticker)
+	}
+
+	wg.Wait()
+	return result
+}
+
 func (s *TickerService) GetCurrentPrice(ticker string) (*CurrentPrice, error) {
 	ticker = strings.TrimSpace(strings.ToUpper(ticker))
 	if ticker == "" {
 		return nil, fmt.Errorf("ticker symbol is required")
 	}
 
+	// Check cache
+	if cached, ok := s.getCached(ticker); ok {
+		return cached, nil
+	}
+
+	price, err := s.fetchPrice(ticker)
+	if err != nil {
+		return nil, err
+	}
+	s.setCache(ticker, price)
+	return price, nil
+}
+
+func (s *TickerService) fetchPrice(ticker string) (*CurrentPrice, error) {
 	// Yahoo Finance Quote API
 	baseURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s", url.QueryEscape(ticker))
 

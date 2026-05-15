@@ -20,6 +20,7 @@ interface AssetDividendStats {
   ticker: string;
   total: number;
   count: number;
+  yield: number;
 }
 
 export default function DividendQuickStats({ accountId, children, refreshTrigger = 0 }: DividendQuickStatsProps) {
@@ -151,21 +152,20 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
         )
       );
 
-      const priceEntries = await Promise.all(
-        tickers.map(async (ticker) => {
-          try {
-            const priceData = await apiClient.GetCurrentPrice(ticker);
-            const price = priceData as any;
-            const rawPrice = Number(price?.price || 0);
-            const currency = String(price?.currency || '');
-            const priceInKRW = currency === 'USD' ? rawPrice * exchangeRateValue : rawPrice;
-            return [ticker, priceInKRW] as const;
-          } catch {
-            return [ticker, 0] as const;
-          }
+      // 일괄 시세 조회 (5분 캐시 적용)
+      const batchPrices = tickers.length > 0
+        ? await apiClient.GetCurrentPrices(tickers) as Record<string, any>
+        : {};
+
+      const priceMap = new Map<string, number>(
+        tickers.map(ticker => {
+          const priceData = batchPrices[ticker.toUpperCase()] || batchPrices[ticker];
+          const rawPrice = Number(priceData?.price || 0);
+          const currency = String(priceData?.currency || '');
+          const priceInKRW = currency === 'USD' ? rawPrice * exchangeRateValue : rawPrice;
+          return [ticker, priceInKRW] as const;
         })
       );
-      const priceMap = new Map<string, number>(priceEntries);
 
       const marketValueInKRW = holdings.reduce((sum, h) => {
         const qty = h.quantity || 0;
@@ -224,16 +224,26 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
         }
       });
 
-      // Top10 정렬
+      // Top10 정렬 (배당률 계산 포함)
       const sortedAssets = Array.from(assetMap.values())
         .sort((a, b) => b.total - a.total)
         .slice(0, 10)
-        .map(asset => ({
-          assetName: asset.name,
-          ticker: asset.ticker,
-          total: asset.total,
-          count: asset.count,
-        }));
+        .map(asset => {
+          // 해당 종목의 평가금액 계산
+          const holding = holdings.find(h => h.asset?.ticker === asset.ticker);
+          const qty = holding?.quantity || 0;
+          const assetPrice = priceMap.get(asset.ticker) || 0;
+          const marketValue = qty * assetPrice;
+          const assetYield = marketValue > 0 ? (asset.total / marketValue) * 100 : 0;
+
+          return {
+            assetName: asset.name,
+            ticker: asset.ticker,
+            total: asset.total,
+            count: asset.count,
+            yield: assetYield,
+          };
+        });
       
       setTopAssets(sortedAssets);
 
@@ -427,9 +437,16 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-green-400">{formatCurrency(asset.total)}</p>
-                      <p className="text-xs text-slate-400">
-                        {totalDividend > 0 ? `${((asset.total / totalDividend) * 100).toFixed(1)}%` : '0%'}
-                      </p>
+                      <div className="flex items-center gap-2 justify-end">
+                        {asset.yield > 0 && (
+                          <span className="text-xs font-medium text-amber-400">
+                            배당률 {asset.yield.toFixed(2)}%
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-400">
+                          {totalDividend > 0 ? `비중 ${((asset.total / totalDividend) * 100).toFixed(1)}%` : '0%'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
