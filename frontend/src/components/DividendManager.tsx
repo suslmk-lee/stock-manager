@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Asset, Dividend } from '../types/models';
-import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock } from 'lucide-react';
+import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock, TrendingUp, Wallet, X } from 'lucide-react';
 import DividendQuickStats from './DividendQuickStats';
 
 interface DividendManagerProps {
@@ -27,6 +27,15 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
   const [deleting, setDeleting] = useState(false);
   const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
   const timelineRef = useRef<HTMLDivElement>(null);
+  const [assetDetailModal, setAssetDetailModal] = useState<{ assetId: number; ticker: string; name: string } | null>(null);
+  const [assetDetailData, setAssetDetailData] = useState<{
+    dividends: Dividend[];
+    monthlyChart: { month: string; total: number }[];
+    totalAmount: number;
+    holdingInfo: { accountName: string; quantity: number; marketValue: number; avgPrice: number }[];
+    yieldPercent: number;
+  } | null>(null);
+  const [assetDetailLoading, setAssetDetailLoading] = useState(false);
   const [formData, setFormData] = useState({
     accountId: 0,
     assetId: 0,
@@ -95,6 +104,82 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
     } catch (err) {
       console.error('Failed to load dividends:', err);
       throw err;
+    }
+  };
+
+  const openAssetDetail = async (assetId: number, ticker: string, name: string) => {
+    setAssetDetailModal({ assetId, ticker, name });
+    setAssetDetailLoading(true);
+    setAssetDetailData(null);
+
+    try {
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+      // 해당 종목의 모든 배당금 (현재 계좌 기준)
+      const allDivs = dividends.filter(d => d.asset_id === assetId);
+      const yearDivs = allDivs.filter(d => new Date(d.date) >= oneYearAgo);
+
+      // 월별 차트 데이터
+      const monthlyMap = new Map<string, number>();
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        monthlyMap.set(key, 0);
+      }
+      yearDivs.forEach(div => {
+        const divDate = new Date(div.date);
+        const key = `${divDate.getFullYear()}-${String(divDate.getMonth() + 1).padStart(2, '0')}`;
+        const amountKRW = div.currency === 'USD' ? div.amount * exchangeRate : div.amount;
+        monthlyMap.set(key, (monthlyMap.get(key) || 0) + amountKRW);
+      });
+      const monthlyChart = Array.from(monthlyMap.entries()).map(([month, total]) => ({ month, total }));
+
+      // 총 배당금 (1년)
+      const totalAmount = yearDivs.reduce((sum, div) => {
+        return sum + (div.currency === 'USD' ? div.amount * exchangeRate : div.amount);
+      }, 0);
+
+      // 보유 정보 조회 (모든 계좌에서 이 종목 보유현황)
+      const holdingsData = await apiClient.GetAllHoldings() as any[];
+      const assetHoldings = holdingsData.filter((h: any) => h.asset_id === assetId && (h.quantity || 0) > 0);
+
+      // 시세 조회
+      let currentPrice = 0;
+      let priceCurrency = '';
+      try {
+        const priceData = await apiClient.GetCurrentPrice(ticker) as any;
+        currentPrice = Number(priceData?.price || 0);
+        priceCurrency = String(priceData?.currency || '');
+      } catch { /* ignore */ }
+
+      const holdingInfo = assetHoldings.map((h: any) => {
+        const acct = accounts.find(a => a.id === h.account_id);
+        const priceInKRW = priceCurrency === 'USD' ? currentPrice * exchangeRate : currentPrice;
+        return {
+          accountName: acct?.name || `계좌 #${h.account_id}`,
+          quantity: h.quantity || 0,
+          marketValue: (h.quantity || 0) * priceInKRW,
+          avgPrice: h.average_price || 0,
+        };
+      });
+
+      // 투자금 대비 배당률
+      const totalMarketValue = holdingInfo.reduce((sum, h) => sum + h.marketValue, 0);
+      const yieldPercent = totalMarketValue > 0 ? (totalAmount / totalMarketValue) * 100 : 0;
+
+      setAssetDetailData({
+        dividends: yearDivs,
+        monthlyChart,
+        totalAmount,
+        holdingInfo,
+        yieldPercent,
+      });
+    } catch (err) {
+      console.error('Failed to load asset detail:', err);
+    } finally {
+      setAssetDetailLoading(false);
     }
   };
 
@@ -372,7 +457,9 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                           <div className="w-3 h-3 rounded-full bg-green-500 border-2 border-slate-800 z-10 mb-6 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
 
                           {/* 카드 */}
-                          <div className="w-full h-full bg-slate-700/60 backdrop-blur rounded-xl p-3 border border-slate-600/60 hover:border-green-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-1 cursor-pointer flex flex-col">
+                          <div
+                            onClick={() => openAssetDetail(dividend.asset_id, dividend.asset?.ticker || '', dividend.asset?.name || '')}
+                            className="w-full h-full bg-slate-700/60 backdrop-blur rounded-xl p-3 border border-slate-600/60 hover:border-green-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-1 cursor-pointer flex flex-col">
                             <div className="flex items-center gap-2 mb-2">
                               <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                                 dividend.is_received
@@ -413,7 +500,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                               <div className="flex-1" />
                               <button
                                 type="button"
-                                onClick={() => handleEditDividend(dividend)}
+                                onClick={(e) => { e.stopPropagation(); handleEditDividend(dividend); }}
                                 className="text-slate-500 hover:text-blue-400 transition-colors p-0.5"
                                 title="수정"
                               >
@@ -421,7 +508,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                               </button>
                               <button
                                 type="button"
-                                onClick={(e) => handleDeleteDividend(dividend, e)}
+                                onClick={(e) => { e.stopPropagation(); handleDeleteDividend(dividend, e); }}
                                 className="text-slate-500 hover:text-red-400 transition-colors p-0.5"
                                 title="삭제"
                               >
@@ -443,7 +530,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                   {dividends.slice(0, 3).map((dividend) => (
                   <div
                     key={dividend.id}
-                    className="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-green-500 transition-all duration-300 animate-[fadeSlideIn_0.3s_ease-out]"
+                    onClick={() => openAssetDetail(dividend.asset_id, dividend.asset?.ticker || '', dividend.asset?.name || '')}
+                    className="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-green-500 transition-all duration-300 animate-[fadeSlideIn_0.3s_ease-out] cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -492,7 +580,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleEditDividend(dividend)}
+                          onClick={(e) => { e.stopPropagation(); handleEditDividend(dividend); }}
                           className="text-blue-400 hover:text-blue-300 transition-colors"
                           title="수정"
                         >
@@ -500,7 +588,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => handleDeleteDividend(dividend, e)}
+                          onClick={(e) => { e.stopPropagation(); handleDeleteDividend(dividend, e); }}
                           className="text-red-400 hover:text-red-300 transition-colors"
                           title="삭제"
                         >
@@ -850,6 +938,169 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 종목 상세 배당금 모달 */}
+      {assetDetailModal && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setAssetDetailModal(null)}
+        >
+          <div
+            className="relative bg-slate-800 rounded-2xl border border-slate-700 max-w-2xl w-full max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 헤더 */}
+            <div className="sticky top-0 bg-slate-800 border-b border-slate-700 rounded-t-2xl px-6 py-4 flex items-center justify-between z-10">
+              <div>
+                <h3 className="text-lg font-bold text-white">
+                  {(assetDetailModal.ticker.includes('.KS') || assetDetailModal.ticker.includes('.KQ'))
+                    ? assetDetailModal.name
+                    : assetDetailModal.ticker}
+                </h3>
+                <p className="text-sm text-slate-400">
+                  {(assetDetailModal.ticker.includes('.KS') || assetDetailModal.ticker.includes('.KQ'))
+                    ? assetDetailModal.ticker
+                    : assetDetailModal.name}
+                  {' · 최근 1년 배당금'}
+                </p>
+              </div>
+              <button
+                onClick={() => setAssetDetailModal(null)}
+                className="text-slate-400 hover:text-white transition-colors p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {assetDetailLoading ? (
+              <div className="p-12 text-center text-slate-400">데이터 로딩 중...</div>
+            ) : assetDetailData ? (
+              <div className="p-6 space-y-6">
+                {/* 요약 카드 */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/40">
+                    <div className="flex items-center gap-2 mb-1">
+                      <DollarSign className="w-4 h-4 text-green-400" />
+                      <span className="text-xs text-slate-400">1년 배당금</span>
+                    </div>
+                    <p className="text-lg font-bold text-green-400">
+                      ₩{assetDetailData.totalAmount.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                  <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/40">
+                    <div className="flex items-center gap-2 mb-1">
+                      <TrendingUp className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs text-slate-400">투자 대비 배당률</span>
+                    </div>
+                    <p className="text-lg font-bold text-amber-400">
+                      {assetDetailData.yieldPercent > 0 ? `${assetDetailData.yieldPercent.toFixed(2)}%` : '-'}
+                    </p>
+                  </div>
+                  <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/40">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Calendar className="w-4 h-4 text-blue-400" />
+                      <span className="text-xs text-slate-400">배당 횟수</span>
+                    </div>
+                    <p className="text-lg font-bold text-blue-400">
+                      {assetDetailData.dividends.length}회
+                    </p>
+                  </div>
+                </div>
+
+                {/* 월별 배당금 차트 */}
+                <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/40">
+                  <h4 className="text-sm font-semibold text-white mb-4">월별 배당금 추이</h4>
+                  <div className="flex items-end gap-1 h-32">
+                    {(() => {
+                      const maxVal = Math.max(...assetDetailData.monthlyChart.map(m => m.total), 1);
+                      return assetDetailData.monthlyChart.map((item, idx) => {
+                        const height = item.total > 0 ? Math.max((item.total / maxVal) * 100, 4) : 0;
+                        const [, month] = item.month.split('-');
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                            <div className="w-full flex items-end justify-center" style={{ height: '100px' }}>
+                              <div
+                                className={`w-full max-w-[24px] rounded-t transition-all duration-300 ${
+                                  item.total > 0
+                                    ? 'bg-gradient-to-t from-green-500 to-emerald-400'
+                                    : 'bg-slate-600/30'
+                                }`}
+                                style={{ height: item.total > 0 ? `${height}%` : '4px' }}
+                                title={`₩${item.total.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}`}
+                              />
+                            </div>
+                            <span className="text-[9px] text-slate-500">{parseInt(month)}월</span>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* 보유 현황 */}
+                {assetDetailData.holdingInfo.length > 0 && (
+                  <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/40">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Wallet className="w-4 h-4 text-purple-400" />
+                      <h4 className="text-sm font-semibold text-white">보유 현황</h4>
+                    </div>
+                    <div className="space-y-2">
+                      {assetDetailData.holdingInfo.map((h, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-slate-600/30 rounded-lg px-4 py-3">
+                          <div>
+                            <p className="text-sm font-medium text-white">{h.accountName}</p>
+                            <p className="text-xs text-slate-400">{h.quantity}주 보유</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-green-400">
+                              ₩{h.marketValue.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              평단 ₩{h.avgPrice.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 배당금 내역 리스트 */}
+                <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/40">
+                  <h4 className="text-sm font-semibold text-white mb-3">배당금 내역 ({assetDetailData.dividends.length}건)</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {assetDetailData.dividends.map(div => {
+                      const amtKRW = div.currency === 'USD' ? div.amount * exchangeRate : div.amount;
+                      return (
+                        <div key={div.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-600/20">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${div.is_received ? 'bg-green-400' : 'bg-yellow-400'}`} />
+                            <span className="text-sm text-slate-300">
+                              {new Date(div.date).toLocaleDateString('ko-KR')}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-medium text-green-400">
+                              ₩{amtKRW.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                            </span>
+                            {div.currency === 'USD' && (
+                              <span className="text-xs text-slate-500 ml-2">
+                                (${div.amount.toFixed(2)})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-12 text-center text-slate-400">데이터를 불러올 수 없습니다.</div>
+            )}
           </div>
         </div>
       )}
