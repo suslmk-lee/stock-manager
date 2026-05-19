@@ -30,6 +30,7 @@ var (
 	dividendService     *services.DividendService
 	tickerService       *services.TickerService
 	exchangeRateService *services.ExchangeRateService
+	snapshotService     *services.PortfolioSnapshotService
 )
 
 func main() {
@@ -67,6 +68,10 @@ func initServices() {
 	dividendService = services.NewDividendService()
 	tickerService = services.NewTickerService()
 	exchangeRateService = services.NewExchangeRateService()
+	snapshotService = services.NewPortfolioSnapshotService(database.GetDB(), tickerService)
+
+	// 앱 시작 시 이번 달 스냅샷 자동 기록 (비동기)
+	snapshotService.EnsureCurrentMonthSnapshotAsync()
 }
 
 func setupRouter() *gin.Engine {
@@ -779,6 +784,38 @@ func setupUtilityRoutes(api *gin.RouterGroup) {
 		currency := c.Query("currency")
 		amount, _ := strconv.ParseFloat(amountStr, 64)
 		res, err := exchangeRateService.ConvertToKRW(amount, currency)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
+	// ==========================================
+	// Portfolio Snapshots
+	// ==========================================
+	api.POST("/snapshots/ensure", func(c *gin.Context) {
+		created, err := snapshotService.EnsureCurrentMonthSnapshot()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"created": created})
+	})
+
+	api.GET("/snapshots/account/:id", func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		res, err := snapshotService.GetSnapshotsByAccount(uint(id))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
+	api.GET("/snapshots/account/:id/monthly", func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		res, err := snapshotService.GetMonthlyTotalByAccount(uint(id))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

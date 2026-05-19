@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"stock-manager/database"
 	"stock-manager/models"
 	"stock-manager/services"
 	"time"
@@ -17,6 +18,7 @@ type App struct {
 	dividendService     *services.DividendService
 	tickerService       *services.TickerService
 	exchangeRateService *services.ExchangeRateService
+	snapshotService     *services.PortfolioSnapshotService
 }
 
 func NewApp() *App {
@@ -32,6 +34,10 @@ func (a *App) startup(ctx context.Context) {
 	a.dividendService = services.NewDividendService()
 	a.tickerService = services.NewTickerService()
 	a.exchangeRateService = services.NewExchangeRateService()
+	a.snapshotService = services.NewPortfolioSnapshotService(database.GetDB(), a.tickerService)
+
+	// 앱 시작 시 이번 달 스냅샷 자동 기록
+	a.snapshotService.EnsureCurrentMonthSnapshotAsync()
 }
 
 func (a *App) GetAllAccounts() (interface{}, error) {
@@ -243,4 +249,16 @@ func (a *App) UpdateHolding(id uint, quantity float64, averagePrice float64) (in
 
 func (a *App) DeleteHolding(id uint) error {
 	return a.holdingService.DeleteHolding(id)
+}
+
+func (a *App) EnsureSnapshot() (bool, error) {
+	return a.snapshotService.EnsureCurrentMonthSnapshot()
+}
+
+func (a *App) GetSnapshotsByAccount(accountID uint) (interface{}, error) {
+	return a.snapshotService.GetSnapshotsByAccount(accountID)
+}
+
+func (a *App) GetMonthlySnapshotByAccount(accountID uint) (interface{}, error) {
+	return a.snapshotService.GetMonthlyTotalByAccount(accountID)
 }

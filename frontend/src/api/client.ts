@@ -278,4 +278,22 @@ export const apiClient = {
     if (isWeb) return fetchApi<number>(`/exchange-rate/convert?amount=${amount}&currency=${currency}`);
     return WailsApp.ConvertToKRW(amount, currency);
   },
+
+  // ==========================================
+  // Portfolio Snapshots
+  // ==========================================
+  EnsureSnapshot: async () => {
+    if (isWeb) return fetchApi<any>('/snapshots/ensure', { method: 'POST' });
+    return WailsApp.EnsureSnapshot();
+  },
+
+  GetSnapshotsByAccount: async (accountID: number) => {
+    if (isWeb) return fetchApi<any[]>(`/snapshots/account/${accountID}`);
+    return WailsApp.GetSnapshotsByAccount(accountID);
+  },
+
+  GetMonthlySnapshotByAccount: async (accountID: number) => {
+    if (isWeb) return fetchApi<any[]>(`/snapshots/account/${accountID}/monthly`);
+    return WailsApp.GetMonthlySnapshotByAccount(accountID);
+  },
 };

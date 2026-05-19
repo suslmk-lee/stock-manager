@@ -32,3 +32,6 @@ export const SearchTicker = stub;
 export const GetCurrentPrice = stub;
 export const GetUSDToKRW = stub;
 export const ConvertToKRW = stub;
+export const EnsureSnapshot = stub;
+export const GetSnapshotsByAccount = stub;
+export const GetMonthlySnapshotByAccount = stub;

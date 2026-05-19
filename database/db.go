@@ -227,6 +227,7 @@ func runMigrations() error {
 		&models.Holding{},
 		&models.Transaction{},
 		&models.Dividend{},
+		&models.PortfolioSnapshot{},
 	)
 }
 
