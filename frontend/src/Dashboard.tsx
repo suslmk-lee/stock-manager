@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Wallet, TrendingUp, DollarSign, BarChart3, Calendar, Camera } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, BarChart3, Calendar, Camera, ArrowLeftRight } from 'lucide-react';
 import App from './App';
 import AssetManager from './components/AssetManager';
 import DividendManager from './components/DividendManager';
 import DividendDashboard from './pages/DividendDashboard';
 import DividendYearlyOverview from './components/DividendYearlyOverview';
 import PortfolioSnapshots from './components/PortfolioSnapshots';
+import TransactionManager from './components/TransactionManager';
 
-type TabType = 'accounts' | 'assets' | 'dividends' | 'stats' | 'yearly' | 'portfolio';
+type TabType = 'accounts' | 'assets' | 'trades' | 'dividends' | 'stats' | 'yearly' | 'portfolio';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('accounts');
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const tabs = [
     { id: 'accounts' as TabType, label: '계좌 관리', icon: Wallet },
     { id: 'assets' as TabType, label: '주식/ETF', icon: TrendingUp },
+    { id: 'trades' as TabType, label: '매매', icon: ArrowLeftRight },
     { id: 'dividends' as TabType, label: '배당금', icon: DollarSign },
     { id: 'stats' as TabType, label: '통계', icon: BarChart3 },
     { id: 'yearly' as TabType, label: '연간 현황', icon: Calendar },
@@ -59,6 +61,7 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {activeTab === 'accounts' && <App />}
         {activeTab === 'assets' && <AssetManager />}
+        {activeTab === 'trades' && <TransactionManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}
         {activeTab === 'dividends' && <DividendManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}
         {activeTab === 'stats' && <DividendDashboard />}
         {activeTab === 'yearly' && <DividendYearlyOverview />}

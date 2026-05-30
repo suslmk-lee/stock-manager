@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"stock-manager/database"
 	"stock-manager/models"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -68,7 +69,7 @@ func (s *TransactionService) CreateTransaction(req CreateTransactionRequest) (*m
 			return fmt.Errorf("failed to create transaction: %w", err)
 		}
 
-		if err := s.updateHolding(tx, req); err != nil {
+		if err := s.updateHolding(tx, req, transaction, &account); err != nil {
 			return err
 		}
 
@@ -82,7 +83,7 @@ func (s *TransactionService) CreateTransaction(req CreateTransactionRequest) (*m
 	return transaction, nil
 }
 
-func (s *TransactionService) updateHolding(tx *gorm.DB, req CreateTransactionRequest) error {
+func (s *TransactionService) updateHolding(tx *gorm.DB, req CreateTransactionRequest, transaction *models.Transaction, account *models.Account) error {
 	var holding models.Holding
 	err := tx.Where("account_id = ? AND asset_id = ?", req.AccountID, req.AssetID).First(&holding).Error
 
@@ -96,7 +97,7 @@ func (s *TransactionService) updateHolding(tx *gorm.DB, req CreateTransactionReq
 	case models.TransactionTypeBuy:
 		return s.processBuy(tx, &holding, req, isNewHolding)
 	case models.TransactionTypeSell:
-		return s.processSell(tx, &holding, req, isNewHolding)
+		return s.processSell(tx, &holding, req, isNewHolding, transaction, account)
 	default:
 		return fmt.Errorf("invalid transaction type: %s", req.Type)
 	}
@@ -128,13 +129,52 @@ func (s *TransactionService) processBuy(tx *gorm.DB, holding *models.Holding, re
 	return nil
 }
 
-func (s *TransactionService) processSell(tx *gorm.DB, holding *models.Holding, req CreateTransactionRequest, isNew bool) error {
+func (s *TransactionService) processSell(tx *gorm.DB, holding *models.Holding, req CreateTransactionRequest, isNew bool, transaction *models.Transaction, account *models.Account) error {
 	if isNew {
 		return errors.New("cannot sell asset that is not held")
 	}
 
 	if holding.Quantity < req.Quantity {
 		return fmt.Errorf("insufficient quantity: have %.4f, trying to sell %.4f", holding.Quantity, req.Quantity)
+	}
+
+	// 매도 시점의 평단가 기준으로 실현 손익 계산
+	buyAvgPrice := holding.AveragePrice
+	grossProfit := (req.Price - buyAvgPrice) * req.Quantity
+	profit := grossProfit - req.Fee
+	costBasis := buyAvgPrice * req.Quantity
+	profitPercent := 0.0
+	if costBasis > 0 {
+		profitPercent = (profit / costBasis) * 100
+	}
+
+	// 티커 기준으로 통화 결정
+	currency := "USD"
+	if holding.Asset.Ticker != "" {
+		t := strings.ToUpper(holding.Asset.Ticker)
+		if strings.HasSuffix(t, ".KS") || strings.HasSuffix(t, ".KQ") {
+			currency = "KRW"
+		}
+	} else if account != nil && account.Currency != "" {
+		currency = account.Currency
+	}
+
+	pnl := &models.RealizedPnL{
+		TransactionID: transaction.ID,
+		AccountID:     req.AccountID,
+		AssetID:       req.AssetID,
+		Date:          req.Date,
+		Quantity:      req.Quantity,
+		BuyAvgPrice:   buyAvgPrice,
+		SellPrice:     req.Price,
+		Fee:           req.Fee,
+		Profit:        profit,
+		ProfitPercent: profitPercent,
+		Currency:      currency,
+		Notes:         req.Notes,
+	}
+	if err := tx.Create(pnl).Error; err != nil {
+		return fmt.Errorf("failed to create realized pnl: %w", err)
 	}
 
 	holding.Quantity -= req.Quantity

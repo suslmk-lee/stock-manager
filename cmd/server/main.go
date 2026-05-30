@@ -31,6 +31,7 @@ var (
 	tickerService       *services.TickerService
 	exchangeRateService *services.ExchangeRateService
 	snapshotService     *services.PortfolioSnapshotService
+	realizedPnLService  *services.RealizedPnLService
 )
 
 func main() {
@@ -69,6 +70,7 @@ func initServices() {
 	tickerService = services.NewTickerService()
 	exchangeRateService = services.NewExchangeRateService()
 	snapshotService = services.NewPortfolioSnapshotService(database.GetDB(), tickerService)
+	realizedPnLService = services.NewRealizedPnLService()
 
 	// 앱 시작 시 이번 달 스냅샷 자동 기록 (비동기)
 	snapshotService.EnsureCurrentMonthSnapshotAsync()
@@ -816,6 +818,47 @@ func setupUtilityRoutes(api *gin.RouterGroup) {
 	api.GET("/snapshots/account/:id/monthly", func(c *gin.Context) {
 		id, _ := strconv.Atoi(c.Param("id"))
 		res, err := snapshotService.GetMonthlyTotalByAccount(uint(id))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
+	// ==========================================
+	// Realized P&L
+	// ==========================================
+	api.GET("/realized-pnl", func(c *gin.Context) {
+		res, err := realizedPnLService.GetAll()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
+	api.GET("/realized-pnl/account/:id", func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		res, err := realizedPnLService.GetByAccount(uint(id))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
+	api.GET("/realized-pnl/asset/:id", func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		res, err := realizedPnLService.GetByAsset(uint(id))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
+	api.GET("/realized-pnl/summary", func(c *gin.Context) {
+		res, err := realizedPnLService.GetSummary()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

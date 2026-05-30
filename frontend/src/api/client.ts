@@ -296,4 +296,27 @@ export const apiClient = {
     if (isWeb) return fetchApi<any[]>(`/snapshots/account/${accountID}/monthly`);
     return WailsApp.GetMonthlySnapshotByAccount(accountID);
   },
+
+  // ==========================================
+  // Realized P&L
+  // ==========================================
+  GetAllRealizedPnL: async () => {
+    if (isWeb) return fetchApi<any[]>('/realized-pnl');
+    return WailsApp.GetAllRealizedPnL();
+  },
+
+  GetRealizedPnLByAccount: async (accountID: number) => {
+    if (isWeb) return fetchApi<any[]>(`/realized-pnl/account/${accountID}`);
+    return WailsApp.GetRealizedPnLByAccount(accountID);
+  },
+
+  GetRealizedPnLByAsset: async (assetID: number) => {
+    if (isWeb) return fetchApi<any[]>(`/realized-pnl/asset/${assetID}`);
+    return WailsApp.GetRealizedPnLByAsset(assetID);
+  },
+
+  GetRealizedPnLSummary: async () => {
+    if (isWeb) return fetchApi<any>('/realized-pnl/summary');
+    return WailsApp.GetRealizedPnLSummary();
+  },
 };

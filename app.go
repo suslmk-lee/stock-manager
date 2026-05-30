@@ -19,6 +19,7 @@ type App struct {
 	tickerService       *services.TickerService
 	exchangeRateService *services.ExchangeRateService
 	snapshotService     *services.PortfolioSnapshotService
+	realizedPnLService  *services.RealizedPnLService
 }
 
 func NewApp() *App {
@@ -35,6 +36,7 @@ func (a *App) startup(ctx context.Context) {
 	a.tickerService = services.NewTickerService()
 	a.exchangeRateService = services.NewExchangeRateService()
 	a.snapshotService = services.NewPortfolioSnapshotService(database.GetDB(), a.tickerService)
+	a.realizedPnLService = services.NewRealizedPnLService()
 
 	// 앱 시작 시 이번 달 스냅샷 자동 기록
 	a.snapshotService.EnsureCurrentMonthSnapshotAsync()
@@ -261,4 +263,20 @@ func (a *App) GetSnapshotsByAccount(accountID uint) (interface{}, error) {
 
 func (a *App) GetMonthlySnapshotByAccount(accountID uint) (interface{}, error) {
 	return a.snapshotService.GetMonthlyTotalByAccount(accountID)
+}
+
+func (a *App) GetAllRealizedPnL() (interface{}, error) {
+	return a.realizedPnLService.GetAll()
+}
+
+func (a *App) GetRealizedPnLByAccount(accountID uint) (interface{}, error) {
+	return a.realizedPnLService.GetByAccount(accountID)
+}
+
+func (a *App) GetRealizedPnLByAsset(assetID uint) (interface{}, error) {
+	return a.realizedPnLService.GetByAsset(assetID)
+}
+
+func (a *App) GetRealizedPnLSummary() (interface{}, error) {
+	return a.realizedPnLService.GetSummary()
 }

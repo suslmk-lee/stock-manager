@@ -104,3 +104,22 @@ export interface DividendStats {
   pending_count: number;
   average_dividend: number;
 }
+
+export interface RealizedPnL {
+  id: number;
+  transaction_id: number;
+  account_id: number;
+  asset_id: number;
+  date: string;
+  quantity: number;
+  buy_avg_price: number;
+  sell_price: number;
+  fee: number;
+  profit: number;
+  profit_percent: number;
+  currency: string;
+  notes: string;
+  created_at: string;
+  account?: Account;
+  asset?: Asset;
+}

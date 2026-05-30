@@ -228,6 +228,7 @@ func runMigrations() error {
 		&models.Transaction{},
 		&models.Dividend{},
 		&models.PortfolioSnapshot{},
+		&models.RealizedPnL{},
 	)
 }
 

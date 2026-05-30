@@ -35,3 +35,7 @@ export const ConvertToKRW = stub;
 export const EnsureSnapshot = stub;
 export const GetSnapshotsByAccount = stub;
 export const GetMonthlySnapshotByAccount = stub;
+export const GetAllRealizedPnL = stub;
+export const GetRealizedPnLByAccount = stub;
+export const GetRealizedPnLByAsset = stub;
+export const GetRealizedPnLSummary = stub;
