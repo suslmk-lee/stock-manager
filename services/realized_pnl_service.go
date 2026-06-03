@@ -21,7 +21,7 @@ func NewRealizedPnLService() *RealizedPnLService {
 // GetAll - 전체 실현 손익 내역 (최신순)
 func (s *RealizedPnLService) GetAll() ([]models.RealizedPnL, error) {
 	var list []models.RealizedPnL
-	err := s.db.Preload("Account").Preload("Asset").
+	err := s.db.Preload("Account").Preload("Asset", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Order("date DESC").
 		Find(&list).Error
 	if err != nil {
@@ -33,7 +33,7 @@ func (s *RealizedPnLService) GetAll() ([]models.RealizedPnL, error) {
 // GetByAccount - 계좌별 실현 손익 내역 (최신순)
 func (s *RealizedPnLService) GetByAccount(accountID uint) ([]models.RealizedPnL, error) {
 	var list []models.RealizedPnL
-	err := s.db.Preload("Account").Preload("Asset").
+	err := s.db.Preload("Account").Preload("Asset", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Where("account_id = ?", accountID).
 		Order("date DESC").
 		Find(&list).Error
@@ -46,7 +46,7 @@ func (s *RealizedPnLService) GetByAccount(accountID uint) ([]models.RealizedPnL,
 // GetByAsset - 종목별 실현 손익 내역
 func (s *RealizedPnLService) GetByAsset(assetID uint) ([]models.RealizedPnL, error) {
 	var list []models.RealizedPnL
-	err := s.db.Preload("Account").Preload("Asset").
+	err := s.db.Preload("Account").Preload("Asset", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Where("asset_id = ?", assetID).
 		Order("date DESC").
 		Find(&list).Error

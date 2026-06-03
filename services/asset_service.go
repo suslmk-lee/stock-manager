@@ -261,36 +261,32 @@ func (s *AssetService) UpdateAsset(id uint, req UpdateAssetRequest) (*models.Ass
 	return &asset, nil
 }
 
+// DeleteAsset 은 자산을 소프트 삭제(목록에서 숨김)한다.
+// 배당금/거래/실현손익 등 과거 이력은 마스터 행과 함께 보존되며,
+// 같은 티커를 다시 추가하면 CreateAsset 이 소프트삭제 행을 복구한다.
+// 단, 현재 보유 수량(>0)이 남아있는 종목은 삭제할 수 없다.
 func (s *AssetService) DeleteAsset(id uint) error {
-	// 보유 내역 확인
-	var holdingCount int64
-	s.db.Model(&models.Holding{}).Where("asset_id = ?", id).Count(&holdingCount)
-	if holdingCount > 0 {
-		return errors.New("이 자산에 대한 보유 내역이 있습니다. 먼저 모든 보유 내역을 삭제해주세요")
+	// 활성 보유(수량 > 0) 확인 → 있으면 차단 (현재 포지션 보호)
+	var activeHoldingCount int64
+	s.db.Model(&models.Holding{}).Where("asset_id = ? AND quantity > 0", id).Count(&activeHoldingCount)
+	if activeHoldingCount > 0 {
+		return errors.New("보유 수량이 남아있는 종목은 삭제할 수 없습니다. 먼저 매도하거나 보유 내역을 정리해주세요")
 	}
 
-	// 배당금 기록 확인
-	var dividendCount int64
-	s.db.Model(&models.Dividend{}).Where("asset_id = ?", id).Count(&dividendCount)
-	if dividendCount > 0 {
-		return errors.New("이 자산에 대한 배당금 기록이 있습니다. 먼저 모든 배당금 기록을 삭제해주세요")
-	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// 수량 0인 잔여 보유 행 정리 (이력 아님 → 소프트 삭제)
+		if err := tx.Where("asset_id = ?", id).Delete(&models.Holding{}).Error; err != nil {
+			return fmt.Errorf("failed to clean holdings: %w", err)
+		}
 
-	// 거래 내역 확인
-	var transactionCount int64
-	s.db.Model(&models.Transaction{}).Where("asset_id = ?", id).Count(&transactionCount)
-	if transactionCount > 0 {
-		return errors.New("이 자산에 대한 거래 내역이 있습니다. 먼저 모든 거래 내역을 삭제해주세요")
-	}
-
-	result := s.db.Delete(&models.Asset{}, id)
-	if result.Error != nil {
-		return fmt.Errorf("failed to delete asset: %w", result.Error)
-	}
-
-	if result.RowsAffected == 0 {
-		return errors.New("asset not found")
-	}
-
-	return nil
+		// 자산 소프트 삭제 (배당/거래/실현손익 이력은 보존)
+		result := tx.Delete(&models.Asset{}, id)
+		if result.Error != nil {
+			return fmt.Errorf("failed to delete asset: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return errors.New("asset not found")
+		}
+		return nil
+	})
 }

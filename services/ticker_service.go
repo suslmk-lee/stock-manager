@@ -290,6 +290,106 @@ func (s *TickerService) fetchPrice(ticker string) (*CurrentPrice, error) {
 	}, nil
 }
 
+type PricePoint struct {
+	Time  int64   `json:"time"` // unix seconds
+	Close float64 `json:"close"`
+}
+
+type PriceHistory struct {
+	Symbol   string       `json:"symbol"`
+	Currency string       `json:"currency"`
+	Range    string       `json:"range"`
+	Interval string       `json:"interval"`
+	Points   []PricePoint `json:"points"`
+}
+
+// GetPriceHistory fetches historical close prices from Yahoo Finance chart API.
+// rangeStr 예: 1mo, 3mo, 6mo, 1y, 5y / interval 예: 1d, 1wk, 1mo
+func (s *TickerService) GetPriceHistory(ticker, rangeStr, interval string) (*PriceHistory, error) {
+	ticker = strings.TrimSpace(strings.ToUpper(ticker))
+	if ticker == "" {
+		return nil, fmt.Errorf("ticker symbol is required")
+	}
+	if rangeStr == "" {
+		rangeStr = "6mo"
+	}
+	if interval == "" {
+		interval = "1d"
+	}
+
+	baseURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s", url.QueryEscape(ticker))
+	params := url.Values{}
+	params.Add("range", rangeStr)
+	params.Add("interval", interval)
+	fullURL := fmt.Sprintf("%s?%s", baseURL, params.Encode())
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch price history: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result struct {
+		Chart struct {
+			Result []struct {
+				Meta struct {
+					Symbol   string `json:"symbol"`
+					Currency string `json:"currency"`
+				} `json:"meta"`
+				Timestamp  []int64 `json:"timestamp"`
+				Indicators struct {
+					Quote []struct {
+						Close []float64 `json:"close"`
+					} `json:"quote"`
+				} `json:"indicators"`
+			} `json:"result"`
+		} `json:"chart"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if len(result.Chart.Result) == 0 {
+		return nil, fmt.Errorf("no history data found for ticker: %s", ticker)
+	}
+
+	r := result.Chart.Result[0]
+	points := make([]PricePoint, 0, len(r.Timestamp))
+	if len(r.Indicators.Quote) > 0 {
+		closes := r.Indicators.Quote[0].Close
+		for i, ts := range r.Timestamp {
+			if i < len(closes) && closes[i] > 0 {
+				points = append(points, PricePoint{Time: ts, Close: closes[i]})
+			}
+		}
+	}
+
+	return &PriceHistory{
+		Symbol:   r.Meta.Symbol,
+		Currency: r.Meta.Currency,
+		Range:    rangeStr,
+		Interval: interval,
+		Points:   points,
+	}, nil
+}
+
 func (s *TickerService) SearchTicker(query string) ([]TickerInfo, error) {
 	query = strings.TrimSpace(strings.ToUpper(query))
 	if query == "" || len(query) < 1 {

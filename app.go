@@ -138,6 +138,26 @@ func (a *App) CreateTransaction(accountID, assetID uint, txType, date string, pr
 	})
 }
 
+func (a *App) UpdateTransaction(id uint, txType, date string, price, quantity, fee float64, notes string) (interface{}, error) {
+	parsedDate, err := parseDate(date)
+	if err != nil {
+		return nil, err
+	}
+
+	return a.transactionService.UpdateTransaction(id, services.CreateTransactionRequest{
+		Type:     models.TransactionType(txType),
+		Date:     parsedDate,
+		Price:    price,
+		Quantity: quantity,
+		Fee:      fee,
+		Notes:    notes,
+	})
+}
+
+func (a *App) DeleteTransaction(id uint) error {
+	return a.transactionService.DeleteTransaction(id)
+}
+
 func (a *App) GetTransactionsByAccount(accountID uint) (interface{}, error) {
 	return a.transactionService.GetTransactionsByAccount(accountID)
 }
@@ -231,6 +251,10 @@ func (a *App) SearchTicker(query string) (interface{}, error) {
 
 func (a *App) GetCurrentPrice(ticker string) (interface{}, error) {
 	return a.tickerService.GetCurrentPrice(ticker)
+}
+
+func (a *App) GetPriceHistory(ticker string, rangeStr string, interval string) (interface{}, error) {
+	return a.tickerService.GetPriceHistory(ticker, rangeStr, interval)
 }
 
 func (a *App) GetUSDToKRW() (float64, error) {

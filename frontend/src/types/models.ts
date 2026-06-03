@@ -1,5 +1,18 @@
 export type MarketType = 'Domestic' | 'International';
 
+export interface PricePoint {
+  time: number; // unix seconds
+  close: number;
+}
+
+export interface PriceHistory {
+  symbol: string;
+  currency: string;
+  range: string;
+  interval: string;
+  points: PricePoint[];
+}
+
 export interface TickerInfo {
   symbol: string;
   name: string;

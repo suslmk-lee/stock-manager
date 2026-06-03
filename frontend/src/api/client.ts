@@ -188,6 +188,21 @@ export const apiClient = {
     return WailsApp.CreateTransaction(accountID, assetID, type, date, price, quantity, fee, notes);
   },
 
+  UpdateTransaction: async (id: number, type: string, date: string, price: number, quantity: number, fee: number, notes: string) => {
+    if (isWeb) {
+      return fetchApi<Transaction>(`/transactions/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ type, date, price, quantity, fee, notes }),
+      });
+    }
+    return WailsApp.UpdateTransaction(id, type, date, price, quantity, fee, notes);
+  },
+
+  DeleteTransaction: async (id: number) => {
+    if (isWeb) return fetchApi<void>(`/transactions/${id}`, { method: 'DELETE' });
+    return WailsApp.DeleteTransaction(id);
+  },
+
   // ==========================================
   // Dividends
   // ==========================================
@@ -255,6 +270,12 @@ export const apiClient = {
   GetCurrentPrice: async (ticker: string) => {
     if (isWeb) return fetchApi<number>(`/ticker/price?ticker=${ticker}`);
     return WailsApp.GetCurrentPrice(ticker);
+  },
+
+  GetPriceHistory: async (ticker: string, range = '6mo', interval = '1d') => {
+    if (isWeb)
+      return fetchApi<any>(`/ticker/history?ticker=${ticker}&range=${range}&interval=${interval}`);
+    return WailsApp.GetPriceHistory(ticker, range, interval);
   },
 
   GetCurrentPrices: async (tickers: string[]) => {

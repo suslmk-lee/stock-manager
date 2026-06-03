@@ -142,7 +142,8 @@ func (s *DividendService) CreateDividend(req CreateDividendRequest) (*models.Div
 func (s *DividendService) GetDividendsByAccount(accountID uint) ([]models.Dividend, error) {
 	var dividends []models.Dividend
 	err := s.db.Where("account_id = ?", accountID).
-		Preload("Asset").
+		// 소프트삭제된 자산도 표시 (과거 배당 내역의 종목명 유지)
+		Preload("Asset", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Order("date DESC, created_at DESC").
 		Find(&dividends).Error
 
