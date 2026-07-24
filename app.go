@@ -188,6 +188,10 @@ func (a *App) GetDividendsByAccount(accountID uint) (interface{}, error) {
 	return a.dividendService.GetDividendsByAccount(accountID)
 }
 
+func (a *App) GetAllDividends() (interface{}, error) {
+	return a.dividendService.GetAllDividends()
+}
+
 func (a *App) GetMonthlyDividends(startDate, endDate string) (interface{}, error) {
 	start, err := parseDate(startDate)
 	if err != nil {
@@ -251,6 +255,11 @@ func (a *App) SearchTicker(query string) (interface{}, error) {
 
 func (a *App) GetCurrentPrice(ticker string) (interface{}, error) {
 	return a.tickerService.GetCurrentPrice(ticker)
+}
+
+// GetCurrentPrices 는 여러 티커의 시세를 동시 5개 제한으로 일괄 조회한다 (5분 캐시 적용).
+func (a *App) GetCurrentPrices(tickers []string) (interface{}, error) {
+	return a.tickerService.GetCurrentPrices(tickers), nil
 }
 
 func (a *App) GetPriceHistory(ticker string, rangeStr string, interval string) (interface{}, error) {

@@ -96,7 +96,7 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
 
   if (loading) {
     return (
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
         <div className="flex items-center justify-center h-64">
           <div className="text-slate-400">로딩 중...</div>
         </div>
@@ -106,7 +106,7 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
 
   if (error) {
     return (
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
         <div className="flex items-center justify-center h-64">
           <div className="text-red-400">{error}</div>
         </div>
@@ -115,7 +115,7 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
   }
 
   return (
-    <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+    <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">

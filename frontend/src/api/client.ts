@@ -211,6 +211,11 @@ export const apiClient = {
     return WailsApp.GetDividendsByAccount(accountID);
   },
 
+  GetAllDividends: async () => {
+    if (isWeb) return fetchApi<Dividend[]>('/dividends/all');
+    return WailsApp.GetAllDividends();
+  },
+
   CreateDividend: async (accountID: number, assetID: number, date: string, amount: number, tax: number, currency: string, isReceived: boolean, notes: string) => {
     if (isWeb) {
       return fetchApi<Dividend>('/dividends', {
@@ -280,14 +285,8 @@ export const apiClient = {
 
   GetCurrentPrices: async (tickers: string[]) => {
     if (isWeb) return fetchApi<Record<string, any>>(`/ticker/prices?tickers=${tickers.join(',')}`);
-    // Wails fallback: call individually
-    const result: Record<string, any> = {};
-    await Promise.all(tickers.map(async (t) => {
-      try {
-        result[t.toUpperCase()] = await WailsApp.GetCurrentPrice(t);
-      } catch { /* ignore */ }
-    }));
-    return result;
+    // Wails: 서버 측 일괄 조회(동시 5개 제한 + 5분 캐시) 사용
+    return (await WailsApp.GetCurrentPrices(tickers)) as Record<string, any>;
   },
 
   GetUSDToKRW: async () => {

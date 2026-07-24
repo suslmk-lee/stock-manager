@@ -143,77 +143,18 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
         ? buyInvestmentRaw * exchangeRateValue
         : buyInvestmentRaw;
 
-      // 보유원가/누적매수가 모두 비어있을 때를 대비해 평가금액도 계산
-      const tickers = Array.from(
-        new Set(
-          holdings
-            .filter(h => (h.quantity || 0) > 0 && h.asset?.ticker)
-            .map(h => h.asset!.ticker)
-        )
-      );
-
-      // 일괄 시세 조회 (5분 캐시 적용)
-      const batchPrices = tickers.length > 0
-        ? await apiClient.GetCurrentPrices(tickers) as Record<string, any>
-        : {};
-
-      const priceMap = new Map<string, number>(
-        tickers.map(ticker => {
-          const priceData = batchPrices[ticker.toUpperCase()] || batchPrices[ticker];
-          const rawPrice = Number(priceData?.price || 0);
-          const currency = String(priceData?.currency || '');
-          const priceInKRW = currency === 'USD' ? rawPrice * exchangeRateValue : rawPrice;
-          return [ticker, priceInKRW] as const;
-        })
-      );
-
-      const marketValueInKRW = holdings.reduce((sum, h) => {
-        const qty = h.quantity || 0;
-        const ticker = h.asset?.ticker;
-        if (!ticker || qty <= 0) return sum;
-        const price = priceMap.get(ticker) || 0;
-        return sum + (qty * price);
-      }, 0);
-
-      // 기본 분모는 총평가금액(주식/ETF 화면의 평가금액 기준)
-      let investmentBase = marketValueInKRW;
-      let basisLabel = '총평가금액';
-
-      // 평가금액 계산이 어려운 경우에만 보조 기준 사용
-      if (investmentBase <= 0) {
-        investmentBase = Math.max(investmentInKRW, buyInvestmentInKRW);
-        basisLabel = buyInvestmentInKRW >= investmentInKRW ? '누적매수(대체)' : '보유원가(대체)';
-      }
-
-      setInvestmentBasisLabel(basisLabel);
-      setTotalInvestment(investmentBase);
-
-      // 올해 누적 연배당률(YTD): 올해 배당금 / 투자금
-      const computedYield = investmentBase > 0
-        ? (yearlyTotal / investmentBase) * 100
-        : 0;
-      setAnnualYield(computedYield);
-
-      // 예상 연배당률: 예상 연배당금 / 투자금
-      const computedExpectedYield = investmentBase > 0
-        ? (annualizedDividend / investmentBase) * 100
-        : 0;
-      setExpectedAnnualYield(computedExpectedYield);
-
-      // 자산별 배당금 Top10 계산
+      // 자산별 배당금 Top10 (배당률은 시세 도착 후 갱신)
       const assetMap = new Map<number, { name: string; ticker: string; total: number; count: number }>();
-      
       dividends.forEach(div => {
         if (div.asset) {
-          const amountInKRW = div.currency === 'USD' 
-            ? div.amount * exchangeRateValue 
+          const amountInKRW = div.currency === 'USD'
+            ? div.amount * exchangeRateValue
             : div.amount;
-          
-          const existing = assetMap.get(div.asset_id) || { 
-            name: div.asset.name, 
-            ticker: div.asset.ticker, 
-            total: 0, 
-            count: 0 
+          const existing = assetMap.get(div.asset_id) || {
+            name: div.asset.name,
+            ticker: div.asset.ticker,
+            total: 0,
+            count: 0,
           };
           assetMap.set(div.asset_id, {
             name: div.asset.name,
@@ -223,33 +164,88 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
           });
         }
       });
-
-      // Top10 정렬 (배당률 계산 포함)
       const sortedAssets = Array.from(assetMap.values())
         .sort((a, b) => b.total - a.total)
-        .slice(0, 10)
-        .map(asset => {
-          // 해당 종목의 평가금액 계산
-          const holding = holdings.find(h => h.asset?.ticker === asset.ticker);
-          const qty = holding?.quantity || 0;
-          const assetPrice = priceMap.get(asset.ticker) || 0;
-          const marketValue = qty * assetPrice;
-          const assetYield = marketValue > 0 ? (asset.total / marketValue) * 100 : 0;
+        .slice(0, 10);
 
-          return {
-            assetName: asset.name,
-            ticker: asset.ticker,
-            total: asset.total,
-            count: asset.count,
-            yield: assetYield,
-          };
+      // 1) 시세 비의존 값 + 원가 기반 잠정 배당률을 먼저 표시 (패널 즉시 렌더)
+      const fallbackBase = Math.max(investmentInKRW, buyInvestmentInKRW);
+      const fallbackLabel = buyInvestmentInKRW >= investmentInKRW ? '누적매수(대체)' : '보유원가(대체)';
+      setInvestmentBasisLabel(fallbackLabel);
+      setTotalInvestment(fallbackBase);
+      setAnnualYield(fallbackBase > 0 ? (yearlyTotal / fallbackBase) * 100 : 0);
+      setExpectedAnnualYield(fallbackBase > 0 ? (annualizedDividend / fallbackBase) * 100 : 0);
+      setTopAssets(
+        sortedAssets.map(asset => ({
+          assetName: asset.name,
+          ticker: asset.ticker,
+          total: asset.total,
+          count: asset.count,
+          yield: 0,
+        }))
+      );
+      setLoading(false);
+
+      // 2) 시세는 비차단으로 받아 평가금액 기반 값(투자금/배당률/종목별 수익률)만 갱신
+      const tickers = Array.from(
+        new Set(
+          holdings
+            .filter(h => (h.quantity || 0) > 0 && h.asset?.ticker)
+            .map(h => h.asset!.ticker)
+        )
+      );
+      if (tickers.length === 0) return;
+
+      apiClient
+        .GetCurrentPrices(tickers)
+        .then((batchPrices) => {
+          const prices = (batchPrices || {}) as Record<string, any>;
+          const priceMap = new Map<string, number>(
+            tickers.map(ticker => {
+              const priceData = prices[ticker.toUpperCase()] || prices[ticker];
+              const rawPrice = Number(priceData?.price || 0);
+              const currency = String(priceData?.currency || '');
+              const priceInKRW = currency === 'USD' ? rawPrice * exchangeRateValue : rawPrice;
+              return [ticker, priceInKRW] as const;
+            })
+          );
+
+          const marketValueInKRW = holdings.reduce((sum, h) => {
+            const qty = h.quantity || 0;
+            const ticker = h.asset?.ticker;
+            if (!ticker || qty <= 0) return sum;
+            return sum + qty * (priceMap.get(ticker) || 0);
+          }, 0);
+
+          // 평가금액이 산출되면 총평가금액 기준으로 교체
+          if (marketValueInKRW > 0) {
+            setInvestmentBasisLabel('총평가금액');
+            setTotalInvestment(marketValueInKRW);
+            setAnnualYield((yearlyTotal / marketValueInKRW) * 100);
+            setExpectedAnnualYield((annualizedDividend / marketValueInKRW) * 100);
+          }
+
+          // 종목별 배당률 갱신
+          setTopAssets(
+            sortedAssets.map(asset => {
+              const holding = holdings.find(h => h.asset?.ticker === asset.ticker);
+              const qty = holding?.quantity || 0;
+              const marketValue = qty * (priceMap.get(asset.ticker) || 0);
+              return {
+                assetName: asset.name,
+                ticker: asset.ticker,
+                total: asset.total,
+                count: asset.count,
+                yield: marketValue > 0 ? (asset.total / marketValue) * 100 : 0,
+              };
+            })
+          );
+        })
+        .catch((err) => {
+          console.error('Failed to load prices for dividend stats:', err);
         });
-      
-      setTopAssets(sortedAssets);
-
     } catch (err) {
       console.error('Failed to load dividend stats:', err);
-    } finally {
       setLoading(false);
     }
   };

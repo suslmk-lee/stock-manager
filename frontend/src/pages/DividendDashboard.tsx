@@ -4,6 +4,7 @@ import { Account } from '../types/models';
 import DividendChart from '../components/DividendChart';
 import DividendStatistics from '../components/DividendStatistics';
 import AssetStatistics from '../components/AssetStatistics';
+import TotalReturnByAsset from '../components/TotalReturnByAsset';
 import { DollarSign, Filter } from 'lucide-react';
 
 export default function DividendDashboard() {
@@ -106,13 +107,20 @@ export default function DividendDashboard() {
         </div>
       )}
 
-      <AssetStatistics 
+      <AssetStatistics
         accountId={selectedAccount || undefined}
         marketType={selectedMarket}
       />
 
       <div className="mt-6">
-        <DividendStatistics 
+        <TotalReturnByAsset
+          accountId={selectedAccount || undefined}
+          marketType={selectedMarket}
+        />
+      </div>
+
+      <div className="mt-6">
+        <DividendStatistics
           accountId={selectedAccount} 
           marketType={selectedMarket}
           months={selectedPeriod}

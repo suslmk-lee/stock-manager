@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../api/client';
-import { Account, Asset, Dividend } from '../types/models';
+import { Account, Asset, Dividend, Transaction } from '../types/models';
 import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock, TrendingUp, Wallet, X } from 'lucide-react';
 import DividendQuickStats from './DividendQuickStats';
 
@@ -22,6 +22,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
   const [showAllDividends, setShowAllDividends] = useState(false);
   const [assetSearchQuery, setAssetSearchQuery] = useState('');
   const [showAssetDropdown, setShowAssetDropdown] = useState(false);
+  // 폼 계좌의 거래 이력에 등장한 자산 id (전량 매도해 보유 0인 종목도 배당 입력 허용)
+  const [accountTxAssetIds, setAccountTxAssetIds] = useState<Set<number>>(new Set());
   const [statsKey, setStatsKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<Dividend | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -64,6 +66,36 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       });
     }
   }, [selectedAccount]);
+
+  // 폼 계좌의 거래 이력 자산 id 로드 (전량 매도된 종목도 배당 입력 가능하도록)
+  useEffect(() => {
+    if (!formData.accountId) {
+      setAccountTxAssetIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    apiClient
+      .GetTransactionsByAccount(formData.accountId)
+      .then((txs) => {
+        if (cancelled) return;
+        const ids = new Set<number>();
+        (txs as Transaction[]).forEach((t) => ids.add(t.asset_id));
+        setAccountTxAssetIds(ids);
+      })
+      .catch(() => {
+        if (!cancelled) setAccountTxAssetIds(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.accountId]);
+
+  // 배당 입력 시 선택 가능한 자산인지 판별:
+  // 현재 보유 / 과거 거래 이력 / 기존 배당 이력 중 하나라도 해당 계좌에 있으면 허용
+  const isAssetSelectableForDividend = (asset: Asset) =>
+    !!asset.holdings?.some((h) => h.account_id === formData.accountId) ||
+    accountTxAssetIds.has(asset.id) ||
+    dividends.some((d) => d.account_id === formData.accountId && d.asset_id === asset.id);
 
   const loadData = async () => {
     try {
@@ -297,7 +329,49 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
   };
 
   if (loading) {
-    return <div className="text-center py-12 text-slate-400">로딩 중...</div>;
+    return (
+      <div className="animate-pulse">
+        {/* 헤더 스켈레톤 */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-7 w-40 rounded bg-slate-700" />
+          <div className="flex gap-2">
+            <div className="h-10 w-32 rounded-lg bg-slate-700" />
+            <div className="h-10 w-28 rounded-lg bg-slate-700" />
+          </div>
+        </div>
+
+        {/* 요약 통계 카드 스켈레톤 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700"
+            >
+              <div className="h-3 w-20 rounded bg-slate-700 mb-3" />
+              <div className="h-6 w-28 rounded bg-slate-700 mb-2" />
+              <div className="h-2.5 w-16 rounded bg-slate-700" />
+            </div>
+          ))}
+        </div>
+
+        {/* 최근 배당금 리스트 스켈레톤 */}
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
+          <div className="h-4 w-32 rounded bg-slate-700 mb-4" />
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 bg-slate-700/40 rounded-lg p-4">
+                <div className="w-10 h-10 rounded-lg bg-slate-600" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-40 rounded bg-slate-600" />
+                  <div className="h-2.5 w-24 rounded bg-slate-600" />
+                </div>
+                <div className="h-4 w-20 rounded bg-slate-600" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (accounts.length === 0) {
@@ -677,10 +751,9 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                         console.log('Enter key pressed in asset search');
                         // 검색 결과 중 첫 번째 자산 자동 선택 (선택된 계좌에 속한 자산만)
                         const filteredAssets = assets.filter(asset => {
-                          // 선택된 계좌에 속한 자산만 필터링
-                          const belongsToAccount = asset.holdings?.some(h => h.account_id === formData.accountId);
-                          if (!belongsToAccount) return false;
-                          
+                          // 보유/거래/배당 이력이 있는 자산만 (전량 매도된 종목 포함)
+                          if (!isAssetSelectableForDividend(asset)) return false;
+
                           const query = assetSearchQuery.toLowerCase();
                           return (
                             asset.ticker.toLowerCase().includes(query) ||
@@ -710,10 +783,9 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                     <div className="absolute z-10 w-full mt-1 bg-slate-700 border border-slate-600 rounded-lg max-h-60 overflow-y-auto shadow-lg">
                       {assets
                         .filter(asset => {
-                          // 선택된 계좌에 속한 자산만 필터링
-                          const belongsToAccount = asset.holdings?.some(h => h.account_id === formData.accountId);
-                          if (!belongsToAccount) return false;
-                          
+                          // 보유/거래/배당 이력이 있는 자산만 (전량 매도된 종목 포함)
+                          if (!isAssetSelectableForDividend(asset)) return false;
+
                           const query = assetSearchQuery.toLowerCase();
                           return (
                             asset.ticker.toLowerCase().includes(query) ||

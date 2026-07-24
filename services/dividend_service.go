@@ -154,6 +154,22 @@ func (s *DividendService) GetDividendsByAccount(accountID uint) ([]models.Divide
 	return dividends, nil
 }
 
+// GetAllDividends 는 전 계좌의 배당 내역을 반환한다 (종합 손익 집계용).
+func (s *DividendService) GetAllDividends() ([]models.Dividend, error) {
+	var dividends []models.Dividend
+	err := s.db.
+		// 소프트삭제된 자산도 표시 (과거 배당 내역의 종목명 유지)
+		Preload("Asset", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Order("date DESC, created_at DESC").
+		Find(&dividends).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dividends: %w", err)
+	}
+
+	return dividends, nil
+}
+
 func (s *DividendService) GetDividendsByAsset(assetID uint) ([]models.Dividend, error) {
 	var dividends []models.Dividend
 	err := s.db.Where("asset_id = ?", assetID).

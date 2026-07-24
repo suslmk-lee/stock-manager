@@ -775,6 +775,15 @@ func setupDividendRoutes(api *gin.RouterGroup) {
 			}
 			c.JSON(http.StatusOK, res)
 		})
+
+		dividends.GET("/all", func(c *gin.Context) {
+			res, err := dividendService.GetAllDividends()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, res)
+		})
 	}
 }
 

@@ -575,6 +575,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
   };
 
   const previewCurrency = getCurrencyFromTicker(selectedAsset?.ticker || '');
+  // 입력 폼 통화 심볼: 종목 선택 시 종목 통화(미국 주식=USD) 기준, 미선택 시 계좌 통화 기준
+  const formCurrencySymbol = selectedAsset ? (previewCurrency === 'USD' ? '$' : '₩') : currencySymbol;
 
   // 실현 손익 합계 (통화별) - 티커 기준으로 통화 재정의
   const pnlSummary = useMemo(() => {
@@ -1692,6 +1694,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       <Tooltip
                         contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
                         labelStyle={{ color: '#cbd5e1' }}
+                        itemStyle={{ color: '#e2e8f0' }}
                         formatter={(v: number) => [formatMoney(v, cur), '종가']}
                       />
                       <Line type="monotone" dataKey="close" stroke="#a78bfa" strokeWidth={2} dot={false} />
@@ -2025,7 +2028,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium">
-                      {formData.type === 'Sell' ? '주당 매도가' : '주당 매수가'} ({currencySymbol}) *
+                      {formData.type === 'Sell' ? '주당 매도가' : '주당 매수가'} ({formCurrencySymbol}) *
                       {formData.type === 'Sell' && formData.price && sellPriceAutoMode && (
                         <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">시세</span>
                       )}
@@ -2072,7 +2075,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium">
-                      수수료 ({currencySymbol})
+                      수수료 ({formCurrencySymbol})
                       {feeAutoMode ? (
                         <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">자동</span>
                       ) : (

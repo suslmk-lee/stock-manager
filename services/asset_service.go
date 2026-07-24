@@ -6,6 +6,7 @@ import (
 	"stock-manager/database"
 	"stock-manager/models"
 	"strings"
+	"sync"
 
 	"gorm.io/gorm"
 )
@@ -126,11 +127,12 @@ func (s *AssetService) CreateAsset(req CreateAssetRequest) (*models.Asset, error
 	}
 
 	asset := &models.Asset{
-		Ticker:  req.Ticker,
-		Name:    req.Name,
-		Type:    req.Type,
-		Sector:  req.Sector,
-		LogoURL: req.LogoURL,
+		Ticker:      req.Ticker,
+		Name:        req.Name,
+		Type:        req.Type,
+		Sector:      req.Sector,
+		LogoURL:     req.LogoURL,
+		LogoChecked: true, // 생성 시점에 로고를 이미 해석함
 	}
 
 	// 트랜잭션 시작
@@ -201,21 +203,46 @@ func (s *AssetService) GetAllAssets() ([]models.Asset, error) {
 		return nil, fmt.Errorf("failed to get assets: %w", err)
 	}
 
-	for i := range assets {
-		if strings.TrimSpace(assets[i].LogoURL) != "" {
-			continue
-		}
-		logoURL := ResolveAssetLogoURL(assets[i].Ticker)
-		if logoURL == "" {
-			continue
-		}
-		assets[i].LogoURL = logoURL
-		_ = s.db.Model(&models.Asset{}).
-			Where("id = ? AND (logo_url IS NULL OR logo_url = '')", assets[i].ID).
-			Update("logo_url", logoURL).Error
-	}
+	// 로고 해석은 외부 CDN HTTP 호출이라 느리므로, 응답을 막지 않고 백그라운드에서 처리한다.
+	// 결과(못 찾은 경우 포함)를 DB에 영속화해 재구동마다 재조회하지 않도록 한다.
+	s.resolveMissingLogosAsync(assets)
 
 	return assets, nil
+}
+
+// resolveMissingLogosAsync 는 로고가 아직 확인되지 않은 자산의 로고를
+// 백그라운드에서 동시(최대 5개)로 해석하고 결과를 영속화한다.
+func (s *AssetService) resolveMissingLogosAsync(assets []models.Asset) {
+	var targets []models.Asset
+	for _, a := range assets {
+		if strings.TrimSpace(a.LogoURL) == "" && !a.LogoChecked {
+			targets = append(targets, a)
+		}
+	}
+	if len(targets) == 0 {
+		return
+	}
+
+	go func(targets []models.Asset) {
+		sem := make(chan struct{}, 5)
+		var wg sync.WaitGroup
+		for _, a := range targets {
+			wg.Add(1)
+			go func(asset models.Asset) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				logoURL := ResolveAssetLogoURL(asset.Ticker)
+				updates := map[string]interface{}{"logo_checked": true}
+				if logoURL != "" {
+					updates["logo_url"] = logoURL
+				}
+				_ = s.db.Model(&models.Asset{}).Where("id = ?", asset.ID).Updates(updates).Error
+			}(a)
+		}
+		wg.Wait()
+	}(targets)
 }
 
 func (s *AssetService) GetAssetsBySector(sector string) ([]models.Asset, error) {

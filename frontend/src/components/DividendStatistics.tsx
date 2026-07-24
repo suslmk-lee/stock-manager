@@ -51,7 +51,7 @@ export default function DividendStatistics({ accountId, marketType, months = 12 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-slate-800 rounded-xl p-6 border border-slate-700 animate-pulse">
+          <div key={i} className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700 animate-pulse">
             <div className="h-20"></div>
           </div>
         ))}
@@ -131,7 +131,7 @@ export default function DividendStatistics({ accountId, marketType, months = 12 
 
       {/* 시장별 통계 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
             국내 시장
@@ -152,7 +152,7 @@ export default function DividendStatistics({ accountId, marketType, months = 12 
           </div>
         </div>
 
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <span className="w-3 h-3 bg-green-500 rounded-full"></span>
             해외 시장
@@ -175,7 +175,7 @@ export default function DividendStatistics({ accountId, marketType, months = 12 
       </div>
 
       {/* 세금 정보 */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
         <h3 className="text-lg font-semibold mb-4">세금 정보</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
