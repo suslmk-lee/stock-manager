@@ -312,6 +312,11 @@ export const apiClient = {
     return WailsApp.GetSnapshotsByAccount(accountID);
   },
 
+  GetSnapshotsByAsset: async (assetID: number) => {
+    if (isWeb) return fetchApi<any[]>(`/snapshots/asset/${assetID}`);
+    return WailsApp.GetSnapshotsByAsset(assetID);
+  },
+
   GetMonthlySnapshotByAccount: async (accountID: number) => {
     if (isWeb) return fetchApi<any[]>(`/snapshots/account/${accountID}/monthly`);
     return WailsApp.GetMonthlySnapshotByAccount(accountID);

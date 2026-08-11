@@ -294,6 +294,10 @@ func (a *App) GetSnapshotsByAccount(accountID uint) (interface{}, error) {
 	return a.snapshotService.GetSnapshotsByAccount(accountID)
 }
 
+func (a *App) GetSnapshotsByAsset(assetID uint) (interface{}, error) {
+	return a.snapshotService.GetSnapshotsByAsset(assetID)
+}
+
 func (a *App) GetMonthlySnapshotByAccount(accountID uint) (interface{}, error) {
 	return a.snapshotService.GetMonthlyTotalByAccount(accountID)
 }

@@ -6,6 +6,7 @@ import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 interface TotalReturnByAssetProps {
   accountId?: number;
   marketType?: string;
+  onSelectAsset?: (asset: { assetId: number; ticker: string; name: string }) => void;
 }
 
 interface AssetRow {
@@ -34,7 +35,10 @@ const formatMoney = (value: number, currency: string) => {
 
 const signed = (value: number, currency: string) => `${value >= 0 ? '+' : ''}${formatMoney(value, currency)}`;
 
-export default function TotalReturnByAsset({ accountId, marketType = 'all' }: TotalReturnByAssetProps) {
+const formatNumber = (n: number, fractionDigits = 0) =>
+  n.toLocaleString('ko-KR', { maximumFractionDigits: fractionDigits });
+
+export default function TotalReturnByAsset({ accountId, marketType = 'all', onSelectAsset }: TotalReturnByAssetProps) {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<AssetRow[]>([]);
   const [priceMap, setPriceMap] = useState<Record<string, number>>({});
@@ -151,11 +155,12 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all' }: To
   const computed = rows.map((r) => {
     const price = priceMap[r.ticker];
     const hasPrice = r.qty <= 0 ? true : price !== undefined && price > 0;
-    const unrealized = r.qty > 0 && price ? r.qty * price - r.costHolding : 0;
+    const marketValue = r.qty > 0 && price ? r.qty * price : 0;
+    const unrealized = r.qty > 0 && price ? marketValue - r.costHolding : 0;
     const total = unrealized + r.realized + r.dividend;
     const cost = r.costHolding + r.costSold;
     const yieldPercent = cost > 0 ? (total / cost) * 100 : 0;
-    return { ...r, unrealized, total, cost, yieldPercent, hasPrice };
+    return { ...r, marketValue, unrealized, total, cost, yieldPercent, hasPrice };
   });
 
   // KRW 환산 실질손익 기준 정렬
@@ -164,6 +169,7 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all' }: To
   // 합계 (KRW 환산)
   const summary = sorted.reduce(
     (acc, r) => {
+      acc.marketValue += toKRW(r.marketValue, r.currency);
       acc.unrealized += toKRW(r.unrealized, r.currency);
       acc.realized += toKRW(r.realized, r.currency);
       acc.dividend += toKRW(r.dividend, r.currency);
@@ -171,7 +177,7 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all' }: To
       acc.cost += toKRW(r.cost, r.currency);
       return acc;
     },
-    { unrealized: 0, realized: 0, dividend: 0, total: 0, cost: 0 }
+    { marketValue: 0, unrealized: 0, realized: 0, dividend: 0, total: 0, cost: 0 }
   );
   const summaryYield = summary.cost > 0 ? (summary.total / summary.cost) * 100 : 0;
 
@@ -203,7 +209,11 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all' }: To
       ) : (
         <>
           {/* 합계 요약 (KRW 환산) */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+            <div className="bg-gradient-to-br from-slate-700/40 to-slate-900/60 rounded-lg p-3 border border-slate-700/50">
+              <p className="text-xs text-slate-500 mb-1">평가금</p>
+              <p className="text-sm font-bold text-white">{formatMoney(summary.marketValue, 'KRW')}</p>
+            </div>
             <div className="bg-gradient-to-br from-slate-700/40 to-slate-900/60 rounded-lg p-3 border border-slate-700/50">
               <p className="text-xs text-slate-500 mb-1">평가손익</p>
               <p className={`text-sm font-bold ${pnlClass(summary.unrealized)}`}>{signed(summary.unrealized, 'KRW')}</p>
@@ -235,6 +245,7 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all' }: To
               <thead>
                 <tr className="bg-slate-800/70 text-xs text-slate-400 border-b border-slate-700">
                   <th className="text-left font-medium px-3 py-2.5">종목</th>
+                  <th className="text-right font-medium px-3 py-2.5">평가금</th>
                   <th className="text-right font-medium px-3 py-2.5">평가손익</th>
                   <th className="text-right font-medium px-3 py-2.5">실현손익</th>
                   <th className="text-right font-medium px-3 py-2.5">배당(세후)</th>
@@ -244,7 +255,11 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all' }: To
               </thead>
               <tbody className="divide-y divide-slate-700/60">
                 {sorted.map((r) => (
-                  <tr key={r.assetId} className="hover:bg-slate-800/50 transition-colors">
+                  <tr
+                    key={r.assetId}
+                    onClick={onSelectAsset ? () => onSelectAsset({ assetId: r.assetId, ticker: r.ticker, name: r.name }) : undefined}
+                    className={`hover:bg-slate-800/50 transition-colors ${onSelectAsset ? 'cursor-pointer' : ''}`}
+                  >
                     <td className="px-3 py-2.5 min-w-[170px]">
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs">{r.currency === 'KRW' ? '🇰🇷' : '🇺🇸'}</span>
@@ -257,6 +272,20 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all' }: To
                         </div>
                       </div>
                     </td>
+                    {/* 평가금 */}
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      {r.qty <= 0 ? (
+                        <span className="text-slate-600">—</span>
+                      ) : r.hasPrice ? (
+                        <div>
+                          <p className="text-white font-medium">{formatMoney(r.marketValue, r.currency)}</p>
+                          <p className="text-xs text-slate-500">{formatNumber(r.qty, 4)}주</p>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">…</span>
+                      )}
+                    </td>
+                    {/* 평가손익 */}
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">
                       {r.qty <= 0 ? (
                         <span className="text-slate-600">—</span>

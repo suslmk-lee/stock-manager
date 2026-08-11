@@ -895,6 +895,16 @@ func setupUtilityRoutes(api *gin.RouterGroup) {
 		c.JSON(http.StatusOK, res)
 	})
 
+	api.GET("/snapshots/asset/:id", func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		res, err := snapshotService.GetSnapshotsByAsset(uint(id))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
 	// ==========================================
 	// Realized P&L
 	// ==========================================

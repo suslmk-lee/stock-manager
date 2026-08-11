@@ -5,6 +5,7 @@ import DividendChart from '../components/DividendChart';
 import DividendStatistics from '../components/DividendStatistics';
 import AssetStatistics from '../components/AssetStatistics';
 import TotalReturnByAsset from '../components/TotalReturnByAsset';
+import AssetDetailView from '../components/AssetDetailView';
 import { DollarSign, Filter } from 'lucide-react';
 
 export default function DividendDashboard() {
@@ -13,6 +14,7 @@ export default function DividendDashboard() {
   const [selectedMarket, setSelectedMarket] = useState<string>('all');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [detailAsset, setDetailAsset] = useState<{ assetId: number; ticker: string; name: string } | null>(null);
 
   useEffect(() => {
     loadAccounts();
@@ -116,8 +118,20 @@ export default function DividendDashboard() {
         <TotalReturnByAsset
           accountId={selectedAccount || undefined}
           marketType={selectedMarket}
+          onSelectAsset={setDetailAsset}
         />
       </div>
+
+      {detailAsset && (
+        <AssetDetailView
+          assetId={detailAsset.assetId}
+          ticker={detailAsset.ticker}
+          name={detailAsset.name}
+          accountId={selectedAccount || undefined}
+          accountName={accounts.find((a) => a.id === selectedAccount)?.name}
+          onClose={() => setDetailAsset(null)}
+        />
+      )}
 
       <div className="mt-6">
         <DividendStatistics

@@ -125,6 +125,16 @@ func (s *PortfolioSnapshotService) GetSnapshotsByAccountAndAsset(accountID, asse
 	return snapshots, err
 }
 
+// GetSnapshotsByAsset returns snapshots for a specific asset across all accounts (전 계좌 기준 종목 추세용)
+func (s *PortfolioSnapshotService) GetSnapshotsByAsset(assetID uint) ([]models.PortfolioSnapshot, error) {
+	var snapshots []models.PortfolioSnapshot
+	err := s.db.Preload("Account").Preload("Asset").
+		Where("asset_id = ?", assetID).
+		Order("year DESC, month DESC").
+		Find(&snapshots).Error
+	return snapshots, err
+}
+
 // GetMonthlyTotalByAccount returns monthly total market value per account
 func (s *PortfolioSnapshotService) GetMonthlyTotalByAccount(accountID uint) ([]map[string]interface{}, error) {
 	var results []struct {

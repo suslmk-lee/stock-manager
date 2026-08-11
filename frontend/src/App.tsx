@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from './api/client';
 import { Account } from './types/models';
 import { Plus, Trash2, Wallet } from 'lucide-react';
+import AccountDashboard from './components/AccountDashboard';
 
 const DOMESTIC_BROKERS = [
   '삼성증권',
@@ -32,6 +33,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [selectedAccountDetail, setSelectedAccountDetail] = useState<Account | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     broker: '',
@@ -104,6 +106,11 @@ function App() {
         <div className="text-white text-xl">로딩 중...</div>
       </div>
     );
+  }
+
+  // 계좌 상세 드릴다운
+  if (selectedAccountDetail) {
+    return <AccountDashboard account={selectedAccountDetail} onBack={() => setSelectedAccountDetail(null)} />;
   }
 
   return (
@@ -241,7 +248,8 @@ function App() {
             accounts.map((account) => (
               <div
                 key={account.id}
-                className="bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-700 hover:border-blue-500 transition-colors"
+                onClick={() => setSelectedAccountDetail(account)}
+                className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 sm:p-6 border border-slate-700 hover:border-blue-500 transition-colors cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
@@ -328,7 +336,7 @@ function App() {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleDeleteAccount(account.id)}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteAccount(account.id); }}
                     className="text-red-400 hover:text-red-300 transition-colors"
                   >
                     <Trash2 className="w-5 h-5" />
