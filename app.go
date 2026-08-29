@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"stock-manager/database"
+	"stock-manager/httpapi"
 	"stock-manager/models"
 	"stock-manager/services"
 	"time"
@@ -22,12 +23,12 @@ type App struct {
 	realizedPnLService  *services.RealizedPnLService
 }
 
+// NewApp 은 서비스 인스턴스를 모두 구성한 App 을 반환한다.
+// main.go 가 wails.Run 이전에 StartAPIServer 를 고루틴으로 띄우므로,
+// 서비스 생성을 startup(=Wails OnStartup)까지 미루면 REST 라우트가 nil 서비스를
+// 붙잡게 된다. database.InitDB() 직후 호출되는 이 시점에 함께 생성한다.
 func NewApp() *App {
-	return &App{}
-}
-
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+	a := &App{}
 	a.accountService = services.NewAccountService()
 	a.assetService = services.NewAssetService()
 	a.transactionService = services.NewTransactionService()
@@ -37,6 +38,27 @@ func (a *App) startup(ctx context.Context) {
 	a.exchangeRateService = services.NewExchangeRateService()
 	a.snapshotService = services.NewPortfolioSnapshotService(database.GetDB(), a.tickerService)
 	a.realizedPnLService = services.NewRealizedPnLService()
+	return a
+}
+
+// apiServices 는 Wails 바인딩이 쓰는 서비스 인스턴스를 그대로 REST 라우트에 넘긴다.
+// (시세 캐시 등 상태를 두 경로가 공유하던 기존 동작을 유지)
+func (a *App) apiServices() *httpapi.Services {
+	return &httpapi.Services{
+		Account:      a.accountService,
+		Asset:        a.assetService,
+		Transaction:  a.transactionService,
+		Holding:      a.holdingService,
+		Dividend:     a.dividendService,
+		Ticker:       a.tickerService,
+		ExchangeRate: a.exchangeRateService,
+		Snapshot:     a.snapshotService,
+		RealizedPnL:  a.realizedPnLService,
+	}
+}
+
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
 
 	// 앱 시작 시 이번 달 스냅샷 자동 기록
 	a.snapshotService.EnsureCurrentMonthSnapshotAsync()

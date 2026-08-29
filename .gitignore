@@ -73,3 +73,6 @@ stockManager_Gsecret.json
 family-care-5553b-fb6310ced806.json
 
 
+
+# 윈도우에서 가져온 원본 env (내용은 .env 로 반영됨)
+/env
