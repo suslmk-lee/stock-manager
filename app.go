@@ -72,7 +72,7 @@ func (a *App) GetAccount(id uint) (interface{}, error) {
 	return a.accountService.GetAccount(id)
 }
 
-func (a *App) CreateAccount(name, broker, accountNumber, marketType, currency, description string) (interface{}, error) {
+func (a *App) CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType string) (interface{}, error) {
 	return a.accountService.CreateAccount(services.CreateAccountRequest{
 		Name:          name,
 		Broker:        broker,
@@ -80,10 +80,11 @@ func (a *App) CreateAccount(name, broker, accountNumber, marketType, currency, d
 		MarketType:    models.MarketType(marketType),
 		Currency:      currency,
 		Description:   description,
+		AccountType:   models.AccountType(accountType),
 	})
 }
 
-func (a *App) UpdateAccount(id uint, name, broker, accountNumber, marketType, currency, description string) (interface{}, error) {
+func (a *App) UpdateAccount(id uint, name, broker, accountNumber, marketType, currency, description, accountType string) (interface{}, error) {
 	return a.accountService.UpdateAccount(id, services.UpdateAccountRequest{
 		Name:          name,
 		Broker:        broker,
@@ -91,6 +92,7 @@ func (a *App) UpdateAccount(id uint, name, broker, accountNumber, marketType, cu
 		MarketType:    models.MarketType(marketType),
 		Currency:      currency,
 		Description:   description,
+		AccountType:   models.AccountType(accountType),
 	})
 }
 

@@ -26,6 +26,7 @@ type CreateAccountRequest struct {
 	MarketType    models.MarketType
 	Currency      string
 	Description   string
+	AccountType   models.AccountType
 }
 
 type UpdateAccountRequest struct {
@@ -35,6 +36,7 @@ type UpdateAccountRequest struct {
 	MarketType    models.MarketType
 	Currency      string
 	Description   string
+	AccountType   models.AccountType
 }
 
 func (s *AccountService) CreateAccount(req CreateAccountRequest) (*models.Account, error) {
@@ -54,6 +56,13 @@ func (s *AccountService) CreateAccount(req CreateAccountRequest) (*models.Accoun
 		req.MarketType = models.MarketTypeDomestic
 	}
 
+	if req.AccountType == "" {
+		req.AccountType = models.AccountTypeGeneral
+	}
+	if !req.AccountType.IsValid() {
+		return nil, fmt.Errorf("invalid account type: %s", req.AccountType)
+	}
+
 	account := &models.Account{
 		Name:          req.Name,
 		Broker:        req.Broker,
@@ -61,6 +70,7 @@ func (s *AccountService) CreateAccount(req CreateAccountRequest) (*models.Accoun
 		MarketType:    req.MarketType,
 		Currency:      req.Currency,
 		Description:   req.Description,
+		AccountType:   req.AccountType,
 	}
 
 	if err := s.db.Create(account).Error; err != nil {
@@ -116,6 +126,12 @@ func (s *AccountService) UpdateAccount(id uint, req UpdateAccountRequest) (*mode
 	}
 	if req.Currency != "" {
 		account.Currency = req.Currency
+	}
+	if req.AccountType != "" {
+		if !req.AccountType.IsValid() {
+			return nil, fmt.Errorf("invalid account type: %s", req.AccountType)
+		}
+		account.AccountType = req.AccountType
 	}
 	account.Description = req.Description
 

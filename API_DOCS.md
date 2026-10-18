@@ -27,7 +27,8 @@ X-API-Key: <API_KEY>
     "broker": "토스증권",
     "account_number": "123-45-67890",
     "market_type": "International", // "Domestic" | "International"
-    "currency": "USD"
+    "currency": "USD",
+    "account_type": "General" // 아래 계좌 유형 참고
   }
 ]
 ```
@@ -43,9 +44,23 @@ X-API-Key: <API_KEY>
   "account_number": "123-45-67890",
   "market_type": "International",
   "currency": "USD",
-  "description": "설명"
+  "description": "설명",
+  "account_type": "General" // 선택, 생략 시 "General"
 }
 ```
+
+**계좌 유형 (`account_type`)**
+
+| 값 | 의미 | 인출 제한 |
+|----|------|-----------|
+| `General` | 일반 계좌 | 없음 |
+| `ISA` | ISA 계좌 | 없음 |
+| `Pension` | 연금저축 | 있음 |
+| `IRP` | 개인형 퇴직연금(IRP) | 있음 |
+| `DC` | 확정기여형 퇴직연금(DC) | 있음 |
+
+허용되지 않은 값은 `invalid account type: X` 오류를 반환합니다. 수정(PUT) 시 생략하면 기존 값을 유지합니다.
+기존 계좌는 마이그레이션 시 이름/설명으로 자동 분류됩니다.
 
 ### 1.3 계좌 수정
 - **Method**: `PUT`
