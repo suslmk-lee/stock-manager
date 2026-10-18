@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Asset, Account, TickerInfo, Holding } from '../types/models';
+import { accountTypePrefix } from '../utils/accountType';
 import { Plus, Trash2, TrendingUp, Search, Edit2 } from 'lucide-react';
 
 const SECTORS = [
@@ -494,7 +495,7 @@ export default function AssetManager() {
                     <option value={0}>선택 안함</option>
                     {accounts.map((account) => (
                       <option key={account.id} value={account.id}>
-                        {account.broker} ({account.name})
+                        {accountTypePrefix(account)}{account.broker} ({account.name})
                       </option>
                     ))}
                   </select>
@@ -627,7 +628,7 @@ export default function AssetManager() {
                           <option value={0}>선택하세요</option>
                           {accounts.map((account) => (
                             <option key={account.id} value={account.id}>
-                              {account.broker} ({account.name})
+                              {accountTypePrefix(account)}{account.broker} ({account.name})
                             </option>
                           ))}
                         </select>

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
-import { ArrowLeft, Wallet } from 'lucide-react';
+import { getAccountTypeMeta } from '../utils/accountType';
+import { ArrowLeft, Wallet, Lock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import TotalReturnByAsset from './TotalReturnByAsset';
 import AssetDetailView from './AssetDetailView';
@@ -72,6 +73,10 @@ export default function AccountDashboard({ account, onBack }: AccountDashboardPr
           </span>
           <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 whitespace-nowrap">
             {account.market_type === 'Domestic' ? '국내' : '해외'}
+          </span>
+          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${getAccountTypeMeta(account).badgeClass}`}>
+            {getAccountTypeMeta(account).restricted && <Lock className="w-3 h-3" />}
+            {getAccountTypeMeta(account).short}
           </span>
         </div>
       </div>
