@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Holding, RealizedPnL, Dividend } from '../types/models';
 import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
 
 interface TotalReturnByAssetProps {
   accountId?: number;
   marketType?: string;
+  liquidity?: LiquidityFilter;
   onSelectAsset?: (asset: { assetId: number; ticker: string; name: string }) => void;
 }
 
@@ -38,7 +40,7 @@ const signed = (value: number, currency: string) => `${value >= 0 ? '+' : ''}${f
 const formatNumber = (n: number, fractionDigits = 0) =>
   n.toLocaleString('ko-KR', { maximumFractionDigits: fractionDigits });
 
-export default function TotalReturnByAsset({ accountId, marketType = 'all', onSelectAsset }: TotalReturnByAssetProps) {
+export default function TotalReturnByAsset({ accountId, marketType = 'all', liquidity = 'all', onSelectAsset }: TotalReturnByAssetProps) {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<AssetRow[]>([]);
   const [priceMap, setPriceMap] = useState<Record<string, number>>({});
@@ -47,7 +49,7 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', onSe
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountId, marketType]);
+  }, [accountId, marketType, liquidity]);
 
   const loadData = async () => {
     try {
@@ -72,6 +74,7 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', onSe
         const acc = accountMap.get(accId);
         if (marketType === 'domestic' && acc?.market_type !== 'Domestic') return false;
         if (marketType === 'international' && acc?.market_type !== 'International') return false;
+        if (!matchesLiquidity(acc, liquidity)) return false;
         return true;
       };
 

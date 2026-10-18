@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import { TrendingUp, DollarSign, Calendar, PieChart } from 'lucide-react';
+import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
 
 interface DividendStatisticsProps {
   accountId?: number;
   marketType?: string;
+  liquidity?: LiquidityFilter;
   months?: number;
 }
 
@@ -18,7 +20,7 @@ interface DividendStats {
   pending_count: number;
 }
 
-export default function DividendStatistics({ accountId, marketType, months = 12 }: DividendStatisticsProps) {
+export default function DividendStatistics({ accountId, marketType, liquidity = 'all', months = 12 }: DividendStatisticsProps) {
   const [stats, setStats] = useState<DividendStats | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [exchangeRate, setExchangeRate] = useState(1300);
@@ -26,7 +28,7 @@ export default function DividendStatistics({ accountId, marketType, months = 12 
 
   useEffect(() => {
     loadData();
-  }, [accountId, marketType, months]);
+  }, [accountId, marketType, liquidity, months]);
 
   const loadData = async () => {
     try {
@@ -59,8 +61,8 @@ export default function DividendStatistics({ accountId, marketType, months = 12 
     );
   }
 
-  const domesticAccounts = accounts.filter(acc => acc.market_type === 'Domestic');
-  const internationalAccounts = accounts.filter(acc => acc.market_type === 'International');
+  const domesticAccounts = accounts.filter(acc => acc.market_type === 'Domestic' && matchesLiquidity(acc, liquidity));
+  const internationalAccounts = accounts.filter(acc => acc.market_type === 'International' && matchesLiquidity(acc, liquidity));
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('ko-KR', {
