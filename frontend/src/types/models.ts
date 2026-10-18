@@ -1,5 +1,8 @@
 export type MarketType = 'Domestic' | 'International';
 
+// 계좌 유형: 연금저축/IRP/DC 는 중도 인출이 제한되는 계좌로 분류된다 (utils/accountType.ts 참고)
+export type AccountType = 'General' | 'ISA' | 'Pension' | 'IRP' | 'DC';
+
 export interface PricePoint {
   time: number; // unix seconds
   close: number;
@@ -31,6 +34,7 @@ export interface Account {
   broker: string;
   account_number: string;
   market_type: MarketType;
+  account_type?: AccountType;
   currency: string;
   description: string;
   created_at: string;
