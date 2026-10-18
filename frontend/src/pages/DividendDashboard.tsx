@@ -7,11 +7,19 @@ import AssetStatistics from '../components/AssetStatistics';
 import TotalReturnByAsset from '../components/TotalReturnByAsset';
 import AssetDetailView from '../components/AssetDetailView';
 import { DollarSign, Filter } from 'lucide-react';
+import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
+
+const LIQUIDITY_OPTIONS: { value: LiquidityFilter; label: string }[] = [
+  { value: 'all', label: '전체' },
+  { value: 'liquid', label: '인출 가능' },
+  { value: 'restricted', label: '인출 제한' },
+];
 
 export default function DividendDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState(12);
   const [selectedAccount, setSelectedAccount] = useState<number>(0);
   const [selectedMarket, setSelectedMarket] = useState<string>('all');
+  const [selectedLiquidity, setSelectedLiquidity] = useState<LiquidityFilter>('all');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [detailAsset, setDetailAsset] = useState<{ assetId: number; ticker: string; name: string } | null>(null);
@@ -29,13 +37,18 @@ export default function DividendDashboard() {
     }
   };
 
-  const filteredAccounts = selectedMarket === 'all' 
-    ? accounts 
-    : accounts.filter(acc => 
-        selectedMarket === 'domestic' 
-          ? acc.market_type === 'Domestic' 
-          : acc.market_type === 'International'
-      );
+  const changeLiquidity = (value: LiquidityFilter) => {
+    setSelectedLiquidity(value);
+    setSelectedAccount(0);
+  };
+
+  const filteredAccounts = accounts.filter(acc =>
+    matchesLiquidity(acc, selectedLiquidity) &&
+    (selectedMarket === 'all' ||
+      (selectedMarket === 'domestic'
+        ? acc.market_type === 'Domestic'
+        : acc.market_type === 'International'))
+  );
 
   return (
     <div>
@@ -47,6 +60,21 @@ export default function DividendDashboard() {
           </h1>
         </div>
         <div className="flex flex-wrap gap-2">
+          <div className="flex rounded-lg bg-slate-700 p-0.5" role="group" aria-label="계좌 유형">
+            {LIQUIDITY_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => changeLiquidity(opt.value)}
+                className={`px-3 py-1.5 rounded-md transition-colors text-sm ${
+                  selectedLiquidity === opt.value
+                    ? opt.value === 'restricted' ? 'bg-amber-600 text-white' : 'bg-emerald-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
@@ -74,7 +102,7 @@ export default function DividendDashboard() {
 
       {showFilters && (
         <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">계좌</label>
               <select
@@ -105,6 +133,18 @@ export default function DividendDashboard() {
                 <option value="international">해외</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">계좌 유형</label>
+              <select
+                value={selectedLiquidity}
+                onChange={(e) => changeLiquidity(e.target.value as LiquidityFilter)}
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {LIQUIDITY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       )}
@@ -112,12 +152,14 @@ export default function DividendDashboard() {
       <AssetStatistics
         accountId={selectedAccount || undefined}
         marketType={selectedMarket}
+        liquidity={selectedLiquidity}
       />
 
       <div className="mt-6">
         <TotalReturnByAsset
           accountId={selectedAccount || undefined}
           marketType={selectedMarket}
+          liquidity={selectedLiquidity}
           onSelectAsset={setDetailAsset}
         />
       </div>
@@ -137,6 +179,7 @@ export default function DividendDashboard() {
         <DividendStatistics
           accountId={selectedAccount} 
           marketType={selectedMarket}
+          liquidity={selectedLiquidity}
           months={selectedPeriod}
         />
       </div>

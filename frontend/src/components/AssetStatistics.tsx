@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Asset, Account } from '../types/models';
-import { TrendingUp, Wallet, Globe, Home, ChevronDown, ChevronUp } from 'lucide-react';
+import { TrendingUp, Wallet, Globe, Home, ChevronDown, ChevronUp, Lock } from 'lucide-react';
+import { LiquidityFilter, matchesLiquidity, isRestrictedAccount, getAccountTypeMeta } from '../utils/accountType';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const PALETTE = [
@@ -14,6 +15,7 @@ const TOP_N = 5; // 기본 축소보기에서 노출할 계좌 수
 interface AssetStatisticsProps {
   accountId?: number;
   marketType?: string;
+  liquidity?: LiquidityFilter;
 }
 
 interface AssetValue {
@@ -27,7 +29,7 @@ interface AssetValue {
   marketType: string;
 }
 
-export default function AssetStatistics({ accountId, marketType = 'all' }: AssetStatisticsProps) {
+export default function AssetStatistics({ accountId, marketType = 'all', liquidity = 'all' }: AssetStatisticsProps) {
   const [loading, setLoading] = useState(true);
   const [totalValue, setTotalValue] = useState(0);
   const [accountValues, setAccountValues] = useState<Map<number, number>>(new Map());
@@ -35,10 +37,12 @@ export default function AssetStatistics({ accountId, marketType = 'all' }: Asset
   const [internationalValue, setInternationalValue] = useState(0);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [expanded, setExpanded] = useState(false);
+  const [liquidValue, setLiquidValue] = useState(0);
+  const [restrictedValue, setRestrictedValue] = useState(0);
 
   useEffect(() => {
     loadAssetValues();
-  }, [accountId, marketType]);
+  }, [accountId, marketType, liquidity]);
 
   const loadAssetValues = async () => {
     try {
@@ -82,6 +86,8 @@ export default function AssetStatistics({ accountId, marketType = 'all' }: Asset
           if (marketType === 'domestic' && account.market_type !== 'Domestic') continue;
           if (marketType === 'international' && account.market_type !== 'International') continue;
 
+          if (!matchesLiquidity(account, liquidity)) continue;
+
           assetValues.push({
             ticker: asset.ticker,
             name: asset.name,
@@ -115,6 +121,17 @@ export default function AssetStatistics({ accountId, marketType = 'all' }: Asset
         .filter(av => av.marketType === 'International')
         .reduce((sum, av) => sum + av.value, 0);
       
+      // 인출 가능/제한별 자산 계산
+      let liquid = 0;
+      let restricted = 0;
+      assetValues.forEach(av => {
+        const acc = accountsList.find(a => a.id === av.accountId);
+        if (isRestrictedAccount(acc)) restricted += av.value;
+        else liquid += av.value;
+      });
+      setLiquidValue(liquid);
+      setRestrictedValue(restricted);
+
       setDomesticValue(domestic);
       setInternationalValue(international);
 
@@ -142,6 +159,24 @@ export default function AssetStatistics({ accountId, marketType = 'all' }: Asset
             </div>
           </div>
         </div>
+
+        {/* 인출 가능/제한 스켈레톤 */}
+        {liquidity === 'all' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[0, 1].map((i) => (
+              <div key={i} className="bg-slate-800/60 rounded-xl p-6 border border-slate-700">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-lg bg-slate-700" />
+                  <div className="space-y-2">
+                    <div className="h-3 w-24 rounded bg-slate-700" />
+                    <div className="h-5 w-32 rounded bg-slate-700" />
+                  </div>
+                </div>
+                <div className="h-2 rounded-full bg-slate-700" />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 계좌별 분포 스켈레톤 */}
         <div className="bg-slate-800/60 rounded-xl p-6 border border-slate-700">
@@ -198,6 +233,10 @@ export default function AssetStatistics({ accountId, marketType = 'all' }: Asset
       : []),
   ];
 
+  const pct = (v: number) => (totalValue > 0 ? (v / totalValue) * 100 : 0);
+  const countAccounts = (restricted: boolean) =>
+    Array.from(accountValues.keys()).filter(id => isRestrictedAccount(accounts.find(a => a.id === id)) === restricted).length;
+
   return (
     <div className="space-y-6">
       {/* 총 자산 */}
@@ -209,9 +248,55 @@ export default function AssetStatistics({ accountId, marketType = 'all' }: Asset
           <div>
             <p className="text-sm text-slate-400">총 자산 평가액</p>
             <p className="text-3xl font-bold text-white">{formatCurrency(totalValue)}</p>
+            {restrictedValue > 0 && liquidity === 'all' && (
+              <p className="text-sm text-emerald-300 mt-1">즉시 인출 가능 {formatCurrency(liquidValue)}</p>
+            )}
           </div>
         </div>
       </div>
+
+      {/* 인출 가능 / 인출 제한 */}
+      {liquidity === 'all' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-gradient-to-br from-emerald-500/10 to-slate-900 rounded-xl p-6 border border-emerald-500/30">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                <Wallet className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-400">인출 가능 자산</p>
+                <p className="text-xl font-bold text-white">{formatCurrency(liquidValue)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-slate-700 rounded-full h-2">
+                <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${pct(liquidValue)}%` }} />
+              </div>
+              <span className="text-xs text-slate-400">{pct(liquidValue).toFixed(1)}%</span>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">{countAccounts(false)}개 계좌</p>
+          </div>
+
+          <div className="bg-gradient-to-br from-amber-500/10 to-slate-900 rounded-xl p-6 border border-amber-500/30">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                <Lock className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-400">인출 제한 자산 · 연금/IRP</p>
+                <p className="text-xl font-bold text-white">{formatCurrency(restrictedValue)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-slate-700 rounded-full h-2">
+                <div className="bg-amber-500 h-2 rounded-full transition-all duration-500" style={{ width: `${pct(restrictedValue)}%` }} />
+              </div>
+              <span className="text-xs text-slate-400">{pct(restrictedValue).toFixed(1)}%</span>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">{countAccounts(true)}개 계좌</p>
+          </div>
+        </div>
+      )}
 
       {/* 계좌별 자산 */}
       {!accountId && accountValues.size > 0 && (
@@ -272,7 +357,15 @@ export default function AssetStatistics({ accountId, marketType = 'all' }: Asset
                   <div key={e.accId} className="bg-slate-700/50 rounded-lg p-3 flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: PALETTE[index % PALETTE.length] }} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{account.name}</p>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{account.name}</p>
+                        {(() => {
+                          const meta = getAccountTypeMeta(account);
+                          return meta.value === 'General' ? null : (
+                            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${meta.badgeClass}`}>{meta.short}</span>
+                          );
+                        })()}
+                      </div>
                       <p className="text-xs text-slate-400 truncate">{account.broker}</p>
                     </div>
                     <div className="text-right shrink-0">
