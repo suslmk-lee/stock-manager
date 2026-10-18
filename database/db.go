@@ -221,7 +221,7 @@ func getGormSlowThreshold() time.Duration {
 }
 
 func runMigrations() error {
-	return DB.AutoMigrate(
+	if err := DB.AutoMigrate(
 		&models.Account{},
 		&models.Asset{},
 		&models.Holding{},
@@ -229,7 +229,29 @@ func runMigrations() error {
 		&models.Dividend{},
 		&models.PortfolioSnapshot{},
 		&models.RealizedPnL{},
-	)
+	); err != nil {
+		return err
+	}
+	return backfillAccountTypes()
+}
+
+// backfillAccountTypes account_type이 비어 있는 기존 계좌에 이름/설명 기반으로 유형을 채운다.
+// 멱등이며 해당 컬럼만 갱신한다.
+func backfillAccountTypes() error {
+	var accounts []models.Account
+	if err := DB.Where("account_type IS NULL OR account_type = ''").Find(&accounts).Error; err != nil {
+		return fmt.Errorf("failed to load accounts for account_type backfill: %w", err)
+	}
+	for _, a := range accounts {
+		t := models.InferAccountType(a.Name, a.Description)
+		if err := DB.Model(&models.Account{}).Where("id = ?", a.ID).UpdateColumn("account_type", t).Error; err != nil {
+			return fmt.Errorf("failed to backfill account_type for account %d: %w", a.ID, err)
+		}
+	}
+	if len(accounts) > 0 {
+		log.Printf("Backfilled account_type for %d account(s)", len(accounts))
+	}
+	return nil
 }
 
 func getDBPath() (string, error) {
