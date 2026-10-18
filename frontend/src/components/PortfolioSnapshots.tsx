@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
+import { accountTypePrefix } from '../utils/accountType';
 import { Camera, TrendingUp, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 
 interface SnapshotItem {
@@ -172,7 +173,7 @@ export default function PortfolioSnapshots() {
           >
             {accounts.map((acc) => (
               <option key={acc.id} value={acc.id}>
-                {acc.name} ({acc.broker})
+                {accountTypePrefix(acc)}{acc.name} ({acc.broker})
               </option>
             ))}
           </select>

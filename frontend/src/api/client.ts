@@ -55,24 +55,24 @@ export const apiClient = {
     return WailsApp.GetAccount(id);
   },
 
-  CreateAccount: async (name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string) => {
+  CreateAccount: async (name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string) => {
     if (isWeb) {
       return fetchApi<Account>('/accounts', {
         method: 'POST',
-        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description }),
+        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType }),
       });
     }
-    return WailsApp.CreateAccount(name, broker, accountNumber, marketType, currency, description);
+    return WailsApp.CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType);
   },
 
-  UpdateAccount: async (id: number, name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string) => {
+  UpdateAccount: async (id: number, name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string) => {
     if (isWeb) {
       return fetchApi<Account>(`/accounts/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description }),
+        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType }),
       });
     }
-    return WailsApp.UpdateAccount(id, name, broker, accountNumber, marketType, currency, description);
+    return WailsApp.UpdateAccount(id, name, broker, accountNumber, marketType, currency, description, accountType);
   },
 
   DeleteAccount: async (id: number) => {

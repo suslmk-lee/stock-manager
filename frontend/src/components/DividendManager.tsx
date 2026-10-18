@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Asset, Dividend, Transaction } from '../types/models';
+import { accountTypePrefix } from '../utils/accountType';
 import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock, TrendingUp, Wallet, X } from 'lucide-react';
 import DividendQuickStats from './DividendQuickStats';
 
@@ -401,7 +402,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
           >
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
-                {account.broker} ({account.name})
+                {accountTypePrefix(account)}{account.broker} ({account.name})
               </option>
             ))}
           </select>
@@ -724,7 +725,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                   <option value={0}>계좌를 선택하세요</option>
                   {accounts.map((account) => (
                     <option key={account.id} value={account.id}>
-                      🏦 {account.name} ({account.broker})
+                      🏦 {accountTypePrefix(account)}{account.name} ({account.broker})
                     </option>
                   ))}
                 </select>

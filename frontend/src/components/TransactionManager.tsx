@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Asset, Transaction, Holding, RealizedPnL, TickerInfo, PricePoint, PriceHistory } from '../types/models';
+import { accountTypePrefix } from '../utils/accountType';
 import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, TrendingDown, History, X, Search, Info } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { calculateFee, roundFee } from '../utils/fees';
@@ -619,7 +620,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
           >
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.broker} ({a.name})
+                {accountTypePrefix(a)}{a.broker} ({a.name})
               </option>
             ))}
           </select>
