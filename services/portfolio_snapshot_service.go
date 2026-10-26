@@ -14,10 +14,16 @@ import (
 type PortfolioSnapshotService struct {
 	db            *gorm.DB
 	tickerService *TickerService
+	histCache     historyCache
+	fetchHistory  func(ticker string) (*PriceHistory, error)
 }
 
 func NewPortfolioSnapshotService(db *gorm.DB, tickerService *TickerService) *PortfolioSnapshotService {
-	return &PortfolioSnapshotService{db: db, tickerService: tickerService}
+	s := &PortfolioSnapshotService{db: db, tickerService: tickerService}
+	s.fetchHistory = func(ticker string) (*PriceHistory, error) {
+		return tickerService.GetPriceHistory(ticker, "5y", "1mo")
+	}
+	return s
 }
 
 // EnsureCurrentMonthSnapshot checks if current month snapshot exists, if not, records it.
@@ -175,19 +181,58 @@ type MonthlySnapshotSummary struct {
 	Currency   string  `json:"currency"`
 	TotalValue float64 `json:"total_value"`
 	AssetCount int64   `json:"asset_count"`
+	Estimated  bool    `json:"estimated"`
 }
 
-// GetMonthlySummary returns all snapshots aggregated by month/account/currency (oldest first).
-func (s *PortfolioSnapshotService) GetMonthlySummary() ([]MonthlySnapshotSummary, error) {
-	results := []MonthlySnapshotSummary{}
+// GetMonthlySummary returns monthly aggregates for the last `months` calendar months (KST, oldest first).
+// Months with real snapshots are returned as recorded; other months up to the current one are
+// estimated from transactions and historical prices (Estimated=true).
+func (s *PortfolioSnapshotService) GetMonthlySummary(months int) ([]MonthlySnapshotSummary, error) {
+	return s.getMonthlySummary(months, time.Now())
+}
+
+func (s *PortfolioSnapshotService) getMonthlySummary(months int, now time.Time) ([]MonthlySnapshotSummary, error) {
+	if months < 1 {
+		months = 1
+	}
+	if months > 60 {
+		months = 60
+	}
+	window := windowMonths(now, months)
+	first := window[0]
+
+	real := []MonthlySnapshotSummary{}
 	err := s.db.Raw(`SELECT year, month, account_id, currency, SUM(market_value) AS total_value, COUNT(*) AS asset_count
 FROM portfolio_snapshots
+WHERE (year * 12 + month) >= ? AND (year * 12 + month) <= ?
 GROUP BY year, month, account_id, currency
-ORDER BY year ASC, month ASC, account_id ASC`).Scan(&results).Error
+ORDER BY year ASC, month ASC, account_id ASC`, first.index()+1, window[len(window)-1].index()+1).Scan(&real).Error
 	if err != nil {
 		return nil, err
 	}
-	return results, nil
+
+	have := map[monthKey]bool{}
+	for _, r := range real {
+		have[monthKey{r.Year, r.Month}] = true
+	}
+	missing := []monthKey{}
+	for _, m := range window {
+		if !have[m] {
+			missing = append(missing, m)
+		}
+	}
+
+	out := real
+	if len(missing) > 0 {
+		est, err := s.estimateMonths(missing)
+		if err != nil {
+			log.Printf("[Snapshot] estimate failed: %v", err)
+		} else {
+			out = append(out, est...)
+		}
+	}
+	sortSummaries(out)
+	return out, nil
 }
 
 // EnsureCurrentMonthSnapshotAsync runs snapshot in background (non-blocking)

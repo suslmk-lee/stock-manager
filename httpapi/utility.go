@@ -94,7 +94,17 @@ func registerUtilityRoutes(api *gin.RouterGroup, s *Services) {
 	})
 
 	api.GET("/snapshots/monthly-summary", func(c *gin.Context) {
-		res, err := s.Snapshot.GetMonthlySummary()
+		months := 36
+		if v, err := strconv.Atoi(c.Query("months")); err == nil {
+			if v < 1 {
+				v = 1
+			}
+			if v > 60 {
+				v = 60
+			}
+			months = v
+		}
+		res, err := s.Snapshot.GetMonthlySummary(months)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

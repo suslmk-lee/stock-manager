@@ -300,6 +300,7 @@ type PriceHistory struct {
 	Currency string       `json:"currency"`
 	Range    string       `json:"range"`
 	Interval string       `json:"interval"`
+	GmtOffset int64       `json:"gmtoffset"`
 	Points   []PricePoint `json:"points"`
 }
 
@@ -351,6 +352,7 @@ func (s *TickerService) GetPriceHistory(ticker, rangeStr, interval string) (*Pri
 				Meta struct {
 					Symbol   string `json:"symbol"`
 					Currency string `json:"currency"`
+					GmtOffset int64 `json:"gmtoffset"`
 				} `json:"meta"`
 				Timestamp  []int64 `json:"timestamp"`
 				Indicators struct {
@@ -386,6 +388,7 @@ func (s *TickerService) GetPriceHistory(ticker, rangeStr, interval string) (*Pri
 		Currency: r.Meta.Currency,
 		Range:    rangeStr,
 		Interval: interval,
+		GmtOffset: r.Meta.GmtOffset,
 		Points:   points,
 	}, nil
 }
