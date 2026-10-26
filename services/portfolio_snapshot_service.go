@@ -167,6 +167,29 @@ func (s *PortfolioSnapshotService) GetMonthlyTotalByAccount(accountID uint) ([]m
 	return output, nil
 }
 
+// MonthlySnapshotSummary is the per-month, per-account, per-currency aggregate of snapshots.
+type MonthlySnapshotSummary struct {
+	Year       int     `json:"year"`
+	Month      int     `json:"month"`
+	AccountID  uint    `json:"account_id"`
+	Currency   string  `json:"currency"`
+	TotalValue float64 `json:"total_value"`
+	AssetCount int64   `json:"asset_count"`
+}
+
+// GetMonthlySummary returns all snapshots aggregated by month/account/currency (oldest first).
+func (s *PortfolioSnapshotService) GetMonthlySummary() ([]MonthlySnapshotSummary, error) {
+	results := []MonthlySnapshotSummary{}
+	err := s.db.Raw(`SELECT year, month, account_id, currency, SUM(market_value) AS total_value, COUNT(*) AS asset_count
+FROM portfolio_snapshots
+GROUP BY year, month, account_id, currency
+ORDER BY year ASC, month ASC, account_id ASC`).Scan(&results).Error
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // EnsureCurrentMonthSnapshotAsync runs snapshot in background (non-blocking)
 var snapshotOnce sync.Once
 

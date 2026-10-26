@@ -275,3 +275,24 @@ X-API-Key: <API_KEY>
   "change_percent": -1.2
 }
 ```
+
+## 7. 포트폴리오 스냅샷 (Snapshots)
+
+### 7.1 월별 스냅샷 요약 (총자산 추이용)
+- **Method**: `GET`
+- **Path**: `/snapshots/monthly-summary`
+- **설명**: 월별/계좌별/통화별로 스냅샷 평가금액을 합산합니다. 연, 월, 계좌 ID 오름차순. 데이터가 없으면 `[]`.
+- **Response**:
+```json
+[
+  {
+    "year": 2026,
+    "month": 9,
+    "account_id": 1,
+    "currency": "KRW",
+    "total_value": 12500000,
+    "asset_count": 4
+  }
+]
+```
+- **Wails**: `GetMonthlySnapshotSummary()`

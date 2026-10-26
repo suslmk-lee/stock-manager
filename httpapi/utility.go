@@ -93,6 +93,15 @@ func registerUtilityRoutes(api *gin.RouterGroup, s *Services) {
 		c.JSON(http.StatusOK, gin.H{"created": created})
 	})
 
+	api.GET("/snapshots/monthly-summary", func(c *gin.Context) {
+		res, err := s.Snapshot.GetMonthlySummary()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
 	api.GET("/snapshots/account/:id", func(c *gin.Context) {
 		id, _ := strconv.Atoi(c.Param("id"))
 		res, err := s.Snapshot.GetSnapshotsByAccount(uint(id))
