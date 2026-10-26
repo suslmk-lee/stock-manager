@@ -281,7 +281,8 @@ X-API-Key: <API_KEY>
 ### 7.1 월별 스냅샷 요약 (총자산 추이용)
 - **Method**: `GET`
 - **Path**: `/snapshots/monthly-summary`
-- **설명**: 월별/계좌별/통화별로 스냅샷 평가금액을 합산합니다. 연, 월, 계좌 ID 오름차순. 데이터가 없으면 `[]`.
+- **Query**: `months` (선택, 기본 36, 1~60으로 보정, 잘못된 값은 기본값) - 현재 월로 끝나는 최근 N개월(KST 기준)
+- **설명**: 월별/계좌별/통화별로 스냅샷 평가금액을 합산합니다. 연, 월, 계좌 ID 오름차순. 데이터가 없으면 `[]`. 스냅샷이 없는 달은 거래내역과 과거 월봉 시세로 추정해 `estimated: true`로 반환합니다(월초 수량 x 직전 달 종가, 통화는 종목 통화 그대로).
 - **Response**:
 ```json
 [
@@ -291,8 +292,9 @@ X-API-Key: <API_KEY>
     "account_id": 1,
     "currency": "KRW",
     "total_value": 12500000,
-    "asset_count": 4
+    "asset_count": 4,
+    "estimated": false
   }
 ]
 ```
-- **Wails**: `GetMonthlySnapshotSummary()`
+- **Wails**: `GetMonthlySnapshotSummary(months)`

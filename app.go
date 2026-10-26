@@ -326,8 +326,8 @@ func (a *App) GetMonthlySnapshotByAccount(accountID uint) (interface{}, error) {
 	return a.snapshotService.GetMonthlyTotalByAccount(accountID)
 }
 
-func (a *App) GetMonthlySnapshotSummary() (interface{}, error) {
-	return a.snapshotService.GetMonthlySummary()
+func (a *App) GetMonthlySnapshotSummary(months int) (interface{}, error) {
+	return a.snapshotService.GetMonthlySummary(months)
 }
 
 func (a *App) GetAllRealizedPnL() (interface{}, error) {
