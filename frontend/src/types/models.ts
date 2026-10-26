@@ -8,6 +8,15 @@ export interface PricePoint {
   close: number;
 }
 
+export interface MonthlySnapshotSummary {
+  year: number;
+  month: number;
+  account_id: number;
+  currency: string;
+  total_value: number;
+  asset_count: number;
+}
+
 export interface PriceHistory {
   symbol: string;
   currency: string;
