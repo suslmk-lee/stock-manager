@@ -15,6 +15,7 @@ export interface MonthlySnapshotSummary {
   currency: string;
   total_value: number;
   asset_count: number;
+  estimated?: boolean;
 }
 
 export interface PriceHistory {
@@ -22,6 +23,7 @@ export interface PriceHistory {
   currency: string;
   range: string;
   interval: string;
+  gmtoffset?: number;
   points: PricePoint[];
 }
 

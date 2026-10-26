@@ -322,9 +322,9 @@ export const apiClient = {
     return WailsApp.GetMonthlySnapshotByAccount(accountID);
   },
 
-  GetMonthlySnapshotSummary: async () => {
-    if (isWeb) return fetchApi<any[]>('/snapshots/monthly-summary');
-    return WailsApp.GetMonthlySnapshotSummary();
+  GetMonthlySnapshotSummary: async (months: number = 36) => {
+    if (isWeb) return fetchApi<any[]>(`/snapshots/monthly-summary?months=${months}`);
+    return WailsApp.GetMonthlySnapshotSummary(months);
   },
 
   // ==========================================
