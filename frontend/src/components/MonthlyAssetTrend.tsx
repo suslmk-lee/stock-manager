@@ -92,7 +92,8 @@ export default function MonthlyAssetTrend({
           map = new Map();
           points.forEach((p) => {
             if (!p.close || p.close <= 0) return;
-            const d = new Date(p.time * 1000);
+            // 월봉 시작 시각은 거래소(런던) 자정이라 BST 기간엔 UTC 로 전월 말 23시가 된다 → 2시간 보정
+            const d = new Date((p.time + 2 * 3600) * 1000);
             map!.set(monthKey(d.getUTCFullYear(), d.getUTCMonth() + 1), p.close);
           });
           if (map.size === 0) map = null;
@@ -119,14 +120,13 @@ export default function MonthlyAssetTrend({
     const fxKeys = fxMap ? Array.from(fxMap.keys()).sort() : [];
     const rateFor = (key: string) => {
       if (!fxMap) return currentRate;
-      const exact = fxMap.get(key);
-      if (exact) return exact;
+      // 스냅샷은 월초에 기록되므로 전월 종가(= 해당 월 월초 환율)를 우선 사용
       let found: number | undefined;
       for (const k of fxKeys) {
         if (k < key) found = fxMap.get(k);
         else break;
       }
-      return found ?? currentRate;
+      return found ?? fxMap.get(key) ?? currentRate;
     };
 
     const agg = new Map<string, MonthPoint>();
