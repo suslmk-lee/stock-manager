@@ -4,6 +4,7 @@ import { Account, MonthlySnapshotSummary, PriceHistory } from '../types/models';
 import { LiquidityFilter, matchesLiquidity, isRestrictedAccount } from '../utils/accountType';
 import { ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import CountUp from './CountUp';
 
 interface MonthlyAssetTrendProps {
   accountId?: number;
@@ -48,12 +49,16 @@ const calcDelta = (from: number, to: number): Delta => ({
   pct: from > 0 ? ((to - from) / from) * 100 : null,
 });
 
-function DeltaText({ delta }: { delta: Delta | null }) {
+function DeltaText({ delta, animate = false }: { delta: Delta | null; animate?: boolean }) {
   if (!delta) return <span className="text-slate-500">-</span>;
   return (
     <span className={deltaColor(delta.amount)}>
-      {signed(delta.amount)}
-      {delta.pct !== null && <span className="ml-1 text-xs">({signedPct(delta.pct)})</span>}
+      {animate ? <CountUp value={delta.amount} format={signed} /> : signed(delta.amount)}
+      {delta.pct !== null && (
+        <span className="ml-1 text-xs">
+          ({animate ? <CountUp value={delta.pct} format={signedPct} /> : signedPct(delta.pct)})
+        </span>
+      )}
     </span>
   );
 }
@@ -222,14 +227,14 @@ export default function MonthlyAssetTrend({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-1">
         <div className={tile}>
           <p className="text-xs text-slate-400 mb-1">최근 평가액 ({last.label})</p>
-          <p className="text-lg font-bold text-white">{formatKRW(last.total)}</p>
+          <p className="text-lg font-bold text-white"><CountUp value={last.total} format={formatKRW} /></p>
         </div>
         <div className={tile}>
           <p className="text-xs text-slate-400 mb-1">
             전월 대비 평가액 변화{prev ? ` (${prev.label} → ${last.label})` : ''}
           </p>
           <p className="text-sm font-semibold">
-            <DeltaText delta={monthDelta} />
+            <DeltaText delta={monthDelta} animate />
           </p>
         </div>
         <div className={tile}>
@@ -237,7 +242,7 @@ export default function MonthlyAssetTrend({
             기간 대비 평가액 변화{hasCompare ? ` (${first.label} → ${last.label})` : ''}
           </p>
           <p className="text-sm font-semibold">
-            <DeltaText delta={periodDelta} />
+            <DeltaText delta={periodDelta} animate />
           </p>
         </div>
       </div>

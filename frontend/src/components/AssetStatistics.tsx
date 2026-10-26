@@ -4,6 +4,7 @@ import { Asset, Account } from '../types/models';
 import { TrendingUp, Wallet, Globe, Home, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 import { LiquidityFilter, matchesLiquidity, isRestrictedAccount, getAccountTypeMeta } from '../utils/accountType';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import CountUp from './CountUp';
 
 const PALETTE = [
   '#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4',
@@ -247,9 +248,9 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
           </div>
           <div>
             <p className="text-sm text-slate-400">총 자산 평가액</p>
-            <p className="text-3xl font-bold text-white">{formatCurrency(totalValue)}</p>
+            <p className="text-3xl font-bold text-white"><CountUp value={totalValue} format={formatCurrency} /></p>
             {restrictedValue > 0 && liquidity === 'all' && (
-              <p className="text-sm text-emerald-300 mt-1">즉시 인출 가능 {formatCurrency(liquidValue)}</p>
+              <p className="text-sm text-emerald-300 mt-1">즉시 인출 가능 <CountUp value={liquidValue} format={formatCurrency} /></p>
             )}
           </div>
         </div>
@@ -265,7 +266,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
               </div>
               <div>
                 <p className="text-sm text-slate-400">인출 가능 자산</p>
-                <p className="text-xl font-bold text-white">{formatCurrency(liquidValue)}</p>
+                <p className="text-xl font-bold text-white"><CountUp value={liquidValue} format={formatCurrency} /></p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -284,7 +285,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
               </div>
               <div>
                 <p className="text-sm text-slate-400">인출 제한 자산 · 연금/IRP</p>
-                <p className="text-xl font-bold text-white">{formatCurrency(restrictedValue)}</p>
+                <p className="text-xl font-bold text-white"><CountUp value={restrictedValue} format={formatCurrency} /></p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -342,7 +343,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
               {/* 도넛 중앙: 총 자산 / 계좌 수 */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <p className="text-[11px] text-slate-400">총 자산</p>
-                <p className="text-base font-bold text-white">{formatCurrency(totalValue)}</p>
+                <p className="text-base font-bold text-white"><CountUp value={totalValue} format={formatCurrency} /></p>
                 <p className="text-[11px] text-slate-500 mt-0.5">{sortedEntries.length}개 계좌</p>
               </div>
             </div>
@@ -369,7 +370,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                       <p className="text-xs text-slate-400 truncate">{account.broker}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-white">{formatCurrency(e.value)}</p>
+                      <p className="text-sm font-bold text-white"><CountUp value={e.value} format={formatCurrency} /></p>
                       <p className="text-xs text-slate-400">{percentage.toFixed(1)}%</p>
                     </div>
                   </div>
@@ -383,7 +384,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                     <p className="text-sm font-medium text-slate-300">기타 {restEntries.length}개 계좌</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-slate-200">{formatCurrency(restValue)}</p>
+                    <p className="text-sm font-bold text-slate-200"><CountUp value={restValue} format={formatCurrency} /></p>
                     <p className="text-xs text-slate-400">
                       {totalValue > 0 ? ((restValue / totalValue) * 100).toFixed(1) : 0}%
                     </p>
@@ -422,7 +423,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
               </div>
               <div>
                 <p className="text-sm text-slate-400">국내 자산</p>
-                <p className="text-xl font-bold text-white">{formatCurrency(domesticValue)}</p>
+                <p className="text-xl font-bold text-white"><CountUp value={domesticValue} format={formatCurrency} /></p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -445,7 +446,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
               </div>
               <div>
                 <p className="text-sm text-slate-400">해외 자산</p>
-                <p className="text-xl font-bold text-white">{formatCurrency(internationalValue)}</p>
+                <p className="text-xl font-bold text-white"><CountUp value={internationalValue} format={formatCurrency} /></p>
               </div>
             </div>
             <div className="flex items-center gap-2">
