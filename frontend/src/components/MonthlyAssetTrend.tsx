@@ -3,7 +3,7 @@ import { apiClient } from '../api/client';
 import { Account, MonthlySnapshotSummary, PriceHistory } from '../types/models';
 import { LiquidityFilter, matchesLiquidity, isRestrictedAccount } from '../utils/accountType';
 import { ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceArea } from 'recharts';
 import CountUp from './CountUp';
 
 interface MonthlyAssetTrendProps {
@@ -19,6 +19,7 @@ interface MonthPoint {
   liquid: number;
   restricted: number;
   total: number;
+  estimated: boolean;
 }
 
 const LIQUID_COLOR = '#10b981';
@@ -82,7 +83,7 @@ export default function MonthlyAssetTrend({
       setLoading(true);
       try {
         const [summaryData, accountsData, rate, hist] = await Promise.all([
-          apiClient.GetMonthlySnapshotSummary(),
+          apiClient.GetMonthlySnapshotSummary(36),
           apiClient.GetAllAccounts(),
           apiClient.GetUSDToKRW(),
           apiClient.GetPriceHistory('KRW=X', '5y', '1mo').catch((err: unknown) => {
@@ -93,12 +94,14 @@ export default function MonthlyAssetTrend({
         if (cancelled) return;
         let map: Map<string, number> | null = null;
         const points = (hist as PriceHistory | null)?.points;
+        const gmtoffset = (hist as PriceHistory | null)?.gmtoffset;
         if (points && points.length > 0) {
           map = new Map();
           points.forEach((p) => {
             if (!p.close || p.close <= 0) return;
-            // 월봉 시작 시각은 거래소(런던) 자정이라 BST 기간엔 UTC 로 전월 말 23시가 된다 → 2시간 보정
-            const d = new Date((p.time + 2 * 3600) * 1000);
+            // 거래소 UTC 오프셋(gmtoffset)이 있으면 그것으로, 없으면 런던 BST 기준 2시간 보정
+            const offset = typeof gmtoffset === 'number' ? gmtoffset : 2 * 3600;
+            const d = new Date((p.time + offset) * 1000);
             map!.set(monthKey(d.getUTCFullYear(), d.getUTCMonth() + 1), p.close);
           });
           if (map.size === 0) map = null;
@@ -149,7 +152,7 @@ export default function MonthlyAssetTrend({
       const value = row.currency === 'USD' ? (row.total_value || 0) * rateFor(key) : row.total_value || 0;
       let p = agg.get(key);
       if (!p) {
-        p = { key, label: key.slice(2).replace('-', '.'), liquid: 0, restricted: 0, total: 0 };
+        p = { key, label: key.slice(2).replace('-', '.'), liquid: 0, restricted: 0, total: 0, estimated: !!row.estimated };
         agg.set(key, p);
       }
       if (acc && isRestrictedAccount(acc)) p.restricted += value;
@@ -174,6 +177,24 @@ export default function MonthlyAssetTrend({
     });
     return map;
   }, [series]);
+
+  // 연속된 추정 구간(label 기준) 목록
+  const estimatedRuns = useMemo(() => {
+    const runs: { x1: string; x2: string }[] = [];
+    let start: string | null = null;
+    let prevLabel = '';
+    for (const p of windowed) {
+      if (p.estimated) {
+        if (start === null) start = p.label;
+        prevLabel = p.label;
+      } else if (start !== null) {
+        runs.push({ x1: start, x2: prevLabel });
+        start = null;
+      }
+    }
+    if (start !== null) runs.push({ x1: start, x2: prevLabel });
+    return runs;
+  }, [windowed]);
 
   const stacked = liquidity === 'all' && !accountId;
   const showRestricted = stacked && windowed.some((p) => p.restricted > 0);
@@ -239,7 +260,7 @@ export default function MonthlyAssetTrend({
         </div>
         <div className={tile}>
           <p className="text-xs text-slate-400 mb-1">
-            기간 대비 평가액 변화{hasCompare ? ` (${first.label} → ${last.label})` : ''}
+            기간 대비 평가액 변화{first.estimated ? ' (추정 포함)' : ''}{hasCompare ? ` (${first.label} → ${last.label})` : ''}
           </p>
           <p className="text-sm font-semibold">
             <DeltaText delta={periodDelta} animate />
@@ -279,7 +300,7 @@ export default function MonthlyAssetTrend({
                 const p = payload[0].payload as MonthPoint;
                 return (
                   <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12, padding: '8px 10px' }}>
-                    <p style={{ color: '#cbd5e1', marginBottom: 4 }}>{label}</p>
+                    <p style={{ color: '#cbd5e1', marginBottom: 4 }}>{label}{p.estimated ? ' (추정)' : ''}</p>
                     {stacked ? (
                       <>
                         <p style={{ color: LIQUID_COLOR }}>인출 가능: {formatKRW(p.liquid)}</p>
@@ -293,6 +314,18 @@ export default function MonthlyAssetTrend({
                 );
               }}
             />
+            {estimatedRuns.map((r) => (
+              <ReferenceArea
+                key={r.x1}
+                x1={r.x1}
+                x2={r.x2}
+                fill="#64748b"
+                fillOpacity={0.15}
+                stroke="none"
+                ifOverflow="extendDomain"
+                label={{ value: '추정', position: 'insideTop', fill: '#94a3b8', fontSize: 10 }}
+              />
+            ))}
             {stacked ? (
               <>
                 <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
@@ -307,6 +340,12 @@ export default function MonthlyAssetTrend({
           </AreaChart>
         </ResponsiveContainer>
       </div>
+
+      {estimatedRuns.length > 0 && (
+        <p className="mt-2 text-xs text-slate-500">
+          추정: 실제 기록 이전 기간은 거래내역과 과거 월초 시세로 계산한 값입니다 (직접 입력한 보유는 기간 내내 보유로 가정)
+        </p>
+      )}
 
       <button
         onClick={() => setShowTable((v) => !v)}
@@ -331,7 +370,11 @@ export default function MonthlyAssetTrend({
             <tbody>
               {tableRows.map((p) => (
                 <tr key={p.key} className="border-b border-slate-700/50 text-slate-200">
-                  <td className="py-2 pr-3 whitespace-nowrap">{p.label}</td>
+                  <td className="py-2 pr-3 whitespace-nowrap">{p.label}
+                    {p.estimated && (
+                      <span className="ml-1.5 px-1 py-0.5 rounded bg-slate-700/70 text-[10px] text-slate-400">추정</span>
+                    )}
+                  </td>
                   {stacked && <td className="text-right py-2 px-3 whitespace-nowrap">{formatKRW(p.liquid)}</td>}
                   {stacked && <td className="text-right py-2 px-3 whitespace-nowrap">{formatKRW(p.restricted)}</td>}
                   <td className="text-right py-2 px-3 whitespace-nowrap font-medium text-white">{formatKRW(p.total)}</td>
