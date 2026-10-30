@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Palette, LayoutTemplate, Type, RotateCcw } from 'lucide-react';
 import { useAppearance } from '../../appearance/AppearanceContext';
 import { THEMES, mix, type AppTheme } from '../../appearance/themes';
 import Portal from '../ui/Portal';
+import Slider from '../ui/Slider';
+import { SettingsGroup, SettingRow } from '../ui/SettingsGroup';
 import {
   CARD_STYLES,
   SANS_FONTS,
@@ -48,7 +50,7 @@ function ThemeGroup({ title, themes }: { title: string; themes: AppTheme[] }) {
   const { settings, update } = useAppearance();
   if (themes.length === 0) return null;
   return (
-    <div className="mb-5">
+    <div>
       <div className="label-mono mb-2">{title}</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {themes.map((t) => (
@@ -72,16 +74,17 @@ function ThemeGroup({ title, themes }: { title: string; themes: AppTheme[] }) {
 
 function ThemeSection() {
   return (
-    <>
+    <SettingsGroup icon={Palette} title="앱 테마">
       <ThemeGroup title="다크" themes={THEMES.filter((t) => t.mode === 'dark')} />
       <ThemeGroup title="라이트" themes={THEMES.filter((t) => t.mode === 'light')} />
-    </>
+    </SettingsGroup>
   );
 }
 
 function CardSection() {
   const { settings, update } = useAppearance();
   return (
+    <SettingsGroup icon={LayoutTemplate} title="카드 스타일">
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       {CARD_STYLES.map((s) => (
         <button
@@ -111,6 +114,7 @@ function CardSection() {
         </button>
       ))}
     </div>
+    </SettingsGroup>
   );
 }
 
@@ -145,37 +149,34 @@ function FontList({
 
 function FontSection() {
   const { settings, update } = useAppearance();
+  const sizeIdx = Math.max(0, FONT_SIZES.findIndex((f) => f.id === settings.fontSize));
   return (
-    <div className="space-y-6">
-      <div className="surface-inset p-4">
+    <SettingsGroup icon={Type} title="글꼴">
+      <div className="surface p-4">
         <div className="label-mono">총 자산</div>
         <div className="mt-1 text-3xl font-semibold tracking-tight text-white">₩152,257,659</div>
         <div className="num label-mono mt-2">USD/KRW 1,325.4</div>
       </div>
       <div>
-        <div className="section-title mb-2">본문 글꼴</div>
+        <div className="label-mono mb-2">본문 글꼴</div>
         <FontList fonts={SANS_FONTS} value={settings.sansFont} onSelect={(id) => update({ sansFont: id })} />
       </div>
       <div>
-        <div className="section-title mb-2">숫자 · 라벨 글꼴 (고정폭)</div>
+        <div className="label-mono mb-2">숫자 · 라벨 글꼴 (고정폭)</div>
         <FontList fonts={MONO_FONTS} value={settings.monoFont} onSelect={(id) => update({ monoFont: id })} />
       </div>
-      <div>
-        <div className="section-title mb-2">글자 크기</div>
-        <div className="glass-pill inline-flex p-1 gap-1">
-          {FONT_SIZES.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => update({ fontSize: s.id })}
-              className={`pill-item ${settings.fontSize === s.id ? 'pill-item-active' : ''}`}
-            >
-              {s.name}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
+      <SettingRow label="글자 크기">
+        <Slider
+          value={sizeIdx}
+          min={0}
+          max={FONT_SIZES.length - 1}
+          step={1}
+          ariaLabel="글자 크기"
+          format={(i) => `${FONT_SIZES[i].px}px`}
+          onChange={(i) => update({ fontSize: FONT_SIZES[i].id })}
+        />
+      </SettingRow>
+    </SettingsGroup>
   );
 }
 
@@ -260,8 +261,13 @@ export default function AppearanceSettings({ open, onClose }: { open: boolean; o
 
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-t border-white/[0.08]">
             <span className="text-xs text-zinc-500">변경 사항은 이 기기에 자동 저장됩니다</span>
-            <div className="flex items-center gap-2">
-              <button type="button" className="btn-ghost" onClick={reset}>
+            <div className="flex flex-1 sm:flex-none items-center gap-2">
+              <button
+                type="button"
+                className="btn-ghost flex flex-1 sm:flex-none items-center justify-center gap-1.5 !rounded-xl"
+                onClick={reset}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
                 기본값으로 되돌리기
               </button>
               <button type="button" className="btn-primary" onClick={onClose}>

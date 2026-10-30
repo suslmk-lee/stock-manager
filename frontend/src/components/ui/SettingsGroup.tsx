@@ -1,0 +1,43 @@
+import type { ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import IconTile from './IconTile';
+
+interface SettingsGroupProps {
+  icon: LucideIcon;
+  title: string;
+  children: ReactNode;
+  action?: ReactNode;
+}
+
+// 아이콘 타일 + 제목 헤더를 가진 설정 섹션 카드
+export function SettingsGroup({ icon, title, children, action }: SettingsGroupProps) {
+  return (
+    <section className="surface-inset p-4">
+      <div className="mb-3 flex items-center gap-3">
+        <IconTile icon={icon} size="sm" />
+        <h3 className="section-title flex-1 min-w-0 truncate">{title}</h3>
+        {action}
+      </div>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+interface SettingRowProps {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}
+
+// 왼쪽 라벨 / 오른쪽 컨트롤 한 줄
+export function SettingRow({ label, hint, children }: SettingRowProps) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div className="min-w-0 shrink-0 max-w-[40%]">
+        <div className="text-sm text-white">{label}</div>
+        {hint && <div className="label-mono mt-0.5">{hint}</div>}
+      </div>
+      <div className="flex min-w-0 flex-1 justify-end">{children}</div>
+    </div>
+  );
+}
