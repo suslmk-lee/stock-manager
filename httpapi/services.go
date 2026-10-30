@@ -19,6 +19,7 @@ type Services struct {
 	Snapshot     *services.PortfolioSnapshotService
 	RealizedPnL  *services.RealizedPnLService
 	Signal       *services.SignalService
+	DailySnap    *services.DailySnapshotService
 }
 
 // NewServices 는 기본 서비스 묶음을 생성한다.
@@ -38,5 +39,6 @@ func NewServices() *Services {
 		Snapshot:     services.NewPortfolioSnapshotService(database.GetDB(), ticker),
 		RealizedPnL:  services.NewRealizedPnLService(),
 		Signal:       services.NewSignalService(database.GetDB(), ticker, exchange),
+		DailySnap:    services.NewDailySnapshotService(database.GetDB(), ticker),
 	}
 }

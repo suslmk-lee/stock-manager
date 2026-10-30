@@ -63,8 +63,22 @@ func (s *TickerService) GetFxHistoryCached() (*PriceHistory, error) {
 	return s.cachedHistory("KRW=X", "5y", "1d")
 }
 
+// GetDailyHistory2yCached fetches range=2y interval=1d (cached 6h per ticker).
+func (s *TickerService) GetDailyHistory2yCached(ticker string) (*PriceHistory, error) {
+	return s.cachedHistory(ticker, "2y", "1d")
+}
+
 // GetDailyHistoriesCached fetches many tickers concurrently (max 5 in flight); failures are omitted.
 func (s *TickerService) GetDailyHistoriesCached(tickers []string) map[string]*PriceHistory {
+	return s.getDailyHistoriesRangeCached(tickers, "1y")
+}
+
+// GetDailyHistoriesRangeCached 는 지정 range(예: 2y, 5y)의 일봉을 동시 조회한다 (일별 총자산 백필용).
+func (s *TickerService) GetDailyHistoriesRangeCached(tickers []string, rangeStr string) map[string]*PriceHistory {
+	return s.getDailyHistoriesRangeCached(tickers, rangeStr)
+}
+
+func (s *TickerService) getDailyHistoriesRangeCached(tickers []string, rangeStr string) map[string]*PriceHistory {
 	out := map[string]*PriceHistory{}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -81,7 +95,7 @@ func (s *TickerService) GetDailyHistoriesCached(tickers []string) map[string]*Pr
 		go func(k string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if h, err := s.GetDailyHistoryCached(k); err == nil && h != nil {
+			if h, err := s.cachedHistory(k, rangeStr, "1d"); err == nil && h != nil {
 				mu.Lock()
 				out[k] = h
 				mu.Unlock()

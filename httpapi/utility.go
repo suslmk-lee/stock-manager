@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"stock-manager/services"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -110,6 +112,32 @@ func registerUtilityRoutes(api *gin.RouterGroup, s *Services) {
 			return
 		}
 		c.JSON(http.StatusOK, res)
+	})
+
+	// 일별 총자산 시계열
+	api.GET("/snapshots/daily", func(c *gin.Context) {
+		res, err := s.DailySnap.GetSeries(c.DefaultQuery("range", "1y"), c.DefaultQuery("interval", "auto"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
+	// 오늘 스냅샷 캡처 (GitHub Actions cron 등에서 호출). 백필은 비동기.
+	api.POST("/snapshots/daily/capture", func(c *gin.Context) {
+		source := c.DefaultQuery("source", "manual")
+		if source != "cron" && source != "manual" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "source must be cron or manual"})
+			return
+		}
+		snap, err := s.DailySnap.CaptureToday(source)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		started := s.DailySnap.BackfillAsync(services.DefaultBackfillDays)
+		c.JSON(http.StatusOK, gin.H{"snapshot": snap, "backfill_started": started})
 	})
 
 	api.GET("/snapshots/account/:id", func(c *gin.Context) {

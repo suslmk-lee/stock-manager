@@ -8,6 +8,7 @@ import (
 
 	"stock-manager/database"
 	"stock-manager/httpapi"
+	"stock-manager/services"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -32,6 +33,10 @@ func main() {
 
 	// 앱 시작 시 이번 달 스냅샷 자동 기록 (비동기)
 	svc.Snapshot.EnsureCurrentMonthSnapshotAsync()
+
+	// 일별 총자산: 오늘 실측 보장 + 2년 추정 백필 (비동기)
+	svc.DailySnap.EnsureTodayAsync()
+	svc.DailySnap.BackfillAsync(services.DefaultBackfillDays)
 
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)
