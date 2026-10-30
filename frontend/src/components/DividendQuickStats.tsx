@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Dividend, Holding, Transaction } from '../types/models';
+import { useThemeColors } from '../appearance/AppearanceContext';
 import IconTile from './ui/IconTile';
 import RingGauge from './ui/RingGauge';
 import { DollarSign, TrendingUp, Calendar, PieChart, Percent } from 'lucide-react';
@@ -26,6 +27,7 @@ interface AssetDividendStats {
 }
 
 export default function DividendQuickStats({ accountId, children, refreshTrigger = 0 }: DividendQuickStatsProps) {
+  const tc = useThemeColors();
   const [loading, setLoading] = useState(true);
   const [totalDividend, setTotalDividend] = useState(0);
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
@@ -389,7 +391,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                     className="h-2.5 rounded-full transition-all duration-500 bg-gradient-to-r from-mint-400 to-mint-200"
                     style={{ 
                       width: `${Math.max(widthByMax, 4)}%`,
-                      boxShadow: '0 0 12px rgba(125,223,176,0.4)',
+                      boxShadow: '0 0 12px rgb(var(--c-mint-400) / 0.4)',
                     }}
                   />
                 </div>
@@ -470,10 +472,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
               <div className="flex items-center justify-center">
                 <svg viewBox="0 0 200 200" className="w-64 h-64">
                   {(() => {
-                    const colors = [
-                      '#7ddfb0', '#7dd3fc', '#fcd34d', '#c4b5fd', '#fda4af',
-                      '#34d399', '#38bdf8', '#fdba74', '#a5b4fc', '#d4d4d8'
-                    ];
+                    const colors = tc.palette;
                     let currentAngle = -90;
                     
                     return topAssets.map((asset, index) => {
@@ -515,10 +514,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
               {/* 범례 */}
               <div className="grid grid-cols-2 gap-2">
                 {topAssets.map((asset, index) => {
-                  const colors = [
-                    '#7ddfb0', '#7dd3fc', '#fcd34d', '#c4b5fd', '#fda4af',
-                    '#34d399', '#38bdf8', '#fdba74', '#a5b4fc', '#d4d4d8'
-                  ];
+                  const colors = tc.palette;
                   const percentage = (asset.total / totalDividend) * 100;
                   
                   return (

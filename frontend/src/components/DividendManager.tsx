@@ -535,7 +535,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                           </p>
 
                           {/* 도트 */}
-                          <div className="w-3 h-3 rounded-full bg-mint-400 border-2 border-ink-950 z-10 mb-6 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(125,223,176,0.5)]" />
+                          <div className="w-3 h-3 rounded-full bg-mint-400 border-2 border-ink-950 z-10 mb-6 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgb(var(--c-mint-400)_/_0.5)]" />
 
                           {/* 카드 */}
                           <div
