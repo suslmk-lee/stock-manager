@@ -29,7 +29,7 @@ export default function CardTilt() {
       const target = e.target instanceof Element ? (e.target.closest(selector) as HTMLElement | null) : null;
       // 모달·알림 드롭다운처럼 화면에 고정된 창은 움직이지 않는다
       const el =
-        target && (target === current || (!target.closest('[role=dialog]') && getComputedStyle(target).position !== 'fixed'))
+        target && (target === current || (!target.closest('[role=dialog], .fixed') && getComputedStyle(target).position !== 'fixed'))
           ? target
           : null;
       if (current && current !== el) release(current);

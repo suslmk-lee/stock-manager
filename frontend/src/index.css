@@ -73,6 +73,13 @@ body {
     backdrop-filter: var(--card-blur);
   }
 
+  /* 팝업·드롭다운·토스트 같은 고정 창 안에서는 카드 그라데이션/입체감을 덧입히지 않는다 */
+  .fixed,
+  [role='dialog'] {
+    --fx-glow-card: none;
+    --fx-depth-card: 0 0 #0000;
+  }
+
   /* 카드 안쪽 패널 */
   .surface-inset {
     border-radius: var(--inset-radius);
