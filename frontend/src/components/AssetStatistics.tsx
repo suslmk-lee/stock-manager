@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Asset, Account } from '../types/models';
-import { TrendingUp, Wallet, Globe, Home, ChevronDown, ChevronUp, Lock } from 'lucide-react';
+import { TrendingUp, Wallet, Globe, Home, ChevronDown, ChevronUp } from 'lucide-react';
 import { LiquidityFilter, matchesLiquidity, isRestrictedAccount, getAccountTypeMeta } from '../utils/accountType';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import CountUp from './CountUp';
+import IconTile from './ui/IconTile';
+import RingGauge from './ui/RingGauge';
+import Chip from './ui/Chip';
 
 const PALETTE = [
-  '#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4',
-  '#ec4899', '#84cc16', '#f97316', '#14b8a6', '#a855f7', '#eab308',
+  '#7ddfb0', '#7dd3fc', '#a78bfa', '#fbbf24', '#fb7185', '#2dd4bf',
+  '#f0abfc', '#bef264', '#fdba74', '#5eead4', '#c4b5fd', '#fde047',
 ];
-const OTHER_COLOR = '#64748b';
+const OTHER_COLOR = '#52525b';
 const TOP_N = 5; // 기본 축소보기에서 노출할 계좌 수
 
 interface AssetStatisticsProps {
@@ -151,52 +154,35 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
     return (
       <div className="space-y-6 animate-pulse">
         {/* 총 자산 스켈레톤 */}
-        <div className="bg-slate-800/60 rounded-xl p-6 border border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-slate-700" />
-            <div className="space-y-2">
-              <div className="h-3 w-24 rounded bg-slate-700" />
-              <div className="h-7 w-48 rounded bg-slate-700" />
+        <div className="hero-grain p-6 sm:p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div className="h-3 w-24 rounded bg-white/10" />
+              <div className="h-12 w-72 max-w-full rounded-lg bg-white/10" />
+              <div className="h-3 w-40 rounded bg-white/10" />
             </div>
+            <div className="surface-inset h-44" />
           </div>
         </div>
 
-        {/* 인출 가능/제한 스켈레톤 */}
-        {liquidity === 'all' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[0, 1].map((i) => (
-              <div key={i} className="bg-slate-800/60 rounded-xl p-6 border border-slate-700">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-slate-700" />
-                  <div className="space-y-2">
-                    <div className="h-3 w-24 rounded bg-slate-700" />
-                    <div className="h-5 w-32 rounded bg-slate-700" />
-                  </div>
-                </div>
-                <div className="h-2 rounded-full bg-slate-700" />
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* 계좌별 분포 스켈레톤 */}
-        <div className="bg-slate-800/60 rounded-xl p-6 border border-slate-700">
-          <div className="h-4 w-40 rounded bg-slate-700 mb-6" />
+        <div className="surface p-6">
+          <div className="h-4 w-40 rounded bg-white/10 mb-6" />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="flex items-center justify-center h-72">
-              <div className="w-44 h-44 rounded-full border-[16px] border-slate-700" />
+            <div className="flex items-center justify-center h-64">
+              <div className="w-44 h-44 rounded-full border-[14px] border-white/[0.06]" />
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {Array.from({ length: TOP_N }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 bg-slate-700/40 rounded-lg p-4">
-                  <div className="w-4 h-4 rounded-full bg-slate-600" />
+                <div key={i} className="surface-inset flex items-center gap-3 p-3">
+                  <div className="w-3 h-3 rounded-full bg-white/10" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-3 w-28 rounded bg-slate-600" />
-                    <div className="h-2.5 w-16 rounded bg-slate-600" />
+                    <div className="h-3 w-28 rounded bg-white/10" />
+                    <div className="h-2.5 w-16 rounded bg-white/10" />
                   </div>
                   <div className="space-y-2 text-right">
-                    <div className="h-3 w-20 rounded bg-slate-600 ml-auto" />
-                    <div className="h-2.5 w-10 rounded bg-slate-600 ml-auto" />
+                    <div className="h-3 w-20 rounded bg-white/10 ml-auto" />
+                    <div className="h-2.5 w-10 rounded bg-white/10 ml-auto" />
                   </div>
                 </div>
               ))}
@@ -238,73 +224,109 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
   const countAccounts = (restricted: boolean) =>
     Array.from(accountValues.keys()).filter(id => isRestrictedAccount(accounts.find(a => a.id === id)) === restricted).length;
 
+
+  const showSplit = liquidity === 'all';
+  const marketStats = marketType === 'all'
+    ? [
+        { key: 'dom', label: '국내', icon: Home, value: pct(domesticValue).toFixed(1), unit: '%', sub: domesticValue },
+        { key: 'intl', label: '해외', icon: Globe, value: pct(internationalValue).toFixed(1), unit: '%', sub: internationalValue },
+      ]
+    : [];
+  const statColumns = [
+    ...marketStats,
+    { key: 'acc', label: '계좌 수', icon: Wallet, value: String(accountValues.size), unit: '개', sub: null as number | null },
+  ];
+
+  const tooltipStyle = {
+    backgroundColor: '#0f0f11',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    color: '#fff',
+    fontSize: 12,
+  };
+
   return (
     <div className="space-y-6">
-      {/* 총 자산 */}
-      <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-6 border border-green-500/30">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-            <TrendingUp className="w-6 h-6 text-green-400" />
-          </div>
+      {/* 총 자산 히어로 */}
+      <div className="hero-grain p-6 sm:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-8 items-center">
           <div>
-            <p className="text-sm text-slate-400">총 자산 평가액</p>
-            <p className="text-3xl font-bold text-white"><CountUp value={totalValue} format={formatCurrency} /></p>
+            <div className="flex items-center gap-2.5 mb-5">
+              <IconTile icon={TrendingUp} tone="mint" size="sm" />
+              <span className="label-mono !text-zinc-400">총 자산 평가액</span>
+            </div>
+            <p className="num text-4xl sm:text-5xl font-light tracking-tight text-white break-all">
+              <CountUp value={totalValue} format={formatCurrency} />
+            </p>
             {restrictedValue > 0 && liquidity === 'all' && (
-              <p className="text-sm text-emerald-300 mt-1">즉시 인출 가능 <CountUp value={liquidValue} format={formatCurrency} /></p>
+              <p className="mt-3 text-sm text-mint-300 num">
+                즉시 인출 가능 <CountUp value={liquidValue} format={formatCurrency} />
+              </p>
             )}
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Chip check>{accountValues.size}개 계좌</Chip>
+              {showSplit && <Chip check>인출 가능 {countAccounts(false)}개</Chip>}
+              {showSplit && restrictedValue > 0 && <Chip check>인출 제한 {countAccounts(true)}개</Chip>}
+            </div>
+          </div>
+
+          <div className="surface-inset p-5 sm:p-6">
+            {showSplit && (
+              <div className="flex items-start justify-around gap-4 mb-6">
+                <RingGauge
+                  size={104}
+                  value={pct(liquidValue)}
+                  color="#7ddfb0"
+                  label={
+                    <>
+                      <span className="block">인출 가능</span>
+                      <span className="block text-zinc-400 num mt-0.5"><CountUp value={liquidValue} format={formatCurrency} /></span>
+                    </>
+                  }
+                >
+                  <span className="text-2xl font-light">{Math.round(pct(liquidValue))}<span className="text-sm">%</span></span>
+                </RingGauge>
+                <RingGauge
+                  size={104}
+                  value={pct(restrictedValue)}
+                  color="#fbbf24"
+                  label={
+                    <>
+                      <span className="block">인출 제한</span>
+                      <span className="block text-zinc-400 num mt-0.5"><CountUp value={restrictedValue} format={formatCurrency} /></span>
+                    </>
+                  }
+                >
+                  <span className="text-2xl font-light">{Math.round(pct(restrictedValue))}<span className="text-sm">%</span></span>
+                </RingGauge>
+              </div>
+            )}
+            <div className={`flex items-stretch justify-between gap-2 ${showSplit ? 'border-t border-white/[0.06] pt-5' : ''}`}>
+              {statColumns.map((c, i) => (
+                <div key={c.key} className="contents">
+                  {i > 0 && <span className="divider-v" />}
+                  <div className="flex-1 min-w-0 text-center">
+                    <p className="num text-2xl font-light text-mint-300">
+                      {c.value}<span className="text-sm ml-0.5">{c.unit}</span>
+                    </p>
+                    <p className="label-mono mt-1 !text-zinc-400">{c.label}</p>
+                    {c.sub !== null && (
+                      <p className="label-mono mt-0.5 truncate"><CountUp value={c.sub} format={formatCurrency} /></p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 인출 가능 / 인출 제한 */}
-      {liquidity === 'all' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gradient-to-br from-emerald-500/10 to-slate-900 rounded-xl p-6 border border-emerald-500/30">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-400">인출 가능 자산</p>
-                <p className="text-xl font-bold text-white"><CountUp value={liquidValue} format={formatCurrency} /></p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-slate-700 rounded-full h-2">
-                <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${pct(liquidValue)}%` }} />
-              </div>
-              <span className="text-xs text-slate-400">{pct(liquidValue).toFixed(1)}%</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">{countAccounts(false)}개 계좌</p>
-          </div>
-
-          <div className="bg-gradient-to-br from-amber-500/10 to-slate-900 rounded-xl p-6 border border-amber-500/30">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                <Lock className="w-5 h-5 text-amber-400" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-400">인출 제한 자산 · 연금/IRP</p>
-                <p className="text-xl font-bold text-white"><CountUp value={restrictedValue} format={formatCurrency} /></p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-slate-700 rounded-full h-2">
-                <div className="bg-amber-500 h-2 rounded-full transition-all duration-500" style={{ width: `${pct(restrictedValue)}%` }} />
-              </div>
-              <span className="text-xs text-slate-400">{pct(restrictedValue).toFixed(1)}%</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">{countAccounts(true)}개 계좌</p>
-          </div>
-        </div>
-      )}
-
       {/* 계좌별 자산 */}
       {!accountId && accountValues.size > 0 && (
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
-          <div className="flex items-center gap-2 mb-4">
-            <Wallet className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-semibold text-white">계좌별 자산 분포</h3>
+        <div className="surface p-5 sm:p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <IconTile icon={Wallet} tone="sky" size="sm" />
+            <h3 className="section-title">계좌별 자산 분포</h3>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 파이 차트 (라벨/범례 제거 → 우측 리스트로 대체, 높이 축소) */}
@@ -315,9 +337,11 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
-                    outerRadius={95}
-                    paddingAngle={1}
+                    innerRadius={66}
+                    outerRadius={98}
+                    paddingAngle={2}
+                    cornerRadius={4}
+                    stroke="none"
                     dataKey="value"
                   >
                     {pieData.map((d, index) => (
@@ -329,22 +353,17 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                       `${formatCurrency(value)} (${totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : 0}%)`,
                       name,
                     ]}
-                    contentStyle={{
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #475569',
-                      borderRadius: '8px',
-                      color: '#fff',
-                    }}
-                    itemStyle={{ color: '#e2e8f0' }}
-                    labelStyle={{ color: '#e2e8f0' }}
+                    contentStyle={tooltipStyle}
+                    itemStyle={{ color: '#e4e4e7' }}
+                    labelStyle={{ color: '#e4e4e7' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
               {/* 도넛 중앙: 총 자산 / 계좌 수 */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <p className="text-[11px] text-slate-400">총 자산</p>
-                <p className="text-base font-bold text-white"><CountUp value={totalValue} format={formatCurrency} /></p>
-                <p className="text-[11px] text-slate-500 mt-0.5">{sortedEntries.length}개 계좌</p>
+                <p className="label-mono">총 자산</p>
+                <p className="num text-base font-light text-white mt-0.5"><CountUp value={totalValue} format={formatCurrency} /></p>
+                <p className="label-mono mt-0.5">{sortedEntries.length}개 계좌</p>
               </div>
             </div>
 
@@ -355,8 +374,8 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                 if (!account) return null;
                 const percentage = totalValue > 0 ? (e.value / totalValue) * 100 : 0;
                 return (
-                  <div key={e.accId} className="bg-slate-700/50 rounded-lg p-3 flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: PALETTE[index % PALETTE.length] }} />
+                  <div key={e.accId} className="surface-inset p-3 flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PALETTE[index % PALETTE.length] }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <p className="text-sm font-medium text-white truncate">{account.name}</p>
@@ -367,25 +386,25 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                           );
                         })()}
                       </div>
-                      <p className="text-xs text-slate-400 truncate">{account.broker}</p>
+                      <p className="label-mono truncate mt-0.5">{account.broker}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-white"><CountUp value={e.value} format={formatCurrency} /></p>
-                      <p className="text-xs text-slate-400">{percentage.toFixed(1)}%</p>
+                      <p className="num text-sm font-medium text-white"><CountUp value={e.value} format={formatCurrency} /></p>
+                      <p className="label-mono mt-0.5">{percentage.toFixed(1)}%</p>
                     </div>
                   </div>
                 );
               })}
 
               {restEntries.length > 0 && (
-                <div className="bg-slate-700/30 rounded-lg p-3 flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: OTHER_COLOR }} />
+                <div className="surface-inset !bg-none p-3 flex items-center gap-3 opacity-80">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: OTHER_COLOR }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-300">기타 {restEntries.length}개 계좌</p>
+                    <p className="text-sm font-medium text-zinc-300">기타 {restEntries.length}개 계좌</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-slate-200"><CountUp value={restValue} format={formatCurrency} /></p>
-                    <p className="text-xs text-slate-400">
+                    <p className="num text-sm font-medium text-zinc-200"><CountUp value={restValue} format={formatCurrency} /></p>
+                    <p className="label-mono mt-0.5">
                       {totalValue > 0 ? ((restValue / totalValue) * 100).toFixed(1) : 0}%
                     </p>
                   </div>
@@ -395,7 +414,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
               {canCollapse && (
                 <button
                   onClick={() => setExpanded((v) => !v)}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-700/30 hover:bg-slate-700/60 rounded-lg transition-colors"
+                  className="btn-ghost w-full !py-2 !text-xs"
                 >
                   {expanded ? (
                     <>
@@ -408,57 +427,6 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                   )}
                 </button>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 국내/해외별 자산 */}
-      {marketType === 'all' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <Home className="w-5 h-5 text-blue-400" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-400">국내 자산</p>
-                <p className="text-xl font-bold text-white"><CountUp value={domesticValue} format={formatCurrency} /></p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-slate-700 rounded-full h-2">
-                <div 
-                  className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: totalValue > 0 ? `${(domesticValue / totalValue) * 100}%` : '0%' }}
-                />
-              </div>
-              <span className="text-xs text-slate-400">
-                {totalValue > 0 ? ((domesticValue / totalValue) * 100).toFixed(1) : 0}%
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <Globe className="w-5 h-5 text-purple-400" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-400">해외 자산</p>
-                <p className="text-xl font-bold text-white"><CountUp value={internationalValue} format={formatCurrency} /></p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-slate-700 rounded-full h-2">
-                <div 
-                  className="bg-purple-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: totalValue > 0 ? `${(internationalValue / totalValue) * 100}%` : '0%' }}
-                />
-              </div>
-              <span className="text-xs text-slate-400">
-                {totalValue > 0 ? ((internationalValue / totalValue) * 100).toFixed(1) : 0}%
-              </span>
             </div>
           </div>
         </div>

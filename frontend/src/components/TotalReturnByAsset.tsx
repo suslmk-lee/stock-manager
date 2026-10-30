@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { Account, Holding, RealizedPnL, Dividend } from '../types/models';
 import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
+import IconTile from './ui/IconTile';
 
 interface TotalReturnByAssetProps {
   accountId?: number;
@@ -184,58 +185,61 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
   );
   const summaryYield = summary.cost > 0 ? (summary.total / summary.cost) * 100 : 0;
 
-  const pnlClass = (v: number) => (v >= 0 ? 'text-emerald-400' : 'text-red-400');
+
+  const pnlClass = (v: number) => (v >= 0 ? 'text-mint-300' : 'text-rose-300');
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
-        <div className="text-center py-8 text-slate-400">종합 손익 계산 중...</div>
+      <div className="surface p-6">
+        <div className="text-center py-8 label-mono">종합 손익 계산 중...</div>
       </div>
     );
   }
 
+  const summaryTile = 'surface-inset p-3.5';
+
   return (
-    <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 sm:p-6 border border-slate-700">
-      <div className="flex items-center gap-2 mb-1">
-        <TrendingUp className="w-5 h-5 text-purple-400" />
-        <h2 className="text-lg sm:text-xl font-bold text-white">종목별 실질 손익</h2>
+    <div className="surface p-5 sm:p-6">
+      <div className="flex items-center gap-3 mb-1.5">
+        <IconTile icon={TrendingUp} tone="amber" size="sm" />
+        <h2 className="section-title">종목별 실질 손익</h2>
       </div>
-      <p className="text-xs text-slate-400 mb-4">
+      <p className="label-mono mb-5 normal-case">
         실질손익 = 평가손익(미실현) + 실현손익 + 배당(세후) · 수익률 = 실질손익 ÷ (보유원가 + 매도분 원가)
       </p>
 
       {sorted.length === 0 ? (
-        <div className="text-center py-10 text-slate-400">
-          <Wallet className="w-10 h-10 mx-auto mb-3 opacity-50" />
+        <div className="text-center py-10 text-zinc-500">
+          <Wallet className="w-10 h-10 mx-auto mb-3 opacity-40" />
           <p>표시할 손익 데이터가 없습니다.</p>
         </div>
       ) : (
         <>
           {/* 합계 요약 (KRW 환산) */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-            <div className="bg-gradient-to-br from-slate-700/40 to-slate-900/60 rounded-lg p-3 border border-slate-700/50">
-              <p className="text-xs text-slate-500 mb-1">평가금</p>
-              <p className="text-sm font-bold text-white">{formatMoney(summary.marketValue, 'KRW')}</p>
+            <div className={summaryTile}>
+              <p className="label-mono mb-1.5">평가금</p>
+              <p className="num text-sm font-medium text-white">{formatMoney(summary.marketValue, 'KRW')}</p>
             </div>
-            <div className="bg-gradient-to-br from-slate-700/40 to-slate-900/60 rounded-lg p-3 border border-slate-700/50">
-              <p className="text-xs text-slate-500 mb-1">평가손익</p>
-              <p className={`text-sm font-bold ${pnlClass(summary.unrealized)}`}>{signed(summary.unrealized, 'KRW')}</p>
+            <div className={summaryTile}>
+              <p className="label-mono mb-1.5">평가손익</p>
+              <p className={`num text-sm font-medium ${pnlClass(summary.unrealized)}`}>{signed(summary.unrealized, 'KRW')}</p>
             </div>
-            <div className="bg-gradient-to-br from-slate-700/40 to-slate-900/60 rounded-lg p-3 border border-slate-700/50">
-              <p className="text-xs text-slate-500 mb-1">실현손익</p>
-              <p className={`text-sm font-bold ${pnlClass(summary.realized)}`}>{signed(summary.realized, 'KRW')}</p>
+            <div className={summaryTile}>
+              <p className="label-mono mb-1.5">실현손익</p>
+              <p className={`num text-sm font-medium ${pnlClass(summary.realized)}`}>{signed(summary.realized, 'KRW')}</p>
             </div>
-            <div className="bg-gradient-to-br from-slate-700/40 to-slate-900/60 rounded-lg p-3 border border-slate-700/50">
-              <p className="text-xs text-slate-500 mb-1">배당(세후)</p>
-              <p className="text-sm font-bold text-emerald-400">{signed(summary.dividend, 'KRW')}</p>
+            <div className={summaryTile}>
+              <p className="label-mono mb-1.5">배당(세후)</p>
+              <p className="num text-sm font-medium text-mint-300">{signed(summary.dividend, 'KRW')}</p>
             </div>
-            <div className="bg-gradient-to-br from-purple-500/25 to-purple-500/5 border border-purple-500/30 rounded-lg p-3">
-              <p className="text-xs text-slate-400 mb-1">실질손익</p>
-              <p className={`text-sm font-bold ${pnlClass(summary.total)}`}>{signed(summary.total, 'KRW')}</p>
+            <div className={`${summaryTile} !border-mint-400/25`} style={{ background: 'linear-gradient(180deg, rgba(125,223,176,0.1), rgba(125,223,176,0.02))' }}>
+              <p className="label-mono mb-1.5 !text-mint-300/80">실질손익</p>
+              <p className={`num text-sm font-medium ${pnlClass(summary.total)}`}>{signed(summary.total, 'KRW')}</p>
             </div>
-            <div className="bg-gradient-to-br from-purple-500/25 to-purple-500/5 border border-purple-500/30 rounded-lg p-3">
-              <p className="text-xs text-slate-400 mb-1">수익률</p>
-              <p className={`text-sm font-bold ${pnlClass(summaryYield)}`}>
+            <div className={`${summaryTile} !border-mint-400/25`} style={{ background: 'linear-gradient(180deg, rgba(125,223,176,0.1), rgba(125,223,176,0.02))' }}>
+              <p className="label-mono mb-1.5 !text-mint-300/80">수익률</p>
+              <p className={`num text-sm font-medium ${pnlClass(summaryYield)}`}>
                 {summaryYield >= 0 ? '+' : ''}
                 {summaryYield.toFixed(2)}%
               </p>
@@ -243,86 +247,90 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
           </div>
 
           {/* 종목별 테이블 */}
-          <div className="overflow-x-auto rounded-lg border border-slate-700">
+          <div className="surface-inset overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-800/70 text-xs text-slate-400 border-b border-slate-700">
-                  <th className="text-left font-medium px-3 py-2.5">종목</th>
-                  <th className="text-right font-medium px-3 py-2.5">평가금</th>
-                  <th className="text-right font-medium px-3 py-2.5">평가손익</th>
-                  <th className="text-right font-medium px-3 py-2.5">실현손익</th>
-                  <th className="text-right font-medium px-3 py-2.5">배당(세후)</th>
-                  <th className="text-right font-medium px-3 py-2.5">실질손익</th>
-                  <th className="text-right font-medium px-3 py-2.5">수익률</th>
+                <tr className="table-head border-b border-white/[0.08]">
+                  <th className="text-left font-normal px-3 py-3">종목</th>
+                  <th className="text-right font-normal px-3 py-3">평가금</th>
+                  <th className="text-right font-normal px-3 py-3">평가손익</th>
+                  <th className="text-right font-normal px-3 py-3">실현손익</th>
+                  <th className="text-right font-normal px-3 py-3">배당(세후)</th>
+                  <th className="text-right font-normal px-3 py-3">실질손익</th>
+                  <th className="text-right font-normal px-3 py-3">수익률</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/60">
+              <tbody>
                 {sorted.map((r) => (
                   <tr
                     key={r.assetId}
                     onClick={onSelectAsset ? () => onSelectAsset({ assetId: r.assetId, ticker: r.ticker, name: r.name }) : undefined}
-                    className={`hover:bg-slate-800/50 transition-colors ${onSelectAsset ? 'cursor-pointer' : ''}`}
+                    className={`table-row last:border-b-0 ${onSelectAsset ? 'cursor-pointer' : ''}`}
                   >
-                    <td className="px-3 py-2.5 min-w-[170px]">
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-3 py-3 min-w-[170px]">
+                      <div className="flex items-center gap-2">
                         <span className="text-xs">{r.currency === 'KRW' ? '🇰🇷' : '🇺🇸'}</span>
                         <div className="min-w-0">
                           <p className="text-white font-medium truncate">{r.name}</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="label-mono mt-0.5">
                             {r.ticker}
-                            {r.qty <= 0 && <span className="ml-1 text-slate-600">· 보유종료</span>}
+                            {r.qty <= 0 && <span className="ml-1 text-zinc-600">· 보유종료</span>}
                           </p>
                         </div>
                       </div>
                     </td>
                     {/* 평가금 */}
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    <td className="px-3 py-3 text-right whitespace-nowrap num">
                       {r.qty <= 0 ? (
-                        <span className="text-slate-600">—</span>
+                        <span className="text-zinc-600">—</span>
                       ) : r.hasPrice ? (
                         <div>
                           <p className="text-white font-medium">{formatMoney(r.marketValue, r.currency)}</p>
-                          <p className="text-xs text-slate-500">{formatNumber(r.qty, 4)}주</p>
+                          <p className="label-mono mt-0.5">{formatNumber(r.qty, 4)}주</p>
                         </div>
                       ) : (
-                        <span className="text-slate-500">…</span>
+                        <span className="text-zinc-500">…</span>
                       )}
                     </td>
                     {/* 평가손익 */}
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    <td className="px-3 py-3 text-right whitespace-nowrap num">
                       {r.qty <= 0 ? (
-                        <span className="text-slate-600">—</span>
+                        <span className="text-zinc-600">—</span>
                       ) : r.hasPrice ? (
                         <span className={pnlClass(r.unrealized)}>{signed(r.unrealized, r.currency)}</span>
                       ) : (
-                        <span className="text-slate-500">…</span>
+                        <span className="text-zinc-500">…</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    <td className="px-3 py-3 text-right whitespace-nowrap num">
                       {r.realized !== 0 ? (
                         <span className={pnlClass(r.realized)}>{signed(r.realized, r.currency)}</span>
                       ) : (
-                        <span className="text-slate-600">—</span>
+                        <span className="text-zinc-600">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    <td className="px-3 py-3 text-right whitespace-nowrap num">
                       {r.dividend !== 0 ? (
-                        <span className="text-emerald-400">{signed(r.dividend, r.currency)}</span>
+                        <span className="text-mint-300">{signed(r.dividend, r.currency)}</span>
                       ) : (
-                        <span className="text-slate-600">—</span>
+                        <span className="text-zinc-600">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    <td className="px-3 py-3 text-right whitespace-nowrap num">
                       <span className={`font-semibold ${pnlClass(r.total)}`}>{signed(r.total, r.currency)}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    <td className="px-3 py-3 text-right whitespace-nowrap num">
                       {r.cost > 0 ? (
-                        <span className={`text-xs font-medium ${pnlClass(r.yieldPercent)}`}>
+                        <span
+                          className={`badge ${
+                            r.yieldPercent >= 0 ? 'bg-mint-400/10 text-mint-300' : 'bg-rose-400/10 text-rose-300'
+                          }`}
+                        >
                           {r.yieldPercent >= 0 ? '+' : ''}
                           {r.yieldPercent.toFixed(2)}%
                         </span>
                       ) : (
-                        <span className="text-slate-600">—</span>
+                        <span className="text-zinc-600">—</span>
                       )}
                     </td>
                   </tr>
@@ -331,7 +339,7 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
             </table>
           </div>
 
-          <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1">
+          <p className="label-mono mt-4 flex items-center gap-1.5 normal-case">
             <TrendingDown className="w-3 h-3" />
             합계는 USD를 환율 ₩{Math.round(exchangeRate).toLocaleString('ko-KR')} 기준으로 환산했습니다. 평가손익은 실시간 시세 기준입니다.
           </p>

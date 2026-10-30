@@ -7,6 +7,7 @@ import AssetStatistics from '../components/AssetStatistics';
 import MonthlyAssetTrend from '../components/MonthlyAssetTrend';
 import TotalReturnByAsset from '../components/TotalReturnByAsset';
 import AssetDetailView from '../components/AssetDetailView';
+import IconTile from '../components/ui/IconTile';
 import { DollarSign, Filter } from 'lucide-react';
 import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
 
@@ -53,63 +54,60 @@ export default function DividendDashboard() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <DollarSign className="w-8 h-8 sm:w-10 sm:h-10 text-green-400" />
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-            배당금 대시보드
-          </h1>
+          <IconTile icon={DollarSign} tone="mint" />
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-white">배당금 대시보드</h1>
+            <p className="label-mono mt-0.5">자산 · 수익 · 배당 현황</p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <div className="flex rounded-lg bg-slate-700 p-0.5" role="group" aria-label="계좌 유형">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="glass-pill flex p-1" role="group" aria-label="계좌 유형">
             {LIQUIDITY_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => changeLiquidity(opt.value)}
-                className={`px-3 py-1.5 rounded-md transition-colors text-sm ${
+                className={`pill-item ${
                   selectedLiquidity === opt.value
-                    ? opt.value === 'restricted' ? 'bg-amber-600 text-white' : 'bg-emerald-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-600'
+                    ? opt.value === 'restricted' ? 'pill-item-active !text-amber-300' : 'pill-item-active !text-mint-300'
+                    : ''
                 }`}
               >
                 {opt.label}
               </button>
             ))}
           </div>
+          <div className="glass-pill flex p-1" role="group" aria-label="기간">
+            {[6, 12, 24, 36].map((months) => (
+              <button
+                key={months}
+                onClick={() => setSelectedPeriod(months)}
+                className={`pill-item font-mono !text-xs ${selectedPeriod === months ? 'pill-item-active' : ''}`}
+              >
+                {months}개월
+              </button>
+            ))}
+          </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
-              showFilters ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
+            className={`btn-ghost ${showFilters ? '!border-mint-400/50 !text-mint-300' : ''}`}
           >
             <Filter className="w-4 h-4" />
             필터
           </button>
-          {[6, 12, 24, 36].map((months) => (
-            <button
-              key={months}
-              onClick={() => setSelectedPeriod(months)}
-              className={`px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
-                selectedPeriod === months
-                  ? 'bg-green-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              {months}개월
-            </button>
-          ))}
         </div>
       </div>
 
       {showFilters && (
-        <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
+        <div className="surface p-5 sm:p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">계좌</label>
+              <label className="field-label">계좌</label>
               <select
                 value={selectedAccount}
                 onChange={(e) => setSelectedAccount(Number(e.target.value))}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="input-field"
               >
                 <option value={0}>전체 계좌</option>
                 {filteredAccounts.map((account) => (
@@ -120,14 +118,14 @@ export default function DividendDashboard() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">시장 구분</label>
+              <label className="field-label">시장 구분</label>
               <select
                 value={selectedMarket}
                 onChange={(e) => {
                   setSelectedMarket(e.target.value);
                   setSelectedAccount(0);
                 }}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="input-field"
               >
                 <option value="all">전체</option>
                 <option value="domestic">국내</option>
@@ -135,11 +133,11 @@ export default function DividendDashboard() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">계좌 유형</label>
+              <label className="field-label">계좌 유형</label>
               <select
                 value={selectedLiquidity}
                 onChange={(e) => changeLiquidity(e.target.value as LiquidityFilter)}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="input-field"
               >
                 {LIQUIDITY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -187,7 +185,7 @@ export default function DividendDashboard() {
 
       <div className="mt-6">
         <DividendStatistics
-          accountId={selectedAccount} 
+          accountId={selectedAccount}
           marketType={selectedMarket}
           liquidity={selectedLiquidity}
           months={selectedPeriod}
@@ -195,9 +193,9 @@ export default function DividendDashboard() {
       </div>
 
       <div className="mt-6">
-        <DividendChart 
-          accountId={selectedAccount || undefined} 
-          months={selectedPeriod} 
+        <DividendChart
+          accountId={selectedAccount || undefined}
+          months={selectedPeriod}
         />
       </div>
     </div>

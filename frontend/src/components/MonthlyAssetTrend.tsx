@@ -5,6 +5,8 @@ import { LiquidityFilter, matchesLiquidity, isRestrictedAccount } from '../utils
 import { ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceArea } from 'recharts';
 import CountUp from './CountUp';
+import IconTile from './ui/IconTile';
+import Chip from './ui/Chip';
 
 interface MonthlyAssetTrendProps {
   accountId?: number;
@@ -22,9 +24,9 @@ interface MonthPoint {
   estimated: boolean;
 }
 
-const LIQUID_COLOR = '#10b981';
-const RESTRICTED_COLOR = '#f59e0b';
-const SINGLE_COLOR = '#3b82f6';
+const LIQUID_COLOR = '#7ddfb0';
+const RESTRICTED_COLOR = '#fbbf24';
+const SINGLE_COLOR = '#7dd3fc';
 
 const formatKRW = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
 const compactKRW = (v: number) => {
@@ -39,7 +41,7 @@ const monthIndex = (key: string) => {
 };
 const signed = (v: number) => `${v >= 0 ? '+' : '-'}${formatKRW(Math.abs(v))}`;
 const signedPct = (v: number) => `${v >= 0 ? '+' : '-'}${Math.abs(v).toFixed(1)}%`;
-const deltaColor = (v: number) => (v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-slate-300');
+const deltaColor = (v: number) => (v > 0 ? 'text-mint-300' : v < 0 ? 'text-rose-300' : 'text-zinc-300');
 
 interface Delta {
   amount: number;
@@ -51,7 +53,7 @@ const calcDelta = (from: number, to: number): Delta => ({
 });
 
 function DeltaText({ delta, animate = false }: { delta: Delta | null; animate?: boolean }) {
-  if (!delta) return <span className="text-slate-500">-</span>;
+  if (!delta) return <span className="text-zinc-500">-</span>;
   return (
     <span className={deltaColor(delta.amount)}>
       {animate ? <CountUp value={delta.amount} format={signed} /> : signed(delta.amount)}
@@ -201,30 +203,30 @@ export default function MonthlyAssetTrend({
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 sm:p-6 border border-slate-700 animate-pulse">
-        <div className="h-4 w-32 rounded bg-slate-700 mb-4" />
+      <div className="surface p-5 sm:p-6 animate-pulse">
+        <div className="h-4 w-32 rounded bg-white/10 mb-4" />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-16 rounded-lg bg-slate-700/60" />
+            <div key={i} className="h-16 rounded-2xl bg-white/[0.05]" />
           ))}
         </div>
-        <div className="h-64 rounded-lg bg-slate-700/40" />
+        <div className="h-64 rounded-2xl bg-white/[0.04]" />
       </div>
     );
   }
 
   const header = (
-    <div className="flex items-center gap-2 mb-4">
-      <TrendingUp className="w-5 h-5 text-blue-400" />
-      <h3 className="text-sm font-semibold text-white">월별 자산 추이</h3>
+    <div className="flex items-center gap-3 mb-5">
+      <IconTile icon={TrendingUp} tone="mint" size="sm" />
+      <h3 className="section-title">월별 자산 추이</h3>
     </div>
   );
 
   if (windowed.length === 0) {
     return (
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 sm:p-6 border border-slate-700">
+      <div className="surface p-5 sm:p-6">
         {header}
-        <div className="h-32 flex items-center justify-center text-sm text-slate-500 text-center">
+        <div className="h-32 flex items-center justify-center text-sm text-zinc-500 text-center">
           스냅샷 데이터가 없습니다. (매월 첫 실행 시 자동 기록됩니다)
         </div>
       </div>
@@ -239,37 +241,37 @@ export default function MonthlyAssetTrend({
   const periodDelta = hasCompare ? calcDelta(first.total, last.total) : null;
   const tableRows = [...windowed].reverse();
 
-  const tile = 'bg-slate-800/60 rounded-lg p-3 border border-slate-700';
+  const tile = 'surface-inset p-4';
 
   return (
-    <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 sm:p-6 border border-slate-700">
+    <div className="surface p-5 sm:p-6">
       {header}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-1">
         <div className={tile}>
-          <p className="text-xs text-slate-400 mb-1">최근 평가액 ({last.label})</p>
-          <p className="text-lg font-bold text-white"><CountUp value={last.total} format={formatKRW} /></p>
+          <p className="label-mono mb-2">최근 평가액 ({last.label})</p>
+          <p className="num text-2xl font-light tracking-tight text-white"><CountUp value={last.total} format={formatKRW} /></p>
         </div>
         <div className={tile}>
-          <p className="text-xs text-slate-400 mb-1">
+          <p className="label-mono mb-2">
             전월 대비 평가액 변화{prev ? ` (${prev.label} → ${last.label})` : ''}
           </p>
-          <p className="text-sm font-semibold">
+          <p className="num text-lg font-light tracking-tight">
             <DeltaText delta={monthDelta} animate />
           </p>
         </div>
         <div className={tile}>
-          <p className="text-xs text-slate-400 mb-1">
+          <p className="label-mono mb-2">
             기간 대비 평가액 변화{first.estimated ? ' (추정 포함)' : ''}{hasCompare ? ` (${first.label} → ${last.label})` : ''}
           </p>
-          <p className="text-sm font-semibold">
+          <p className="num text-lg font-light tracking-tight">
             <DeltaText delta={periodDelta} animate />
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <p className="text-xs text-slate-500">입금·매수에 따른 증감 포함</p>
-        {fxMap === null && <p className="text-xs text-slate-500">환율: 현재 환율 기준</p>}
+      <div className="flex flex-wrap items-center gap-2 mt-3 mb-5">
+        <Chip check>입금·매수에 따른 증감 포함</Chip>
+        <Chip check>{fxMap === null ? '환율: 현재 환율 기준' : '환율: 월초 기준'}</Chip>
       </div>
 
       <div className="h-64">
@@ -277,30 +279,30 @@ export default function MonthlyAssetTrend({
           <AreaChart data={windowed} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="mat-liquid" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={LIQUID_COLOR} stopOpacity={0.5} />
-                <stop offset="100%" stopColor={LIQUID_COLOR} stopOpacity={0.05} />
+                <stop offset="0%" stopColor={LIQUID_COLOR} stopOpacity={0.32} />
+                <stop offset="100%" stopColor={LIQUID_COLOR} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="mat-restricted" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={RESTRICTED_COLOR} stopOpacity={0.5} />
-                <stop offset="100%" stopColor={RESTRICTED_COLOR} stopOpacity={0.05} />
+                <stop offset="0%" stopColor={RESTRICTED_COLOR} stopOpacity={0.32} />
+                <stop offset="100%" stopColor={RESTRICTED_COLOR} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="mat-single" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={SINGLE_COLOR} stopOpacity={0.4} />
+                <stop offset="0%" stopColor={SINGLE_COLOR} stopOpacity={0.28} />
                 <stop offset="100%" stopColor={SINGLE_COLOR} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#94a3b8' }} minTickGap={30} axisLine={{ stroke: '#334155' }} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} domain={[0, 'auto']} width={55} axisLine={false} tickLine={false} tickFormatter={compactKRW} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#71717a', fontFamily: 'JetBrains Mono, monospace' }} minTickGap={30} axisLine={{ stroke: 'rgba(255,255,255,0.08)' }} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#71717a', fontFamily: 'JetBrains Mono, monospace' }} domain={[0, 'auto']} width={55} axisLine={false} tickLine={false} tickFormatter={compactKRW} />
             <Tooltip
-              contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-              labelStyle={{ color: '#cbd5e1' }}
-              itemStyle={{ color: '#e2e8f0' }}
+              contentStyle={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
+              labelStyle={{ color: '#d4d4d8' }}
+              itemStyle={{ color: '#e4e4e7' }}
               content={({ active, payload, label }) => {
                 if (!active || !payload || payload.length === 0) return null;
                 const p = payload[0].payload as MonthPoint;
                 return (
-                  <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12, padding: '8px 10px' }}>
-                    <p style={{ color: '#cbd5e1', marginBottom: 4 }}>{label}{p.estimated ? ' (추정)' : ''}</p>
+                  <div style={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12, padding: '10px 12px' }}>
+                    <p style={{ color: '#d4d4d8', marginBottom: 4 }}>{label}{p.estimated ? ' (추정)' : ''}</p>
                     {stacked ? (
                       <>
                         <p style={{ color: LIQUID_COLOR }}>인출 가능: {formatKRW(p.liquid)}</p>
@@ -319,37 +321,37 @@ export default function MonthlyAssetTrend({
                 key={r.x1}
                 x1={r.x1}
                 x2={r.x2}
-                fill="#64748b"
-                fillOpacity={0.15}
+                fill="#ffffff"
+                fillOpacity={0.04}
                 stroke="none"
                 ifOverflow="extendDomain"
-                label={{ value: '추정', position: 'insideTop', fill: '#94a3b8', fontSize: 10 }}
+                label={{ value: '추정', position: 'insideTop', fill: '#71717a', fontSize: 10 }}
               />
             ))}
             {stacked ? (
               <>
-                <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
-                <Area type="monotone" dataKey="liquid" name="인출 가능" stackId="a" stroke={LIQUID_COLOR} strokeWidth={2} fill="url(#mat-liquid)" />
+                <Legend wrapperStyle={{ fontSize: 11, color: '#a1a1aa' }} iconType="circle" iconSize={8} />
+                <Area type="monotone" dataKey="liquid" name="인출 가능" stackId="a" stroke={LIQUID_COLOR} strokeWidth={1.75} fill="url(#mat-liquid)" />
                 {showRestricted && (
-                  <Area type="monotone" dataKey="restricted" name="인출 제한" stackId="a" stroke={RESTRICTED_COLOR} strokeWidth={2} fill="url(#mat-restricted)" />
+                  <Area type="monotone" dataKey="restricted" name="인출 제한" stackId="a" stroke={RESTRICTED_COLOR} strokeWidth={1.75} fill="url(#mat-restricted)" />
                 )}
               </>
             ) : (
-              <Area type="monotone" dataKey="total" name="평가액" stroke={SINGLE_COLOR} strokeWidth={2} fill="url(#mat-single)" />
+              <Area type="monotone" dataKey="total" name="평가액" stroke={SINGLE_COLOR} strokeWidth={1.75} fill="url(#mat-single)" />
             )}
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
       {estimatedRuns.length > 0 && (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 label-mono !text-zinc-500 normal-case">
           추정: 실제 기록 이전 기간은 거래내역과 과거 월초 시세로 계산한 값입니다 (직접 입력한 보유는 기간 내내 보유로 가정)
         </p>
       )}
 
       <button
         onClick={() => setShowTable((v) => !v)}
-        className="mt-3 flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+        className="mt-3 btn-ghost !py-1.5 !text-xs"
       >
         {showTable ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         월별 상세 보기
@@ -359,26 +361,26 @@ export default function MonthlyAssetTrend({
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-xs text-slate-400 border-b border-slate-700">
-                <th className="text-left py-2 pr-3 font-medium">월</th>
-                {stacked && <th className="text-right py-2 px-3 font-medium">인출 가능</th>}
-                {stacked && <th className="text-right py-2 px-3 font-medium">인출 제한</th>}
-                <th className="text-right py-2 px-3 font-medium">합계</th>
-                <th className="text-right py-2 pl-3 font-medium">전월 대비</th>
+              <tr className="table-head border-b border-white/[0.08]">
+                <th className="text-left py-2.5 pr-3 font-normal">월</th>
+                {stacked && <th className="text-right py-2.5 px-3 font-normal">인출 가능</th>}
+                {stacked && <th className="text-right py-2.5 px-3 font-normal">인출 제한</th>}
+                <th className="text-right py-2.5 px-3 font-normal">합계</th>
+                <th className="text-right py-2.5 pl-3 font-normal">전월 대비</th>
               </tr>
             </thead>
             <tbody>
               {tableRows.map((p) => (
-                <tr key={p.key} className="border-b border-slate-700/50 text-slate-200">
-                  <td className="py-2 pr-3 whitespace-nowrap">{p.label}
+                <tr key={p.key} className="table-row num text-zinc-200">
+                  <td className="py-2.5 pr-3 whitespace-nowrap">{p.label}
                     {p.estimated && (
-                      <span className="ml-1.5 px-1 py-0.5 rounded bg-slate-700/70 text-[10px] text-slate-400">추정</span>
+                      <span className="ml-1.5 chip !px-1.5 !py-0 !text-[10px]">추정</span>
                     )}
                   </td>
-                  {stacked && <td className="text-right py-2 px-3 whitespace-nowrap">{formatKRW(p.liquid)}</td>}
-                  {stacked && <td className="text-right py-2 px-3 whitespace-nowrap">{formatKRW(p.restricted)}</td>}
-                  <td className="text-right py-2 px-3 whitespace-nowrap font-medium text-white">{formatKRW(p.total)}</td>
-                  <td className="text-right py-2 pl-3 whitespace-nowrap">
+                  {stacked && <td className="text-right py-2.5 px-3 whitespace-nowrap">{formatKRW(p.liquid)}</td>}
+                  {stacked && <td className="text-right py-2.5 px-3 whitespace-nowrap">{formatKRW(p.restricted)}</td>}
+                  <td className="text-right py-2.5 px-3 whitespace-nowrap font-medium text-white">{formatKRW(p.total)}</td>
+                  <td className="text-right py-2.5 pl-3 whitespace-nowrap">
                     <DeltaText delta={momDelta.get(p.key) || null} />
                   </td>
                 </tr>
