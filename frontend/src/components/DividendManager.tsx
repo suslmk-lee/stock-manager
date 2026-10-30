@@ -37,7 +37,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
     dividends: Dividend[];
     monthlyChart: { month: string; total: number }[];
     totalAmount: number;
-    holdingInfo: { accountName: string; quantity: number; marketValue: number; avgPrice: number }[];
+    holdingInfo: { accountName: string; quantity: number; marketValue: number; avgPrice: number; costKRW: number }[];
+    currency: string; // 평단가 통화 (KRW / USD)
     yieldPercent: number;
   } | null>(null);
   const [assetDetailLoading, setAssetDetailLoading] = useState(false);
@@ -190,14 +191,19 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
         priceCurrency = String(priceData?.currency || '');
       } catch { /* ignore */ }
 
+      // 시세를 못 받으면 티커로 통화를 추정 (국내 .KS/.KQ = 원화)
+      const currency = priceCurrency || (/\.(KS|KQ)$/i.test(ticker) ? 'KRW' : 'USD');
+      const toKRW = (v: number) => (currency === 'USD' ? v * exchangeRate : v);
       const holdingInfo = assetHoldings.map((h: any) => {
         const acct = accounts.find(a => a.id === h.account_id);
-        const priceInKRW = priceCurrency === 'USD' ? currentPrice * exchangeRate : currentPrice;
+        const quantity = h.quantity || 0;
+        const avgPrice = h.average_price || 0;
         return {
           accountName: acct?.name || `계좌 #${h.account_id}`,
-          quantity: h.quantity || 0,
-          marketValue: (h.quantity || 0) * priceInKRW,
-          avgPrice: h.average_price || 0,
+          quantity,
+          marketValue: quantity * toKRW(currentPrice),
+          avgPrice,
+          costKRW: quantity * toKRW(avgPrice), // 투자 원금 (외화는 현재 환율 기준)
         };
       });
 
@@ -210,6 +216,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
         monthlyChart,
         totalAmount,
         holdingInfo,
+        currency,
         yieldPercent,
       });
     } catch (err) {
@@ -1061,6 +1068,50 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 <div className="p-12 text-center text-zinc-400">데이터 로딩 중...</div>
               ) : assetDetailData ? (
                 <div className="p-6 space-y-6">
+                  {/* 종목 전체 투자금 (모든 계좌 합산) */}
+                  {assetDetailData.holdingInfo.length > 0 && (() => {
+                    const hs = assetDetailData.holdingInfo;
+                    const cost = hs.reduce((s, h) => s + h.costKRW, 0);
+                    const value = hs.reduce((s, h) => s + h.marketValue, 0);
+                    const qty = hs.reduce((s, h) => s + h.quantity, 0);
+                    const pnl = value - cost;
+                    const pnlPct = cost > 0 ? (pnl / cost) * 100 : 0;
+                    const pnlTone = value <= 0 ? 'text-zinc-400' : pnl >= 0 ? 'text-mint-300' : 'text-rose-300';
+                    const won = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
+                    return (
+                      <div className="surface-inset flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Wallet className="h-4 w-4 text-zinc-300" />
+                            <span className="label-mono">전체 투자금</span>
+                          </div>
+                          <p className="num mt-1 text-3xl font-light tracking-tight text-white">{won(cost)}</p>
+                          <p className="label-mono mt-1">
+                            {hs.length}개 계좌 · 총 {qty.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}주
+                            {assetDetailData.currency === 'USD' && ' · 현재 환율 기준'}
+                          </p>
+                        </div>
+                        <div className="flex gap-6 sm:text-right">
+                          <div>
+                            <div className="label-mono">평가금액</div>
+                            <p className="num mt-1 text-lg font-medium text-white">{value > 0 ? won(value) : '-'}</p>
+                          </div>
+                          <div>
+                            <div className="label-mono">평가손익</div>
+                            <p className={`num mt-1 text-lg font-medium ${pnlTone}`}>
+                              {value > 0 ? `${pnl >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%` : '-'}
+                            </p>
+                            {value > 0 && (
+                              <p className={`num text-xs ${pnlTone}`}>
+                                {pnl >= 0 ? '+' : '-'}{won(Math.abs(pnl))}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* 요약 카드 */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="surface-inset p-4">
@@ -1141,7 +1192,10 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                                 ₩{h.marketValue.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
                               </p>
                               <p className="text-xs text-zinc-400">
-                                평단 ₩{h.avgPrice.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                                투자금 ₩{Math.round(h.costKRW).toLocaleString('ko-KR')} · 평단{' '}
+                                {assetDetailData.currency === 'USD'
+                                  ? `$${h.avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  : `₩${h.avgPrice.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}`}
                               </p>
                             </div>
                           </div>
