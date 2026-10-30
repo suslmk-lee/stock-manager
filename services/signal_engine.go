@@ -1,6 +1,8 @@
 package services
 
 import (
+	"math"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -370,4 +372,33 @@ func checksHit(checks []SignalCheck, mode string) bool {
 		}
 	}
 	return false
+}
+
+// sanitizeSignalReport 는 NaN/±Inf 를 0 으로 바꾼다. encoding/json 은 이런 값을
+// 직렬화하지 못해 Wails/HTTP 응답 전체가 실패하므로, 비정상 DB 값 하나가 화면을 막지 않게 한다.
+func sanitizeSignalReport(r *SignalReport) {
+	sanitizeFloats(reflect.ValueOf(r).Elem())
+}
+
+func sanitizeFloats(v reflect.Value) {
+	switch v.Kind() {
+	case reflect.Float32, reflect.Float64:
+		if f := v.Float(); math.IsNaN(f) || math.IsInf(f, 0) {
+			v.SetFloat(0)
+		}
+	case reflect.Struct:
+		for i := 0; i < v.NumField(); i++ {
+			if v.Field(i).CanSet() {
+				sanitizeFloats(v.Field(i))
+			}
+		}
+	case reflect.Slice:
+		for i := 0; i < v.Len(); i++ {
+			sanitizeFloats(v.Index(i))
+		}
+	case reflect.Ptr:
+		if !v.IsNil() {
+			sanitizeFloats(v.Elem())
+		}
+	}
 }

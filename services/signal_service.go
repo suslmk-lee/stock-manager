@@ -165,7 +165,7 @@ func (s *SignalService) DeleteAssetRule(assetID uint) error {
 func (s *SignalService) GetSignals() (*SignalReport, error) {
 	rules, err := s.GetSignalRules()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("신호 규칙 조회 실패: %w", err)
 	}
 	overrides := make(map[uint]models.SignalRule, len(rules.Overrides))
 	for _, o := range rules.Overrides {
@@ -174,11 +174,11 @@ func (s *SignalService) GetSignals() (*SignalReport, error) {
 
 	var holdings []models.Holding
 	if err := s.db.Where("quantity > 0").Find(&holdings).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("보유 조회 실패: %w", err)
 	}
 	var accounts []models.Account
 	if err := s.db.Find(&accounts).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("계좌 조회 실패: %w", err)
 	}
 	accMap := make(map[uint]models.Account, len(accounts))
 	for _, a := range accounts {
@@ -186,7 +186,7 @@ func (s *SignalService) GetSignals() (*SignalReport, error) {
 	}
 	var assets []models.Asset
 	if err := s.db.Find(&assets).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("종목 조회 실패: %w", err)
 	}
 	assetMap := make(map[uint]models.Asset, len(assets))
 	for _, a := range assets {
@@ -224,7 +224,7 @@ func (s *SignalService) GetSignals() (*SignalReport, error) {
 	if len(order) > 0 {
 		var pnls []models.RealizedPnL
 		if err := s.db.Where("asset_id IN ?", order).Find(&pnls).Error; err != nil {
-			return nil, err
+			return nil, fmt.Errorf("실현손익 조회 실패: %w", err)
 		}
 		for _, p := range pnls {
 			if _, ok := accMap[p.AccountID]; !ok {
@@ -236,7 +236,7 @@ func (s *SignalService) GetSignals() (*SignalReport, error) {
 		}
 		var divs []models.Dividend
 		if err := s.db.Where("asset_id IN ?", order).Find(&divs).Error; err != nil {
-			return nil, err
+			return nil, fmt.Errorf("배당 조회 실패: %w", err)
 		}
 		for _, d := range divs {
 			if _, ok := accMap[d.AccountID]; !ok {
@@ -273,6 +273,7 @@ func (s *SignalService) GetSignals() (*SignalReport, error) {
 		list = append(list, *inputs[id])
 	}
 	report := BuildSignalReport(list, usdKRW, time.Now())
+	sanitizeSignalReport(&report)
 	return &report, nil
 }
 

@@ -226,7 +226,7 @@ export default function SignalRuleEditor({ mode, assetId, assetName, defaultRule
       }
       onSaved();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : '전략 저장에 실패했습니다.');
+      setSubmitError(err instanceof Error ? err.message : typeof err === 'string' && err ? err : '전략 저장에 실패했습니다.');
     } finally {
       setSaving(false);
     }

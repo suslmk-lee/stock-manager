@@ -263,7 +263,9 @@ export default function SignalsDashboard() {
       setRules(ru);
     } catch (err) {
       console.error('Failed to load signals:', err);
-      setError(err instanceof Error ? err.message : '매매 신호를 불러오지 못했습니다.');
+      // Wails 는 Go 오류를 문자열로 reject 한다
+      const detail = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+      setError(detail ? `매매 신호를 불러오지 못했습니다: ${detail}` : '매매 신호를 불러오지 못했습니다.');
     } finally {
       setLoading(false);
       setRefreshing(false);
