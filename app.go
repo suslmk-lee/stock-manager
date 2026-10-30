@@ -65,6 +65,9 @@ func (a *App) startup(ctx context.Context) {
 
 	// 앱 시작 시 이번 달 스냅샷 자동 기록
 	a.snapshotService.EnsureCurrentMonthSnapshotAsync()
+
+	// 신호 백그라운드 점검 (ctx 종료 시 중단)
+	a.startSignalMonitor(ctx)
 }
 
 func (a *App) GetAllAccounts() (interface{}, error) {
@@ -369,4 +372,46 @@ func (a *App) DeleteAssetSignalRule(assetID uint) error {
 
 func (a *App) GetSignals() (interface{}, error) {
 	return a.signalService.GetSignals()
+}
+
+// ===== 매매 신호 알림 =====
+
+func (a *App) GetSignalEvents(limit int, unreadOnly bool) (interface{}, error) {
+	events, unread, err := a.signalService.GetSignalEvents(limit, unreadOnly)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{"events": events, "unread_count": unread}, nil
+}
+
+func (a *App) MarkSignalEventsRead(ids []uint, all bool) (interface{}, error) {
+	unread, err := a.signalService.MarkSignalEventsRead(ids, all)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{"unread_count": unread}, nil
+}
+
+func (a *App) GetUnreadSignalCount() (interface{}, error) {
+	unread, err := a.signalService.GetUnreadSignalCount()
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{"unread_count": unread}, nil
+}
+
+func (a *App) CheckSignals() (interface{}, error) {
+	events, unread, err := a.signalService.CheckSignals()
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{"new_events": events, "unread_count": unread}, nil
+}
+
+func (a *App) GetNotificationSettings() (interface{}, error) {
+	return a.signalService.GetNotificationSettings()
+}
+
+func (a *App) SaveNotificationSettings(s models.NotificationSetting) (interface{}, error) {
+	return a.signalService.SaveNotificationSettings(s)
 }

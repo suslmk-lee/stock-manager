@@ -368,3 +368,40 @@ SignalItem 추가 필드:
 ```json
 "tax": { "year": 2026, "realized_gain_krw": 0, "realized_loss_krw": 0, "net_krw": 0, "exemption_krw": 2500000, "remaining_krw": 2500000, "estimated_tax_krw": 0, "harvest_window": false, "count": 0 }
 ```
+
+---
+
+## 9. 신호 알림 (Signal Alerts)
+
+신호 계산(`GET /api/signals`, `POST /api/signals/check`) 때마다 종목별 신호 상태를 이전 상태와 비교해 변화 이력(이벤트)을 기록합니다. 신호 상태 테이블이 비어 있는 최초 실행에서는 기준선만 저장하고 이벤트를 만들지 않으며, `NO_PRICE` 종목은 무시합니다. 이벤트는 최대 500개까지 보관합니다.
+
+이벤트 종류: 관망에서 SELL/BUY/CONFLICT 로 전환("{라벨}로 전환 · {충족 조건}"), 같은 신호에서 새 조건 충족("새 조건 충족 · {새 조건}"), 신호 해제("신호 해제 · 관망", 항상 읽음 처리). 알림 설정에서 꺼진 종류(`notify_*`)이거나 `enabled=false` 이면 이력에는 남지만 읽음 상태로 저장됩니다.
+
+### 9.1 이벤트 목록
+`GET /api/signal-events?limit=50&unread_only=false`
+```json
+{ "events": [ { "id": 1, "asset_id": 3, "ticker": "AAPL", "name": "Apple", "from_action": "HOLD", "to_action": "SELL",
+  "met_codes": "take_profit", "message": "매도 검토로 전환 · 목표 수익률", "total_return_pct": 40.1, "current_price": 210.5,
+  "currency": "USD", "created_at": "2026-01-01T09:00:00Z", "read_at": null } ], "unread_count": 1 }
+```
+최신순. `limit` 기본 50, 최대 500.
+
+### 9.2 읽음 처리
+`POST /api/signal-events/read` — 본문 `{ "ids": [1, 2], "all": false }` (`all=true` 이면 전체) → `{ "unread_count": 0 }`
+
+### 9.3 읽지 않은 개수
+`GET /api/signal-events/unread-count` → `{ "unread_count": 2 }`
+
+### 9.4 즉시 점검
+`POST /api/signals/check` → `{ "new_events": [SignalEvent...], "unread_count": 3 }` (이번 점검에서 생긴 읽지 않은 이벤트만 `new_events`)
+
+### 9.5 알림 설정
+`GET /api/notification-settings`, `PUT /api/notification-settings`
+```json
+{ "enabled": true, "interval_minutes": 60, "os_notify": true, "notify_sell": true, "notify_buy": true, "notify_conflict": true, "updated_at": "..." }
+```
+`interval_minutes` 는 15, 30, 60, 180, 360 만 허용(그 외 400).
+
+### 9.6 데스크톱 전용
+- Wails 바인딩: `GetSignalEvents(limit, unreadOnly)`, `MarkSignalEventsRead(ids, all)`, `GetUnreadSignalCount()`, `CheckSignals()`, `GetNotificationSettings()`, `SaveNotificationSettings(s)`.
+- 데스크톱 앱은 시작 20초 후부터 `interval_minutes` 주기로 백그라운드 점검을 하며(설정 저장 시 즉시 재시작), 새 읽지 않은 이벤트가 있으면 Wails 이벤트 `signals:new`(payload: SignalEvent[])를 발생시키고 `os_notify` 이면 Windows 알림을 1회 표시합니다. 클라우드 서버(cmd/server)는 백그라운드 점검과 OS 알림이 없으며, 클라이언트가 `POST /api/signals/check` 를 호출할 때만 기록됩니다.
