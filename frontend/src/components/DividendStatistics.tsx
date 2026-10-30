@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
-import { TrendingUp, DollarSign, Calendar, PieChart } from 'lucide-react';
+import { TrendingUp, DollarSign, Calendar, PieChart, Receipt } from 'lucide-react';
+import IconTile from './ui/IconTile';
 import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
 
 interface DividendStatisticsProps {
@@ -53,7 +54,7 @@ export default function DividendStatistics({ accountId, marketType, liquidity = 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700 animate-pulse">
+          <div key={i} className="surface p-6 animate-pulse">
             <div className="h-20"></div>
           </div>
         ))}
@@ -80,125 +81,90 @@ export default function DividendStatistics({ accountId, marketType, liquidity = 
   const totalCount = stats.received_count + stats.pending_count;
   const averageDividendKRW = totalCount > 0 ? totalDividendsKRW / totalCount : 0;
 
+  const kpis = [
+    { label: '총 배당금', value: formatCurrency(totalDividendsKRW), sub: '세전 금액', icon: DollarSign, tone: 'mint' as const },
+    { label: '순 배당금', value: formatCurrency(netDividendsKRW), sub: '세후 금액', icon: TrendingUp, tone: 'sky' as const },
+    { label: '평균 배당금', value: formatCurrency(averageDividendKRW), sub: '건당 평균', icon: PieChart, tone: 'warm' as const },
+    {
+      label: '배당 건수',
+      value: `${stats.received_count + stats.pending_count}건`,
+      sub: `수령 ${stats.received_count} / 예정 ${stats.pending_count}`,
+      icon: Calendar,
+      tone: 'amber' as const,
+    },
+  ];
+
+  const marketCards = [
+    { label: '국내 시장', accounts: domesticAccounts, dot: '#7dd3fc' },
+    { label: '해외 시장', accounts: internationalAccounts, dot: '#7ddfb0' },
+  ];
+
   return (
     <div className="space-y-6">
       {/* 주요 통계 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-6 border border-green-500/30">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-slate-300 text-sm">총 배당금</p>
-            <DollarSign className="w-5 h-5 text-green-400" />
+        {kpis.map((k) => (
+          <div key={k.label} className="surface p-5">
+            <div className="flex items-center justify-between mb-4">
+              <p className="label-mono !text-zinc-400">{k.label}</p>
+              <IconTile icon={k.icon} tone={k.tone} size="sm" />
+            </div>
+            <p className="num text-2xl font-light tracking-tight text-white">{k.value}</p>
+            <p className="label-mono mt-1.5">{k.sub}</p>
           </div>
-          <p className="text-2xl font-bold text-white">
-            {formatCurrency(totalDividendsKRW)}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">세전 금액</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl p-6 border border-blue-500/30">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-slate-300 text-sm">순 배당금</p>
-            <TrendingUp className="w-5 h-5 text-blue-400" />
-          </div>
-          <p className="text-2xl font-bold text-white">
-            {formatCurrency(netDividendsKRW)}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">세후 금액</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-6 border border-purple-500/30">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-slate-300 text-sm">평균 배당금</p>
-            <PieChart className="w-5 h-5 text-purple-400" />
-          </div>
-          <p className="text-2xl font-bold text-white">
-            {formatCurrency(averageDividendKRW)}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">건당 평균</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl p-6 border border-orange-500/30">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-slate-300 text-sm">배당 건수</p>
-            <Calendar className="w-5 h-5 text-orange-400" />
-          </div>
-          <p className="text-2xl font-bold text-white">
-            {stats.received_count + stats.pending_count}건
-          </p>
-          <p className="text-xs text-slate-400 mt-1">
-            수령 {stats.received_count} / 예정 {stats.pending_count}
-          </p>
-        </div>
+        ))}
       </div>
 
       {/* 시장별 통계 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
-            국내 시장
-          </h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">계좌 수</span>
-              <span className="text-white font-semibold">{domesticAccounts.length}개</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">주요 증권사</span>
-              <span className="text-white font-semibold">
-                {domesticAccounts.length > 0 
-                  ? domesticAccounts[0].broker 
-                  : '-'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <span className="w-3 h-3 bg-green-500 rounded-full"></span>
-            해외 시장
-          </h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">계좌 수</span>
-              <span className="text-white font-semibold">{internationalAccounts.length}개</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">주요 증권사</span>
-              <span className="text-white font-semibold">
-                {internationalAccounts.length > 0 
-                  ? internationalAccounts[0].broker 
-                  : '-'}
-              </span>
+        {marketCards.map((m) => (
+          <div key={m.label} className="surface p-5 sm:p-6">
+            <h3 className="section-title mb-4 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: m.dot, boxShadow: `0 0 8px ${m.dot}88` }}></span>
+              {m.label}
+            </h3>
+            <div className="space-y-2">
+              <div className="surface-inset flex justify-between items-center px-4 py-3">
+                <span className="label-mono">계좌 수</span>
+                <span className="num text-white font-medium">{m.accounts.length}개</span>
+              </div>
+              <div className="surface-inset flex justify-between items-center px-4 py-3">
+                <span className="label-mono">주요 증권사</span>
+                <span className="text-white font-medium">
+                  {m.accounts.length > 0 ? m.accounts[0].broker : '-'}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        ))}
       </div>
 
       {/* 세금 정보 */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
-        <h3 className="text-lg font-semibold mb-4">세금 정보</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <p className="text-slate-400 text-sm mb-1">총 세금</p>
-            <p className="text-xl font-bold text-red-400">
-              {formatCurrency(totalTaxKRW)}
-            </p>
+      <div className="surface p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <IconTile icon={Receipt} tone="amber" size="sm" />
+          <h3 className="section-title">세금 정보</h3>
+        </div>
+        <div className="surface-inset flex flex-col sm:flex-row items-stretch gap-4 sm:gap-0 p-5">
+          <div className="flex-1 sm:text-center">
+            <p className="num text-xl font-light text-rose-300">{formatCurrency(totalTaxKRW)}</p>
+            <p className="label-mono mt-1.5">총 세금</p>
           </div>
-          <div>
-            <p className="text-slate-400 text-sm mb-1">세율</p>
-            <p className="text-xl font-bold text-white">
-              {totalDividendsKRW > 0 
-                ? ((totalTaxKRW / totalDividendsKRW) * 100).toFixed(1) 
+          <span className="divider-v hidden sm:block" />
+          <div className="flex-1 sm:text-center">
+            <p className="num text-xl font-light text-white">
+              {totalDividendsKRW > 0
+                ? ((totalTaxKRW / totalDividendsKRW) * 100).toFixed(1)
                 : 0}%
             </p>
+            <p className="label-mono mt-1.5">세율</p>
           </div>
-          <div>
-            <p className="text-slate-400 text-sm mb-1">환율 (USD/KRW)</p>
-            <p className="text-xl font-bold text-white">
+          <span className="divider-v hidden sm:block" />
+          <div className="flex-1 sm:text-center">
+            <p className="num text-xl font-light text-white">
               ₩{exchangeRate.toLocaleString()}
             </p>
+            <p className="label-mono mt-1.5">환율 (USD/KRW)</p>
           </div>
         </div>
       </div>

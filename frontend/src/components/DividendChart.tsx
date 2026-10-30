@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { apiClient } from '../api/client';
 import { TrendingUp, Calendar } from 'lucide-react';
+import IconTile from './ui/IconTile';
 
 interface MonthlyDividend {
   year: number;
@@ -84,10 +85,13 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-lg">
-          <p className="text-white font-semibold mb-1">{data.label}</p>
-          <p className="text-green-400">배당금: {formatCurrency(data.total)}</p>
-          <p className="text-slate-400 text-sm">건수: {data.count}건</p>
+        <div
+          className="p-3 shadow-lg"
+          style={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12 }}
+        >
+          <p className="text-white font-medium mb-1 text-sm">{data.label}</p>
+          <p className="text-mint-300 text-sm num">배당금: {formatCurrency(data.total)}</p>
+          <p className="label-mono mt-0.5">건수: {data.count}건</p>
         </div>
       );
     }
@@ -96,9 +100,9 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
+      <div className="surface p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="text-slate-400">로딩 중...</div>
+          <div className="label-mono">로딩 중...</div>
         </div>
       </div>
     );
@@ -106,67 +110,68 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
 
   if (error) {
     return (
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
+      <div className="surface p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="text-red-400">{error}</div>
+          <div className="text-rose-300">{error}</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
-      <div className="flex items-center justify-between mb-6">
+    <div className="surface p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
-            <TrendingUp className="w-6 h-6 text-white" />
-          </div>
+          <IconTile icon={TrendingUp} tone="mint" />
           <div>
-            <h2 className="text-2xl font-bold text-white">월별 배당금 현황</h2>
-            <p className="text-slate-400 text-sm">최근 {months}개월</p>
+            <h2 className="section-title !text-lg">월별 배당금 현황</h2>
+            <p className="label-mono mt-0.5">최근 {months}개월</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-sm text-slate-400">총 배당금</p>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(totalDividend)}</p>
+          <p className="label-mono">총 배당금</p>
+          <p className="num text-2xl sm:text-3xl font-light tracking-tight text-mint-300">{formatCurrency(totalDividend)}</p>
         </div>
       </div>
 
       {data.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-          <Calendar className="w-16 h-16 mb-4 opacity-50" />
+        <div className="flex flex-col items-center justify-center h-64 text-zinc-500">
+          <Calendar className="w-14 h-14 mb-4 opacity-40" />
           <p className="text-lg">배당금 데이터가 없습니다.</p>
           <p className="text-sm mt-2">배당금을 추가하면 여기에 표시됩니다.</p>
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <ResponsiveContainer width="100%" height={360}>
+          <BarChart data={data} margin={{ top: 16, right: 16, left: 8, bottom: 5 }}>
             <defs>
               <linearGradient id="colorDividend" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                <stop offset="95%" stopColor="#059669" stopOpacity={0.6}/>
+                <stop offset="0%" stopColor="#7ddfb0" stopOpacity={0.9}/>
+                <stop offset="100%" stopColor="#7ddfb0" stopOpacity={0.15}/>
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis 
-              dataKey="label" 
-              stroke="#9ca3af"
-              tick={{ fill: '#9ca3af' }}
+            <XAxis
+              dataKey="label"
+              axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+              tickLine={false}
+              tick={{ fill: '#71717a', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
             />
-            <YAxis 
-              stroke="#9ca3af"
-              tick={{ fill: '#9ca3af' }}
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: '#71717a', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
               tickFormatter={(value) => `₩${value.toLocaleString()}`}
             />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend 
-              wrapperStyle={{ color: '#9ca3af' }}
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+            <Legend
+              wrapperStyle={{ color: '#a1a1aa', fontSize: 11 }}
+              iconType="circle"
+              iconSize={8}
               formatter={() => '배당금'}
             />
-            <Bar 
-              dataKey="total" 
-              fill="url(#colorDividend)" 
-              radius={[8, 8, 0, 0]}
+            <Bar
+              dataKey="total"
+              fill="url(#colorDividend)"
+              radius={[10, 10, 2, 2]}
               name="배당금"
             />
           </BarChart>
@@ -174,31 +179,21 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
       )}
 
       {data.length > 0 && (
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-slate-700/50 rounded-lg p-4">
-            <p className="text-slate-400 text-sm">평균 월 배당금</p>
-            <p className="text-white text-lg font-semibold mt-1">
-              {formatCurrency(totalDividend / data.length)}
-            </p>
-          </div>
-          <div className="bg-slate-700/50 rounded-lg p-4">
-            <p className="text-slate-400 text-sm">최고 월 배당금</p>
-            <p className="text-white text-lg font-semibold mt-1">
-              {formatCurrency(Math.max(...data.map(d => d.total || 0)))}
-            </p>
-          </div>
-          <div className="bg-slate-700/50 rounded-lg p-4">
-            <p className="text-slate-400 text-sm">총 배당 건수</p>
-            <p className="text-white text-lg font-semibold mt-1">
-              {data.reduce((sum, d) => sum + d.count, 0)}건
-            </p>
-          </div>
-          <div className="bg-slate-700/50 rounded-lg p-4">
-            <p className="text-slate-400 text-sm">배당 월 수</p>
-            <p className="text-white text-lg font-semibold mt-1">
-              {data.length}개월
-            </p>
-          </div>
+        <div className="mt-6 surface-inset flex flex-col sm:flex-row items-stretch gap-4 sm:gap-0 p-5">
+          {[
+            { label: '평균 월 배당금', value: formatCurrency(totalDividend / data.length) },
+            { label: '최고 월 배당금', value: formatCurrency(Math.max(...data.map(d => d.total || 0))) },
+            { label: '총 배당 건수', value: `${data.reduce((sum, d) => sum + d.count, 0)}건` },
+            { label: '배당 월 수', value: `${data.length}개월` },
+          ].map((s, i) => (
+            <div key={s.label} className="contents">
+              {i > 0 && <span className="divider-v hidden sm:block" />}
+              <div className="flex-1 sm:text-center">
+                <p className="num text-lg font-light text-white">{s.value}</p>
+                <p className="label-mono mt-1.5">{s.label}</p>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
