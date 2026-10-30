@@ -140,7 +140,7 @@ function Tile({
       title={description}
       className={`cpg-tile flex flex-col gap-1.5 rounded-xl p-1.5 text-left transition-colors ${selected ? selectedCls : idleCls}`}
     >
-      <div className="flex h-20 w-full items-center justify-center rounded-lg bg-ink-900 ring-1 ring-white/5">{children}</div>
+      <div className="flex h-16 w-full items-center justify-center rounded-lg bg-ink-900 ring-1 ring-white/5">{children}</div>
       <span className="truncate px-1 text-xs text-white">{name}</span>
     </button>
   );
@@ -150,7 +150,7 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <div className="label-mono mb-2 uppercase tracking-widest">{label}</div>
-      <div className="grid grid-cols-2 gap-2">{children}</div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{children}</div>
     </div>
   );
 }
