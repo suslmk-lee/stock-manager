@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate } from '../types/models';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -422,5 +422,54 @@ export const apiClient = {
   SaveNotificationSettings: async (s: NotificationSetting): Promise<NotificationSetting> => {
     if (isWeb) return fetchApi<NotificationSetting>('/notification-settings', { method: 'PUT', body: JSON.stringify(s) });
     return (await WailsApp.SaveNotificationSettings(s as unknown as Parameters<typeof WailsApp.SaveNotificationSettings>[0])) as NotificationSetting;
+  },
+
+  // ------------------------------------------
+  // Signal Profiles
+  // ------------------------------------------
+  GetSignalProfiles: async (): Promise<SignalProfilesResponse> => {
+    if (isWeb) return fetchApi<SignalProfilesResponse>('/signal-profiles');
+    return (await WailsApp.GetSignalProfiles()) as SignalProfilesResponse;
+  },
+
+  CreateSignalProfile: async (req: CreateProfileRequest): Promise<SignalProfile> => {
+    if (isWeb) return fetchApi<SignalProfile>('/signal-profiles', { method: 'POST', body: JSON.stringify(req) });
+    return (await WailsApp.CreateSignalProfile(req as unknown as Parameters<typeof WailsApp.CreateSignalProfile>[0])) as SignalProfile;
+  },
+
+  UpdateSignalProfile: async (id: number, req: UpdateProfileRequest): Promise<SignalProfile> => {
+    if (isWeb) return fetchApi<SignalProfile>(`/signal-profiles/${id}`, { method: 'PUT', body: JSON.stringify(req) });
+    return (await WailsApp.UpdateSignalProfile(id, req as unknown as Parameters<typeof WailsApp.UpdateSignalProfile>[1])) as SignalProfile;
+  },
+
+  DeleteSignalProfile: async (id: number): Promise<void> => {
+    if (isWeb) {
+      await fetchApi(`/signal-profiles/${id}`, { method: 'DELETE' });
+      return;
+    }
+    return WailsApp.DeleteSignalProfile(id);
+  },
+
+  ResetSignalProfile: async (id: number): Promise<SignalProfile> => {
+    if (isWeb) return fetchApi<SignalProfile>(`/signal-profiles/${id}/reset`, { method: 'POST' });
+    return (await WailsApp.ResetSignalProfile(id)) as SignalProfile;
+  },
+
+  AssignSignalProfile: async (id: number, assetIds: number[]): Promise<{ assignments: ProfileAssignment[] }> => {
+    if (isWeb) return fetchApi<{ assignments: ProfileAssignment[] }>(`/signal-profiles/${id}/assets`, { method: 'PUT', body: JSON.stringify({ asset_ids: assetIds }) });
+    return (await WailsApp.AssignSignalProfile(id, assetIds)) as { assignments: ProfileAssignment[] };
+  },
+
+  GetProfileCandidates: async (): Promise<{ candidates: ProfileCandidate[] }> => {
+    if (isWeb) return fetchApi<{ candidates: ProfileCandidate[] }>('/signal-profiles/candidates');
+    return (await WailsApp.GetProfileCandidates()) as { candidates: ProfileCandidate[] };
+  },
+
+  DismissProfileSuggestion: async (assetId: number): Promise<void> => {
+    if (isWeb) {
+      await fetchApi(`/signal-profiles/suggestions/${assetId}/dismiss`, { method: 'POST' });
+      return;
+    }
+    return WailsApp.DismissProfileSuggestion(assetId);
   },
 };

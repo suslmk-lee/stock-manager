@@ -1,20 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, BellOff } from 'lucide-react';
+import { Bell, BellOff, Lightbulb } from 'lucide-react';
 import type { SignalEvent } from '../../types/models';
 import { useAlerts } from './AlertsProvider';
-import { eventTone, relativeTime, shortLabel } from './alertMeta';
+import { eventTone, isSuggestion, relativeTime, shortLabel } from './alertMeta';
 
 function Row({ event, onOpen }: { event: SignalEvent; onOpen: () => void }) {
+  const { acceptSuggestion, dismissSuggestion } = useAlerts();
+  const [busy, setBusy] = useState(false);
   const tone = eventTone(event);
   const unread = !event.read_at;
+  const suggestion = isSuggestion(event);
+  const act = async (fn: (e: SignalEvent) => Promise<void>) => {
+    try {
+      setBusy(true);
+      await fn(event);
+    } catch (err) {
+      console.error('Suggestion action failed:', err);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <li>
+    <li className={unread ? 'bg-white/[0.07] shadow-[inset_2px_0_0_rgb(var(--c-mint-400))]' : ''}>
       <button
         type="button"
         onClick={onOpen}
-        className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.07] ${unread ? 'bg-white/[0.07] shadow-[inset_2px_0_0_rgb(var(--c-mint-400))]' : ''}`}
+        className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.07]"
       >
-        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tone.dot} ${unread ? '' : 'opacity-50'}`} />
+        {suggestion ? (
+          <Lightbulb className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${tone.text} ${unread ? '' : 'opacity-50'}`} />
+        ) : (
+          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tone.dot} ${unread ? '' : 'opacity-50'}`} />
+        )}
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className={`truncate text-sm ${unread ? 'font-semibold text-white' : 'font-medium text-zinc-300'}`}>{event.name}</span>
@@ -28,6 +45,16 @@ function Row({ event, onOpen }: { event: SignalEvent; onOpen: () => void }) {
         </span>
         {unread && <span className="sr-only">읽지 않음</span>}
       </button>
+      {suggestion && unread && (
+        <div className="flex gap-2 pb-3 pl-[2.75rem] pr-4">
+          <button type="button" disabled={busy} onClick={() => act(acceptSuggestion)} className="btn-ghost !border-sky-400/30 !bg-sky-400/10 !px-3 !py-1 !text-xs !text-sky-200">
+            지정
+          </button>
+          <button type="button" disabled={busy} onClick={() => act(dismissSuggestion)} className="btn-ghost !px-3 !py-1 !text-xs">
+            무시
+          </button>
+        </div>
+      )}
     </li>
   );
 }

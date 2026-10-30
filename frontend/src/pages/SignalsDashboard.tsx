@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck } from 'lucide-react';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import SignalHistory from '../components/alerts/SignalHistory';
 import { apiClient } from '../api/client';
-import { SignalAction, SignalCheck, SignalItem, SignalReport, SignalRule, SignalRulesResponse, SignalTaxSummary } from '../types/models';
+import { SignalAction, SignalCheck, SignalItem, SignalProfile, SignalReport, SignalRule, SignalRulesResponse, SignalTaxSummary } from '../types/models';
 import IconTile from '../components/ui/IconTile';
 import RingGauge from '../components/ui/RingGauge';
 import Chip from '../components/ui/Chip';
 import CountUp from '../components/CountUp';
 import SignalRuleEditor from '../components/signals/SignalRuleEditor';
+import ProfileManager from '../components/signals/ProfileManager';
+import ProfileChip from '../components/signals/ProfileChip';
 import { getAccountTypeMeta } from '../utils/accountType';
 
 type FilterValue = 'all' | 'SELL' | 'BUY' | 'CONFLICT' | 'HOLD';
@@ -33,6 +35,7 @@ const ACTION_META: Record<SignalAction, { label: string; badge: string; ring: st
 const CHECK_OPS: Record<string, string> = {
   take_profit: '≥',
   stop_loss: '≤',
+  crash: '≤',
   weight_over: '≥',
   weight_under: '≤',
   dividend_payback: '≥',
@@ -208,13 +211,26 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
   const [open, setOpen] = useState(false);
   const meta = ACTION_META[item.action];
   const actionLabel = item.action === 'SELL' && item.restricted_only ? '리밸런싱 검토' : meta.label;
-  const ring = ringInfo(item);
   const noPrice = item.action === 'NO_PRICE';
+  const dividendKind = item.profile_kind === 'dividend';
+  // 배당형 프로필은 목표 수익률 대신 배당 회수율을 링으로 보여 준다
+  const ring = dividendKind && !noPrice ? { value: item.dividend_payback_pct, text: fmtPct(item.dividend_payback_pct, 0) } : ringInfo(item);
+  const ringColor = dividendKind ? 'rgb(var(--c-sky-400))' : meta.ring;
   const fx = item.return_basis === 'fx' && item.total_return_pct_fx !== undefined;
   const coverage = item.fx_coverage_pct ?? 100;
   const showTrend = !noPrice && !!item.price_history_ok && !!item.high_52w && !!item.low_52w;
   const showDiv = !noPrice && !!item.dividend_trend_ok;
   const hint = !noPrice ? item.tax_hint : null;
+  const divMetrics = (
+    <>
+      <Metric label="누적 배당" sub={`회수율 ${fmtPct(item.dividend_payback_pct)}`}>
+        {fmtKrw(item.dividends_krw)}
+      </Metric>
+      <Metric label="배당수익률" sub="현재 / 원금 기준">
+        {fmtPct(item.current_yield_pct, 2)} <span className="text-zinc-500">/ {fmtPct(item.yield_on_cost_pct, 2)}</span>
+      </Metric>
+    </>
+  );
 
   return (
     <article id={'signal-card-' + item.asset_id} className={`surface flex scroll-mt-48 flex-col p-5 sm:p-6 ${flash ? 'focus-flash' : ''}`}>
@@ -232,6 +248,18 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
         </div>
       </header>
 
+      {(item.profile_name || item.sell_disabled) && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {item.profile_name && <ProfileChip name={item.profile_name} kind={item.profile_kind} />}
+          {item.sell_disabled && (
+            <span className="badge border border-sky-400/25 bg-sky-400/10 text-sky-200">
+              <ShieldCheck className="h-3 w-3" />
+              매도 신호 없음 · 장기보유
+            </span>
+          )}
+        </div>
+      )}
+
       {item.restricted_only && (
         <div className="mt-2.5">
           <span className="badge border border-amber-400/25 bg-amber-400/10 text-amber-200">
@@ -244,7 +272,7 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
         {ring && (
           <div className="flex justify-center sm:block">
-            <RingGauge value={ring.value} size={96} stroke={4} color={meta.ring} label="목표 대비">
+            <RingGauge value={ring.value} size={96} stroke={4} color={ringColor} label={dividendKind ? '배당 회수' : '목표 대비'}>
               <span className="text-[15px]">{ring.text}</span>
             </RingGauge>
           </div>
@@ -256,6 +284,7 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
             </div>
           ) : (
             <>
+              {dividendKind && divMetrics}
               <Metric label="평가금액">{fmtKrw(item.market_value_krw)}</Metric>
               {fx ? (
                 <div className="surface-inset min-w-0 px-3 py-2.5">
@@ -286,12 +315,7 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
                   <span className={signTone(item.total_return_pct)}>{fmtSignedPct(item.total_return_pct)}</span>
                 </Metric>
               )}
-              <Metric label="누적 배당" sub={`회수율 ${fmtPct(item.dividend_payback_pct)}`}>
-                {fmtKrw(item.dividends_krw)}
-              </Metric>
-              <Metric label="배당수익률" sub="현재 / 원금 기준">
-                {fmtPct(item.current_yield_pct, 2)} <span className="text-zinc-500">/ {fmtPct(item.yield_on_cost_pct, 2)}</span>
-              </Metric>
+              {!dividendKind && divMetrics}
               <Metric label="비중">{fmtPct(item.weight_pct)}</Metric>
               <Metric label="평단 대비" sub={`${formatPrice(item.avg_price, item.currency)} → ${formatPrice(item.current_price, item.currency)}`}>
                 <span className={signTone(item.from_avg_pct)}>{fmtSignedPct(item.from_avg_pct)}</span>
@@ -422,7 +446,7 @@ function Skeleton() {
   );
 }
 
-type EditorState = { mode: 'default' } | { mode: 'asset'; item: SignalItem } | null;
+type EditorState = { item: SignalItem } | null;
 
 // 이미 처리한 포커스 요청 (탭 전환으로 다시 마운트돼도 재실행하지 않도록)
 let handledFocusNonce = 0;
@@ -433,7 +457,7 @@ interface SignalsDashboardProps {
 }
 
 export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDashboardProps = {}) {
-  const { openSettings } = useAlerts();
+  const { openSettings, openCandidates, profilesVersion } = useAlerts();
   const [flashId, setFlashId] = useState<number | null>(null);
   const [report, setReport] = useState<SignalReport | null>(null);
   const [rules, setRules] = useState<SignalRulesResponse | null>(null);
@@ -442,15 +466,24 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterValue>('all');
   const [editor, setEditor] = useState<EditorState>(null);
+  const [profiles, setProfiles] = useState<SignalProfile[] | null>(null);
+  const [profileFilter, setProfileFilter] = useState<number | 'all'>('all');
+  const [managerOpen, setManagerOpen] = useState(false);
 
   const load = useCallback(async (initial = false) => {
     try {
       if (initial) setLoading(true);
       else setRefreshing(true);
       setError(null);
-      const [r, ru] = await Promise.all([apiClient.GetSignals(), apiClient.GetSignalRules().catch(() => null)]);
+      const [r, ru, pr] = await Promise.all([
+        apiClient.GetSignals(),
+        apiClient.GetSignalRules().catch(() => null),
+        apiClient.GetSignalProfiles().catch(() => null),
+      ]);
       setReport(r);
       setRules(ru);
+      setProfiles(pr ? [...(pr.profiles ?? [])].sort((a, b) => Number(b.built_in) - Number(a.built_in) || a.sort_order - b.sort_order || a.id - b.id) : null);
+      setProfileFilter((cur) => (cur !== 'all' && pr && !(pr.profiles ?? []).some((p) => p.id === cur) ? 'all' : cur));
     } catch (err) {
       console.error('Failed to load signals:', err);
       // Wails 는 Go 오류를 문자열로 reject 한다
@@ -466,13 +499,22 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
     load(true);
   }, [load]);
 
+  // 알림 등 다른 곳에서 프로필 지정이 바뀌면 다시 불러온다
+  const seenVersionRef = useRef(profilesVersion);
+  useEffect(() => {
+    if (seenVersionRef.current === profilesVersion) return;
+    seenVersionRef.current = profilesVersion;
+    load(false);
+  }, [profilesVersion, load]);
+
   // 알림에서 넘어온 종목 카드로 스크롤하고 잠깐 강조
   useEffect(() => {
     if (!report || !focusAssetId || !focusNonce || focusNonce === handledFocusNonce) return;
     const target = report.items.find((i) => i.asset_id === focusAssetId);
     if (!target) return;
-    if (filter !== 'all' && target.action !== filter) {
+    if ((filter !== 'all' && target.action !== filter) || (profileFilter !== 'all' && target.profile_id !== profileFilter)) {
       setFilter('all'); // 필터를 풀고 난 뒤 다시 실행된다
+      setProfileFilter('all');
       return;
     }
     const t1 = window.setTimeout(() => {
@@ -485,13 +527,16 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [report, focusAssetId, focusNonce, filter]);
+  }, [report, focusAssetId, focusNonce, filter, profileFilter]);
 
   const ruleFor = (item: SignalItem): SignalRule | undefined =>
-    rules?.overrides?.find((o) => o.asset_id === item.asset_id) ?? rules?.default;
+    rules?.overrides?.find((o) => o.asset_id === item.asset_id) ?? profiles?.find((p) => p.id === item.profile_id)?.rule ?? rules?.default;
 
   const items = report?.items ?? [];
-  const visible = useMemo(() => (filter === 'all' ? items : items.filter((i) => i.action === filter)), [items, filter]);
+  const visible = useMemo(
+    () => items.filter((i) => (filter === 'all' || i.action === filter) && (profileFilter === 'all' || i.profile_id === profileFilter)),
+    [items, filter, profileFilter],
+  );
   const summary = report?.summary;
 
   const stats: { label: string; value: number; tone: string }[] = [
@@ -524,14 +569,18 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
             <p className="label-mono mt-0.5">규칙 기반 · 매도 / 매수 검토 알림</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button type="button" className="btn-ghost" onClick={openSettings}>
             <Bell className="h-4 w-4" />
             알림 설정
           </button>
-          <button type="button" className="btn-ghost" disabled={!rules} onClick={() => setEditor({ mode: 'default' })}>
+          <button type="button" className="btn-ghost" onClick={() => openCandidates()}>
+            <Coins className="h-4 w-4 text-sky-300" />
+            배당 종목 정리
+          </button>
+          <button type="button" className="btn-ghost" disabled={!profiles} onClick={() => setManagerOpen(true)}>
             <SlidersHorizontal className="h-4 w-4" />
-            기본 전략
+            전략 프로필
           </button>
           <button type="button" className="btn-icon !h-9 !w-9" onClick={() => load(false)} disabled={refreshing} aria-label="새로고침" title="새로고침">
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -569,17 +618,34 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
                 </div>
               ))}
             </div>
-            <div className="glass-pill flex self-start overflow-x-auto p-1 lg:self-auto" role="group" aria-label="신호 필터">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  onClick={() => setFilter(f.value)}
-                  className={`pill-item ${filter === f.value ? `pill-item-active ${filterTone[f.value]}` : ''}`}
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+              {profiles && profiles.length > 0 && (
+                <select
+                  aria-label="전략 프로필 필터"
+                  className="input-field !w-auto !py-1.5 !text-xs sm:max-w-[200px]"
+                  value={profileFilter}
+                  onChange={(e) => setProfileFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                 >
-                  {f.label}
-                </button>
-              ))}
+                  <option value="all">프로필: 전체</option>
+                  {profiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="glass-pill flex self-start overflow-x-auto p-1 lg:self-auto" role="group" aria-label="신호 필터">
+                {FILTERS.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => setFilter(f.value)}
+                    className={`pill-item ${filter === f.value ? `pill-item-active ${filterTone[f.value]}` : ''}`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -595,7 +661,7 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
           ) : (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {visible.map((item) => (
-                <SignalCard key={item.asset_id} item={item} rule={ruleFor(item)} onEdit={() => rules && setEditor({ mode: 'asset', item })} flash={flashId === item.asset_id} />
+                <SignalCard key={item.asset_id} item={item} rule={ruleFor(item)} onEdit={() => profiles && setEditor({ item })} flash={flashId === item.asset_id} />
               ))}
             </div>
           )}
@@ -608,15 +674,25 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
 
       <SignalHistory />
 
-      {editor && rules && (
+      {editor && profiles && (
         <SignalRuleEditor
-          mode={editor.mode}
-          assetId={editor.mode === 'asset' ? editor.item.asset_id : undefined}
-          assetName={editor.mode === 'asset' ? `${editor.item.name} (${editor.item.ticker})` : undefined}
-          defaultRule={rules.default}
-          assetRule={editor.mode === 'asset' ? rules.overrides?.find((o) => o.asset_id === editor.item.asset_id) ?? null : null}
+          assetId={editor.item.asset_id}
+          assetName={`${editor.item.name} (${editor.item.ticker})`}
+          profiles={profiles}
+          currentProfileId={editor.item.profile_id}
+          assetRule={rules?.overrides?.find((o) => o.asset_id === editor.item.asset_id) ?? null}
           onClose={() => setEditor(null)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {managerOpen && (
+        <ProfileManager
+          items={items}
+          onClose={(changed) => {
+            setManagerOpen(false);
+            if (changed) load(false);
+          }}
         />
       )}
     </div>

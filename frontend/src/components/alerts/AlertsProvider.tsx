@@ -4,6 +4,8 @@ import { onSignalsNew } from '../../api/events';
 import type { SignalEvent } from '../../types/models';
 import NotificationSettings from './NotificationSettings';
 import ToastStack from './ToastStack';
+import DividendCandidates from '../signals/DividendCandidates';
+import { isSuggestion } from './alertMeta';
 
 const isWeb = !(window as any).go;
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;
@@ -27,6 +29,14 @@ interface AlertsContextValue {
   /** 알림 항목(토스트/알림함 행)을 눌렀을 때: 읽음 처리 + 해당 종목으로 이동 */
   openEvent: (e: SignalEvent) => void;
   openSettings: () => void;
+  /** 배당 종목 정리 화면 열기 (assetId 가 있으면 그 종목을 강조/미리 선택) */
+  openCandidates: (assetId?: number) => void;
+  /** 프로필 지정/변경이 일어날 때마다 올라가는 값 — 신호 화면이 다시 불러오는 데 쓴다 */
+  profilesVersion: number;
+  /** 제안 알림의 종목을 제안된 프로필로 지정 */
+  acceptSuggestion: (e: SignalEvent) => Promise<void>;
+  /** 제안 알림을 무시 */
+  dismissSuggestion: (e: SignalEvent) => Promise<void>;
 }
 
 const AlertsContext = createContext<AlertsContextValue | null>(null);
@@ -43,6 +53,8 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<SignalEvent[]>([]);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [candidates, setCandidates] = useState<{ assetId?: number; nonce: number } | null>(null);
+  const [profilesVersion, setProfilesVersion] = useState(0);
   const lastCheckRef = useRef(0);
   const nonceRef = useRef(0);
   const initRef = useRef(false);
@@ -157,22 +169,65 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
     (e: SignalEvent) => {
       if (!e.read_at) markRead([e.id]);
       dismissToast(e.id);
-      focusAsset(e.asset_id);
+      if (isSuggestion(e)) {
+        nonceRef.current += 1;
+        setCandidates({ assetId: e.asset_id, nonce: nonceRef.current });
+      } else {
+        focusAsset(e.asset_id);
+      }
     },
     [markRead, dismissToast, focusAsset],
+  );
+
+  const openCandidates = useCallback((assetId?: number) => {
+    nonceRef.current += 1;
+    setCandidates({ assetId, nonce: nonceRef.current });
+  }, []);
+
+  const acceptSuggestion = useCallback(
+    async (e: SignalEvent) => {
+      if (!e.suggested_profile_id) {
+        openCandidates(e.asset_id);
+        return;
+      }
+      await apiClient.AssignSignalProfile(e.suggested_profile_id, [e.asset_id]);
+      await markRead([e.id]);
+      dismissToast(e.id);
+      setProfilesVersion((v) => v + 1);
+    },
+    [markRead, dismissToast, openCandidates],
+  );
+
+  const dismissSuggestion = useCallback(
+    async (e: SignalEvent) => {
+      await apiClient.DismissProfileSuggestion(e.asset_id);
+      await markRead([e.id]);
+      dismissToast(e.id);
+    },
+    [markRead, dismissToast],
   );
 
   const openSettings = useCallback(() => setSettingsOpen(true), []);
 
   const value = useMemo<AlertsContextValue>(
-    () => ({ unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings }),
-    [unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings],
+    () => ({ unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings, openCandidates, profilesVersion, acceptSuggestion, dismissSuggestion }),
+    [unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings, openCandidates, profilesVersion, acceptSuggestion, dismissSuggestion],
   );
 
   return (
     <AlertsContext.Provider value={value}>
       {children}
       <ToastStack />
+      {candidates && (
+        <DividendCandidates
+          key={candidates.nonce}
+          highlightAssetId={candidates.assetId}
+          onClose={(changed) => {
+            setCandidates(null);
+            if (changed) setProfilesVersion((v) => v + 1);
+          }}
+        />
+      )}
       <NotificationSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </AlertsContext.Provider>
   );
