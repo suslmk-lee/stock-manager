@@ -6,6 +6,7 @@ import { useThemeColors } from '../appearance/AppearanceContext';
 import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, TrendingDown, History, X, Search, Info } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { calculateFee, roundFee } from '../utils/fees';
+import Portal from './ui/Portal';
 
 interface TransactionManagerProps {
   selectedAccountId?: number;
@@ -1247,107 +1248,109 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
         const costBasis = p.buy_avg_price * p.quantity;
         const proceeds = p.sell_price * p.quantity;
         return (
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setSelectedPnl(null)}
-          >
+          <Portal>
             <div
-              className="surface p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setSelectedPnl(null)}
             >
-              <div className="flex items-start justify-between mb-5">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`icon-tile w-11 h-11 ${
-                      isProfit
-                        ? 'icon-tile-mint text-mint-300'
-                        : 'icon-tile-amber text-rose-300'
-                    }`}
-                  >
-                    {isProfit ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-xl font-semibold text-white truncate">
-                      {p.asset?.name || p.asset?.ticker || `Asset #${p.asset_id}`}
-                    </h3>
-                    <p className="text-xs text-zinc-400 mt-0.5">
-                      {p.asset?.ticker} · {new Date(p.date).toLocaleDateString('ko-KR')}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedPnl(null)}
-                  className="text-zinc-400 hover:text-white shrink-0"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* 실현 손익 강조 */}
               <div
-                className={`rounded-2xl p-4 mb-5 border ${
-                  isProfit ? 'bg-mint-400/10 border-mint-400/30' : 'bg-rose-500/10 border-rose-400/30'
-                }`}
+                className="surface p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
               >
-                <p className="text-xs text-zinc-400 mb-1">실현 손익 ({cur})</p>
-                <div className="flex items-baseline gap-2">
-                  <span className={`text-2xl font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {isProfit ? '+' : ''}{formatMoney(p.profit, cur)}
-                  </span>
-                  <span className={`text-sm font-medium ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>
-                    ({isProfit ? '+' : ''}{p.profit_percent.toFixed(2)}%)
-                  </span>
+                <div className="flex items-start justify-between mb-5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`icon-tile w-11 h-11 ${
+                        isProfit
+                          ? 'icon-tile-mint text-mint-300'
+                          : 'icon-tile-amber text-rose-300'
+                      }`}
+                    >
+                      {isProfit ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-xl font-semibold text-white truncate">
+                        {p.asset?.name || p.asset?.ticker || `Asset #${p.asset_id}`}
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        {p.asset?.ticker} · {new Date(p.date).toLocaleDateString('ko-KR')}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedPnl(null)}
+                    className="text-zinc-400 hover:text-white shrink-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-              </div>
 
-              {/* 상세 항목 */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                <div>
-                  <p className="label-mono mb-0.5">매도 수량</p>
-                  <p className="text-white font-medium">{formatNumber(p.quantity, 4)}주</p>
+                {/* 실현 손익 강조 */}
+                <div
+                  className={`rounded-2xl p-4 mb-5 border ${
+                    isProfit ? 'bg-mint-400/10 border-mint-400/30' : 'bg-rose-500/10 border-rose-400/30'
+                  }`}
+                >
+                  <p className="text-xs text-zinc-400 mb-1">실현 손익 ({cur})</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-2xl font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {isProfit ? '+' : ''}{formatMoney(p.profit, cur)}
+                    </span>
+                    <span className={`text-sm font-medium ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>
+                      ({isProfit ? '+' : ''}{p.profit_percent.toFixed(2)}%)
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <p className="label-mono mb-0.5">매도일</p>
-                  <p className="text-white font-medium">{new Date(p.date).toLocaleDateString('ko-KR')}</p>
-                </div>
-                <div>
-                  <p className="label-mono mb-0.5">평균 매수가</p>
-                  <p className="text-white font-medium">{formatMoney(p.buy_avg_price, cur)}</p>
-                </div>
-                <div>
-                  <p className="label-mono mb-0.5">매도가</p>
-                  <p className="text-white font-medium">{formatMoney(p.sell_price, cur)}</p>
-                </div>
-                <div>
-                  <p className="label-mono mb-0.5">매입 원가</p>
-                  <p className="text-white font-medium">{formatMoney(costBasis, cur)}</p>
-                </div>
-                <div>
-                  <p className="label-mono mb-0.5">매도 금액</p>
-                  <p className="text-white font-medium">{formatMoney(proceeds, cur)}</p>
-                </div>
-                <div>
-                  <p className="label-mono mb-0.5">수수료</p>
-                  <p className="text-white font-medium">{formatMoney(p.fee, cur)}</p>
-                </div>
-                <div>
-                  <p className="label-mono mb-0.5">계좌</p>
-                  <p className="text-white font-medium truncate">{p.account?.name || `#${p.account_id}`}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="label-mono mb-0.5">등록 시각 (KST)</p>
-                  <p className="text-white font-medium">{formatDateTimeKST(p.created_at)}</p>
-                </div>
-              </div>
 
-              {p.notes && (
-                <div className="mt-5 pt-4 border-t border-white/[0.08]">
-                  <p className="text-xs text-zinc-500 mb-1">메모</p>
-                  <p className="text-sm text-zinc-300 whitespace-pre-wrap">{p.notes}</p>
+                {/* 상세 항목 */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div>
+                    <p className="label-mono mb-0.5">매도 수량</p>
+                    <p className="text-white font-medium">{formatNumber(p.quantity, 4)}주</p>
+                  </div>
+                  <div>
+                    <p className="label-mono mb-0.5">매도일</p>
+                    <p className="text-white font-medium">{new Date(p.date).toLocaleDateString('ko-KR')}</p>
+                  </div>
+                  <div>
+                    <p className="label-mono mb-0.5">평균 매수가</p>
+                    <p className="text-white font-medium">{formatMoney(p.buy_avg_price, cur)}</p>
+                  </div>
+                  <div>
+                    <p className="label-mono mb-0.5">매도가</p>
+                    <p className="text-white font-medium">{formatMoney(p.sell_price, cur)}</p>
+                  </div>
+                  <div>
+                    <p className="label-mono mb-0.5">매입 원가</p>
+                    <p className="text-white font-medium">{formatMoney(costBasis, cur)}</p>
+                  </div>
+                  <div>
+                    <p className="label-mono mb-0.5">매도 금액</p>
+                    <p className="text-white font-medium">{formatMoney(proceeds, cur)}</p>
+                  </div>
+                  <div>
+                    <p className="label-mono mb-0.5">수수료</p>
+                    <p className="text-white font-medium">{formatMoney(p.fee, cur)}</p>
+                  </div>
+                  <div>
+                    <p className="label-mono mb-0.5">계좌</p>
+                    <p className="text-white font-medium truncate">{p.account?.name || `#${p.account_id}`}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="label-mono mb-0.5">등록 시각 (KST)</p>
+                    <p className="text-white font-medium">{formatDateTimeKST(p.created_at)}</p>
+                  </div>
                 </div>
-              )}
+
+                {p.notes && (
+                  <div className="mt-5 pt-4 border-t border-white/[0.08]">
+                    <p className="text-xs text-zinc-500 mb-1">메모</p>
+                    <p className="text-sm text-zinc-300 whitespace-pre-wrap">{p.notes}</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </Portal>
         );
       })()}
 
@@ -1359,227 +1362,229 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
         const gross = tx.price * tx.quantity;
         const total = gross + (isBuy ? tx.fee : -tx.fee);
         return (
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => { if (!txActionLoading) { setSelectedTx(null); setTxEditMode(false); } }}
-          >
+          <Portal>
             <div
-              className="surface p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => { if (!txActionLoading) { setSelectedTx(null); setTxEditMode(false); } }}
             >
-              <div className="flex items-start justify-between mb-5">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`icon-tile w-11 h-11 ${
-                      isBuy
-                        ? 'icon-tile-mint text-mint-300'
-                        : 'icon-tile-amber text-rose-300'
-                    }`}
-                  >
-                    {isBuy ? <ArrowDownCircle className="w-6 h-6" /> : <ArrowUpCircle className="w-6 h-6" />}
+              <div
+                className="surface p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between mb-5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`icon-tile w-11 h-11 ${
+                        isBuy
+                          ? 'icon-tile-mint text-mint-300'
+                          : 'icon-tile-amber text-rose-300'
+                      }`}
+                    >
+                      {isBuy ? <ArrowDownCircle className="w-6 h-6" /> : <ArrowUpCircle className="w-6 h-6" />}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-xl font-semibold text-white truncate">
+                          {tx.asset?.name || tx.asset?.ticker || `Asset #${tx.asset_id}`}
+                        </h3>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
+                            isBuy ? 'bg-mint-400/15 text-mint-300' : 'bg-rose-500/10 text-rose-300'
+                          }`}
+                        >
+                          {isBuy ? '매수' : '매도'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        {tx.asset?.ticker} · {new Date(tx.date).toLocaleDateString('ko-KR')}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-xl font-semibold text-white truncate">
-                        {tx.asset?.name || tx.asset?.ticker || `Asset #${tx.asset_id}`}
-                      </h3>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
-                          isBuy ? 'bg-mint-400/15 text-mint-300' : 'bg-rose-500/10 text-rose-300'
+                  <button
+                    onClick={() => { setSelectedTx(null); setTxEditMode(false); }}
+                    className="text-zinc-400 hover:text-white shrink-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {txEditMode ? (
+                  /* ===== 수정 폼 ===== */
+                  <div className="space-y-4">
+                    <p className="text-xs text-zinc-400">
+                      {tx.asset?.ticker} · {tx.account?.name || `#${tx.account_id}`} 거래를 수정합니다. (종목/계좌는 변경할 수 없습니다)
+                    </p>
+
+                    {/* 매수/매도 토글 */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTxEditData({ ...txEditData, type: 'Buy' })}
+                        className={`py-2 rounded-lg font-medium transition-colors ${
+                          txEditData.type === 'Buy' ? 'bg-mint-400/20 text-mint-200 ring-1 ring-mint-400/40' : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
                         }`}
                       >
-                        {isBuy ? '매수' : '매도'}
+                        매수
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTxEditData({ ...txEditData, type: 'Sell' })}
+                        className={`py-2 rounded-lg font-medium transition-colors ${
+                          txEditData.type === 'Sell' ? 'bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/40' : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
+                        }`}
+                      >
+                        매도
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="field-label">거래일</label>
+                        <input
+                          type="date"
+                          value={txEditData.date}
+                          onChange={(e) => setTxEditData({ ...txEditData, date: e.target.value })}
+                          className="input-field w-full px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="field-label">{txEditData.type === 'Buy' ? '매수가' : '매도가'} ({cur})</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={txEditData.price}
+                          onChange={(e) => setTxEditData({ ...txEditData, price: e.target.value })}
+                          className="input-field w-full px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="field-label">수량</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={txEditData.quantity}
+                          onChange={(e) => setTxEditData({ ...txEditData, quantity: e.target.value })}
+                          className="input-field w-full px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="field-label">수수료 ({cur})</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={txEditData.fee}
+                          onChange={(e) => setTxEditData({ ...txEditData, fee: e.target.value })}
+                          className="input-field w-full px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="field-label">메모</label>
+                      <input
+                        type="text"
+                        value={txEditData.notes}
+                        onChange={(e) => setTxEditData({ ...txEditData, notes: e.target.value })}
+                        className="input-field w-full px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    <p className="text-[11px] text-amber-400/80">
+                      ⚠ 수정 시 해당 종목의 보유 수량·평단가·실현 손익이 전체 거래 기준으로 재계산됩니다.
+                    </p>
+
+                    <div className="flex gap-3 pt-1">
+                      <button
+                        onClick={handleUpdateTransaction}
+                        disabled={txActionLoading}
+                        className="btn-primary flex-1 px-4 py-2"
+                      >
+                        {txActionLoading ? '저장 중...' : '저장'}
+                      </button>
+                      <button
+                        onClick={() => setTxEditMode(false)}
+                        disabled={txActionLoading}
+                        className="btn-ghost flex-1 px-4 py-2"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ===== 읽기 전용 ===== */
+                  <>
+                    {/* 금액 강조 */}
+                    <div
+                      className={`rounded-2xl p-4 mb-5 border ${
+                        isBuy ? 'bg-mint-400/15 border-mint-400/30' : 'bg-rose-500/10 border-rose-400/30'
+                      }`}
+                    >
+                      <p className="text-xs text-zinc-400 mb-1">{isBuy ? '총 지불액' : '실수령액'} ({cur})</p>
+                      <span className={`text-2xl font-bold ${isBuy ? 'text-mint-400' : 'text-rose-400'}`}>
+                        {formatMoney(total, cur)}
                       </span>
                     </div>
-                    <p className="text-xs text-zinc-400 mt-0.5">
-                      {tx.asset?.ticker} · {new Date(tx.date).toLocaleDateString('ko-KR')}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setSelectedTx(null); setTxEditMode(false); }}
-                  className="text-zinc-400 hover:text-white shrink-0"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+
+                    {/* 상세 항목 */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                      <div>
+                        <p className="label-mono mb-0.5">{isBuy ? '매수가' : '매도가'}</p>
+                        <p className="text-white font-medium">{formatMoney(tx.price, cur)}</p>
+                      </div>
+                      <div>
+                        <p className="label-mono mb-0.5">수량</p>
+                        <p className="text-white font-medium">{formatNumber(tx.quantity, 4)}주</p>
+                      </div>
+                      <div>
+                        <p className="label-mono mb-0.5">거래 금액</p>
+                        <p className="text-white font-medium">{formatMoney(gross, cur)}</p>
+                      </div>
+                      <div>
+                        <p className="label-mono mb-0.5">수수료</p>
+                        <p className="text-white font-medium">{formatMoney(tx.fee, cur)}</p>
+                      </div>
+                      <div>
+                        <p className="label-mono mb-0.5">거래일</p>
+                        <p className="text-white font-medium">{new Date(tx.date).toLocaleDateString('ko-KR')}</p>
+                      </div>
+                      <div>
+                        <p className="label-mono mb-0.5">계좌</p>
+                        <p className="text-white font-medium truncate">{tx.account?.name || `#${tx.account_id}`}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="label-mono mb-0.5">등록 시각 (KST)</p>
+                        <p className="text-white font-medium">{formatDateTimeKST(tx.created_at)}</p>
+                      </div>
+                    </div>
+
+                    {tx.notes && (
+                      <div className="mt-5 pt-4 border-t border-white/[0.08]">
+                        <p className="text-xs text-zinc-500 mb-1">메모</p>
+                        <p className="text-sm text-zinc-300 whitespace-pre-wrap">{tx.notes}</p>
+                      </div>
+                    )}
+
+                    {/* 액션 */}
+                    <div className="flex gap-3 mt-6 pt-4 border-t border-white/[0.08]">
+                      <button
+                        onClick={() => startTxEdit(tx)}
+                        className="btn-primary flex-1 px-4 py-2"
+                      >
+                        수정
+                      </button>
+                      <button
+                        onClick={handleDeleteTransaction}
+                        disabled={txActionLoading}
+                        className="btn-danger flex-1 px-4 py-2"
+                      >
+                        {txActionLoading ? '삭제 중...' : '삭제'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
-
-              {txEditMode ? (
-                /* ===== 수정 폼 ===== */
-                <div className="space-y-4">
-                  <p className="text-xs text-zinc-400">
-                    {tx.asset?.ticker} · {tx.account?.name || `#${tx.account_id}`} 거래를 수정합니다. (종목/계좌는 변경할 수 없습니다)
-                  </p>
-
-                  {/* 매수/매도 토글 */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTxEditData({ ...txEditData, type: 'Buy' })}
-                      className={`py-2 rounded-lg font-medium transition-colors ${
-                        txEditData.type === 'Buy' ? 'bg-mint-400/20 text-mint-200 ring-1 ring-mint-400/40' : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
-                      }`}
-                    >
-                      매수
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTxEditData({ ...txEditData, type: 'Sell' })}
-                      className={`py-2 rounded-lg font-medium transition-colors ${
-                        txEditData.type === 'Sell' ? 'bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/40' : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
-                      }`}
-                    >
-                      매도
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="field-label">거래일</label>
-                      <input
-                        type="date"
-                        value={txEditData.date}
-                        onChange={(e) => setTxEditData({ ...txEditData, date: e.target.value })}
-                        className="input-field w-full px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label">{txEditData.type === 'Buy' ? '매수가' : '매도가'} ({cur})</label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={txEditData.price}
-                        onChange={(e) => setTxEditData({ ...txEditData, price: e.target.value })}
-                        className="input-field w-full px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label">수량</label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={txEditData.quantity}
-                        onChange={(e) => setTxEditData({ ...txEditData, quantity: e.target.value })}
-                        className="input-field w-full px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label">수수료 ({cur})</label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={txEditData.fee}
-                        onChange={(e) => setTxEditData({ ...txEditData, fee: e.target.value })}
-                        className="input-field w-full px-3 py-2 text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="field-label">메모</label>
-                    <input
-                      type="text"
-                      value={txEditData.notes}
-                      onChange={(e) => setTxEditData({ ...txEditData, notes: e.target.value })}
-                      className="input-field w-full px-3 py-2 text-sm"
-                    />
-                  </div>
-
-                  <p className="text-[11px] text-amber-400/80">
-                    ⚠ 수정 시 해당 종목의 보유 수량·평단가·실현 손익이 전체 거래 기준으로 재계산됩니다.
-                  </p>
-
-                  <div className="flex gap-3 pt-1">
-                    <button
-                      onClick={handleUpdateTransaction}
-                      disabled={txActionLoading}
-                      className="btn-primary flex-1 px-4 py-2"
-                    >
-                      {txActionLoading ? '저장 중...' : '저장'}
-                    </button>
-                    <button
-                      onClick={() => setTxEditMode(false)}
-                      disabled={txActionLoading}
-                      className="btn-ghost flex-1 px-4 py-2"
-                    >
-                      취소
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* ===== 읽기 전용 ===== */
-                <>
-                  {/* 금액 강조 */}
-                  <div
-                    className={`rounded-2xl p-4 mb-5 border ${
-                      isBuy ? 'bg-mint-400/15 border-mint-400/30' : 'bg-rose-500/10 border-rose-400/30'
-                    }`}
-                  >
-                    <p className="text-xs text-zinc-400 mb-1">{isBuy ? '총 지불액' : '실수령액'} ({cur})</p>
-                    <span className={`text-2xl font-bold ${isBuy ? 'text-mint-400' : 'text-rose-400'}`}>
-                      {formatMoney(total, cur)}
-                    </span>
-                  </div>
-
-                  {/* 상세 항목 */}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                    <div>
-                      <p className="label-mono mb-0.5">{isBuy ? '매수가' : '매도가'}</p>
-                      <p className="text-white font-medium">{formatMoney(tx.price, cur)}</p>
-                    </div>
-                    <div>
-                      <p className="label-mono mb-0.5">수량</p>
-                      <p className="text-white font-medium">{formatNumber(tx.quantity, 4)}주</p>
-                    </div>
-                    <div>
-                      <p className="label-mono mb-0.5">거래 금액</p>
-                      <p className="text-white font-medium">{formatMoney(gross, cur)}</p>
-                    </div>
-                    <div>
-                      <p className="label-mono mb-0.5">수수료</p>
-                      <p className="text-white font-medium">{formatMoney(tx.fee, cur)}</p>
-                    </div>
-                    <div>
-                      <p className="label-mono mb-0.5">거래일</p>
-                      <p className="text-white font-medium">{new Date(tx.date).toLocaleDateString('ko-KR')}</p>
-                    </div>
-                    <div>
-                      <p className="label-mono mb-0.5">계좌</p>
-                      <p className="text-white font-medium truncate">{tx.account?.name || `#${tx.account_id}`}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="label-mono mb-0.5">등록 시각 (KST)</p>
-                      <p className="text-white font-medium">{formatDateTimeKST(tx.created_at)}</p>
-                    </div>
-                  </div>
-
-                  {tx.notes && (
-                    <div className="mt-5 pt-4 border-t border-white/[0.08]">
-                      <p className="text-xs text-zinc-500 mb-1">메모</p>
-                      <p className="text-sm text-zinc-300 whitespace-pre-wrap">{tx.notes}</p>
-                    </div>
-                  )}
-
-                  {/* 액션 */}
-                  <div className="flex gap-3 mt-6 pt-4 border-t border-white/[0.08]">
-                    <button
-                      onClick={() => startTxEdit(tx)}
-                      className="btn-primary flex-1 px-4 py-2"
-                    >
-                      수정
-                    </button>
-                    <button
-                      onClick={handleDeleteTransaction}
-                      disabled={txActionLoading}
-                      className="btn-danger flex-1 px-4 py-2"
-                    >
-                      {txActionLoading ? '삭제 중...' : '삭제'}
-                    </button>
-                  </div>
-                </>
-              )}
             </div>
-          </div>
+          </Portal>
         );
       })()}
 
@@ -1610,616 +1615,622 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
           { key: '5y', label: '5Y' },
         ];
         return (
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setDetailHolding(null)}
-          >
+          <Portal>
             <div
-              className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setDetailHolding(null)}
             >
-              {/* 헤더 */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="min-w-0">
-                  <h3 className="text-xl font-semibold text-white truncate">{h.asset?.name || ticker}</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    {ticker}
-                    {info?.exchange ? ` · ${info.exchange}` : ''}
-                    {info?.sector ? ` · ${info.sector}` : ''}
-                  </p>
+              <div
+                className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* 헤더 */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="min-w-0">
+                    <h3 className="text-xl font-semibold text-white truncate">{h.asset?.name || ticker}</h3>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {ticker}
+                      {info?.exchange ? ` · ${info.exchange}` : ''}
+                      {info?.sector ? ` · ${info.sector}` : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => setDetailHolding(null)} className="text-zinc-400 hover:text-white shrink-0">
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <button onClick={() => setDetailHolding(null)} className="text-zinc-400 hover:text-white shrink-0">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
 
-              {/* 현재가 */}
-              <div className="flex items-baseline gap-3 mb-4">
-                <span className="text-2xl font-bold text-white">
-                  {hasPrice ? formatMoney(curPrice, cur) : '—'}
-                </span>
-                {hasPrice && changePercent !== 0 && (
-                  <span className={`text-sm font-medium ${changePercent > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {changePercent > 0 ? '+' : ''}{changePercent.toFixed(2)}%
+                {/* 현재가 */}
+                <div className="flex items-baseline gap-3 mb-4">
+                  <span className="text-2xl font-bold text-white">
+                    {hasPrice ? formatMoney(curPrice, cur) : '—'}
                   </span>
-                )}
-                {price?.market_state && (
-                  <span className="text-[11px] text-zinc-500">{price.market_state}</span>
-                )}
-              </div>
-
-              {/* 기간 선택 */}
-              <div className="flex gap-1.5 mb-2">
-                {RANGES.map((r) => (
-                  <button
-                    key={r.key}
-                    onClick={() => setDetailRange(r.key)}
-                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                      detailRange === r.key
-                        ? 'bg-mint-400/20 text-mint-200'
-                        : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* 차트 */}
-              <div className="bg-black/30 rounded-lg p-3 mb-4 h-[240px] flex items-center justify-center">
-                {detailLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-zinc-500">
-                    <div className="w-4 h-4 border border-white/[0.08] border-t-transparent rounded-full animate-spin" />
-                    차트 로딩 중...
-                  </div>
-                ) : chartData.length === 0 ? (
-                  <p className="text-sm text-zinc-500">시세 데이터를 가져올 수 없습니다.</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                      <XAxis
-                        dataKey="label"
-                        tick={{ fontSize: 10, fill: tc.axis }}
-                        minTickGap={40}
-                        axisLine={{ stroke: tc.grid }}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 10, fill: tc.axis }}
-                        domain={['auto', 'auto']}
-                        width={60}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(v: number) =>
-                          cur === 'USD' ? `$${v.toFixed(0)}` : `₩${Math.round(v).toLocaleString('ko-KR')}`
-                        }
-                      />
-                      <Tooltip
-                        contentStyle={{ ...tc.tooltip.contentStyle, fontSize: 12 }}
-                        labelStyle={tc.tooltip.labelStyle}
-                        itemStyle={tc.tooltip.itemStyle}
-                        formatter={(v: number) => [formatMoney(v, cur), '종가']}
-                      />
-                      <Line type="monotone" dataKey="close" stroke={tc.accent} strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-
-              {/* 내 보유 정보 */}
-              <div className="surface-inset p-4">
-                <p className="text-xs text-zinc-500 mb-3">내 보유 정보 ({currentAccount?.name})</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
-                  <div>
-                    <p className="label-mono mb-0.5">보유 수량</p>
-                    <p className="text-white font-medium">{formatNumber(h.quantity, 4)}주</p>
-                  </div>
-                  <div>
-                    <p className="label-mono mb-0.5">평단가</p>
-                    <p className="text-white font-medium">{formatMoney(h.average_price, cur)}</p>
-                  </div>
-                  <div>
-                    <p className="label-mono mb-0.5">평가금</p>
-                    <p className="text-white font-medium">{hasPrice ? formatMoney(marketValue, cur) : '—'}</p>
-                  </div>
-                  <div>
-                    <p className="label-mono mb-0.5">평가 손익</p>
-                    {hasPrice ? (
-                      <p className={`font-medium ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {isProfit ? '+' : ''}{formatMoney(profit, cur)}
-                        <span className="text-xs ml-1">({isProfit ? '+' : ''}{profitPercent.toFixed(2)}%)</span>
-                      </p>
-                    ) : (
-                      <p className="text-zinc-500">—</p>
-                    )}
-                  </div>
+                  {hasPrice && changePercent !== 0 && (
+                    <span className={`text-sm font-medium ${changePercent > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {changePercent > 0 ? '+' : ''}{changePercent.toFixed(2)}%
+                    </span>
+                  )}
+                  {price?.market_state && (
+                    <span className="text-[11px] text-zinc-500">{price.market_state}</span>
+                  )}
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <button
-                    onClick={() => { setDetailHolding(null); openBuyForm(h.asset_id); }}
-                    className="btn-primary flex-1 px-3 py-2 text-sm"
-                  >
-                    매수
-                  </button>
-                  <button
-                    onClick={() => { setDetailHolding(null); openSellForm(h.asset_id); }}
-                    className="btn-danger flex-1 px-3 py-2 text-sm"
-                  >
-                    매도
-                  </button>
+
+                {/* 기간 선택 */}
+                <div className="flex gap-1.5 mb-2">
+                  {RANGES.map((r) => (
+                    <button
+                      key={r.key}
+                      onClick={() => setDetailRange(r.key)}
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                        detailRange === r.key
+                          ? 'bg-mint-400/20 text-mint-200'
+                          : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 차트 */}
+                <div className="bg-black/30 rounded-lg p-3 mb-4 h-[240px] flex items-center justify-center">
+                  {detailLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-zinc-500">
+                      <div className="w-4 h-4 border border-white/[0.08] border-t-transparent rounded-full animate-spin" />
+                      차트 로딩 중...
+                    </div>
+                  ) : chartData.length === 0 ? (
+                    <p className="text-sm text-zinc-500">시세 데이터를 가져올 수 없습니다.</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                        <XAxis
+                          dataKey="label"
+                          tick={{ fontSize: 10, fill: tc.axis }}
+                          minTickGap={40}
+                          axisLine={{ stroke: tc.grid }}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 10, fill: tc.axis }}
+                          domain={['auto', 'auto']}
+                          width={60}
+                          axisLine={false}
+                          tickLine={false}
+                          tickFormatter={(v: number) =>
+                            cur === 'USD' ? `$${v.toFixed(0)}` : `₩${Math.round(v).toLocaleString('ko-KR')}`
+                          }
+                        />
+                        <Tooltip
+                          contentStyle={{ ...tc.tooltip.contentStyle, fontSize: 12 }}
+                          labelStyle={tc.tooltip.labelStyle}
+                          itemStyle={tc.tooltip.itemStyle}
+                          formatter={(v: number) => [formatMoney(v, cur), '종가']}
+                        />
+                        <Line type="monotone" dataKey="close" stroke={tc.accent} strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+
+                {/* 내 보유 정보 */}
+                <div className="surface-inset p-4">
+                  <p className="text-xs text-zinc-500 mb-3">내 보유 정보 ({currentAccount?.name})</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
+                    <div>
+                      <p className="label-mono mb-0.5">보유 수량</p>
+                      <p className="text-white font-medium">{formatNumber(h.quantity, 4)}주</p>
+                    </div>
+                    <div>
+                      <p className="label-mono mb-0.5">평단가</p>
+                      <p className="text-white font-medium">{formatMoney(h.average_price, cur)}</p>
+                    </div>
+                    <div>
+                      <p className="label-mono mb-0.5">평가금</p>
+                      <p className="text-white font-medium">{hasPrice ? formatMoney(marketValue, cur) : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="label-mono mb-0.5">평가 손익</p>
+                      {hasPrice ? (
+                        <p className={`font-medium ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isProfit ? '+' : ''}{formatMoney(profit, cur)}
+                          <span className="text-xs ml-1">({isProfit ? '+' : ''}{profitPercent.toFixed(2)}%)</span>
+                        </p>
+                      ) : (
+                        <p className="text-zinc-500">—</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => { setDetailHolding(null); openBuyForm(h.asset_id); }}
+                      className="btn-primary flex-1 px-3 py-2 text-sm"
+                    >
+                      매수
+                    </button>
+                    <button
+                      onClick={() => { setDetailHolding(null); openSellForm(h.asset_id); }}
+                      className="btn-danger flex-1 px-3 py-2 text-sm"
+                    >
+                      매도
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </Portal>
         );
       })()}
 
       {/* 자산 추가 모달 */}
       {showAssetForm && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => !submitting && (setShowAssetForm(false), resetAssetForm())}
-        >
+        <Portal>
           <div
-            className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => !submitting && (setShowAssetForm(false), resetAssetForm())}
           >
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-xl font-semibold text-white">새 자산 추가</h3>
-              <button
-                onClick={() => { setShowAssetForm(false); resetAssetForm(); }}
-                disabled={submitting}
-                className="text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-xs text-zinc-400 mb-4">
-              {currentAccount ? `${currentAccount.broker} (${currentAccount.name})` : ''} 계좌에 자산이 추가됩니다.
-            </p>
-
-            <form onSubmit={handleCreateAsset} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="field-label">티커 심볼 *</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={assetFormData.ticker}
-                      onChange={(e) => setAssetFormData({ ...assetFormData, ticker: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAssetTickerSearch();
-                        }
-                      }}
-                      className="input-field flex-1 px-4 py-2 uppercase"
-                      placeholder="예: AAPL, 005930"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAssetTickerSearch}
-                      disabled={assetSearching || !assetFormData.ticker}
-                      className="btn-primary px-4 py-2"
-                    >
-                      {assetSearching ? '검색중...' : <Search className="w-5 h-5" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-zinc-400 mt-1">티커 입력 후 검색 (실패 시 수동 입력 가능)</p>
-                </div>
-                <div>
-                  <label className="field-label">자산명 * (한글 가능)</label>
-                  <input
-                    type="text"
-                    value={assetFormData.name}
-                    onChange={(e) => setAssetFormData({ ...assetFormData, name: e.target.value })}
-                    className="input-field w-full px-4 py-2"
-                    placeholder="예: Apple Inc., 삼성전자"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="field-label">타입 *</label>
-                  <select
-                    value={assetFormData.type}
-                    onChange={(e) => setAssetFormData({ ...assetFormData, type: e.target.value as 'Stock' | 'ETF' })}
-                    className="input-field w-full px-4 py-2"
-                  >
-                    <option value="Stock">주식 (Stock)</option>
-                    <option value="ETF">ETF</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="field-label">섹터</label>
-                  <select
-                    value={assetFormData.sector}
-                    onChange={(e) => setAssetFormData({ ...assetFormData, sector: e.target.value })}
-                    className="input-field w-full px-4 py-2"
-                  >
-                    <option value="">선택하세요</option>
-                    {SECTORS.map((sector) => (
-                      <option key={sector} value={sector}>
-                        {sector}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="border-t border-white/[0.08] pt-4 mt-2">
-                <h4 className="text-sm font-medium mb-3 text-zinc-300">보유 정보 (선택)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="field-label">보유 수량</label>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={assetFormData.quantity}
-                      onChange={(e) => setAssetFormData({ ...assetFormData, quantity: e.target.value })}
-                      className="input-field w-full px-4 py-2"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="field-label">평균 단가</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={assetFormData.averagePrice}
-                      onChange={(e) => setAssetFormData({ ...assetFormData, averagePrice: e.target.value })}
-                      className="input-field w-full px-4 py-2"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-zinc-400 mt-2">수량을 입력하면 현재 계좌에 보유 내역이 함께 생성됩니다.</p>
-              </div>
-
-              <div className="flex gap-3">
+            <div
+              className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-xl font-semibold text-white">새 자산 추가</h3>
                 <button
-                  type="submit"
-                  disabled={submitting}
-                  className="btn-primary flex-1 px-4 py-2"
-                >
-                  {submitting ? '처리 중...' : '등록'}
-                </button>
-                <button
-                  type="button"
                   onClick={() => { setShowAssetForm(false); resetAssetForm(); }}
                   disabled={submitting}
-                  className="btn-ghost flex-1 px-4 py-2"
+                  className="text-zinc-400 hover:text-white"
                 >
-                  취소
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </form>
+              <p className="text-xs text-zinc-400 mb-4">
+                {currentAccount ? `${currentAccount.broker} (${currentAccount.name})` : ''} 계좌에 자산이 추가됩니다.
+              </p>
+
+              <form onSubmit={handleCreateAsset} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="field-label">티커 심볼 *</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={assetFormData.ticker}
+                        onChange={(e) => setAssetFormData({ ...assetFormData, ticker: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAssetTickerSearch();
+                          }
+                        }}
+                        className="input-field flex-1 px-4 py-2 uppercase"
+                        placeholder="예: AAPL, 005930"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAssetTickerSearch}
+                        disabled={assetSearching || !assetFormData.ticker}
+                        className="btn-primary px-4 py-2"
+                      >
+                        {assetSearching ? '검색중...' : <Search className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-1">티커 입력 후 검색 (실패 시 수동 입력 가능)</p>
+                  </div>
+                  <div>
+                    <label className="field-label">자산명 * (한글 가능)</label>
+                    <input
+                      type="text"
+                      value={assetFormData.name}
+                      onChange={(e) => setAssetFormData({ ...assetFormData, name: e.target.value })}
+                      className="input-field w-full px-4 py-2"
+                      placeholder="예: Apple Inc., 삼성전자"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="field-label">타입 *</label>
+                    <select
+                      value={assetFormData.type}
+                      onChange={(e) => setAssetFormData({ ...assetFormData, type: e.target.value as 'Stock' | 'ETF' })}
+                      className="input-field w-full px-4 py-2"
+                    >
+                      <option value="Stock">주식 (Stock)</option>
+                      <option value="ETF">ETF</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label">섹터</label>
+                    <select
+                      value={assetFormData.sector}
+                      onChange={(e) => setAssetFormData({ ...assetFormData, sector: e.target.value })}
+                      className="input-field w-full px-4 py-2"
+                    >
+                      <option value="">선택하세요</option>
+                      {SECTORS.map((sector) => (
+                        <option key={sector} value={sector}>
+                          {sector}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/[0.08] pt-4 mt-2">
+                  <h4 className="text-sm font-medium mb-3 text-zinc-300">보유 정보 (선택)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="field-label">보유 수량</label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        value={assetFormData.quantity}
+                        onChange={(e) => setAssetFormData({ ...assetFormData, quantity: e.target.value })}
+                        className="input-field w-full px-4 py-2"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="field-label">평균 단가</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={assetFormData.averagePrice}
+                        onChange={(e) => setAssetFormData({ ...assetFormData, averagePrice: e.target.value })}
+                        className="input-field w-full px-4 py-2"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-2">수량을 입력하면 현재 계좌에 보유 내역이 함께 생성됩니다.</p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="btn-primary flex-1 px-4 py-2"
+                  >
+                    {submitting ? '처리 중...' : '등록'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowAssetForm(false); resetAssetForm(); }}
+                    disabled={submitting}
+                    className="btn-ghost flex-1 px-4 py-2"
+                  >
+                    취소
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* 거래 기록 모달 */}
       {showForm && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => !submitting && setShowForm(false)}
-        >
+        <Portal>
           <div
-            className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => !submitting && setShowForm(false)}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-white">거래 기록</h3>
-              <button
-                onClick={() => setShowForm(false)}
-                disabled={submitting}
-                className="text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* 매수/매도 토글 */}
-              <div className="grid grid-cols-2 gap-2">
+            <div
+              className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-white">거래 기록</h3>
                 <button
-                  type="button"
-                  onClick={() => {
-                    setSellPriceAutoMode(true);
-                    setFormData({ ...formData, type: 'Buy', assetId: 0, price: '' });
-                  }}
-                  className={`flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${
-                    formData.type === 'Buy'
-                      ? 'bg-mint-400/20 text-mint-200 ring-1 ring-mint-400/40'
-                      : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
-                  }`}
-                >
-                  <ArrowDownCircle className="w-5 h-5" />
-                  매수
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSellPriceAutoMode(true);
-                    setFormData({ ...formData, type: 'Sell', assetId: 0, price: '' });
-                  }}
-                  className={`flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${
-                    formData.type === 'Sell'
-                      ? 'bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/40'
-                      : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
-                  }`}
-                >
-                  <ArrowUpCircle className="w-5 h-5" />
-                  매도
-                </button>
-              </div>
-
-              {/* 종목 검색 */}
-              <div className="relative">
-                <label className="field-label">
-                  종목 *
-                  {formData.type === 'Sell' && (
-                    <span className="text-xs text-zinc-500 ml-2">(보유 종목만 표시)</span>
-                  )}
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                  <input
-                    type="text"
-                    value={selectedAsset ? `${selectedAsset.ticker} - ${selectedAsset.name}` : assetSearch}
-                    onChange={(e) => {
-                      setAssetSearch(e.target.value);
-                      setFormData({ ...formData, assetId: 0 });
-                      setShowAssetDropdown(true);
-                    }}
-                    onFocus={() => setShowAssetDropdown(true)}
-                    placeholder={formData.type === 'Sell' ? '보유 종목 선택...' : '종목 검색...'}
-                    className="input-field w-full pl-10 pr-4 py-2"
-                    required
-                  />
-                </div>
-                {showAssetDropdown && filteredAssetOptions.length > 0 && !selectedAsset && (
-                  <div className="absolute z-10 w-full mt-1 bg-white/[0.07] border border-white/[0.08] rounded-lg max-h-48 overflow-y-auto shadow-lg">
-                    {filteredAssetOptions.map((a) => {
-                      const h = holdings.find((x) => x.asset_id === a.id);
-                      return (
-                        <button
-                          type="button"
-                          key={a.id}
-                          onClick={() => {
-                            setFormData({ ...formData, assetId: a.id });
-                            setShowAssetDropdown(false);
-                            setAssetSearch('');
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-white/[0.1] text-sm flex items-center justify-between"
-                        >
-                          <span className="text-white">
-                            <span className="font-medium">{a.ticker}</span> · {a.name}
-                          </span>
-                          {h && (
-                            <span className="text-xs text-zinc-400">
-                              {formatNumber(h.quantity, 4)}주 · 평단 {formatMoney(h.average_price, getCurrencyFromTicker(a.ticker))}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                {formData.type === 'Sell' && selectedHolding && (
-                  <p className="text-xs text-zinc-400 mt-1">
-                    보유 수량: {formatNumber(selectedHolding.quantity, 4)}주 · 평단:{' '}
-                    {formatMoney(selectedHolding.average_price, getCurrencyFromTicker(selectedAsset?.ticker || ''))}
-                  </p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="field-label">거래일 *</label>
-                  <input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="input-field w-full px-3 py-2"
-                    required
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium">
-                      {formData.type === 'Sell' ? '주당 매도가' : '주당 매수가'} ({formCurrencySymbol}) *
-                      {formData.type === 'Sell' && formData.price && sellPriceAutoMode && (
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-mint-400/15 text-mint-300">시세</span>
-                      )}
-                    </label>
-                  </div>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.price}
-                    onChange={(e) => {
-                      setSellPriceAutoMode(false);
-                      setFormData({ ...formData, price: e.target.value });
-                    }}
-                    className="input-field w-full px-3 py-2"
-                    placeholder="1주당 가격"
-                    required
-                  />
-                  {formData.type === 'Sell' && !sellPriceAutoMode && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSellPriceAutoMode(true);
-                        setFormData({ ...formData, price: '' });
-                      }}
-                      className="text-[10px] text-mint-400 hover:text-mint-300 mt-1"
-                    >
-                      현재 시세 다시 가져오기
-                    </button>
-                  )}
-                </div>
-                <div>
-                  <label className="field-label">수량 *</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                    className="input-field w-full px-3 py-2"
-                    placeholder="0"
-                    required
-                    max={formData.type === 'Sell' && selectedHolding ? selectedHolding.quantity : undefined}
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium">
-                      수수료 ({formCurrencySymbol})
-                      {feeAutoMode ? (
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-mint-400/10 text-emerald-300">자동</span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setFeeAutoMode(true)}
-                          className="btn-ghost ml-2 text-[10px] px-1.5 py-0.5 text-zinc-300"
-                        >
-                          자동 복귀
-                        </button>
-                      )}
-                    </label>
-                  </div>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.fee}
-                    onChange={(e) => {
-                      setFeeAutoMode(false);
-                      setFormData({ ...formData, fee: e.target.value });
-                    }}
-                    className="input-field w-full px-3 py-2"
-                    placeholder="0"
-                  />
-                  {(() => {
-                    const p = parseFloat(formData.price);
-                    const q = parseFloat(formData.quantity);
-                    if (!p || !q) return null;
-                    const cur = currentAccount?.currency || 'KRW';
-                    const bd = calculateFee(p, q, cur, formData.type);
-                    if (bd.total <= 0) return null;
-                    return (
-                      <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1">
-                        <Info className="w-3 h-3" />
-                        {bd.rateDescription}
-                      </p>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* 거래 총액 미리보기 */}
-              {(() => {
-                const p = parseFloat(formData.price);
-                const q = parseFloat(formData.quantity);
-                const f = parseFloat(formData.fee || '0');
-                if (!p || !q) return null;
-                const gross = p * q;
-                const net = formData.type === 'Buy' ? gross + f : gross - f;
-                return (
-                  <div className="surface-inset p-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-zinc-400">
-                        {formatMoney(p, previewCurrency)} × {formatNumber(q, 4)}주
-                      </span>
-                      <span className="text-white font-semibold">
-                        = {formatMoney(gross, previewCurrency)}
-                      </span>
-                    </div>
-                    {f > 0 && (
-                      <div className="flex items-center justify-between text-xs text-zinc-500 mt-1 pt-1 border-t border-white/[0.06]">
-                        <span>{formData.type === 'Buy' ? '+ 수수료' : '- 수수료'}</span>
-                        <span>
-                          {formData.type === 'Buy' ? '실제 지불액' : '실수령액'}:{' '}
-                          <span className={`font-semibold ${formData.type === 'Buy' ? 'text-mint-300' : 'text-rose-300'}`}>
-                            {formatMoney(net, previewCurrency)}
-                          </span>
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* 매도 시 실현손익 미리보기 */}
-              {pnlPreview && (
-                <div
-                  className={`rounded-lg p-3 border ${
-                    pnlPreview.profit >= 0
-                      ? 'bg-mint-400/10 border-mint-400/30'
-                      : 'bg-rose-500/10 border-rose-400/30'
-                  }`}
-                >
-                  <p className="text-xs text-zinc-400 mb-1">예상 실현 손익</p>
-                  <div className="flex items-baseline gap-2">
-                    <p
-                      className={`text-xl font-bold ${
-                        pnlPreview.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                      }`}
-                    >
-                      {pnlPreview.profit >= 0 ? '+' : ''}
-                      {formatMoney(pnlPreview.profit, previewCurrency)}
-                    </p>
-                    <p
-                      className={`text-sm ${
-                        pnlPreview.profit >= 0 ? 'text-emerald-300' : 'text-rose-300'
-                      }`}
-                    >
-                      ({pnlPreview.profit >= 0 ? '+' : ''}
-                      {pnlPreview.profitPercent.toFixed(2)}%)
-                    </p>
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    매입원가 {formatMoney(pnlPreview.costBasis, previewCurrency)} (평단 {formatMoney(pnlPreview.buyAvg, previewCurrency)})
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <label className="field-label">메모</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="input-field w-full px-3 py-2"
-                  rows={2}
-                  placeholder="추가 메모 (선택)"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
                   onClick={() => setShowForm(false)}
                   disabled={submitting}
-                  className="btn-ghost flex-1 px-4 py-2 disabled:opacity-50"
+                  className="text-zinc-400 hover:text-white"
                 >
-                  취소
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className={`flex-1 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ${
-                    formData.type === 'Buy' ? 'bg-mint-400/20 hover:bg-mint-400/30' : 'bg-rose-500/20 hover:bg-rose-500/30'
-                  }`}
-                >
-                  {submitting ? '처리 중...' : formData.type === 'Buy' ? '매수 기록' : '매도 기록'}
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* 매수/매도 토글 */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSellPriceAutoMode(true);
+                      setFormData({ ...formData, type: 'Buy', assetId: 0, price: '' });
+                    }}
+                    className={`flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${
+                      formData.type === 'Buy'
+                        ? 'bg-mint-400/20 text-mint-200 ring-1 ring-mint-400/40'
+                        : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
+                    }`}
+                  >
+                    <ArrowDownCircle className="w-5 h-5" />
+                    매수
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSellPriceAutoMode(true);
+                      setFormData({ ...formData, type: 'Sell', assetId: 0, price: '' });
+                    }}
+                    className={`flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${
+                      formData.type === 'Sell'
+                        ? 'bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/40'
+                        : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
+                    }`}
+                  >
+                    <ArrowUpCircle className="w-5 h-5" />
+                    매도
+                  </button>
+                </div>
+
+                {/* 종목 검색 */}
+                <div className="relative">
+                  <label className="field-label">
+                    종목 *
+                    {formData.type === 'Sell' && (
+                      <span className="text-xs text-zinc-500 ml-2">(보유 종목만 표시)</span>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                    <input
+                      type="text"
+                      value={selectedAsset ? `${selectedAsset.ticker} - ${selectedAsset.name}` : assetSearch}
+                      onChange={(e) => {
+                        setAssetSearch(e.target.value);
+                        setFormData({ ...formData, assetId: 0 });
+                        setShowAssetDropdown(true);
+                      }}
+                      onFocus={() => setShowAssetDropdown(true)}
+                      placeholder={formData.type === 'Sell' ? '보유 종목 선택...' : '종목 검색...'}
+                      className="input-field w-full pl-10 pr-4 py-2"
+                      required
+                    />
+                  </div>
+                  {showAssetDropdown && filteredAssetOptions.length > 0 && !selectedAsset && (
+                    <div className="absolute z-10 w-full mt-1 bg-white/[0.07] border border-white/[0.08] rounded-lg max-h-48 overflow-y-auto shadow-lg">
+                      {filteredAssetOptions.map((a) => {
+                        const h = holdings.find((x) => x.asset_id === a.id);
+                        return (
+                          <button
+                            type="button"
+                            key={a.id}
+                            onClick={() => {
+                              setFormData({ ...formData, assetId: a.id });
+                              setShowAssetDropdown(false);
+                              setAssetSearch('');
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-white/[0.1] text-sm flex items-center justify-between"
+                          >
+                            <span className="text-white">
+                              <span className="font-medium">{a.ticker}</span> · {a.name}
+                            </span>
+                            {h && (
+                              <span className="text-xs text-zinc-400">
+                                {formatNumber(h.quantity, 4)}주 · 평단 {formatMoney(h.average_price, getCurrencyFromTicker(a.ticker))}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {formData.type === 'Sell' && selectedHolding && (
+                    <p className="text-xs text-zinc-400 mt-1">
+                      보유 수량: {formatNumber(selectedHolding.quantity, 4)}주 · 평단:{' '}
+                      {formatMoney(selectedHolding.average_price, getCurrencyFromTicker(selectedAsset?.ticker || ''))}
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="field-label">거래일 *</label>
+                    <input
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      className="input-field w-full px-3 py-2"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium">
+                        {formData.type === 'Sell' ? '주당 매도가' : '주당 매수가'} ({formCurrencySymbol}) *
+                        {formData.type === 'Sell' && formData.price && sellPriceAutoMode && (
+                          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-mint-400/15 text-mint-300">시세</span>
+                        )}
+                      </label>
+                    </div>
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.price}
+                      onChange={(e) => {
+                        setSellPriceAutoMode(false);
+                        setFormData({ ...formData, price: e.target.value });
+                      }}
+                      className="input-field w-full px-3 py-2"
+                      placeholder="1주당 가격"
+                      required
+                    />
+                    {formData.type === 'Sell' && !sellPriceAutoMode && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSellPriceAutoMode(true);
+                          setFormData({ ...formData, price: '' });
+                        }}
+                        className="text-[10px] text-mint-400 hover:text-mint-300 mt-1"
+                      >
+                        현재 시세 다시 가져오기
+                      </button>
+                    )}
+                  </div>
+                  <div>
+                    <label className="field-label">수량 *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                      className="input-field w-full px-3 py-2"
+                      placeholder="0"
+                      required
+                      max={formData.type === 'Sell' && selectedHolding ? selectedHolding.quantity : undefined}
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium">
+                        수수료 ({formCurrencySymbol})
+                        {feeAutoMode ? (
+                          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-mint-400/10 text-emerald-300">자동</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setFeeAutoMode(true)}
+                            className="btn-ghost ml-2 text-[10px] px-1.5 py-0.5 text-zinc-300"
+                          >
+                            자동 복귀
+                          </button>
+                        )}
+                      </label>
+                    </div>
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.fee}
+                      onChange={(e) => {
+                        setFeeAutoMode(false);
+                        setFormData({ ...formData, fee: e.target.value });
+                      }}
+                      className="input-field w-full px-3 py-2"
+                      placeholder="0"
+                    />
+                    {(() => {
+                      const p = parseFloat(formData.price);
+                      const q = parseFloat(formData.quantity);
+                      if (!p || !q) return null;
+                      const cur = currentAccount?.currency || 'KRW';
+                      const bd = calculateFee(p, q, cur, formData.type);
+                      if (bd.total <= 0) return null;
+                      return (
+                        <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1">
+                          <Info className="w-3 h-3" />
+                          {bd.rateDescription}
+                        </p>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* 거래 총액 미리보기 */}
+                {(() => {
+                  const p = parseFloat(formData.price);
+                  const q = parseFloat(formData.quantity);
+                  const f = parseFloat(formData.fee || '0');
+                  if (!p || !q) return null;
+                  const gross = p * q;
+                  const net = formData.type === 'Buy' ? gross + f : gross - f;
+                  return (
+                    <div className="surface-inset p-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-zinc-400">
+                          {formatMoney(p, previewCurrency)} × {formatNumber(q, 4)}주
+                        </span>
+                        <span className="text-white font-semibold">
+                          = {formatMoney(gross, previewCurrency)}
+                        </span>
+                      </div>
+                      {f > 0 && (
+                        <div className="flex items-center justify-between text-xs text-zinc-500 mt-1 pt-1 border-t border-white/[0.06]">
+                          <span>{formData.type === 'Buy' ? '+ 수수료' : '- 수수료'}</span>
+                          <span>
+                            {formData.type === 'Buy' ? '실제 지불액' : '실수령액'}:{' '}
+                            <span className={`font-semibold ${formData.type === 'Buy' ? 'text-mint-300' : 'text-rose-300'}`}>
+                              {formatMoney(net, previewCurrency)}
+                            </span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* 매도 시 실현손익 미리보기 */}
+                {pnlPreview && (
+                  <div
+                    className={`rounded-lg p-3 border ${
+                      pnlPreview.profit >= 0
+                        ? 'bg-mint-400/10 border-mint-400/30'
+                        : 'bg-rose-500/10 border-rose-400/30'
+                    }`}
+                  >
+                    <p className="text-xs text-zinc-400 mb-1">예상 실현 손익</p>
+                    <div className="flex items-baseline gap-2">
+                      <p
+                        className={`text-xl font-bold ${
+                          pnlPreview.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {pnlPreview.profit >= 0 ? '+' : ''}
+                        {formatMoney(pnlPreview.profit, previewCurrency)}
+                      </p>
+                      <p
+                        className={`text-sm ${
+                          pnlPreview.profit >= 0 ? 'text-emerald-300' : 'text-rose-300'
+                        }`}
+                      >
+                        ({pnlPreview.profit >= 0 ? '+' : ''}
+                        {pnlPreview.profitPercent.toFixed(2)}%)
+                      </p>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      매입원가 {formatMoney(pnlPreview.costBasis, previewCurrency)} (평단 {formatMoney(pnlPreview.buyAvg, previewCurrency)})
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="field-label">메모</label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="input-field w-full px-3 py-2"
+                    rows={2}
+                    placeholder="추가 메모 (선택)"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    disabled={submitting}
+                    className="btn-ghost flex-1 px-4 py-2 disabled:opacity-50"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className={`flex-1 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ${
+                      formData.type === 'Buy' ? 'bg-mint-400/20 hover:bg-mint-400/30' : 'bg-rose-500/20 hover:bg-rose-500/30'
+                    }`}
+                  >
+                    {submitting ? '처리 중...' : formData.type === 'Buy' ? '매수 기록' : '매도 기록'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

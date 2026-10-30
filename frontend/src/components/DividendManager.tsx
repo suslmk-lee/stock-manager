@@ -5,6 +5,7 @@ import { accountTypePrefix } from '../utils/accountType';
 import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock, TrendingUp, Wallet, X } from 'lucide-react';
 import IconTile from './ui/IconTile';
 import DividendQuickStats from './DividendQuickStats';
+import Portal from './ui/Portal';
 
 interface DividendManagerProps {
   selectedAccountId?: number;
@@ -688,531 +689,539 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       )}
 
       {showForm && (
-        <div 
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={handleCancelEdit}
-        >
+        <Portal>
           <div 
-            className="surface p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={handleCancelEdit}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="section-title !text-lg">배당금 기록</h3>
-              <button
-                type="button"
-                onClick={handleCancelEdit}
-                className="btn-icon"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <form 
-              onSubmit={handleCreateDividend} 
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
-                  e.preventDefault();
-                }
-              }}
-              className="space-y-4"
+            <div 
+              className="surface p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
             >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="field-label">계좌 *</label>
-                <select
-                  value={formData.accountId}
-                  onChange={(e) => setFormData({ ...formData, accountId: Number(e.target.value) })}
-                  className="input-field"
-                  required
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="section-title !text-lg">배당금 기록</h3>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="btn-icon"
                 >
-                  <option value={0}>계좌를 선택하세요</option>
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      🏦 {accountTypePrefix(account)}{account.name} ({account.broker})
-                    </option>
-                  ))}
-                </select>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <div>
-                <label className="field-label">자산 *</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={assetSearchQuery}
-                    autoComplete="off"
-                    onChange={(e) => {
-                      setAssetSearchQuery(e.target.value);
-                      setShowAssetDropdown(true);
-                      if (!e.target.value) {
-                        setFormData({ ...formData, assetId: 0 });
-                      }
-                    }}
-                    onFocus={() => setShowAssetDropdown(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        console.log('Enter key pressed in asset search');
-                        // 검색 결과 중 첫 번째 자산 자동 선택 (선택된 계좌에 속한 자산만)
-                        const filteredAssets = assets.filter(asset => {
-                          // 보유/거래/배당 이력이 있는 자산만 (전량 매도된 종목 포함)
-                          if (!isAssetSelectableForDividend(asset)) return false;
-
-                          const query = assetSearchQuery.toLowerCase();
-                          return (
-                            asset.ticker.toLowerCase().includes(query) ||
-                            asset.name.toLowerCase().includes(query)
-                          );
-                        });
-                        console.log('Filtered assets:', filteredAssets);
-                        if (filteredAssets.length > 0) {
-                          const selectedAsset = filteredAssets[0];
-                          const isKoreanAsset = selectedAsset.ticker.includes('.KS') || selectedAsset.ticker.includes('.KQ');
-                          console.log('Selecting asset:', selectedAsset.ticker, 'Currency:', isKoreanAsset ? 'KRW' : 'USD');
-                          setFormData({ 
-                            ...formData, 
-                            assetId: selectedAsset.id,
-                            currency: isKoreanAsset ? 'KRW' : 'USD'
-                          });
-                          setAssetSearchQuery(`${selectedAsset.ticker} - ${selectedAsset.name}`);
-                          setShowAssetDropdown(false);
-                        }
-                      }
-                    }}
-                    placeholder="티커 또는 자산명 검색..."
+              <form 
+                onSubmit={handleCreateDividend} 
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                  }
+                }}
+                className="space-y-4"
+              >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="field-label">계좌 *</label>
+                  <select
+                    value={formData.accountId}
+                    onChange={(e) => setFormData({ ...formData, accountId: Number(e.target.value) })}
                     className="input-field"
-                    required={formData.assetId === 0}
-                  />
-                  {showAssetDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-ink-900 border border-white/[0.12] rounded-xl max-h-60 overflow-y-auto shadow-2xl shadow-black/50">
-                      {assets
-                        .filter(asset => {
-                          // 보유/거래/배당 이력이 있는 자산만 (전량 매도된 종목 포함)
-                          if (!isAssetSelectableForDividend(asset)) return false;
+                    required
+                  >
+                    <option value={0}>계좌를 선택하세요</option>
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        🏦 {accountTypePrefix(account)}{account.name} ({account.broker})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label">자산 *</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={assetSearchQuery}
+                      autoComplete="off"
+                      onChange={(e) => {
+                        setAssetSearchQuery(e.target.value);
+                        setShowAssetDropdown(true);
+                        if (!e.target.value) {
+                          setFormData({ ...formData, assetId: 0 });
+                        }
+                      }}
+                      onFocus={() => setShowAssetDropdown(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Enter key pressed in asset search');
+                          // 검색 결과 중 첫 번째 자산 자동 선택 (선택된 계좌에 속한 자산만)
+                          const filteredAssets = assets.filter(asset => {
+                            // 보유/거래/배당 이력이 있는 자산만 (전량 매도된 종목 포함)
+                            if (!isAssetSelectableForDividend(asset)) return false;
 
+                            const query = assetSearchQuery.toLowerCase();
+                            return (
+                              asset.ticker.toLowerCase().includes(query) ||
+                              asset.name.toLowerCase().includes(query)
+                            );
+                          });
+                          console.log('Filtered assets:', filteredAssets);
+                          if (filteredAssets.length > 0) {
+                            const selectedAsset = filteredAssets[0];
+                            const isKoreanAsset = selectedAsset.ticker.includes('.KS') || selectedAsset.ticker.includes('.KQ');
+                            console.log('Selecting asset:', selectedAsset.ticker, 'Currency:', isKoreanAsset ? 'KRW' : 'USD');
+                            setFormData({ 
+                              ...formData, 
+                              assetId: selectedAsset.id,
+                              currency: isKoreanAsset ? 'KRW' : 'USD'
+                            });
+                            setAssetSearchQuery(`${selectedAsset.ticker} - ${selectedAsset.name}`);
+                            setShowAssetDropdown(false);
+                          }
+                        }
+                      }}
+                      placeholder="티커 또는 자산명 검색..."
+                      className="input-field"
+                      required={formData.assetId === 0}
+                    />
+                    {showAssetDropdown && (
+                      <div className="absolute z-10 w-full mt-1 bg-ink-900 border border-white/[0.12] rounded-xl max-h-60 overflow-y-auto shadow-2xl shadow-black/50">
+                        {assets
+                          .filter(asset => {
+                            // 보유/거래/배당 이력이 있는 자산만 (전량 매도된 종목 포함)
+                            if (!isAssetSelectableForDividend(asset)) return false;
+
+                            const query = assetSearchQuery.toLowerCase();
+                            return (
+                              asset.ticker.toLowerCase().includes(query) ||
+                              asset.name.toLowerCase().includes(query)
+                            );
+                          })
+                          .map((asset) => (
+                            <button
+                              key={asset.id}
+                              type="button"
+                              onClick={() => {
+                                // 한국 ETF 판별 (티커에 .KS 또는 .KQ 포함)
+                                const isKoreanAsset = asset.ticker.includes('.KS') || asset.ticker.includes('.KQ');
+                                setFormData({ 
+                                  ...formData, 
+                                  assetId: asset.id,
+                                  currency: isKoreanAsset ? 'KRW' : 'USD'
+                                });
+                                setAssetSearchQuery(`${asset.ticker} - ${asset.name}`);
+                                setShowAssetDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-2 hover:bg-white/[0.08] transition-colors text-sm"
+                            >
+                              <span className="font-medium text-mint-300">{asset.ticker}</span>
+                              <span className="text-zinc-300"> - {asset.name}</span>
+                            </button>
+                          ))}
+                        {assets.filter(asset => {
+                          // 선택된 계좌에 속한 자산만 필터링
+                          const belongsToAccount = asset.holdings?.some(h => h.account_id === formData.accountId);
+                          if (!belongsToAccount) return false;
+                          
                           const query = assetSearchQuery.toLowerCase();
                           return (
                             asset.ticker.toLowerCase().includes(query) ||
                             asset.name.toLowerCase().includes(query)
                           );
-                        })
-                        .map((asset) => (
-                          <button
-                            key={asset.id}
-                            type="button"
-                            onClick={() => {
-                              // 한국 ETF 판별 (티커에 .KS 또는 .KQ 포함)
-                              const isKoreanAsset = asset.ticker.includes('.KS') || asset.ticker.includes('.KQ');
-                              setFormData({ 
-                                ...formData, 
-                                assetId: asset.id,
-                                currency: isKoreanAsset ? 'KRW' : 'USD'
-                              });
-                              setAssetSearchQuery(`${asset.ticker} - ${asset.name}`);
-                              setShowAssetDropdown(false);
-                            }}
-                            className="w-full text-left px-4 py-2 hover:bg-white/[0.08] transition-colors text-sm"
-                          >
-                            <span className="font-medium text-mint-300">{asset.ticker}</span>
-                            <span className="text-zinc-300"> - {asset.name}</span>
-                          </button>
-                        ))}
-                      {assets.filter(asset => {
-                        // 선택된 계좌에 속한 자산만 필터링
-                        const belongsToAccount = asset.holdings?.some(h => h.account_id === formData.accountId);
-                        if (!belongsToAccount) return false;
-                        
-                        const query = assetSearchQuery.toLowerCase();
-                        return (
-                          asset.ticker.toLowerCase().includes(query) ||
-                          asset.name.toLowerCase().includes(query)
-                        );
-                      }).length === 0 && (
-                        <div className="px-4 py-3 text-sm text-zinc-400 text-center">
-                          검색 결과가 없습니다.
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        }).length === 0 && (
+                          <div className="px-4 py-3 text-sm text-zinc-400 text-center">
+                            검색 결과가 없습니다.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="field-label">지급일 *</label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="input-field"
-                  required
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="field-label">지급일 *</label>
+                  <input
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="input-field"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="field-label">배당금액 *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    className="input-field"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="field-label">세금</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.tax}
+                    onChange={(e) => setFormData({ ...formData, tax: e.target.value })}
+                    className="input-field"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="field-label">통화</label>
+                  <select
+                    value={formData.currency}
+                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                    className="input-field"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="KRW">KRW</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label">수령 여부</label>
+                  <select
+                    value={formData.isReceived ? 'true' : 'false'}
+                    onChange={(e) => setFormData({ ...formData, isReceived: e.target.value === 'true' })}
+                    className="input-field"
+                  >
+                    <option value="true">수령 완료</option>
+                    <option value="false">수령 예정</option>
+                  </select>
+                </div>
               </div>
               <div>
-                <label className="field-label">배당금액 *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                <label className="field-label">메모</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="input-field"
-                  placeholder="0.00"
-                  required
+                  placeholder="추가 메모"
+                  rows={2}
                 />
               </div>
-              <div>
-                <label className="field-label">세금</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.tax}
-                  onChange={(e) => setFormData({ ...formData, tax: e.target.value })}
-                  className="input-field"
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="field-label">통화</label>
-                <select
-                  value={formData.currency}
-                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                  className="input-field"
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
                 >
-                  <option value="USD">USD</option>
-                  <option value="KRW">KRW</option>
-                </select>
-              </div>
-              <div>
-                <label className="field-label">수령 여부</label>
-                <select
-                  value={formData.isReceived ? 'true' : 'false'}
-                  onChange={(e) => setFormData({ ...formData, isReceived: e.target.value === 'true' })}
-                  className="input-field"
+                  {editingDividend ? '수정' : '기록'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="btn-ghost flex-1"
                 >
-                  <option value="true">수령 완료</option>
-                  <option value="false">수령 예정</option>
-                </select>
+                  취소
+                </button>
               </div>
+            </form>
             </div>
-            <div>
-              <label className="field-label">메모</label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="input-field"
-                placeholder="추가 메모"
-                rows={2}
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                className="btn-primary flex-1"
-              >
-                {editingDividend ? '수정' : '기록'}
-              </button>
-              <button
-                type="button"
-                onClick={handleCancelEdit}
-                className="btn-ghost flex-1"
-              >
-                취소
-              </button>
-            </div>
-          </form>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* 전체 배당금 모달 */}
       {showAllDividends && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setShowAllDividends(false)}
-        >
+        <Portal>
           <div
-            className="relative surface max-w-3xl w-full max-h-[85vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowAllDividends(false)}
           >
-            <div className="flex items-center justify-between p-6 pb-4 border-b border-white/[0.08]">
-              <h3 className="section-title">배당금 전체 내역 ({dividends.length}건)</h3>
-              <button
-                onClick={() => setShowAllDividends(false)}
-                className="btn-icon"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="overflow-y-auto p-6 pt-4 space-y-3">
-              {dividends.map((dividend) => (
-                <div
-                  key={dividend.id}
-                  className="surface-inset p-4 hover:border-mint-400/40 transition-all duration-200"
+            <div
+              className="relative surface max-w-3xl w-full max-h-[85vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-6 pb-4 border-b border-white/[0.08]">
+                <h3 className="section-title">배당금 전체 내역 ({dividends.length}건)</h3>
+                <button
+                  onClick={() => setShowAllDividends(false)}
+                  className="btn-icon"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <IconTile icon={DollarSign} tone="mint" />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-semibold text-white">
-                            {dividend.asset?.name || 'N/A'}
-                          </h4>
-                          <span className={`badge ${
-                            dividend.is_received
-                              ? 'bg-mint-400/15 text-mint-300'
-                              : 'bg-amber-400/15 text-amber-300'
-                          }`}>
-                            {dividend.is_received ? '수령완료' : '수령예정'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-zinc-400 mt-0.5">
-                          {dividend.asset?.ticker || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <p className="num text-lg font-medium text-mint-300">
-                          ₩{(dividend.currency === 'USD'
-                            ? dividend.amount * exchangeRate
-                            : dividend.amount
-                          ).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
-                        </p>
-                        {dividend.currency === 'USD' && (
-                          <p className="text-xs text-zinc-500">
-                            (USD ${dividend.amount.toLocaleString()})
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="overflow-y-auto p-6 pt-4 space-y-3">
+                {dividends.map((dividend) => (
+                  <div
+                    key={dividend.id}
+                    className="surface-inset p-4 hover:border-mint-400/40 transition-all duration-200"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <IconTile icon={DollarSign} tone="mint" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-white">
+                              {dividend.asset?.name || 'N/A'}
+                            </h4>
+                            <span className={`badge ${
+                              dividend.is_received
+                                ? 'bg-mint-400/15 text-mint-300'
+                                : 'bg-amber-400/15 text-amber-300'
+                            }`}>
+                              {dividend.is_received ? '수령완료' : '수령예정'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-zinc-400 mt-0.5">
+                            {dividend.asset?.ticker || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
                           </p>
-                        )}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => { setShowAllDividends(false); handleEditDividend(dividend); }}
-                        className="text-zinc-500 hover:text-mint-300 transition-colors"
-                        title="수정"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { setShowAllDividends(false); handleDeleteDividend(dividend, e); }}
-                        className="text-zinc-500 hover:text-rose-300 transition-colors"
-                        title="삭제"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="num text-lg font-medium text-mint-300">
+                            ₩{(dividend.currency === 'USD'
+                              ? dividend.amount * exchangeRate
+                              : dividend.amount
+                            ).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                          </p>
+                          {dividend.currency === 'USD' && (
+                            <p className="text-xs text-zinc-500">
+                              (USD ${dividend.amount.toLocaleString()})
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setShowAllDividends(false); handleEditDividend(dividend); }}
+                          className="text-zinc-500 hover:text-mint-300 transition-colors"
+                          title="수정"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { setShowAllDividends(false); handleDeleteDividend(dividend, e); }}
+                          className="text-zinc-500 hover:text-rose-300 transition-colors"
+                          title="삭제"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
+                    {dividend.notes && (
+                      <p className="text-sm text-zinc-400 mt-2 pl-14">{dividend.notes}</p>
+                    )}
                   </div>
-                  {dividend.notes && (
-                    <p className="text-sm text-zinc-400 mt-2 pl-14">{dividend.notes}</p>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* 종목 상세 배당금 모달 */}
       {assetDetailModal && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setAssetDetailModal(null)}
-        >
+        <Portal>
           <div
-            className="relative surface max-w-2xl w-full max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setAssetDetailModal(null)}
           >
-            {/* 헤더 */}
-            <div className="sticky top-0 bg-ink-900/95 backdrop-blur border-b border-white/[0.08] rounded-t-3xl px-6 py-4 flex items-center justify-between z-10">
-              <div>
-                <h3 className="section-title !text-lg">
-                  {(assetDetailModal.ticker.includes('.KS') || assetDetailModal.ticker.includes('.KQ'))
-                    ? assetDetailModal.name
-                    : assetDetailModal.ticker}
-                </h3>
-                <p className="label-mono mt-0.5">
-                  {(assetDetailModal.ticker.includes('.KS') || assetDetailModal.ticker.includes('.KQ'))
-                    ? assetDetailModal.ticker
-                    : assetDetailModal.name}
-                  {' · 최근 1년 배당금'}
-                </p>
-              </div>
-              <button
-                onClick={() => setAssetDetailModal(null)}
-                className="btn-icon"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {assetDetailLoading ? (
-              <div className="p-12 text-center text-zinc-400">데이터 로딩 중...</div>
-            ) : assetDetailData ? (
-              <div className="p-6 space-y-6">
-                {/* 요약 카드 */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="surface-inset p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <DollarSign className="w-4 h-4 text-mint-300" />
-                      <span className="label-mono">1년 배당금</span>
-                    </div>
-                    <p className="num text-lg font-medium text-mint-300">
-                      ₩{assetDetailData.totalAmount.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
-                    </p>
-                  </div>
-                  <div className="surface-inset p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <TrendingUp className="w-4 h-4 text-amber-300" />
-                      <span className="label-mono">투자 대비 배당률</span>
-                    </div>
-                    <p className="num text-lg font-medium text-amber-300">
-                      {assetDetailData.yieldPercent > 0 ? `${assetDetailData.yieldPercent.toFixed(2)}%` : '-'}
-                    </p>
-                  </div>
-                  <div className="surface-inset p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Calendar className="w-4 h-4 text-sky-300" />
-                      <span className="label-mono">배당 횟수</span>
-                    </div>
-                    <p className="num text-lg font-medium text-sky-300">
-                      {assetDetailData.dividends.length}회
-                    </p>
-                  </div>
+            <div
+              className="relative surface max-w-2xl w-full max-h-[85vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 헤더 */}
+              <div className="sticky top-0 bg-ink-900/95 backdrop-blur border-b border-white/[0.08] rounded-t-3xl px-6 py-4 flex items-center justify-between z-10">
+                <div>
+                  <h3 className="section-title !text-lg">
+                    {(assetDetailModal.ticker.includes('.KS') || assetDetailModal.ticker.includes('.KQ'))
+                      ? assetDetailModal.name
+                      : assetDetailModal.ticker}
+                  </h3>
+                  <p className="label-mono mt-0.5">
+                    {(assetDetailModal.ticker.includes('.KS') || assetDetailModal.ticker.includes('.KQ'))
+                      ? assetDetailModal.ticker
+                      : assetDetailModal.name}
+                    {' · 최근 1년 배당금'}
+                  </p>
                 </div>
+                <button
+                  onClick={() => setAssetDetailModal(null)}
+                  className="btn-icon"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-                {/* 월별 배당금 차트 */}
-                <div className="surface-inset p-4">
-                  <h4 className="text-sm font-medium text-white mb-4">월별 배당금 추이</h4>
-                  <div className="flex items-end gap-1 h-32">
-                    {(() => {
-                      const maxVal = Math.max(...assetDetailData.monthlyChart.map(m => m.total), 1);
-                      return assetDetailData.monthlyChart.map((item, idx) => {
-                        const height = item.total > 0 ? Math.max((item.total / maxVal) * 100, 4) : 0;
-                        const [, month] = item.month.split('-');
-                        return (
-                          <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                            <div className="w-full flex items-end justify-center" style={{ height: '100px' }}>
-                              <div
-                                className={`w-full max-w-[24px] rounded-t transition-all duration-300 ${
-                                  item.total > 0
-                                    ? 'bg-gradient-to-t from-mint-600/60 to-mint-300'
-                                    : 'bg-white/[0.08]'
-                                }`}
-                                style={{ height: item.total > 0 ? `${height}%` : '4px' }}
-                                title={`₩${item.total.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}`}
-                              />
+              {assetDetailLoading ? (
+                <div className="p-12 text-center text-zinc-400">데이터 로딩 중...</div>
+              ) : assetDetailData ? (
+                <div className="p-6 space-y-6">
+                  {/* 요약 카드 */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="surface-inset p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <DollarSign className="w-4 h-4 text-mint-300" />
+                        <span className="label-mono">1년 배당금</span>
+                      </div>
+                      <p className="num text-lg font-medium text-mint-300">
+                        ₩{assetDetailData.totalAmount.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                      </p>
+                    </div>
+                    <div className="surface-inset p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <TrendingUp className="w-4 h-4 text-amber-300" />
+                        <span className="label-mono">투자 대비 배당률</span>
+                      </div>
+                      <p className="num text-lg font-medium text-amber-300">
+                        {assetDetailData.yieldPercent > 0 ? `${assetDetailData.yieldPercent.toFixed(2)}%` : '-'}
+                      </p>
+                    </div>
+                    <div className="surface-inset p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Calendar className="w-4 h-4 text-sky-300" />
+                        <span className="label-mono">배당 횟수</span>
+                      </div>
+                      <p className="num text-lg font-medium text-sky-300">
+                        {assetDetailData.dividends.length}회
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 월별 배당금 차트 */}
+                  <div className="surface-inset p-4">
+                    <h4 className="text-sm font-medium text-white mb-4">월별 배당금 추이</h4>
+                    <div className="flex items-end gap-1 h-32">
+                      {(() => {
+                        const maxVal = Math.max(...assetDetailData.monthlyChart.map(m => m.total), 1);
+                        return assetDetailData.monthlyChart.map((item, idx) => {
+                          const height = item.total > 0 ? Math.max((item.total / maxVal) * 100, 4) : 0;
+                          const [, month] = item.month.split('-');
+                          return (
+                            <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                              <div className="w-full flex items-end justify-center" style={{ height: '100px' }}>
+                                <div
+                                  className={`w-full max-w-[24px] rounded-t transition-all duration-300 ${
+                                    item.total > 0
+                                      ? 'bg-gradient-to-t from-mint-600/60 to-mint-300'
+                                      : 'bg-white/[0.08]'
+                                  }`}
+                                  style={{ height: item.total > 0 ? `${height}%` : '4px' }}
+                                  title={`₩${item.total.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}`}
+                                />
+                              </div>
+                              <span className="label-mono !text-[9px]">{parseInt(month)}월</span>
                             </div>
-                            <span className="label-mono !text-[9px]">{parseInt(month)}월</span>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* 보유 현황 */}
+                  {assetDetailData.holdingInfo.length > 0 && (
+                    <div className="surface-inset p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Wallet className="w-4 h-4 text-zinc-300" />
+                        <h4 className="text-sm font-medium text-white">보유 현황</h4>
+                      </div>
+                      <div className="space-y-2">
+                        {assetDetailData.holdingInfo.map((h, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-white/[0.04] rounded-xl px-4 py-3">
+                            <div>
+                              <p className="text-sm font-medium text-white">{h.accountName}</p>
+                              <p className="text-xs text-zinc-400">{h.quantity}주 보유</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="num text-sm font-medium text-mint-300">
+                                ₩{h.marketValue.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                              </p>
+                              <p className="text-xs text-zinc-400">
+                                평단 ₩{h.avgPrice.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 배당금 내역 리스트 */}
+                  <div className="surface-inset p-4">
+                    <h4 className="text-sm font-medium text-white mb-3">배당금 내역 ({assetDetailData.dividends.length}건)</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {assetDetailData.dividends.map(div => {
+                        const amtKRW = div.currency === 'USD' ? div.amount * exchangeRate : div.amount;
+                        return (
+                          <div key={div.id} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-white/[0.05]">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-2 h-2 rounded-full ${div.is_received ? 'bg-mint-400' : 'bg-amber-300'}`} />
+                              <span className="text-sm text-zinc-300">
+                                {new Date(div.date).toLocaleDateString('ko-KR')}
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="num text-sm font-medium text-mint-300">
+                                ₩{amtKRW.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
+                              </span>
+                              {div.currency === 'USD' && (
+                                <span className="text-xs text-zinc-500 ml-2">
+                                  (${div.amount.toFixed(2)})
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
-                      });
-                    })()}
-                  </div>
-                </div>
-
-                {/* 보유 현황 */}
-                {assetDetailData.holdingInfo.length > 0 && (
-                  <div className="surface-inset p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Wallet className="w-4 h-4 text-zinc-300" />
-                      <h4 className="text-sm font-medium text-white">보유 현황</h4>
-                    </div>
-                    <div className="space-y-2">
-                      {assetDetailData.holdingInfo.map((h, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-white/[0.04] rounded-xl px-4 py-3">
-                          <div>
-                            <p className="text-sm font-medium text-white">{h.accountName}</p>
-                            <p className="text-xs text-zinc-400">{h.quantity}주 보유</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="num text-sm font-medium text-mint-300">
-                              ₩{h.marketValue.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
-                            </p>
-                            <p className="text-xs text-zinc-400">
-                              평단 ₩{h.avgPrice.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                      })}
                     </div>
                   </div>
-                )}
-
-                {/* 배당금 내역 리스트 */}
-                <div className="surface-inset p-4">
-                  <h4 className="text-sm font-medium text-white mb-3">배당금 내역 ({assetDetailData.dividends.length}건)</h4>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {assetDetailData.dividends.map(div => {
-                      const amtKRW = div.currency === 'USD' ? div.amount * exchangeRate : div.amount;
-                      return (
-                        <div key={div.id} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-white/[0.05]">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${div.is_received ? 'bg-mint-400' : 'bg-amber-300'}`} />
-                            <span className="text-sm text-zinc-300">
-                              {new Date(div.date).toLocaleDateString('ko-KR')}
-                            </span>
-                          </div>
-                          <div className="text-right">
-                            <span className="num text-sm font-medium text-mint-300">
-                              ₩{amtKRW.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
-                            </span>
-                            {div.currency === 'USD' && (
-                              <span className="text-xs text-zinc-500 ml-2">
-                                (${div.amount.toFixed(2)})
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="p-12 text-center text-zinc-400">데이터를 불러올 수 없습니다.</div>
-            )}
+              ) : (
+                <div className="p-12 text-center text-zinc-400">데이터를 불러올 수 없습니다.</div>
+              )}
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {deleteTarget && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => !deleting && setDeleteTarget(null)}
-        >
+        <Portal>
           <div
-            className="surface p-6 max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => !deleting && setDeleteTarget(null)}
           >
-            <h3 className="text-lg font-semibold text-white mb-2">배당금 삭제</h3>
-            <p className="text-zinc-300 mb-6">
-              {`${deleteTarget.asset?.name || ''} 배당금 (${new Date(deleteTarget.date).toLocaleDateString('ko-KR')})을 삭제하시겠습니까?`}
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                disabled={deleting}
-                className="btn-ghost flex-1"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={confirmDeleteDividend}
-                disabled={deleting}
-                className="btn-danger flex-1"
-              >
-                {deleting ? '삭제 중...' : '삭제'}
-              </button>
+            <div
+              className="surface p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold text-white mb-2">배당금 삭제</h3>
+              <p className="text-zinc-300 mb-6">
+                {`${deleteTarget.asset?.name || ''} 배당금 (${new Date(deleteTarget.date).toLocaleDateString('ko-KR')})을 삭제하시겠습니까?`}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  className="btn-ghost flex-1"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteDividend}
+                  disabled={deleting}
+                  className="btn-danger flex-1"
+                >
+                  {deleting ? '삭제 중...' : '삭제'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

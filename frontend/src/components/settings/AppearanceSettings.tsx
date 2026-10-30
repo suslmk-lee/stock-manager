@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useAppearance } from '../../appearance/AppearanceContext';
 import { THEMES, mix, type AppTheme } from '../../appearance/themes';
+import Portal from '../ui/Portal';
 import {
   CARD_STYLES,
   SANS_FONTS,
@@ -196,78 +197,80 @@ export default function AppearanceSettings({ open, onClose }: { open: boolean; o
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <Portal>
       <div
-        ref={panelRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label="모양"
-        className="surface flex w-full max-w-4xl max-h-[85vh] flex-col outline-none"
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
       >
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.08]">
-          <h2 className="text-base font-semibold text-white">모양</h2>
-          <button type="button" className="btn-icon" onClick={onClose} aria-label="닫기">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <nav className="shrink-0 p-3 md:w-48 md:border-r md:border-white/[0.08]">
-            <div className="glass-pill flex md:hidden p-1 gap-1">
-              {SECTIONS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSection(s.id)}
-                  className={`pill-item flex-1 ${section === s.id ? 'pill-item-active' : ''}`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-            <div className="hidden md:flex flex-col gap-2">
-              {SECTIONS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSection(s.id)}
-                  className={`w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
-                    section === s.id
-                      ? 'ring-1 ring-mint-400/60 bg-white/[0.06] text-white'
-                      : 'text-zinc-400 ring-1 ring-white/10 hover:bg-white/[0.04]'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </nav>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
-            {section === 'theme' && <ThemeSection />}
-            {section === 'card' && <CardSection />}
-            {section === 'font' && <FontSection />}
+        <div
+          ref={panelRef}
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-label="모양"
+          className="surface flex w-full max-w-4xl max-h-[85vh] flex-col outline-none"
+        >
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.08]">
+            <h2 className="text-base font-semibold text-white">모양</h2>
+            <button type="button" className="btn-icon" onClick={onClose} aria-label="닫기">
+              <X className="w-4 h-4" />
+            </button>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-t border-white/[0.08]">
-          <span className="text-xs text-zinc-500">변경 사항은 이 기기에 자동 저장됩니다</span>
-          <div className="flex items-center gap-2">
-            <button type="button" className="btn-ghost" onClick={reset}>
-              기본값으로 되돌리기
-            </button>
-            <button type="button" className="btn-primary" onClick={onClose}>
-              완료
-            </button>
+          <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+            <nav className="shrink-0 p-3 md:w-48 md:border-r md:border-white/[0.08]">
+              <div className="glass-pill flex md:hidden p-1 gap-1">
+                {SECTIONS.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSection(s.id)}
+                    className={`pill-item flex-1 ${section === s.id ? 'pill-item-active' : ''}`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <div className="hidden md:flex flex-col gap-2">
+                {SECTIONS.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSection(s.id)}
+                    className={`w-full rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
+                      section === s.id
+                        ? 'ring-1 ring-mint-400/60 bg-white/[0.06] text-white'
+                        : 'text-zinc-400 ring-1 ring-white/10 hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </nav>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+              {section === 'theme' && <ThemeSection />}
+              {section === 'card' && <CardSection />}
+              {section === 'font' && <FontSection />}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-t border-white/[0.08]">
+            <span className="text-xs text-zinc-500">변경 사항은 이 기기에 자동 저장됩니다</span>
+            <div className="flex items-center gap-2">
+              <button type="button" className="btn-ghost" onClick={reset}>
+                기본값으로 되돌리기
+              </button>
+              <button type="button" className="btn-primary" onClick={onClose}>
+                완료
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
 }

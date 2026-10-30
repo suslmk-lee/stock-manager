@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { Asset, Account, TickerInfo, Holding } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
 import { Plus, Trash2, TrendingUp, Search, Edit2 } from 'lucide-react';
+import Portal from './ui/Portal';
 
 const SECTORS = [
   'Technology',
@@ -344,195 +345,197 @@ export default function AssetManager() {
       )}
 
       {showForm && (
-        <div 
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => {
-            setShowForm(false);
-            setEditingAsset(null);
-            setFormData({
-              ticker: '',
-              name: '',
-              type: 'Stock' as 'Stock' | 'ETF',
-              sector: '',
-              accountId: 0,
-              quantity: '',
-            });
-          }}
-        >
+        <Portal>
           <div 
-            className="surface p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => {
+              setShowForm(false);
+              setEditingAsset(null);
+              setFormData({
+                ticker: '',
+                name: '',
+                type: 'Stock' as 'Stock' | 'ETF',
+                sector: '',
+                accountId: 0,
+                quantity: '',
+              });
+            }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">{editingAsset ? '자산 수정' : '새 자산 추가'}</h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingAsset(null);
-                  setFormData({
-                    ticker: '',
-                    name: '',
-                    type: 'Stock' as 'Stock' | 'ETF',
-                    sector: '',
-                    accountId: 0,
-                    quantity: '',
-                  });
-                }}
-                className="text-zinc-400 hover:text-white transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <form onSubmit={handleCreateAsset} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="field-label">티커 심볼 *</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={formData.ticker}
-                    onChange={(e) => setFormData({ ...formData, ticker: e.target.value })}
-                    onKeyPress={(e) => e.key === 'Enter' && !editingAsset && (e.preventDefault(), handleTickerSearch())}
-                    className="input-field flex-1 px-4 py-2 uppercase"
-                    placeholder="예: AAPL, 005930"
-                    required
-                    disabled={!!editingAsset}
-                  />
-                  {!editingAsset && (
-                    <button
-                      type="button"
-                      onClick={handleTickerSearch}
-                      disabled={searching || !formData.ticker}
-                      className="btn-primary px-4 py-2"
-                    >
-                      {searching ? '검색중...' : <Search className="w-5 h-5" />}
-                    </button>
-                  )}
-                </div>
-                {!editingAsset && <p className="text-xs text-zinc-400 mt-1">티커 입력 후 검색 버튼 클릭 (검색 실패 시 수동 입력 가능)</p>}
-                {editingAsset && <p className="text-xs text-zinc-400 mt-1">티커는 수정할 수 없습니다</p>}
-              </div>
-              <div>
-                <label className="field-label">자산명 * (한글 가능)</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="input-field w-full px-4 py-2"
-                  placeholder="예: SOL골드커버드콜액티브, Apple Inc."
-                  required
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="field-label">타입 *</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as 'Stock' | 'ETF' })}
-                  className="input-field w-full px-4 py-2"
+            <div 
+              className="surface p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold">{editingAsset ? '자산 수정' : '새 자산 추가'}</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingAsset(null);
+                    setFormData({
+                      ticker: '',
+                      name: '',
+                      type: 'Stock' as 'Stock' | 'ETF',
+                      sector: '',
+                      accountId: 0,
+                      quantity: '',
+                    });
+                  }}
+                  className="text-zinc-400 hover:text-white transition-colors"
                 >
-                  <option value="Stock">주식 (Stock)</option>
-                  <option value="ETF">ETF</option>
-                </select>
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <div>
-                <label className="field-label">섹터</label>
-                <select
-                  value={formData.sector}
-                  onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
-                  className="input-field w-full px-4 py-2"
-                >
-                  <option value="">선택하세요</option>
-                  {SECTORS.map((sector) => (
-                    <option key={sector} value={sector}>
-                      {sector}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            {editingAsset ? (
-              <div className="border-t border-white/[0.08] pt-4 mt-2">
-                <h4 className="text-sm font-medium mb-3 text-zinc-300">현재 보유 내역</h4>
-                {editingAsset.holdings && editingAsset.holdings.length > 0 ? (
-                  <div className="space-y-2">
-                    {editingAsset.holdings.map((holding) => {
-                      const account = accounts.find(acc => acc.id === holding.account_id);
-                      return (
-                        <div key={holding.id} className="bg-white/[0.04] rounded p-2 flex justify-between items-center">
-                          <span className="text-sm text-zinc-300">
-                            {account?.name || '알 수 없음'}
-                          </span>
-                          <span className="text-sm text-white font-medium">
-                            {holding.quantity.toLocaleString()} 주
-                          </span>
-                        </div>
-                      );
-                    })}
-                    <p className="text-xs text-mint-400 mt-2">
-                      💡 보유 수량을 수정하려면 자산 카드의 계좌별 보유 내역에서 수정 버튼(✏️)을 클릭하세요.
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-zinc-400">보유 내역이 없습니다.</p>
-                )}
-              </div>
-            ) : (
-              <div className="border-t border-white/[0.08] pt-4 mt-2">
-                <h4 className="text-sm font-medium mb-3 text-zinc-300">보유 정보 (선택)</h4>
+              <form onSubmit={handleCreateAsset} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="field-label">계좌</label>
+                  <label className="field-label">티커 심볼 *</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formData.ticker}
+                      onChange={(e) => setFormData({ ...formData, ticker: e.target.value })}
+                      onKeyPress={(e) => e.key === 'Enter' && !editingAsset && (e.preventDefault(), handleTickerSearch())}
+                      className="input-field flex-1 px-4 py-2 uppercase"
+                      placeholder="예: AAPL, 005930"
+                      required
+                      disabled={!!editingAsset}
+                    />
+                    {!editingAsset && (
+                      <button
+                        type="button"
+                        onClick={handleTickerSearch}
+                        disabled={searching || !formData.ticker}
+                        className="btn-primary px-4 py-2"
+                      >
+                        {searching ? '검색중...' : <Search className="w-5 h-5" />}
+                      </button>
+                    )}
+                  </div>
+                  {!editingAsset && <p className="text-xs text-zinc-400 mt-1">티커 입력 후 검색 버튼 클릭 (검색 실패 시 수동 입력 가능)</p>}
+                  {editingAsset && <p className="text-xs text-zinc-400 mt-1">티커는 수정할 수 없습니다</p>}
+                </div>
+                <div>
+                  <label className="field-label">자산명 * (한글 가능)</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="input-field w-full px-4 py-2"
+                    placeholder="예: SOL골드커버드콜액티브, Apple Inc."
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="field-label">타입 *</label>
                   <select
-                    value={formData.accountId}
-                    onChange={(e) => setFormData({ ...formData, accountId: Number(e.target.value) })}
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value as 'Stock' | 'ETF' })}
                     className="input-field w-full px-4 py-2"
                   >
-                    <option value={0}>선택 안함</option>
-                    {accounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {accountTypePrefix(account)}{account.broker} ({account.name})
+                    <option value="Stock">주식 (Stock)</option>
+                    <option value="ETF">ETF</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label">섹터</label>
+                  <select
+                    value={formData.sector}
+                    onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
+                    className="input-field w-full px-4 py-2"
+                  >
+                    <option value="">선택하세요</option>
+                    {SECTORS.map((sector) => (
+                      <option key={sector} value={sector}>
+                        {sector}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="field-label">보유 수량</label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                    className="input-field w-full px-4 py-2"
-                    placeholder="0"
-                  />
+              </div>
+              {editingAsset ? (
+                <div className="border-t border-white/[0.08] pt-4 mt-2">
+                  <h4 className="text-sm font-medium mb-3 text-zinc-300">현재 보유 내역</h4>
+                  {editingAsset.holdings && editingAsset.holdings.length > 0 ? (
+                    <div className="space-y-2">
+                      {editingAsset.holdings.map((holding) => {
+                        const account = accounts.find(acc => acc.id === holding.account_id);
+                        return (
+                          <div key={holding.id} className="bg-white/[0.04] rounded p-2 flex justify-between items-center">
+                            <span className="text-sm text-zinc-300">
+                              {account?.name || '알 수 없음'}
+                            </span>
+                            <span className="text-sm text-white font-medium">
+                              {holding.quantity.toLocaleString()} 주
+                            </span>
+                          </div>
+                        );
+                      })}
+                      <p className="text-xs text-mint-400 mt-2">
+                        💡 보유 수량을 수정하려면 자산 카드의 계좌별 보유 내역에서 수정 버튼(✏️)을 클릭하세요.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-zinc-400">보유 내역이 없습니다.</p>
+                  )}
                 </div>
+              ) : (
+                <div className="border-t border-white/[0.08] pt-4 mt-2">
+                  <h4 className="text-sm font-medium mb-3 text-zinc-300">보유 정보 (선택)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="field-label">계좌</label>
+                    <select
+                      value={formData.accountId}
+                      onChange={(e) => setFormData({ ...formData, accountId: Number(e.target.value) })}
+                      className="input-field w-full px-4 py-2"
+                    >
+                      <option value={0}>선택 안함</option>
+                      {accounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {accountTypePrefix(account)}{account.broker} ({account.name})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label">보유 수량</label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                      className="input-field w-full px-4 py-2"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+                  <p className="text-xs text-zinc-400 mt-2">계좌와 수량을 입력하면 보유 내역이 생성됩니다. 평단가는 거래 내역을 통해 자동 계산됩니다.</p>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  className="btn-primary flex-1 px-4 py-2"
+                >
+                  {editingAsset ? '수정' : '등록'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="btn-ghost flex-1 px-4 py-2"
+                >
+                  취소
+                </button>
               </div>
-                <p className="text-xs text-zinc-400 mt-2">계좌와 수량을 입력하면 보유 내역이 생성됩니다. 평단가는 거래 내역을 통해 자동 계산됩니다.</p>
-              </div>
-            )}
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                className="btn-primary flex-1 px-4 py-2"
-              >
-                {editingAsset ? '수정' : '등록'}
-              </button>
-              <button
-                type="button"
-                onClick={handleCancelEdit}
-                className="btn-ghost flex-1 px-4 py-2"
-              >
-                취소
-              </button>
+            </form>
             </div>
-          </form>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* 자산 목록 */}

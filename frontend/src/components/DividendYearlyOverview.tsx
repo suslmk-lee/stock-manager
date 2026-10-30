@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { Account, Dividend } from '../types/models';
 import IconTile from './ui/IconTile';
 import { Calendar, X } from 'lucide-react';
+import Portal from './ui/Portal';
 
 interface MonthlyData {
   [accountId: number]: {
@@ -318,124 +319,126 @@ export default function DividendYearlyOverview() {
 
       {/* 종목별 상세 모달 */}
       {showAssetModal && selectedAccount && (
-        <div 
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setShowAssetModal(false)}
-        >
+        <Portal>
           <div 
-            className="surface max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowAssetModal(false)}
           >
-            {/* 모달 헤더 */}
-            <div className="flex items-center justify-between p-6 border-b border-white/[0.08]">
-              <div>
-                <h3 className="section-title !text-lg">{selectedAccount.name} - 종목별 배당금</h3>
-                <p className="label-mono mt-1">{selectedAccount.broker} · {selectedYear}년</p>
-              </div>
-              <button
-                onClick={() => setShowAssetModal(false)}
-                className="btn-icon"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* 모달 내용 */}
-            <div className="flex-1 overflow-auto p-6">
-              {modalLoading ? (
-                <div className="text-center py-8 text-zinc-400">데이터 로딩 중...</div>
-              ) : assetMonthlyData.length === 0 ? (
-                <div className="text-center py-8 text-zinc-400">배당금 기록이 없습니다.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-white/[0.08]">
-                        <th className="px-4 py-3 text-left table-head sticky left-0 bg-ink-900 z-20 min-w-[200px]">
-                          종목
-                        </th>
-                        {monthNames.map((month, index) => (
-                          <th key={index} className="px-4 py-3 text-right table-head min-w-[100px]">
-                            {month}
-                          </th>
-                        ))}
-                        <th className="px-4 py-3 text-right table-head !text-mint-300 min-w-[120px]">
-                          합계
-                        </th>
-                        <th className="px-4 py-3 text-right table-head min-w-[80px]">
-                          건수
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {assetMonthlyData.map((asset, idx) => (
-                        <tr 
-                          key={asset.assetId}
-                          className={`table-row ${
-                            idx % 2 === 0 ? 'bg-white/[0.02]' : ''
-                          }`}
-                        >
-                          <td className="px-4 py-3 sticky left-0 bg-ink-900 z-20">
-                            <p className="font-medium text-white">
-                              {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ') 
-                                ? asset.assetName 
-                                : asset.ticker}
-                            </p>
-                            <p className="text-xs text-zinc-400">
-                              {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ')
-                                ? asset.ticker
-                                : asset.assetName}
-                            </p>
-                          </td>
-                          {asset.months.map((amount, monthIdx) => (
-                            <td 
-                              key={monthIdx}
-                              className={`px-4 py-3 text-right ${
-                                amount > 0 ? 'num text-mint-300 bg-mint-400/[0.07] font-medium' : 'num text-zinc-600'
-                              }`}
-                            >
-                              {formatCurrency(amount)}
-                            </td>
-                          ))}
-                          <td className="px-4 py-3 text-right num font-medium text-white bg-white/[0.03]">
-                            {formatCurrency(asset.total)}
-                          </td>
-                          <td className="px-4 py-3 text-right num text-zinc-500">
-                            {asset.count}건
-                          </td>
-                        </tr>
-                      ))}
-
-                      {/* 합계 행 */}
-                      <tr className="bg-white/[0.04] font-medium border-t border-white/[0.14]">
-                        <td className="px-4 py-3 text-white sticky left-0 bg-ink-900 z-20">
-                          월별 합계
-                        </td>
-                        {monthNames.map((_, monthIdx) => {
-                          const total = assetMonthlyData.reduce((sum, asset) => sum + asset.months[monthIdx], 0);
-                          return (
-                            <td 
-                              key={monthIdx}
-                              className={`px-4 py-3 text-right ${
-                                total > 0 ? 'num text-mint-300' : 'num text-zinc-600'
-                              }`}
-                            >
-                              {formatCurrency(total)}
-                            </td>
-                          );
-                        })}
-                        <td className="px-4 py-3 text-right num text-white bg-white/[0.06]">
-                          {formatCurrency(assetMonthlyData.reduce((sum, asset) => sum + asset.total, 0))}
-                        </td>
-                        <td className="px-4 py-3"></td>
-                      </tr>
-                    </tbody>
-                  </table>
+            <div 
+              className="surface max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 모달 헤더 */}
+              <div className="flex items-center justify-between p-6 border-b border-white/[0.08]">
+                <div>
+                  <h3 className="section-title !text-lg">{selectedAccount.name} - 종목별 배당금</h3>
+                  <p className="label-mono mt-1">{selectedAccount.broker} · {selectedYear}년</p>
                 </div>
-              )}
+                <button
+                  onClick={() => setShowAssetModal(false)}
+                  className="btn-icon"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* 모달 내용 */}
+              <div className="flex-1 overflow-auto p-6">
+                {modalLoading ? (
+                  <div className="text-center py-8 text-zinc-400">데이터 로딩 중...</div>
+                ) : assetMonthlyData.length === 0 ? (
+                  <div className="text-center py-8 text-zinc-400">배당금 기록이 없습니다.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-white/[0.08]">
+                          <th className="px-4 py-3 text-left table-head sticky left-0 bg-ink-900 z-20 min-w-[200px]">
+                            종목
+                          </th>
+                          {monthNames.map((month, index) => (
+                            <th key={index} className="px-4 py-3 text-right table-head min-w-[100px]">
+                              {month}
+                            </th>
+                          ))}
+                          <th className="px-4 py-3 text-right table-head !text-mint-300 min-w-[120px]">
+                            합계
+                          </th>
+                          <th className="px-4 py-3 text-right table-head min-w-[80px]">
+                            건수
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assetMonthlyData.map((asset, idx) => (
+                          <tr 
+                            key={asset.assetId}
+                            className={`table-row ${
+                              idx % 2 === 0 ? 'bg-white/[0.02]' : ''
+                            }`}
+                          >
+                            <td className="px-4 py-3 sticky left-0 bg-ink-900 z-20">
+                              <p className="font-medium text-white">
+                                {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ') 
+                                  ? asset.assetName 
+                                  : asset.ticker}
+                              </p>
+                              <p className="text-xs text-zinc-400">
+                                {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ')
+                                  ? asset.ticker
+                                  : asset.assetName}
+                              </p>
+                            </td>
+                            {asset.months.map((amount, monthIdx) => (
+                              <td 
+                                key={monthIdx}
+                                className={`px-4 py-3 text-right ${
+                                  amount > 0 ? 'num text-mint-300 bg-mint-400/[0.07] font-medium' : 'num text-zinc-600'
+                                }`}
+                              >
+                                {formatCurrency(amount)}
+                              </td>
+                            ))}
+                            <td className="px-4 py-3 text-right num font-medium text-white bg-white/[0.03]">
+                              {formatCurrency(asset.total)}
+                            </td>
+                            <td className="px-4 py-3 text-right num text-zinc-500">
+                              {asset.count}건
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* 합계 행 */}
+                        <tr className="bg-white/[0.04] font-medium border-t border-white/[0.14]">
+                          <td className="px-4 py-3 text-white sticky left-0 bg-ink-900 z-20">
+                            월별 합계
+                          </td>
+                          {monthNames.map((_, monthIdx) => {
+                            const total = assetMonthlyData.reduce((sum, asset) => sum + asset.months[monthIdx], 0);
+                            return (
+                              <td 
+                                key={monthIdx}
+                                className={`px-4 py-3 text-right ${
+                                  total > 0 ? 'num text-mint-300' : 'num text-zinc-600'
+                                }`}
+                              >
+                                {formatCurrency(total)}
+                              </td>
+                            );
+                          })}
+                          <td className="px-4 py-3 text-right num text-white bg-white/[0.06]">
+                            {formatCurrency(assetMonthlyData.reduce((sum, asset) => sum + asset.total, 0))}
+                          </td>
+                          <td className="px-4 py-3"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );
