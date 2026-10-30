@@ -5,6 +5,7 @@ import { AppearanceProvider, initAppearance } from './appearance/AppearanceConte
 import { AlertsProvider } from './components/alerts/AlertsProvider';
 import CursorTrail from './components/effects/CursorTrail';
 import CursorPointer from './components/effects/CursorPointer';
+import CardTilt from './components/effects/CardTilt';
 import './index.css';
 
 initAppearance();
@@ -14,6 +15,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <AppearanceProvider>
       <CursorTrail />
       <CursorPointer />
+      <CardTilt />
       <AlertsProvider>
         <Dashboard />
       </AlertsProvider>

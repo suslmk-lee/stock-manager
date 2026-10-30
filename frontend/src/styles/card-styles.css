@@ -125,10 +125,10 @@
   --card-border-w: 1px;
   --card-border: rgb(var(--c-white) / 0.13);
   --card-bg: rgb(var(--c-ink-950));
-  --card-shadow: none;
+  --card-shadow: 0 0 #0000; /* 효과 그림자를 앞에 덧붙일 수 있게 none 대신 투명 그림자 */
   --card-blur: none;
   --card-hover-border: rgb(var(--c-white) / 0.35);
-  --card-hover-shadow: none;
+  --card-hover-shadow: 0 0 #0000; /* 효과 그림자를 앞에 덧붙일 수 있게 none 대신 투명 그림자 */
   --card-hover-transform: none;
 
   --inset-radius: 8px;
@@ -202,7 +202,7 @@
   --hero-border-w: 1px;
   --hero-border: rgb(var(--c-white) / 0.15);
   --hero-bg: rgb(var(--c-ink-900));
-  --hero-shadow: none;
+  --hero-shadow: 0 0 #0000; /* 효과 그림자를 앞에 덧붙일 수 있게 none 대신 투명 그림자 */
   --hero-grain-opacity: 0;
 }
 
@@ -214,7 +214,7 @@
   --card-border-w: 0px;
   --card-border: transparent;
   --card-bg: rgb(var(--c-ink-800));
-  --card-shadow: none;
+  --card-shadow: 0 0 #0000; /* 효과 그림자를 앞에 덧붙일 수 있게 none 대신 투명 그림자 */
   --card-blur: none;
   --card-hover-border: transparent;
   --card-hover-shadow: 0 0 0 2px rgb(var(--c-white) / 0.08);
@@ -291,7 +291,7 @@
   --hero-border-w: 0px;
   --hero-border: transparent;
   --hero-bg: linear-gradient(135deg, rgb(var(--c-mint-400) / 0.18), transparent 60%), rgb(var(--c-ink-800));
-  --hero-shadow: none;
+  --hero-shadow: 0 0 #0000; /* 효과 그림자를 앞에 덧붙일 수 있게 none 대신 투명 그림자 */
   --hero-grain-opacity: 0.06;
 }
 
@@ -496,7 +496,7 @@
   --card-border-w: 1px;
   --card-border: rgb(var(--c-white) / 0.1);
   --card-bg: rgb(var(--c-surface));
-  --card-shadow: none;
+  --card-shadow: 0 0 #0000; /* 효과 그림자를 앞에 덧붙일 수 있게 none 대신 투명 그림자 */
   --card-blur: none;
   --card-hover-border: rgb(var(--c-mint-400) / 0.55);
   --card-hover-shadow: var(--glow-ring);

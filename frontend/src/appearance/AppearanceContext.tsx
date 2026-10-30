@@ -3,7 +3,7 @@ import { buildThemeVars, getTheme, hexToRgb, rgbToHex, DEFAULT_THEME_ID, AppThem
 import {
   DEFAULT_CARD_STYLE, DEFAULT_FONT_SIZE, DEFAULT_MONO, DEFAULT_SANS, FONT_SIZES, FontSizeId,
   MONO_FALLBACK, MONO_FONTS, SANS_FALLBACK, SANS_FONTS, CARD_STYLES, CURSOR_TRAIL_LIMITS,
-  CARD_GLOW_LIMITS, POINTER_PRESETS, TRAIL_PRESETS, type PointerPresetId, type TrailPresetId,
+  CARD_GLOW_LIMITS, CARD_DEPTH_LIMITS, POINTER_PRESETS, TRAIL_PRESETS, type PointerPresetId, type TrailPresetId,
 } from './options';
 
 // 커서를 따라다니는 점 체인 효과 (장식용, 기본 꺼짐)
@@ -43,6 +43,20 @@ export const DEFAULT_CARD_GLOW: CardGlowSettings = {
   enabled: false, scope: 'hero', intensity: 0.18, size: 65, x: 0, y: 0, gradient: false,
 };
 
+// 카드 입체감: 그림자 깊이·모서리 빛(베벨)·마우스 기울기·떠오름 (기본 꺼짐)
+export interface CardDepthSettings {
+  enabled: boolean;
+  scope: 'hero' | 'all';
+  depth: number; // 바깥 그림자 0~1
+  bevel: number; // 위 모서리 빛 / 아래 모서리 그늘 0~1
+  tilt: number; // 마우스를 올렸을 때 최대 기울기(도), 0 = 끔
+  lift: number; // 마우스를 올렸을 때 떠오르는 높이(px)
+}
+
+export const DEFAULT_CARD_DEPTH: CardDepthSettings = {
+  enabled: false, scope: 'all', depth: 0.5, bevel: 0.5, tilt: 5, lift: 3,
+};
+
 export interface AppearanceSettings {
   themeId: string;
   cardStyle: string;
@@ -52,6 +66,7 @@ export interface AppearanceSettings {
   cursorTrail: CursorTrailSettings;
   cursorPointer: CursorPointerSettings;
   cardGlow: CardGlowSettings;
+  cardDepth: CardDepthSettings;
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -63,6 +78,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   cursorTrail: DEFAULT_CURSOR_TRAIL,
   cursorPointer: DEFAULT_CURSOR_POINTER,
   cardGlow: DEFAULT_CARD_GLOW,
+  cardDepth: DEFAULT_CARD_DEPTH,
 };
 
 // index.html 의 첫 페인트 전 스크립트도 이 키를 읽는다 (깜빡임 방지)
@@ -109,6 +125,37 @@ function sanitizeCardGlow(raw: unknown): CardGlowSettings {
   };
 }
 
+function sanitizeCardDepth(raw: unknown): CardDepthSettings {
+  const d = DEFAULT_CARD_DEPTH;
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const L = CARD_DEPTH_LIMITS;
+  return {
+    enabled: typeof r.enabled === 'boolean' ? r.enabled : d.enabled,
+    scope: r.scope === 'all' || r.scope === 'hero' ? r.scope : d.scope,
+    depth: clampNum(r.depth, L.depth, d.depth),
+    bevel: clampNum(r.bevel, L.bevel, d.bevel),
+    tilt: clampNum(r.tilt, L.tilt, d.tilt),
+    lift: clampNum(r.lift, L.lift, d.lift),
+  };
+}
+
+// 카드 본래 그림자 앞에 덧붙일 입체 그림자 (.surface / .hero-grain 이 --fx-depth-* 를 읽는다)
+function cardDepthShadow(c: CardDepthSettings) {
+  const { depth: d, bevel: b } = c;
+  const f = (v: number) => v.toFixed(2);
+  const parts: string[] = [];
+  if (d > 0) {
+    parts.push(`0 ${f(1 + 2 * d)}px ${f(2 + 4 * d)}px rgb(var(--c-shadow) / ${f(0.3 * d)})`);
+    parts.push(`0 ${f(8 + 20 * d)}px ${f(16 + 40 * d)}px -${f(6 + 8 * d)}px rgb(var(--c-shadow) / ${f(0.75 * d)})`);
+  }
+  if (b > 0) {
+    // 위쪽은 밝게, 아래쪽은 어둡게 → 돌출된 느낌 (라이트 테마에서도 같은 흰 빛)
+    parts.push(`inset 0 1px 0 rgb(255 255 255 / ${f(0.16 * b)})`);
+    parts.push(`inset 0 -${f(1 + 2 * b)}px ${f(2 + 3 * b)}px rgb(var(--c-shadow) / ${f(0.4 * b)})`);
+  }
+  return parts.length ? parts.join(', ') : '0 0 #0000';
+}
+
 // 카드 배경 맨 위에 겹칠 광원 레이어 (.surface / .hero-grain 이 --fx-glow-* 를 읽는다)
 function cardGlowLayer(g: CardGlowSettings) {
   const a = g.intensity.toFixed(3);
@@ -133,6 +180,7 @@ function loadSettings(): AppearanceSettings {
     merged.cursorTrail = sanitizeCursorTrail(saved.cursorTrail);
     merged.cursorPointer = sanitizeCursorPointer(saved.cursorPointer);
     merged.cardGlow = sanitizeCardGlow(saved.cardGlow);
+    merged.cardDepth = sanitizeCardDepth(saved.cardDepth);
     return merged;
   } catch {
     return DEFAULT_APPEARANCE;
@@ -151,6 +199,9 @@ export function computeRootStyle(s: AppearanceSettings) {
   const glow = s.cardGlow?.enabled ? cardGlowLayer(s.cardGlow) : 'none';
   vars['--fx-glow-hero'] = glow;
   vars['--fx-glow-card'] = s.cardGlow?.enabled && s.cardGlow.scope === 'all' ? glow : 'none';
+  const depth = s.cardDepth?.enabled ? cardDepthShadow(s.cardDepth) : '0 0 #0000';
+  vars['--fx-depth-hero'] = depth;
+  vars['--fx-depth-card'] = s.cardDepth?.enabled && s.cardDepth.scope === 'all' ? depth : '0 0 #0000';
   return { vars, attrs: { 'data-card': s.cardStyle, 'data-theme-mode': theme.mode, 'data-theme': theme.id } };
 }
 

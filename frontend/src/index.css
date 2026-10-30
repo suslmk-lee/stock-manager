@@ -67,7 +67,8 @@ body {
     border: var(--card-border-w) solid var(--card-border);
     /* --fx-glow-card: 모양 설정의 카드 그라데이션 (끄면 none) */
     background: var(--fx-glow-card, none), var(--card-bg);
-    box-shadow: var(--card-shadow);
+    /* --fx-depth-card: 모양 설정의 카드 입체감 (끄면 투명 그림자) */
+    box-shadow: var(--fx-depth-card, 0 0 #0000), var(--card-shadow);
     -webkit-backdrop-filter: var(--card-blur);
     backdrop-filter: var(--card-blur);
   }
@@ -86,7 +87,7 @@ body {
   }
   .surface-interactive:hover {
     border-color: var(--card-hover-border);
-    box-shadow: var(--card-hover-shadow);
+    box-shadow: var(--fx-depth-card, 0 0 #0000), var(--card-hover-shadow);
     transform: var(--card-hover-transform);
   }
 
@@ -280,7 +281,7 @@ body {
     border-radius: var(--hero-radius);
     border: var(--hero-border-w) solid var(--hero-border);
     background: var(--fx-glow-hero, none), var(--hero-bg);
-    box-shadow: var(--hero-shadow);
+    box-shadow: var(--fx-depth-hero, 0 0 #0000), var(--hero-shadow);
   }
   .hero-grain::before {
     content: '';

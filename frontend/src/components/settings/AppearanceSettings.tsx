@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Palette, LayoutTemplate, Type, RotateCcw, MousePointer2, Contrast, SunMedium } from 'lucide-react';
+import { X, Palette, LayoutTemplate, Type, RotateCcw, MousePointer2, Contrast, SunMedium, Box } from 'lucide-react';
 import {
   useAppearance,
   DEFAULT_CURSOR_TRAIL,
   DEFAULT_CARD_GLOW,
+  DEFAULT_CARD_DEPTH,
+  type CardDepthSettings,
   DEFAULT_CURSOR_POINTER,
   type CursorTrailSettings,
   type CardGlowSettings,
@@ -22,6 +24,7 @@ import {
   CURSOR_TRAIL_LIMITS,
   TRAIL_PRESETS,
   CARD_GLOW_LIMITS,
+  CARD_DEPTH_LIMITS,
   type FontOption,
 } from '../../appearance/options';
 
@@ -259,6 +262,94 @@ function CardGlowGroup() {
   );
 }
 
+function CardDepthGroup() {
+  const { settings, update } = useAppearance();
+  const depth = settings.cardDepth;
+  const set = (patch: Partial<CardDepthSettings>) => update({ cardDepth: { ...depth, ...patch } });
+  const L = CARD_DEPTH_LIMITS;
+  const sliders: { key: 'depth' | 'bevel' | 'tilt' | 'lift'; label: string; format: (v: number) => string }[] = [
+    { key: 'depth', label: '그림자 깊이', format: (v) => `${Math.round(v * 100)}%` },
+    { key: 'bevel', label: '모서리 빛', format: (v) => `${Math.round(v * 100)}%` },
+    { key: 'tilt', label: '기울기', format: (v) => (v === 0 ? '끔' : `${v}°`) },
+    { key: 'lift', label: '떠오름', format: (v) => (v === 0 ? '끔' : `${v}px`) },
+  ];
+  return (
+    <SettingsGroup
+      icon={Box}
+      title="카드 입체감"
+      action={<Switch checked={depth.enabled} onChange={(v) => set({ enabled: v })} label="카드 입체감 켜기" />}
+    >
+      <p className="text-xs leading-relaxed text-zinc-500">
+        그림자와 모서리 빛으로 카드를 띄우고, 마우스를 올리면 포인터 쪽으로 기울어집니다. 아래 미리보기 카드에 마우스를 올려 보세요.
+      </p>
+      <SettingRow label="적용 범위">
+        <div className="glass-pill inline-flex gap-1 p-1">
+          {(
+            [
+              { value: 'hero', label: '대표 카드' },
+              { value: 'all', label: '모든 카드' },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              disabled={!depth.enabled}
+              onClick={() => set({ scope: o.value })}
+              className={`pill-item disabled:opacity-50 ${depth.scope === o.value ? 'pill-item-active' : ''}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </SettingRow>
+      {sliders.map((s) => (
+        <SettingRow key={s.key} label={s.label}>
+          <Slider
+            value={depth[s.key]}
+            min={L[s.key].min}
+            max={L[s.key].max}
+            step={L[s.key].step}
+            ariaLabel={`카드 입체감 ${s.label}`}
+            format={s.format}
+            disabled={!depth.enabled}
+            onChange={(v) => set({ [s.key]: v })}
+          />
+        </SettingRow>
+      ))}
+      {/* 설정 창 안의 카드는 기울지 않으므로 미리보기는 여기서 직접 기울인다 */}
+      <DepthPreview />
+    </SettingsGroup>
+  );
+}
+
+function DepthPreview() {
+  const { settings } = useAppearance();
+  const { enabled, tilt, lift } = settings.cardDepth;
+  const [t, setT] = useState('');
+  const move = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!enabled) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    setT(`perspective(800px) rotateX(${(-py * 2 * tilt).toFixed(2)}deg) rotateY(${(px * 2 * tilt).toFixed(2)}deg) translateY(${-lift}px)`);
+  };
+  return (
+    <div className="px-2 pb-2 pt-3">
+      <div
+        className="hero-grain flex h-24 items-end p-4"
+        style={{ transform: t, transition: t ? 'transform 0.12s ease-out' : 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)' }}
+        onPointerMove={move}
+        onPointerLeave={() => setT('')}
+      >
+        <div>
+          <div className="label-mono">총 자산 평가액</div>
+          <div className="mt-1 text-2xl font-light tracking-tight text-white">₩101,485,514</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EffectsSection() {
   const { settings, update } = useAppearance();
   const trail = settings.cursorTrail;
@@ -275,6 +366,7 @@ function EffectsSection() {
     <div className="space-y-4">
       <CursorPresetGallery />
       <CardGlowGroup />
+      <CardDepthGroup />
       <SettingsGroup
         icon={MousePointer2}
         title="트레일 세부 조정"
@@ -310,7 +402,7 @@ function EffectsSection() {
           </span>
         </SettingRow>
       </SettingsGroup>
-      <button type="button" className="btn-ghost w-full justify-center !rounded-full !py-2.5" onClick={() => update({ cursorTrail: DEFAULT_CURSOR_TRAIL, cursorPointer: DEFAULT_CURSOR_POINTER, cardGlow: DEFAULT_CARD_GLOW })}>
+      <button type="button" className="btn-ghost w-full justify-center !rounded-full !py-2.5" onClick={() => update({ cursorTrail: DEFAULT_CURSOR_TRAIL, cursorPointer: DEFAULT_CURSOR_POINTER, cardGlow: DEFAULT_CARD_GLOW, cardDepth: DEFAULT_CARD_DEPTH })}>
         <RotateCcw className="h-4 w-4" />
         효과 초기화
       </button>

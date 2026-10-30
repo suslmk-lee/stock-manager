@@ -93,3 +93,11 @@ export const TRAIL_PRESETS = [
   { id: 'comet', name: '혜성', description: '빛나는 머리와 흩어지는 꼬리' },
 ] as const;
 export type TrailPresetId = (typeof TRAIL_PRESETS)[number]['id'];
+
+// 카드 입체감 설정 범위
+export const CARD_DEPTH_LIMITS = {
+  depth: { min: 0, max: 1, step: 0.05 },
+  bevel: { min: 0, max: 1, step: 0.05 },
+  tilt: { min: 0, max: 12, step: 1 }, // 도
+  lift: { min: 0, max: 10, step: 1 }, // px
+} as const;
