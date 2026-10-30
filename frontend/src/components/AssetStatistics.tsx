@@ -311,7 +311,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                     </p>
                     <p className="label-mono mt-1 !text-zinc-400">{c.label}</p>
                     {c.sub !== null && (
-                      <p className="label-mono mt-0.5 truncate"><CountUp value={c.sub} format={formatCurrency} /></p>
+                      <p className="label-mono !text-[10px] sm:!text-[11px] mt-0.5 whitespace-nowrap"><CountUp value={c.sub} format={formatCurrency} /></p>
                     )}
                   </div>
                 </div>

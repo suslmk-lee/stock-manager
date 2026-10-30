@@ -322,6 +322,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
               <RingGauge
                 size={72}
                 value={totalInvestment > 0 && expectedAnnualYield > 0 ? (annualYield / expectedAnnualYield) * 100 : 0}
+                label="예상 대비"
               >
                 <span className="text-sm">{totalInvestment > 0 ? `${annualYield.toFixed(1)}%` : '-'}</span>
               </RingGauge>

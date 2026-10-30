@@ -28,7 +28,7 @@ export default {
       },
       fontFamily: {
         sans: ['"Pretendard Variable"', 'Pretendard', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        mono: ['"JetBrains Mono"', '"Pretendard Variable"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       borderRadius: {
         '4xl': '2rem',
