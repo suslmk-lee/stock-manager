@@ -21,6 +21,7 @@ type App struct {
 	exchangeRateService *services.ExchangeRateService
 	snapshotService     *services.PortfolioSnapshotService
 	realizedPnLService  *services.RealizedPnLService
+	signalService       *services.SignalService
 }
 
 // NewApp 은 서비스 인스턴스를 모두 구성한 App 을 반환한다.
@@ -38,6 +39,7 @@ func NewApp() *App {
 	a.exchangeRateService = services.NewExchangeRateService()
 	a.snapshotService = services.NewPortfolioSnapshotService(database.GetDB(), a.tickerService)
 	a.realizedPnLService = services.NewRealizedPnLService()
+	a.signalService = services.NewSignalService(database.GetDB(), a.tickerService, a.exchangeRateService)
 	return a
 }
 
@@ -54,6 +56,7 @@ func (a *App) apiServices() *httpapi.Services {
 		ExchangeRate: a.exchangeRateService,
 		Snapshot:     a.snapshotService,
 		RealizedPnL:  a.realizedPnLService,
+		Signal:       a.signalService,
 	}
 }
 
@@ -344,4 +347,26 @@ func (a *App) GetRealizedPnLByAsset(assetID uint) (interface{}, error) {
 
 func (a *App) GetRealizedPnLSummary() (interface{}, error) {
 	return a.realizedPnLService.GetSummary()
+}
+
+// ===== 매매 신호 =====
+
+func (a *App) GetSignalRules() (interface{}, error) {
+	return a.signalService.GetSignalRules()
+}
+
+func (a *App) SaveDefaultSignalRule(rule models.SignalRule) (interface{}, error) {
+	return a.signalService.SaveDefaultRule(rule)
+}
+
+func (a *App) SaveAssetSignalRule(assetID uint, rule models.SignalRule) (interface{}, error) {
+	return a.signalService.SaveAssetRule(assetID, rule)
+}
+
+func (a *App) DeleteAssetSignalRule(assetID uint) error {
+	return a.signalService.DeleteAssetRule(assetID)
+}
+
+func (a *App) GetSignals() (interface{}, error) {
+	return a.signalService.GetSignals()
 }

@@ -229,6 +229,7 @@ func runMigrations() error {
 		&models.Dividend{},
 		&models.PortfolioSnapshot{},
 		&models.RealizedPnL{},
+		&models.SignalRule{},
 	); err != nil {
 		return err
 	}
