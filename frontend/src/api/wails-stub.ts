@@ -53,3 +53,5 @@ export const ResetSignalProfile = stub;
 export const AssignSignalProfile = stub;
 export const GetProfileCandidates = stub;
 export const DismissProfileSuggestion = stub;
+export const GetDailyAssetSeries = stub;
+export const CaptureDailySnapshot = stub;

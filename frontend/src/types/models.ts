@@ -398,3 +398,30 @@ export interface NotificationSetting {
   notify_conflict: boolean;
   updated_at?: string;
 }
+
+// 일별 총자산 추이
+export interface DailyAssetPoint {
+  date: string; // YYYY-MM-DD
+  total_krw: number;
+  cost_krw: number;
+  liquid_krw: number;
+  restricted_krw: number;
+  dividends_cum_krw: number;
+  usd_krw: number;
+  estimated: boolean;
+}
+
+export interface DailyAssetSeries {
+  range: string;
+  interval: string;
+  points: DailyAssetPoint[];
+  first_date: string;
+  last_real_date: string;
+  real_count: number;
+  estimated_count: number;
+}
+
+export interface DailyCaptureResult {
+  snapshot: Record<string, any>;
+  backfill_started: boolean;
+}

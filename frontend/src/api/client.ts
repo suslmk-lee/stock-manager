@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult } from '../types/models';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -325,6 +325,16 @@ export const apiClient = {
   GetMonthlySnapshotSummary: async (months: number = 36) => {
     if (isWeb) return fetchApi<any[]>(`/snapshots/monthly-summary?months=${months}`);
     return WailsApp.GetMonthlySnapshotSummary(months);
+  },
+
+  GetDailyAssetSeries: async (range: string, interval: string = 'auto'): Promise<DailyAssetSeries> => {
+    if (isWeb) return fetchApi<DailyAssetSeries>(`/snapshots/daily?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`);
+    return WailsApp.GetDailyAssetSeries(range, interval);
+  },
+
+  CaptureDailySnapshot: async (): Promise<DailyCaptureResult> => {
+    if (isWeb) return fetchApi<DailyCaptureResult>('/snapshots/daily/capture?source=manual', { method: 'POST' });
+    return WailsApp.CaptureDailySnapshot();
   },
 
   // ==========================================
