@@ -233,11 +233,11 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
               <p className="label-mono mb-1.5">배당(세후)</p>
               <p className="num text-sm font-medium text-mint-300">{signed(summary.dividend, 'KRW')}</p>
             </div>
-            <div className={`${summaryTile} !border-mint-400/25`} style={{ background: 'linear-gradient(180deg, rgba(125,223,176,0.1), rgba(125,223,176,0.02))' }}>
+            <div className={`${summaryTile} !border-mint-400/25`} style={{ background: 'linear-gradient(180deg, rgb(var(--c-mint-400) / 0.1), rgb(var(--c-mint-400) / 0.02))' }}>
               <p className="label-mono mb-1.5 !text-mint-300/80">실질손익</p>
               <p className={`num text-sm font-medium ${pnlClass(summary.total)}`}>{signed(summary.total, 'KRW')}</p>
             </div>
-            <div className={`${summaryTile} !border-mint-400/25`} style={{ background: 'linear-gradient(180deg, rgba(125,223,176,0.1), rgba(125,223,176,0.02))' }}>
+            <div className={`${summaryTile} !border-mint-400/25`} style={{ background: 'linear-gradient(180deg, rgb(var(--c-mint-400) / 0.1), rgb(var(--c-mint-400) / 0.02))' }}>
               <p className="label-mono mb-1.5 !text-mint-300/80">수익률</p>
               <p className={`num text-sm font-medium ${pnlClass(summaryYield)}`}>
                 {summaryYield >= 0 ? '+' : ''}

@@ -7,6 +7,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import TotalReturnByAsset from './TotalReturnByAsset';
 import AssetDetailView from './AssetDetailView';
 import IconTile from './ui/IconTile';
+import { useThemeColors } from '../appearance/AppearanceContext';
 
 interface AccountDashboardProps {
   account: Account;
@@ -21,6 +22,7 @@ const compactKRW = (v: number) => {
 };
 
 export default function AccountDashboard({ account, onBack }: AccountDashboardProps) {
+  const tc = useThemeColors();
   const [trend, setTrend] = useState<{ label: string; value: number }[]>([]);
   const [trendLoading, setTrendLoading] = useState(true);
   const [detailAsset, setDetailAsset] = useState<{ assetId: number; ticker: string; name: string } | null>(null);
@@ -97,18 +99,18 @@ export default function AccountDashboard({ account, onBack }: AccountDashboardPr
               <AreaChart data={trend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="acctTrendFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#7ddfb0" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#7ddfb0" stopOpacity={0} />
+                    <stop offset="0%" stopColor={tc.accent} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={tc.accent} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} minTickGap={30} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#71717a' }} domain={['auto', 'auto']} width={55} axisLine={false} tickLine={false} tickFormatter={compactKRW} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: tc.axis }} minTickGap={30} axisLine={{ stroke: tc.grid }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: tc.axis }} domain={['auto', 'auto']} width={55} axisLine={false} tickLine={false} tickFormatter={compactKRW} />
                 <Tooltip
-                  contentStyle={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
-                  labelStyle={{ color: '#a1a1aa' }} itemStyle={{ color: '#f4f4f5' }}
+                  contentStyle={tc.tooltip.contentStyle}
+                  labelStyle={tc.tooltip.labelStyle} itemStyle={tc.tooltip.itemStyle}
                   formatter={(v: number) => [formatKRW(v), '평가금(KRW)']}
                 />
-                <Area type="monotone" dataKey="value" stroke="#7ddfb0" strokeWidth={2} fill="url(#acctTrendFill)" />
+                <Area type="monotone" dataKey="value" stroke={tc.accent} strokeWidth={2} fill="url(#acctTrendFill)" />
               </AreaChart>
             </ResponsiveContainer>
           )}
