@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // SignalState 는 종목별 마지막 신호 상태다 (변화 감지용, 내부 전용).
 type SignalState struct {
@@ -26,6 +30,18 @@ type SignalEvent struct {
 	Currency       string     `json:"currency"`
 	CreatedAt      time.Time  `gorm:"index" json:"created_at"`
 	ReadAt         *time.Time `gorm:"index" json:"read_at"`
+
+	// Kind 는 "signal"(기본) 또는 "suggestion"(프로필 추천). 기존 행(빈 값)은 "signal" 로 취급한다.
+	Kind               string `gorm:"size:20" json:"kind"`
+	SuggestedProfileID uint   `json:"suggested_profile_id"`
+}
+
+// AfterFind 는 Kind 가 비어 있는 기존 행을 "signal" 로 정규화한다.
+func (e *SignalEvent) AfterFind(_ *gorm.DB) error {
+	if e.Kind == "" {
+		e.Kind = SignalEventKindSignal
+	}
+	return nil
 }
 
 // NotificationSetting 은 신호 알림 설정이다 (단일 행, id=1).

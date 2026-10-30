@@ -88,13 +88,32 @@ func (m *signalMonitor) checkOnce(set *models.NotificationSetting) {
 		m.emit(events)
 	}
 	if set.OSNotify && m.notify != nil {
-		if err := m.notify("매매 신호", notificationBody(events)); err != nil {
+		if err := m.notify(notificationTitle(events), notificationBody(events)); err != nil {
 			log.Printf("signal monitor: notify: %v", err)
 		}
 	}
 }
 
+func allSuggestions(events []models.SignalEvent) bool {
+	for _, e := range events {
+		if e.Kind != models.SignalEventKindSuggestion {
+			return false
+		}
+	}
+	return len(events) > 0
+}
+
+func notificationTitle(events []models.SignalEvent) string {
+	if allSuggestions(events) {
+		return "전략 프로필 추천"
+	}
+	return "매매 신호"
+}
+
 func notificationBody(events []models.SignalEvent) string {
+	if len(events) > 1 && allSuggestions(events) {
+		return fmt.Sprintf("프로필 후보 %d건 · %s 외", len(events), events[0].Name)
+	}
 	if len(events) == 1 {
 		return fmt.Sprintf("%s: %s", events[0].Name, events[0].Message)
 	}

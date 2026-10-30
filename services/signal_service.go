@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	"stock-manager/models"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // ErrInvalidSignalRule 은 규칙 검증 실패를 나타낸다 (HTTP 400 으로 매핑).
@@ -19,10 +17,10 @@ type ErrInvalidSignalRule struct{ Msg string }
 
 func (e *ErrInvalidSignalRule) Error() string { return e.Msg }
 
-type SignalRules struct {
-	Default   models.SignalRule   `json:"default"`
-	Overrides []models.SignalRule `json:"overrides"`
-}
+// ErrSignalNotFound 는 대상(프로필/종목)이 없음을 나타낸다 (HTTP 404 으로 매핑).
+type ErrSignalNotFound struct{ Msg string }
+
+func (e *ErrSignalNotFound) Error() string { return e.Msg }
 
 type SignalService struct {
 	db       *gorm.DB
@@ -30,6 +28,8 @@ type SignalService struct {
 	exchange *ExchangeRateService
 
 	alertMu         sync.Mutex // 신호 상태/이벤트 기록 직렬화
+	seedMu          sync.Mutex // 기본 프로필 시딩 직렬화
+	seeded          bool
 	onSettingsSaved func()
 }
 
@@ -39,6 +39,11 @@ func NewSignalService(db *gorm.DB, ticker *TickerService, exchange *ExchangeRate
 
 // ValidateSignalRule 은 규칙을 검증하고 sell_mode/buy_mode 를 정규화한다.
 func ValidateSignalRule(r *models.SignalRule) error {
+	return ValidateSignalRuleConfig(&r.SignalRuleConfig)
+}
+
+// ValidateSignalRuleConfig 는 규칙 설정을 검증하고 일부 값을 정규화한다.
+func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	fin := map[string]float64{
 		"take_profit_pct":                 r.TakeProfitPct,
 		"stop_loss_pct":                   r.StopLossPct,
@@ -53,6 +58,7 @@ func ValidateSignalRule(r *models.SignalRule) error {
 		"below_ma_pct":                    r.BelowMAPct,
 		"above_ma_pct":                    r.AboveMAPct,
 		"dividend_cut_pct":                r.DividendCutPct,
+		"crash_pct":                       r.CrashPct,
 	}
 	for k, v := range fin {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -61,6 +67,12 @@ func ValidateSignalRule(r *models.SignalRule) error {
 	}
 	if r.StopLossPct > 0 {
 		return &ErrInvalidSignalRule{"stop_loss_pct must be <= 0"}
+	}
+	if r.CrashPct > 0 {
+		return &ErrInvalidSignalRule{"crash_pct must be <= 0"}
+	}
+	if r.CrashPct == 0 {
+		r.CrashPct = defaultCrashPct // 구버전 클라이언트가 필드를 보내지 않은 경우
 	}
 	if r.BuyDipPct > 0 {
 		return &ErrInvalidSignalRule{"buy_dip_pct must be <= 0"}
@@ -106,133 +118,6 @@ func normalizeSignalMode(name, v string) (string, error) {
 	return "", &ErrInvalidSignalRule{name + " must be 'any' or 'all'"}
 }
 
-// getOrCreateDefault 는 전역 기본 규칙을 반환하며 없으면 "균형" 기본값으로 생성한다.
-func (s *SignalService) getOrCreateDefault() (models.SignalRule, error) {
-	var r models.SignalRule
-	err := s.db.Where("asset_id = ?", 0).First(&r).Error
-	if err == nil {
-		return r, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return r, err
-	}
-	r = models.DefaultSignalRule()
-	if err := s.db.Create(&r).Error; err != nil {
-		return r, err
-	}
-	return r, nil
-}
-
-const defaultTaxHarvestMonth = 11
-
-// migrateSignalRule 은 1단계(RuleVersion < 2) 규칙의 0 값 필드를 새 기본값으로 한 번만 보정한다.
-// 보정했으면 true.
-func migrateSignalRule(r *models.SignalRule) bool {
-	if r.RuleVersion >= models.SignalRuleVersion {
-		return false
-	}
-	def := models.DefaultSignalRule()
-	if r.FromHighPct == 0 {
-		r.FromHighPct = def.FromHighPct
-	}
-	if r.BelowMAPct == 0 {
-		r.BelowMAPct = def.BelowMAPct
-	}
-	if r.AboveMAPct == 0 {
-		r.AboveMAPct = def.AboveMAPct
-	}
-	if r.DividendCutPct == 0 {
-		r.DividendCutPct = def.DividendCutPct
-	}
-	if r.TaxHarvestFromMonth == 0 {
-		r.TaxHarvestFromMonth = defaultTaxHarvestMonth
-	}
-	r.FxHistorical = true
-	r.TaxHarvestEnabled = true
-	r.RuleVersion = models.SignalRuleVersion
-	return true
-}
-
-func (s *SignalService) persistMigrated(r *models.SignalRule) error {
-	if !migrateSignalRule(r) {
-		return nil
-	}
-	return s.db.Omit(clause.Associations).Save(r).Error
-}
-
-func (s *SignalService) GetSignalRules() (*SignalRules, error) {
-	def, err := s.getOrCreateDefault()
-	if err != nil {
-		return nil, err
-	}
-	if err := s.persistMigrated(&def); err != nil {
-		return nil, err
-	}
-	overrides := []models.SignalRule{}
-	if err := s.db.Where("asset_id <> ?", 0).Order("asset_id").Find(&overrides).Error; err != nil {
-		return nil, err
-	}
-	for i := range overrides {
-		if err := s.persistMigrated(&overrides[i]); err != nil {
-			return nil, err
-		}
-	}
-	return &SignalRules{Default: def, Overrides: overrides}, nil
-}
-
-func (s *SignalService) saveRule(assetID uint, rule models.SignalRule) (models.SignalRule, error) {
-	if err := ValidateSignalRule(&rule); err != nil {
-		return rule, err
-	}
-	rule.AssetID = assetID
-	rule.RuleVersion = models.SignalRuleVersion // 클라이언트가 보낸 값과 무관하게 최신 스키마로 저장 (재보정 방지)
-	var existing models.SignalRule
-	err := s.db.Where("asset_id = ?", assetID).First(&existing).Error
-	switch {
-	case err == nil:
-		rule.ID = existing.ID
-		rule.CreatedAt = existing.CreatedAt
-		if err := s.db.Omit(clause.Associations).Save(&rule).Error; err != nil {
-			return rule, err
-		}
-	case errors.Is(err, gorm.ErrRecordNotFound):
-		rule.ID = 0
-		rule.CreatedAt = time.Time{}
-		if err := s.db.Create(&rule).Error; err != nil {
-			return rule, err
-		}
-	default:
-		return rule, err
-	}
-	return rule, nil
-}
-
-func (s *SignalService) SaveDefaultRule(rule models.SignalRule) (*models.SignalRule, error) {
-	r, err := s.saveRule(0, rule)
-	if err != nil {
-		return nil, err
-	}
-	return &r, nil
-}
-
-func (s *SignalService) SaveAssetRule(assetID uint, rule models.SignalRule) (*models.SignalRule, error) {
-	if assetID == 0 {
-		return nil, &ErrInvalidSignalRule{"asset id is required"}
-	}
-	r, err := s.saveRule(assetID, rule)
-	if err != nil {
-		return nil, err
-	}
-	return &r, nil
-}
-
-func (s *SignalService) DeleteAssetRule(assetID uint) error {
-	if assetID == 0 {
-		return &ErrInvalidSignalRule{"asset id is required"}
-	}
-	return s.db.Where("asset_id = ?", assetID).Delete(&models.SignalRule{}).Error
-}
-
 // GetSignals 는 신호 리포트를 만들고, 신호 변화를 이력에 기록한다 (기록 실패는 로그만 남김).
 func (s *SignalService) GetSignals() (*SignalReport, error) {
 	report, err := s.buildSignalReport()
@@ -253,6 +138,26 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 	overrides := make(map[uint]models.SignalRule, len(rules.Overrides))
 	for _, o := range rules.Overrides {
 		overrides[o.AssetID] = o
+	}
+	var profiles []models.SignalProfile
+	if err := s.db.Find(&profiles).Error; err != nil {
+		return nil, fmt.Errorf("프로필 조회 실패: %w", err)
+	}
+	profByID := make(map[uint]models.SignalProfile, len(profiles))
+	var defProf models.SignalProfile
+	for _, p := range profiles {
+		profByID[p.ID] = p
+		if p.Key == models.ProfileKeyDefault {
+			defProf = p
+		}
+	}
+	var assigns []models.AssetSignalProfile
+	if err := s.db.Find(&assigns).Error; err != nil {
+		return nil, fmt.Errorf("프로필 배정 조회 실패: %w", err)
+	}
+	assignOf := make(map[uint]uint, len(assigns))
+	for _, a := range assigns {
+		assignOf[a.AssetID] = a.ProfileID
 	}
 
 	var holdings []models.Holding
@@ -289,12 +194,8 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 		}
 		in := inputs[h.AssetID]
 		if in == nil {
-			in = &SignalAssetInput{AssetID: asset.ID, Ticker: asset.Ticker, Name: asset.Name}
-			if o, has := overrides[asset.ID]; has {
-				in.Rule, in.RuleSource = o, "asset"
-			} else {
-				in.Rule, in.RuleSource = rules.Default, "default"
-			}
+			in = &SignalAssetInput{AssetID: asset.ID, Ticker: asset.Ticker, Name: asset.Name, Sector: asset.Sector}
+			applyResolvedRule(in, defProf, profByID, assignOf, overrides)
 			inputs[h.AssetID] = in
 			order = append(order, h.AssetID)
 		}
@@ -400,7 +301,7 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 	}
 
 	ctx := SignalContext{FxAt: NewFxLookup(fxHist, usdKRW), FxOK: fxHist != nil && len(fxHist.Points) > 0}
-	month := rules.Default.TaxHarvestFromMonth
+	month := defProf.Rule.TaxHarvestFromMonth
 	if month < 1 || month > 12 {
 		month = defaultTaxHarvestMonth
 	}
@@ -414,6 +315,21 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 	report := BuildSignalReport(list, usdKRW, now, ctx)
 	sanitizeSignalReport(&report)
 	return &report, nil
+}
+
+// applyResolvedRule 은 종목에 적용할 규칙을 정한다: 종목 오버라이드 > 배정된 프로필 > 기본 프로필.
+// 프로필 정보(profile_*)는 오버라이드가 있어도 종목이 속한 프로필을 가리킨다.
+func applyResolvedRule(in *SignalAssetInput, def models.SignalProfile, profByID map[uint]models.SignalProfile,
+	assignOf map[uint]uint, overrides map[uint]models.SignalRule) {
+	prof, source := def, "default"
+	if p, ok := profByID[assignOf[in.AssetID]]; ok && p.ID != def.ID {
+		prof, source = p, "profile"
+	}
+	in.Rule, in.RuleSource = prof.Rule, source
+	in.ProfileID, in.ProfileKey, in.ProfileName, in.ProfileKind = prof.ID, prof.Key, prof.Name, prof.Kind
+	if o, has := overrides[in.AssetID]; has {
+		in.Rule, in.RuleSource = o.SignalRuleConfig, "asset"
+	}
 }
 
 func lookupPrice(prices map[string]*CurrentPrice, ticker string) *CurrentPrice {

@@ -2,16 +2,17 @@ package models
 
 import "time"
 
-// SignalRule 은 매매 신호 규칙이다. AssetID == 0 이면 전역 기본 규칙, 아니면 종목별 오버라이드.
-// 소프트 삭제를 쓰지 않아(DeletedAt 없음) AssetID 유니크 인덱스가 단순하게 유지된다.
-type SignalRule struct {
-	ID      uint `gorm:"primaryKey" json:"id"`
-	AssetID uint `gorm:"uniqueIndex;not null" json:"asset_id"`
-
+// SignalRuleConfig 는 매매 신호 규칙 설정 값 묶음이다. 종목별 규칙(SignalRule)과
+// 전략 프로필(SignalProfile)이 공유한다. JSON 은 평평한(flat) 필드 그대로 직렬화된다.
+type SignalRuleConfig struct {
 	TakeProfitEnabled bool    `json:"take_profit_enabled"`
 	TakeProfitPct     float64 `json:"take_profit_pct"`
 	StopLossEnabled   bool    `json:"stop_loss_enabled"`
 	StopLossPct       float64 `json:"stop_loss_pct"`
+
+	// 큰 폭락 경고: 수익률(반환 기준)이 CrashPct 이하이면 매도 검토 (3단계)
+	CrashEnabled bool    `json:"crash_enabled"`
+	CrashPct     float64 `json:"crash_pct"` // <= 0
 
 	WeightEnabled   bool    `json:"weight_enabled"`
 	TargetWeightPct float64 `json:"target_weight_pct"`
@@ -45,27 +46,38 @@ type SignalRule struct {
 	TaxHarvestFromMonth int  `json:"tax_harvest_from_month"` // 1~12
 	FxHistorical        bool `json:"fx_historical"`
 
-	// RuleVersion 은 스키마 버전이다. 1단계 행(0)은 로드 시 한 번만 새 기본값으로 보정된다.
-	RuleVersion int `json:"rule_version"`
-
 	SellMode string `gorm:"size:10" json:"sell_mode"`
 	BuyMode  string `gorm:"size:10" json:"buy_mode"`
+}
+
+// SignalRule 은 매매 신호 규칙이다. AssetID == 0 이면 (레거시) 전역 기본 규칙, 아니면 종목별 오버라이드.
+// 전역 기본 규칙은 이제 "기본" 전략 프로필이 대체하며 AssetID == 0 행은 보존만 한다.
+// 소프트 삭제를 쓰지 않아(DeletedAt 없음) AssetID 유니크 인덱스가 단순하게 유지된다.
+type SignalRule struct {
+	ID      uint `gorm:"primaryKey" json:"id"`
+	AssetID uint `gorm:"uniqueIndex;not null" json:"asset_id"`
+
+	SignalRuleConfig `gorm:"embedded"`
+
+	// RuleVersion 은 스키마 버전이다. 이전 단계 행은 로드 시 한 번만 새 기본값으로 보정된다.
+	RuleVersion int `json:"rule_version"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // SignalRuleVersion 은 현재 규칙 스키마 버전이다.
-const SignalRuleVersion = 2
+const SignalRuleVersion = 3
 
-// DefaultSignalRule 은 "균형" 기본 규칙(저장 전)을 반환한다.
-func DefaultSignalRule() SignalRule {
-	return SignalRule{
-		AssetID:                     0,
+// DefaultSignalRuleConfig 는 "균형" 기본 규칙 설정(저장 전)을 반환한다.
+func DefaultSignalRuleConfig() SignalRuleConfig {
+	return SignalRuleConfig{
 		TakeProfitEnabled:           true,
 		TakeProfitPct:               30,
 		StopLossEnabled:             true,
 		StopLossPct:                 -20,
+		CrashEnabled:                false,
+		CrashPct:                    -40,
 		WeightEnabled:               false,
 		TargetWeightPct:             0,
 		WeightBandPct:               5,
@@ -85,8 +97,34 @@ func DefaultSignalRule() SignalRule {
 		TaxHarvestEnabled:           true,
 		TaxHarvestFromMonth:         11,
 		FxHistorical:                true,
-		RuleVersion:                 SignalRuleVersion,
 		SellMode:                    "any",
 		BuyMode:                     "any",
+	}
+}
+
+// DividendSignalRuleConfig 는 "배당 장기보유" 프로필의 공장 출고 규칙이다.
+// 손절은 끄고 큰 폭락 경고(-40%)를 켠다.
+func DividendSignalRuleConfig() SignalRuleConfig {
+	c := DefaultSignalRuleConfig()
+	c.TakeProfitEnabled = false
+	c.StopLossEnabled = false
+	c.CrashEnabled = true
+	c.CrashPct = -40
+	c.DividendCutEnabled = true
+	c.BuyDipEnabled = true
+	c.BuyDipPct = -10
+	c.HighYieldEnabled = true
+	c.HighYieldPct = 4
+	c.FromHighEnabled = true
+	c.FromHighPct = -20
+	return c
+}
+
+// DefaultSignalRule 은 "균형" 기본 규칙(저장 전)을 반환한다.
+func DefaultSignalRule() SignalRule {
+	return SignalRule{
+		AssetID:          0,
+		SignalRuleConfig: DefaultSignalRuleConfig(),
+		RuleVersion:      SignalRuleVersion,
 	}
 }

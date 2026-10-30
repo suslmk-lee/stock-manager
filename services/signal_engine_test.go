@@ -12,9 +12,9 @@ var sigNow = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 
 func approx(a, b float64) bool { return math.Abs(a-b) < 1e-6 }
 
-func noRules() models.SignalRule { return models.SignalRule{SellMode: "any", BuyMode: "any"} }
+func noRules() models.SignalRuleConfig { return models.SignalRuleConfig{SellMode: "any", BuyMode: "any"} }
 
-func krwAsset(id uint, price, qty, avg float64, rule models.SignalRule) SignalAssetInput {
+func krwAsset(id uint, price, qty, avg float64, rule models.SignalRuleConfig) SignalAssetInput {
 	return SignalAssetInput{
 		AssetID: id, Ticker: "005930.KS", Name: "삼성", Price: price, PriceCurrency: "KRW",
 		Holdings: []SignalHoldingInput{{AccountID: 1, AccountType: models.AccountTypeGeneral, Quantity: qty, AvgPrice: avg}},
@@ -109,20 +109,20 @@ func TestRuleBoundaries(t *testing.T) {
 	// avg 100, qty 1: price p => total_return_pct = p-100 (percent), from_avg = p-100
 	tests := []struct {
 		name  string
-		rule  models.SignalRule
+		rule  models.SignalRuleConfig
 		price float64
 		want  string
 		code  string
 		met   bool
 	}{
-		{"tp at boundary", models.SignalRule{TakeProfitEnabled: true, TakeProfitPct: 30}, 130, SignalSell, "take_profit", true},
-		{"tp below", models.SignalRule{TakeProfitEnabled: true, TakeProfitPct: 30}, 129.99, SignalHold, "take_profit", false},
-		{"sl at boundary", models.SignalRule{StopLossEnabled: true, StopLossPct: -20}, 80, SignalSell, "stop_loss", true},
-		{"sl above", models.SignalRule{StopLossEnabled: true, StopLossPct: -20}, 80.01, SignalHold, "stop_loss", false},
-		{"dip at boundary", models.SignalRule{BuyDipEnabled: true, BuyDipPct: -10}, 90, SignalBuy, "buy_dip", true},
-		{"dip above", models.SignalRule{BuyDipEnabled: true, BuyDipPct: -10}, 90.01, SignalHold, "buy_dip", false},
-		{"payback ok", models.SignalRule{DividendPaybackEnabled: true, DividendPaybackPct: 0, DividendPaybackMinReturnPct: 10}, 110, SignalSell, "dividend_payback", true},
-		{"payback min return unmet", models.SignalRule{DividendPaybackEnabled: true, DividendPaybackPct: 0, DividendPaybackMinReturnPct: 10}, 109, SignalHold, "dividend_payback", false},
+		{"tp at boundary", models.SignalRuleConfig{TakeProfitEnabled: true, TakeProfitPct: 30}, 130, SignalSell, "take_profit", true},
+		{"tp below", models.SignalRuleConfig{TakeProfitEnabled: true, TakeProfitPct: 30}, 129.99, SignalHold, "take_profit", false},
+		{"sl at boundary", models.SignalRuleConfig{StopLossEnabled: true, StopLossPct: -20}, 80, SignalSell, "stop_loss", true},
+		{"sl above", models.SignalRuleConfig{StopLossEnabled: true, StopLossPct: -20}, 80.01, SignalHold, "stop_loss", false},
+		{"dip at boundary", models.SignalRuleConfig{BuyDipEnabled: true, BuyDipPct: -10}, 90, SignalBuy, "buy_dip", true},
+		{"dip above", models.SignalRuleConfig{BuyDipEnabled: true, BuyDipPct: -10}, 90.01, SignalHold, "buy_dip", false},
+		{"payback ok", models.SignalRuleConfig{DividendPaybackEnabled: true, DividendPaybackPct: 0, DividendPaybackMinReturnPct: 10}, 110, SignalSell, "dividend_payback", true},
+		{"payback min return unmet", models.SignalRuleConfig{DividendPaybackEnabled: true, DividendPaybackPct: 0, DividendPaybackMinReturnPct: 10}, 109, SignalHold, "dividend_payback", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -140,7 +140,7 @@ func TestRuleBoundaries(t *testing.T) {
 }
 
 func TestDividendPaybackThreshold(t *testing.T) {
-	rule := models.SignalRule{DividendPaybackEnabled: true, DividendPaybackPct: 50, DividendPaybackMinReturnPct: 0, SellMode: "any", BuyMode: "any"}
+	rule := models.SignalRuleConfig{DividendPaybackEnabled: true, DividendPaybackPct: 50, DividendPaybackMinReturnPct: 0, SellMode: "any", BuyMode: "any"}
 	in := krwAsset(1, 100, 1, 100, rule)
 	in.Dividends = []SignalDividendInput{{Amount: 50, Date: sigNow}}
 	// cost 100, dividends 50 => 50%
@@ -155,7 +155,7 @@ func TestDividendPaybackThreshold(t *testing.T) {
 }
 
 func TestLowAndHighYield(t *testing.T) {
-	low := models.SignalRule{LowYieldEnabled: true, LowYieldPct: 2, SellMode: "any", BuyMode: "any"}
+	low := models.SignalRuleConfig{LowYieldEnabled: true, LowYieldPct: 2, SellMode: "any", BuyMode: "any"}
 	in := krwAsset(1, 100, 10, 100, low) // MV 1000
 	// no dividends in 12m -> not met
 	in.Dividends = []SignalDividendInput{{Amount: 5, Date: sigNow.AddDate(-2, 0, 0)}}
@@ -172,7 +172,7 @@ func TestLowAndHighYield(t *testing.T) {
 		t.Errorf("2.1%% should not be met")
 	}
 
-	high := models.SignalRule{HighYieldEnabled: true, HighYieldPct: 5, SellMode: "any", BuyMode: "any"}
+	high := models.SignalRuleConfig{HighYieldEnabled: true, HighYieldPct: 5, SellMode: "any", BuyMode: "any"}
 	in = krwAsset(1, 100, 10, 100, high)
 	in.Dividends = []SignalDividendInput{{Amount: 50, Date: sigNow}}
 	if it := evalOne(t, in); it.Action != SignalBuy {
@@ -185,7 +185,7 @@ func TestLowAndHighYield(t *testing.T) {
 }
 
 func TestWeightRules(t *testing.T) {
-	rule := models.SignalRule{WeightEnabled: true, TargetWeightPct: 50, WeightBandPct: 10, SellMode: "any", BuyMode: "any"}
+	rule := models.SignalRuleConfig{WeightEnabled: true, TargetWeightPct: 50, WeightBandPct: 10, SellMode: "any", BuyMode: "any"}
 	mk := func(a, b float64) []SignalAssetInput {
 		x := krwAsset(1, a, 1, a, rule)
 		y := krwAsset(2, b, 1, b, rule)
@@ -222,7 +222,7 @@ func TestWeightRules(t *testing.T) {
 
 func TestModesAndConflict(t *testing.T) {
 	// price 130, avg 100: tp(30) met, stop_loss(-20) unmet; buy_dip(-10) unmet
-	rule := models.SignalRule{TakeProfitEnabled: true, TakeProfitPct: 30, StopLossEnabled: true, StopLossPct: -20, SellMode: "any", BuyMode: "any"}
+	rule := models.SignalRuleConfig{TakeProfitEnabled: true, TakeProfitPct: 30, StopLossEnabled: true, StopLossPct: -20, SellMode: "any", BuyMode: "any"}
 	if it := evalOne(t, krwAsset(1, 130, 1, 100, rule)); it.Action != SignalSell {
 		t.Errorf("any: %s", it.Action)
 	}
@@ -232,21 +232,21 @@ func TestModesAndConflict(t *testing.T) {
 	}
 	rule.StopLossPct = 0 // 30 <= 0 false still
 	// all enabled and met
-	rule2 := models.SignalRule{TakeProfitEnabled: true, TakeProfitPct: 30, DividendPaybackEnabled: true, DividendPaybackPct: 0, DividendPaybackMinReturnPct: 0, SellMode: "all", BuyMode: "any"}
+	rule2 := models.SignalRuleConfig{TakeProfitEnabled: true, TakeProfitPct: 30, DividendPaybackEnabled: true, DividendPaybackPct: 0, DividendPaybackMinReturnPct: 0, SellMode: "all", BuyMode: "any"}
 	if it := evalOne(t, krwAsset(1, 130, 1, 100, rule2)); it.Action != SignalSell {
 		t.Errorf("all met: %s", it.Action)
 	}
 	// nothing enabled with all mode -> hold
-	if it := evalOne(t, krwAsset(1, 130, 1, 100, models.SignalRule{SellMode: "all", BuyMode: "all"})); it.Action != SignalHold {
+	if it := evalOne(t, krwAsset(1, 130, 1, 100, models.SignalRuleConfig{SellMode: "all", BuyMode: "all"})); it.Action != SignalHold {
 		t.Errorf("empty all: %s", it.Action)
 	}
 	// buy all mode
-	buyAll := models.SignalRule{BuyDipEnabled: true, BuyDipPct: -10, HighYieldEnabled: true, HighYieldPct: 5, SellMode: "any", BuyMode: "all"}
+	buyAll := models.SignalRuleConfig{BuyDipEnabled: true, BuyDipPct: -10, HighYieldEnabled: true, HighYieldPct: 5, SellMode: "any", BuyMode: "all"}
 	if it := evalOne(t, krwAsset(1, 80, 1, 100, buyAll)); it.Action != SignalHold {
 		t.Errorf("buy all unmet yield: %s", it.Action)
 	}
 	// conflict: stop_loss and buy_dip both met at price 80
-	c := models.SignalRule{StopLossEnabled: true, StopLossPct: -20, BuyDipEnabled: true, BuyDipPct: -10, SellMode: "any", BuyMode: "any"}
+	c := models.SignalRuleConfig{StopLossEnabled: true, StopLossPct: -20, BuyDipEnabled: true, BuyDipPct: -10, SellMode: "any", BuyMode: "any"}
 	r := BuildSignalReport([]SignalAssetInput{krwAsset(1, 80, 1, 100, c)}, 1000, sigNow, SignalContext{})
 	if r.Items[0].Action != SignalConflict || r.Summary.Conflict != 1 {
 		t.Errorf("%+v", r)
@@ -254,7 +254,7 @@ func TestModesAndConflict(t *testing.T) {
 }
 
 func TestNoPriceAndGuards(t *testing.T) {
-	rule := models.DefaultSignalRule()
+	rule := models.DefaultSignalRuleConfig()
 	in := krwAsset(1, 0, 5, 100, rule)
 	in.Dividends = []SignalDividendInput{{Amount: 10, Date: sigNow}}
 	other := krwAsset(2, 100, 1, 100, noRules())
@@ -271,7 +271,7 @@ func TestNoPriceAndGuards(t *testing.T) {
 	}
 
 	// zero cost / zero avg guards
-	z := krwAsset(3, 100, 1, 0, models.DefaultSignalRule())
+	z := krwAsset(3, 100, 1, 0, models.DefaultSignalRuleConfig())
 	it := evalOne(t, z)
 	if math.IsNaN(it.TotalReturnPct) || math.IsInf(it.TotalReturnPct, 0) || it.FromAvgPct != 0 || it.UnrealizedPct != 0 {
 		t.Errorf("guards %+v", it)
@@ -299,7 +299,7 @@ func TestRestrictedOnly(t *testing.T) {
 }
 
 func TestRuleSourceAndSorting(t *testing.T) {
-	tp := models.SignalRule{TakeProfitEnabled: true, TakeProfitPct: 10, SellMode: "any", BuyMode: "any"}
+	tp := models.SignalRuleConfig{TakeProfitEnabled: true, TakeProfitPct: 10, SellMode: "any", BuyMode: "any"}
 	a := krwAsset(1, 100, 1, 100, noRules()) // hold, small
 	b := krwAsset(2, 120, 1, 100, tp)        // sell via override
 	b.RuleSource = "asset"

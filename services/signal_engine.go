@@ -45,7 +45,13 @@ type SignalItem struct {
 	Name       string `json:"name"`
 	Currency   string `json:"currency"`
 	Action     string `json:"action"`
-	RuleSource string `json:"rule_source"`
+	RuleSource string `json:"rule_source"` // "asset" | "profile" | "default"
+
+	ProfileID    uint   `json:"profile_id"`
+	ProfileKey   string `json:"profile_key"`
+	ProfileName  string `json:"profile_name"`
+	ProfileKind  string `json:"profile_kind"`
+	SellDisabled bool   `json:"sell_disabled"` // 적용된 규칙에 켜진 매도 체크가 없음
 
 	RestrictedOnly bool `json:"restricted_only"`
 
@@ -109,6 +115,9 @@ type SignalReport struct {
 	Summary     SignalSummary `json:"summary"`
 	Items       []SignalItem  `json:"items"`
 	Tax         *TaxSummary   `json:"tax"`
+
+	// Candidates 는 보유 종목별 배당 장기보유 후보 평가 (내부용: 알림/후보 API).
+	Candidates []DividendCandidate `json:"-"`
 }
 
 // SignalContext 는 순수 엔진에 주입하는 외부 데이터(환율 이력, 양도세 요약)다.
@@ -165,8 +174,13 @@ type SignalAssetInput struct {
 	Dividends     []SignalDividendInput
 	Txns          []SignalTxnInput
 	History       []PricePoint // 일봉 종가 (종목 통화). 비어 있으면 추세 지표 없음
-	Rule          models.SignalRule
-	RuleSource    string // "default" | "asset"
+	Rule          models.SignalRuleConfig
+	RuleSource    string // "asset" | "profile" | "default"
+	Sector        string
+	ProfileID     uint
+	ProfileKey    string
+	ProfileName   string
+	ProfileKind   string
 }
 
 // CurrencyForTicker 는 통화 정보가 없을 때 티커 접미사로 통화를 추정한다.
@@ -200,8 +214,11 @@ func safeDiv(a, b float64) float64 {
 // 수량이 0 이하인 종목은 제외한다.
 func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time, ctx SignalContext) SignalReport {
 	items := make([]SignalItem, 0, len(inputs))
-	rules := make(map[uint]models.SignalRule, len(inputs))
+	rules := make(map[uint]models.SignalRuleConfig, len(inputs))
 	var totalMV float64
+	var candidates []DividendCandidate
+	priced := map[uint]bool{}
+	eligible := map[uint]bool{}
 
 	for _, in := range inputs {
 		item, ok := computeSignalMetrics(in, usdKRW, now, ctx)
@@ -209,6 +226,12 @@ func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time,
 			continue
 		}
 		rules[in.AssetID] = in.Rule
+		cand := ScoreDividendCandidate(candidateInputOf(in, item, now))
+		cand.ProfileID, cand.ProfileName = item.ProfileID, item.ProfileName
+		cand.HasOverride = item.RuleSource == "asset"
+		candidates = append(candidates, cand)
+		priced[in.AssetID] = item.Action != SignalNoPrice
+		eligible[in.AssetID] = item.RuleSource == "default"
 		if item.Action != SignalNoPrice {
 			totalMV += item.MarketValueKRW
 		}
@@ -220,6 +243,12 @@ func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time,
 		USDKRW:      usdKRW,
 		Items:       items,
 		Tax:         ctx.Tax,
+		Candidates:  candidates,
+	}
+	for i := range report.Candidates {
+		id := report.Candidates[i].AssetID
+		report.Candidates[i].priced = priced[id]
+		report.Candidates[i].unassigned = eligible[id]
 	}
 
 	for i := range report.Items {
@@ -275,6 +304,7 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time, ct
 		Name:       in.Name,
 		Currency:   priceCur,
 		RuleSource: in.RuleSource,
+		ProfileID:  in.ProfileID, ProfileKey: in.ProfileKey, ProfileName: in.ProfileName, ProfileKind: in.ProfileKind,
 		Quantity:   qty,
 		AvgPrice:   safeDiv(costHolding, qty),
 		SellChecks: []SignalCheck{},
@@ -468,7 +498,7 @@ func computeFxMetrics(item *SignalItem, in SignalAssetInput, priceCur string, us
 }
 
 // evaluateSignalRule 은 item 의 지표(비중 포함)로 규칙을 평가해 Checks 를 채우고 액션을 돌려준다.
-func evaluateSignalRule(it *SignalItem, r models.SignalRule) string {
+func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	sell := []SignalCheck{}
 	buy := []SignalCheck{}
 
@@ -482,6 +512,9 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRule) string {
 	}
 	if r.StopLossEnabled {
 		sell = append(sell, SignalCheck{"stop_loss", "손절선", ret <= r.StopLossPct, ret, r.StopLossPct, "%"})
+	}
+	if r.CrashEnabled {
+		sell = append(sell, SignalCheck{"crash", "큰 폭락 경고", ret <= r.CrashPct, ret, r.CrashPct, "%"})
 	}
 	if r.WeightEnabled && r.TargetWeightPct > 0 {
 		th := r.TargetWeightPct + r.WeightBandPct
@@ -525,6 +558,7 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRule) string {
 
 	it.SellChecks = sell
 	it.BuyChecks = buy
+	it.SellDisabled = len(sell) == 0
 
 	sellHit := checksHit(sell, r.SellMode)
 	buyHit := checksHit(buy, r.BuyMode)

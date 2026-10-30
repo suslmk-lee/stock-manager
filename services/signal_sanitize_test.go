@@ -13,7 +13,7 @@ import (
 func TestSanitizeSignalReportAllowsJSON(t *testing.T) {
 	in := []SignalAssetInput{{
 		AssetID: 1, Ticker: "SCHD", Name: "SCHD", Price: 28, PriceCurrency: "USD",
-		Rule: models.DefaultSignalRule(), RuleSource: "default",
+		Rule: models.DefaultSignalRuleConfig(), RuleSource: "default",
 		Holdings: []SignalHoldingInput{{AccountID: 1, Quantity: 10, AvgPrice: math.NaN()}},
 	}}
 	report := BuildSignalReport(in, 1300, time.Now(), SignalContext{})

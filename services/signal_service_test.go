@@ -17,7 +17,7 @@ func newSignalTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.SignalRule{}); err != nil {
+	if err := db.AutoMigrate(&models.SignalRule{}, &models.SignalProfile{}, &models.AssetSignalProfile{}, &models.ProfileSuggestion{}, &models.Asset{}, &models.Holding{}); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -43,17 +43,17 @@ func TestSignalRuleCRUD(t *testing.T) {
 	}
 
 	// save default (store whatever is saved, incl. disabled)
-	saved, err := svc.SaveDefaultRule(models.SignalRule{TakeProfitPct: 50, SellMode: ""})
+	saved, err := svc.SaveDefaultRule(models.SignalRule{SignalRuleConfig: models.SignalRuleConfig{TakeProfitPct: 50, SellMode: ""}})
 	if err != nil || saved.ID != defID || saved.TakeProfitEnabled || saved.SellMode != "any" || saved.TakeProfitPct != 50 {
 		t.Fatalf("save default %+v %v", saved, err)
 	}
 
 	// upsert override twice -> one row
-	o1, err := svc.SaveAssetRule(7, models.SignalRule{StopLossEnabled: true, StopLossPct: -5, SellMode: "all", BuyMode: "any"})
+	o1, err := svc.SaveAssetRule(7, models.SignalRule{SignalRuleConfig: models.SignalRuleConfig{StopLossEnabled: true, StopLossPct: -5, SellMode: "all", BuyMode: "any"}})
 	if err != nil || o1.AssetID != 7 {
 		t.Fatalf("%+v %v", o1, err)
 	}
-	o2, err := svc.SaveAssetRule(7, models.SignalRule{StopLossEnabled: true, StopLossPct: -8})
+	o2, err := svc.SaveAssetRule(7, models.SignalRule{SignalRuleConfig: models.SignalRuleConfig{StopLossEnabled: true, StopLossPct: -8}})
 	if err != nil || o2.ID != o1.ID || o2.StopLossPct != -8 || o2.SellMode != "any" {
 		t.Fatalf("%+v %v", o2, err)
 	}
@@ -70,13 +70,13 @@ func TestSignalRuleCRUD(t *testing.T) {
 		t.Error("override not deleted")
 	}
 	// re-create after hard delete works with unique index
-	if _, err := svc.SaveAssetRule(7, models.SignalRule{}); err != nil {
+	if _, err := svc.SaveAssetRule(7, models.SignalRule{SignalRuleConfig: models.SignalRuleConfig{}}); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestValidateSignalRule(t *testing.T) {
-	bad := []models.SignalRule{
+	bad := []models.SignalRuleConfig{
 		{SellMode: "some"},
 		{BuyMode: "x"},
 		{StopLossPct: 1},
@@ -87,12 +87,12 @@ func TestValidateSignalRule(t *testing.T) {
 	}
 	for i, r := range bad {
 		var inv *ErrInvalidSignalRule
-		if err := ValidateSignalRule(&r); !errors.As(err, &inv) {
+		if err := ValidateSignalRuleConfig(&r); !errors.As(err, &inv) {
 			t.Errorf("case %d: expected invalid, got %v", i, err)
 		}
 	}
-	ok := models.SignalRule{SellMode: "ALL", StopLossPct: -20, BuyDipPct: 0}
-	if err := ValidateSignalRule(&ok); err != nil || ok.SellMode != "all" || ok.BuyMode != "any" {
+	ok := models.SignalRuleConfig{SellMode: "ALL", StopLossPct: -20, BuyDipPct: 0}
+	if err := ValidateSignalRuleConfig(&ok); err != nil || ok.SellMode != "all" || ok.BuyMode != "any" {
 		t.Errorf("%v %+v", err, ok)
 	}
 }
@@ -100,8 +100,8 @@ func TestValidateSignalRule(t *testing.T) {
 func TestSignalRuleMigrationV1(t *testing.T) {
 	db := newSignalTestDB(t)
 	// 1단계 행: 새 컬럼은 모두 0/false, RuleVersion 0
-	v1 := models.SignalRule{AssetID: 0, TakeProfitEnabled: true, TakeProfitPct: 30, StopLossEnabled: true, StopLossPct: -20, SellMode: "any", BuyMode: "any"}
-	ov := models.SignalRule{AssetID: 5, TakeProfitEnabled: true, TakeProfitPct: 12, SellMode: "any", BuyMode: "any"}
+	v1 := models.SignalRule{AssetID: 0, SignalRuleConfig: models.SignalRuleConfig{TakeProfitEnabled: true, TakeProfitPct: 30, StopLossEnabled: true, StopLossPct: -20, SellMode: "any", BuyMode: "any"}}
+	ov := models.SignalRule{AssetID: 5, SignalRuleConfig: models.SignalRuleConfig{TakeProfitEnabled: true, TakeProfitPct: 12, SellMode: "any", BuyMode: "any"}}
 	if err := db.Create(&v1).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestSignalRuleMigrationV1(t *testing.T) {
 	}
 	check := func(r models.SignalRule) {
 		t.Helper()
-		if r.RuleVersion != 2 || r.FromHighPct != -20 || r.BelowMAPct != -5 || r.AboveMAPct != 25 || r.DividendCutPct != 10 ||
+		if r.RuleVersion != 3 || r.FromHighPct != -20 || r.BelowMAPct != -5 || r.AboveMAPct != 25 || r.DividendCutPct != 10 ||
 			r.TaxHarvestFromMonth != 11 || !r.FxHistorical || !r.TaxHarvestEnabled ||
 			r.FromHighEnabled || r.BelowMAEnabled || r.AboveMAEnabled || r.DividendCutEnabled {
 			t.Errorf("migrated rule %+v", r)
@@ -134,19 +134,19 @@ func TestSignalRuleMigrationV1(t *testing.T) {
 	}
 	check(stored)
 
-	// 사용자가 이후 값을 바꾸면(0 포함) 재보정되지 않는다: 버전은 저장 시 항상 2
-	if _, err := svc.SaveDefaultRule(models.SignalRule{FromHighPct: 0, FxHistorical: false, TaxHarvestFromMonth: 0}); err != nil {
+	// 사용자가 이후 값을 바꾸면(0 포함) 재보정되지 않는다: 버전은 저장 시 항상 최신
+	if _, err := svc.SaveDefaultRule(models.SignalRule{SignalRuleConfig: models.SignalRuleConfig{FromHighPct: 0, FxHistorical: false, TaxHarvestFromMonth: 0}}); err != nil {
 		t.Fatal(err)
 	}
 	rules, _ = svc.GetSignalRules()
 	d := rules.Default
-	if d.RuleVersion != 2 || d.FromHighPct != 0 || d.FxHistorical || d.TaxHarvestEnabled || d.TaxHarvestFromMonth != 11 {
+	if d.RuleVersion != 3 || d.FromHighPct != 0 || d.FxHistorical || d.TaxHarvestEnabled || d.TaxHarvestFromMonth != 11 {
 		t.Errorf("must not re-migrate: %+v", d)
 	}
 }
 
 func TestValidateSignalRuleStage2(t *testing.T) {
-	bad := []models.SignalRule{
+	bad := []models.SignalRuleConfig{
 		{FromHighPct: 1},
 		{BelowMAPct: 0.5},
 		{AboveMAPct: -1},
@@ -158,17 +158,17 @@ func TestValidateSignalRuleStage2(t *testing.T) {
 	}
 	for i, r := range bad {
 		var inv *ErrInvalidSignalRule
-		if err := ValidateSignalRule(&r); !errors.As(err, &inv) {
+		if err := ValidateSignalRuleConfig(&r); !errors.As(err, &inv) {
 			t.Errorf("case %d: expected invalid, got %v", i, err)
 		}
 	}
-	ok := models.SignalRule{FromHighPct: -30, AboveMAPct: 0, TaxHarvestFromMonth: 0}
-	if err := ValidateSignalRule(&ok); err != nil || ok.TaxHarvestFromMonth != 11 {
+	ok := models.SignalRuleConfig{FromHighPct: -30, AboveMAPct: 0, TaxHarvestFromMonth: 0}
+	if err := ValidateSignalRuleConfig(&ok); err != nil || ok.TaxHarvestFromMonth != 11 {
 		t.Errorf("%v %+v", err, ok)
 	}
 	def := models.DefaultSignalRule()
 	if err := ValidateSignalRule(&def); err != nil || def.FromHighEnabled || def.BelowMAEnabled || def.AboveMAEnabled || def.DividendCutEnabled ||
-		!def.TaxHarvestEnabled || !def.FxHistorical || def.RuleVersion != 2 {
+		!def.TaxHarvestEnabled || !def.FxHistorical || def.RuleVersion != 3 {
 		t.Errorf("default %v %+v", err, def)
 	}
 }

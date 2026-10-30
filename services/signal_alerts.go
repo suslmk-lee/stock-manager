@@ -145,7 +145,7 @@ func DiffSignals(items []SignalItem, prev map[uint]models.SignalState, baseline 
 			AssetID: it.AssetID, Ticker: it.Ticker, Name: it.Name,
 			FromAction: p.Action, ToAction: it.Action, MetCodes: strings.Join(evCodes, ","),
 			Message: msg, TotalReturnPct: it.TotalReturnPct, CurrentPrice: it.CurrentPrice,
-			Currency: it.Currency, CreatedAt: now,
+			Currency: it.Currency, CreatedAt: now, Kind: models.SignalEventKindSignal,
 		}
 		if it.Action == SignalHold || !set.Enabled || !alertKindEnabled(set, it.Action) {
 			t := now
@@ -207,6 +207,11 @@ func (s *SignalService) SetSettingsListener(fn func()) { s.onSettingsSaved = fn 
 
 // recordReport 는 리포트와 저장된 상태를 비교해 이벤트를 기록하고, 이번에 생성된 이벤트를 반환한다.
 func (s *SignalService) recordReport(report *SignalReport) ([]models.SignalEvent, error) {
+	if len(report.Candidates) > 0 {
+		if err := s.ensureSeeded(); err != nil {
+			return nil, fmt.Errorf("프로필 초기화 실패: %w", err)
+		}
+	}
 	s.alertMu.Lock()
 	defer s.alertMu.Unlock()
 	var created []models.SignalEvent
@@ -223,7 +228,13 @@ func (s *SignalService) recordReport(report *SignalReport) ([]models.SignalEvent
 		for _, st := range stored {
 			prev[st.AssetID] = st
 		}
-		events, states := DiffSignals(report.Items, prev, len(stored) == 0, set, time.Now())
+		now := time.Now()
+		events, states := DiffSignals(report.Items, prev, len(stored) == 0, set, now)
+		sugg, err := s.recordSuggestions(tx, report, set, now)
+		if err != nil {
+			return err
+		}
+		events = append(events, sugg...)
 		for _, st := range states {
 			if old, ok := prev[st.AssetID]; ok {
 				if old.Action == st.Action && old.MetKey == st.MetKey {

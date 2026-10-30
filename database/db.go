@@ -232,6 +232,9 @@ func runMigrations() error {
 		&models.SignalRule{},
 		&models.SignalState{},
 		&models.SignalEvent{},
+		&models.SignalProfile{},
+		&models.AssetSignalProfile{},
+		&models.ProfileSuggestion{},
 		&models.NotificationSetting{},
 	); err != nil {
 		return err
