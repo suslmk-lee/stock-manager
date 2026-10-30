@@ -12,11 +12,11 @@ interface AccountTypeMeta {
 }
 
 export const ACCOUNT_TYPES: AccountTypeMeta[] = [
-  { value: 'General', label: '일반 (위탁)', short: '일반', restricted: false, badgeClass: 'bg-emerald-500/20 text-emerald-300' },
-  { value: 'ISA', label: 'ISA', short: 'ISA', restricted: false, badgeClass: 'bg-sky-500/20 text-sky-300' },
-  { value: 'Pension', label: '연금저축', short: '연금', restricted: true, badgeClass: 'bg-amber-500/20 text-amber-300' },
-  { value: 'IRP', label: 'IRP (개인형 퇴직연금)', short: 'IRP', restricted: true, badgeClass: 'bg-orange-500/20 text-orange-300' },
-  { value: 'DC', label: '퇴직연금 DC', short: 'DC', restricted: true, badgeClass: 'bg-rose-500/20 text-rose-300' },
+  { value: 'General', label: '일반 (위탁)', short: '일반', restricted: false, badgeClass: 'border border-mint-400/20 bg-mint-400/10 text-mint-300' },
+  { value: 'ISA', label: 'ISA', short: 'ISA', restricted: false, badgeClass: 'border border-sky-400/20 bg-sky-400/10 text-sky-200' },
+  { value: 'Pension', label: '연금저축', short: '연금', restricted: true, badgeClass: 'border border-amber-400/25 bg-amber-400/10 text-amber-200' },
+  { value: 'IRP', label: 'IRP (개인형 퇴직연금)', short: 'IRP', restricted: true, badgeClass: 'border border-orange-400/25 bg-orange-400/10 text-orange-200' },
+  { value: 'DC', label: '퇴직연금 DC', short: 'DC', restricted: true, badgeClass: 'border border-rose-400/25 bg-rose-400/10 text-rose-200' },
 ];
 
 export const LIQUIDITY_LABELS: Record<Exclude<LiquidityFilter, 'all'>, string> = {

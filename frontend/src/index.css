@@ -1,3 +1,7 @@
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,13 +14,13 @@
 
 html {
   color-scheme: dark;
-  scrollbar-color: #64748b #0f172a;
+  scrollbar-color: #3a3a40 #0a0a0b;
 }
 
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #64748b #0f172a;
+  scrollbar-color: #3a3a40 #0a0a0b;
 }
 
 /* Chromium / Safari */
@@ -26,30 +30,244 @@ html {
 }
 
 *::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #0a0a0b;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #64748b;
+  background: #2a2a2e;
   border-radius: 9999px;
-  border: 2px solid #0f172a;
+  border: 2px solid #0a0a0b;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #4a4a50;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  @apply font-sans bg-ink-950 text-zinc-100;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'tnum' 0;
 }
 
 #root {
   width: 100%;
   min-height: 100vh;
+}
+
+/* ------------------------------------------------------------------
+ * 디자인 시스템 — 유리 질감 다크 카드 / pill / 칩 / 링 게이지
+ * 화면 컴포넌트는 slate-* 대신 이 클래스와 ink/mint 토큰을 쓴다.
+ * ------------------------------------------------------------------ */
+@layer components {
+  /* 최상위 카드: 얇은 테두리 + 위쪽 하이라이트 + 깊은 그림자 */
+  .surface {
+    @apply relative rounded-3xl border border-white/[0.08];
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 100%),
+      #0d0d0f;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 24px 48px -24px rgba(0, 0, 0, 0.9);
+  }
+
+  /* 카드 안쪽 패널 (참고 이미지의 우측 지표 박스) */
+  .surface-inset {
+    @apply rounded-2xl border border-white/[0.07];
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  /* 클릭 가능한 카드 */
+  .surface-interactive {
+    @apply transition-all duration-300 cursor-pointer;
+  }
+  .surface-interactive:hover {
+    @apply border-white/[0.16];
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      0 28px 56px -24px rgba(0, 0, 0, 0.95);
+    transform: translateY(-1px);
+  }
+
+  /* 유리 pill (네비게이션, 필터 그룹) */
+  .glass-pill {
+    @apply rounded-full border border-white/[0.09] backdrop-blur-xl;
+    background: rgba(255, 255, 255, 0.035);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  /* pill 내부 세그먼트 버튼 */
+  .pill-item {
+    @apply rounded-full px-3.5 py-1.5 text-sm text-zinc-400 transition-colors whitespace-nowrap;
+  }
+  .pill-item:hover {
+    @apply text-zinc-100;
+  }
+  .pill-item-active {
+    @apply bg-white/[0.09] text-white;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  /* 아이콘 타일: 어두운 그라데이션 + 아래쪽 은은한 웜 글로우 */
+  .icon-tile {
+    @apply inline-flex items-center justify-center w-10 h-10 shrink-0 rounded-xl border border-white/[0.1] text-zinc-200;
+    background:
+      radial-gradient(120% 80% at 50% 120%, rgba(251, 146, 60, 0.28), transparent 60%),
+      linear-gradient(180deg, #2a2a2e 0%, #141416 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 6px 16px -8px rgba(0, 0, 0, 0.9);
+  }
+  .icon-tile-mint {
+    background:
+      radial-gradient(120% 80% at 50% 120%, rgba(125, 223, 176, 0.3), transparent 60%),
+      linear-gradient(180deg, #2a2a2e 0%, #141416 100%);
+  }
+  .icon-tile-amber {
+    background:
+      radial-gradient(120% 80% at 50% 120%, rgba(251, 191, 36, 0.32), transparent 60%),
+      linear-gradient(180deg, #2a2a2e 0%, #141416 100%);
+  }
+  .icon-tile-sky {
+    background:
+      radial-gradient(120% 80% at 50% 120%, rgba(125, 211, 252, 0.28), transparent 60%),
+      linear-gradient(180deg, #2a2a2e 0%, #141416 100%);
+  }
+
+  /* 고정폭 칩 (체크 아이콘과 함께) */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.045] px-2 py-1 font-mono text-[11px] text-zinc-300 whitespace-nowrap;
+  }
+
+  /* "New" 배지 */
+  .badge-new {
+    @apply inline-flex items-center rounded-full border border-white/80 bg-black px-1.5 py-px text-[10px] font-semibold leading-none text-white;
+  }
+
+  /* 상태 배지 */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap;
+  }
+
+  /* 고정폭 보조 라벨 (예: "Mobile median") */
+  .label-mono {
+    @apply font-mono text-[11px] tracking-wide text-zinc-500;
+  }
+
+  /* 섹션 제목 */
+  .section-title {
+    @apply text-[15px] font-semibold tracking-tight text-white;
+  }
+
+  /* 큰 숫자 */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 버튼: 흰색 pill (주 행동) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-ink-950 transition-all disabled:opacity-50;
+    background: linear-gradient(180deg, #ffffff 0%, #e4e4e7 100%);
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.12), 0 8px 20px -10px rgba(255, 255, 255, 0.35);
+  }
+  .btn-primary:hover {
+    background: linear-gradient(180deg, #ffffff 0%, #f4f4f5 100%);
+  }
+
+  /* 버튼: 테두리 pill (보조 행동) */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/[0.14] px-4 py-2 text-sm font-medium text-zinc-100 transition-colors disabled:opacity-50;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+  }
+  .btn-ghost:hover {
+    @apply border-white/[0.24] bg-white/[0.06];
+  }
+
+  /* 버튼: 위험 행동 */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-rose-400/25 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-200 transition-colors hover:bg-rose-500/20;
+  }
+
+  /* 아이콘 전용 원형 버튼 */
+  .btn-icon {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-zinc-400 transition-colors hover:border-white/[0.16] hover:text-white;
+  }
+
+  /* 입력 필드 */
+  .input-field {
+    @apply w-full rounded-xl border border-white/[0.1] bg-white/[0.035] px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 transition-colors;
+    @apply focus:outline-none focus:border-mint-400/50 focus:ring-2 focus:ring-mint-400/15;
+  }
+  select.input-field {
+    @apply appearance-none pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+  }
+  select.input-field option {
+    background: #141416;
+    color: #f4f4f5;
+  }
+  .field-label {
+    @apply mb-1.5 block text-xs font-medium text-zinc-400;
+  }
+
+  /* 테이블 */
+  .table-head {
+    @apply font-mono text-[11px] font-normal uppercase tracking-wider text-zinc-500;
+  }
+  .table-row {
+    @apply border-b border-white/[0.05] transition-colors hover:bg-white/[0.025];
+  }
+
+  /* 구분선 */
+  .divider-v {
+    @apply w-px self-stretch bg-white/[0.07];
+  }
+
+  /* 그레인 질감 + 사선 광원 히어로 (참고 이미지 3) */
+  .hero-grain {
+    @apply relative overflow-hidden rounded-4xl border border-white/[0.09];
+    background:
+      radial-gradient(60% 120% at 8% 0%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.06) 35%, transparent 65%),
+      linear-gradient(115deg, rgba(220, 225, 232, 0.16) 0%, rgba(160, 165, 175, 0.07) 28%, transparent 46%),
+      #070708;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 30px 60px -30px rgba(0, 0, 0, 0.95);
+  }
+  .hero-grain::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.22;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .hero-grain > * {
+    position: relative;
+  }
+
+  /* 탭 카드 (참고 이미지 2) */
+  .tab-card {
+    @apply relative flex min-w-[118px] flex-1 flex-col items-start gap-3 overflow-hidden rounded-2xl border border-white/[0.07] px-3.5 pb-3.5 pt-3 text-left transition-all duration-300;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.008));
+  }
+  .tab-card:hover {
+    @apply border-white/[0.14];
+  }
+  .tab-card-active {
+    @apply border-white/[0.22];
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.02));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 16px 32px -18px rgba(0, 0, 0, 0.9);
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes fadeSlideIn {
@@ -71,5 +289,23 @@ body {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tabProgress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
