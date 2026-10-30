@@ -367,14 +367,15 @@ export const apiClient = {
     if (isWeb) {
       return fetchApi<SignalRule>('/signal-rules/default', { method: 'PUT', body: JSON.stringify(rule) });
     }
-    return (await WailsApp.SaveDefaultSignalRule(rule)) as SignalRule;
+    // Wails 생성 타입은 convertValues 를 가진 클래스지만 실제 전달은 JSON 이므로 형태만 맞춘다
+    return (await WailsApp.SaveDefaultSignalRule(rule as unknown as Parameters<typeof WailsApp.SaveDefaultSignalRule>[0])) as SignalRule;
   },
 
   SaveAssetSignalRule: async (assetId: number, rule: SignalRule): Promise<SignalRule> => {
     if (isWeb) {
       return fetchApi<SignalRule>(`/signal-rules/asset/${assetId}`, { method: 'PUT', body: JSON.stringify(rule) });
     }
-    return (await WailsApp.SaveAssetSignalRule(assetId, rule)) as SignalRule;
+    return (await WailsApp.SaveAssetSignalRule(assetId, rule as unknown as Parameters<typeof WailsApp.SaveAssetSignalRule>[1])) as SignalRule;
   },
 
   DeleteAssetSignalRule: async (assetId: number) => {
