@@ -230,6 +230,9 @@ func runMigrations() error {
 		&models.PortfolioSnapshot{},
 		&models.RealizedPnL{},
 		&models.SignalRule{},
+		&models.SignalState{},
+		&models.SignalEvent{},
+		&models.NotificationSetting{},
 	); err != nil {
 		return err
 	}

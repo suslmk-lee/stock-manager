@@ -28,6 +28,9 @@ type SignalService struct {
 	db       *gorm.DB
 	ticker   *TickerService
 	exchange *ExchangeRateService
+
+	alertMu         sync.Mutex // 신호 상태/이벤트 기록 직렬화
+	onSettingsSaved func()
 }
 
 func NewSignalService(db *gorm.DB, ticker *TickerService, exchange *ExchangeRateService) *SignalService {
@@ -230,8 +233,19 @@ func (s *SignalService) DeleteAssetRule(assetID uint) error {
 	return s.db.Where("asset_id = ?", assetID).Delete(&models.SignalRule{}).Error
 }
 
-// GetSignals 는 보유 종목별 지표를 집계해 규칙을 평가한 리포트를 만든다.
+// GetSignals 는 신호 리포트를 만들고, 신호 변화를 이력에 기록한다 (기록 실패는 로그만 남김).
 func (s *SignalService) GetSignals() (*SignalReport, error) {
+	report, err := s.buildSignalReport()
+	if err != nil {
+		return nil, err
+	}
+	_, rerr := s.recordReport(report)
+	logRecordErr(rerr)
+	return report, nil
+}
+
+// buildSignalReport 는 보유 종목별 지표를 집계해 규칙을 평가한 리포트를 만든다.
+func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 	rules, err := s.GetSignalRules()
 	if err != nil {
 		return nil, fmt.Errorf("신호 규칙 조회 실패: %w", err)
