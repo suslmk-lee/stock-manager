@@ -12,9 +12,19 @@ type NumKey =
   | 'dividend_payback_min_return_pct'
   | 'low_yield_pct'
   | 'buy_dip_pct'
-  | 'high_yield_pct';
+  | 'high_yield_pct'
+  | 'from_high_pct'
+  | 'below_ma_pct'
+  | 'above_ma_pct'
+  | 'dividend_cut_pct';
 
 type EnableKey =
+  | 'from_high_enabled'
+  | 'below_ma_enabled'
+  | 'above_ma_enabled'
+  | 'dividend_cut_enabled'
+  | 'tax_harvest_enabled'
+  | 'fx_historical'
   | 'take_profit_enabled'
   | 'stop_loss_enabled'
   | 'weight_enabled'
@@ -60,41 +70,63 @@ const SELL_RULES: RuleDef[] = [
     ],
   },
   { enabled: 'low_yield_enabled', label: '배당수익률 하락', desc: '현재가 기준 배당수익률이 기준 이하이면 매도를 검토합니다.', fields: [{ key: 'low_yield_pct', label: '기준', suffix: '%' }] },
+  { enabled: 'above_ma_enabled', label: '장기 이평 과열', desc: '현재가가 200일 이동평균선보다 기준 이상 높으면 과열로 보고 매도를 검토합니다.', fields: [{ key: 'above_ma_pct', label: '괴리율', suffix: '%' }] },
+  { enabled: 'dividend_cut_enabled', label: '배당 삭감', desc: '주당배당금이 직전 12개월 대비 기준(%) 이상 줄면 매도를 검토합니다.', fields: [{ key: 'dividend_cut_pct', label: '감소율', suffix: '%' }] },
 ];
 
 const BUY_RULES: RuleDef[] = [
   { enabled: 'buy_dip_enabled', label: '평단 대비 하락', desc: '현재가가 평단보다 기준 이상 낮으면 추가 매수를 검토합니다.', fields: [{ key: 'buy_dip_pct', label: '기준', suffix: '%' }] },
   { enabled: 'high_yield_enabled', label: '배당수익률 상승', desc: '현재가 기준 배당수익률이 기준 이상이면 매수를 검토합니다.', fields: [{ key: 'high_yield_pct', label: '기준', suffix: '%' }] },
+  { enabled: 'from_high_enabled', label: '52주 고점 대비 하락', desc: '현재가가 52주 최고가보다 기준 이상 낮으면 매수를 검토합니다.', fields: [{ key: 'from_high_pct', label: '기준', suffix: '%' }] },
+  { enabled: 'below_ma_enabled', label: '장기 이평 하회', desc: '현재가가 200일 이동평균선보다 기준 이상 낮으면 매수를 검토합니다.', fields: [{ key: 'below_ma_pct', label: '기준', suffix: '%' }] },
 ];
 
 const NUM_KEYS: NumKey[] = [
   'take_profit_pct', 'stop_loss_pct', 'target_weight_pct', 'weight_band_pct', 'dividend_payback_pct',
   'dividend_payback_min_return_pct', 'low_yield_pct', 'buy_dip_pct', 'high_yield_pct',
+  'from_high_pct', 'below_ma_pct', 'above_ma_pct', 'dividend_cut_pct',
 ];
 const ENABLE_KEYS: EnableKey[] = [
   'take_profit_enabled', 'stop_loss_enabled', 'weight_enabled', 'dividend_payback_enabled',
   'low_yield_enabled', 'buy_dip_enabled', 'high_yield_enabled',
+  'from_high_enabled', 'below_ma_enabled', 'above_ma_enabled', 'dividend_cut_enabled',
+  'tax_harvest_enabled', 'fx_historical',
 ];
 
+// 2단계 필드 기본값 (구 백엔드가 내려주지 않을 때 균형 값으로 채움)
+const NEW_NUM_DEFAULTS: Partial<Record<NumKey, number>> = { from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10 };
+const NEW_FLAG_DEFAULTS: Partial<Record<EnableKey, boolean>> = {
+  from_high_enabled: false, below_ma_enabled: false, above_ma_enabled: false, dividend_cut_enabled: false,
+  tax_harvest_enabled: true, fx_historical: true,
+};
+const DEFAULT_HARVEST_MONTH = 11;
+
 const PRESETS: { id: string; label: string; values: Partial<Record<NumKey, number>> }[] = [
-  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6 } },
-  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5 } },
-  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4 } },
+  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5 } },
+  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10 } },
+  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20 } },
 ];
 
 interface Draft {
   nums: Record<NumKey, string>;
   flags: Record<EnableKey, boolean>;
+  month: string;
   sell_mode: SignalMode;
   buy_mode: SignalMode;
 }
 
 function toDraft(rule: SignalRule): Draft {
   const nums = {} as Record<NumKey, string>;
-  NUM_KEYS.forEach((k) => (nums[k] = String(rule[k] ?? 0)));
+  NUM_KEYS.forEach((k) => (nums[k] = String(rule[k] ?? NEW_NUM_DEFAULTS[k] ?? 0)));
   const flags = {} as Record<EnableKey, boolean>;
-  ENABLE_KEYS.forEach((k) => (flags[k] = !!rule[k]));
-  return { nums, flags, sell_mode: rule.sell_mode || 'any', buy_mode: rule.buy_mode || 'any' };
+  ENABLE_KEYS.forEach((k) => (flags[k] = rule[k] ?? NEW_FLAG_DEFAULTS[k] ?? false));
+  return {
+    nums,
+    flags,
+    month: String(rule.tax_harvest_from_month || DEFAULT_HARVEST_MONTH),
+    sell_mode: rule.sell_mode || 'any',
+    buy_mode: rule.buy_mode || 'any',
+  };
 }
 
 function validate(d: Draft): Partial<Record<NumKey, string>> {
@@ -106,8 +138,8 @@ function validate(d: Draft): Partial<Record<NumKey, string>> {
       errs[k] = '숫자를 입력하세요';
       return;
     }
-    if ((k === 'stop_loss_pct' || k === 'buy_dip_pct') && n > 0) errs[k] = '0 이하로 입력하세요';
-    else if (k === 'weight_band_pct' && n < 0) errs[k] = '0 이상으로 입력하세요';
+    if ((k === 'stop_loss_pct' || k === 'buy_dip_pct' || k === 'from_high_pct' || k === 'below_ma_pct') && n > 0) errs[k] = '0 이하로 입력하세요';
+    else if ((k === 'above_ma_pct' || k === 'dividend_cut_pct' || k === 'weight_band_pct') && n < 0) errs[k] = '0 이상으로 입력하세요';
     else if (k === 'target_weight_pct' && (n < 0 || n > 100)) errs[k] = '0~100 사이로 입력하세요';
   });
   return errs;
@@ -208,6 +240,8 @@ export default function SignalRuleEditor({ mode, assetId, assetName, defaultRule
     if (isAsset && !assetRule) delete base.id;
     NUM_KEYS.forEach((k) => (base[k] = Number(draft.nums[k])));
     ENABLE_KEYS.forEach((k) => (base[k] = draft.flags[k]));
+    const month = Math.round(Number(draft.month));
+    base.tax_harvest_from_month = month >= 1 && month <= 12 ? month : DEFAULT_HARVEST_MONTH;
     return base;
   };
 
@@ -342,6 +376,48 @@ export default function SignalRuleEditor({ mode, assetId, assetName, defaultRule
               <ModeToggle value={draft.buy_mode} onChange={(m) => !readOnly && setDraft((d) => ({ ...d, buy_mode: m }))} label="매수 조건 충족 방식" />
             </div>
             {BUY_RULES.map(renderRule)}
+          </section>
+
+          <section className="space-y-2.5">
+            <h3 className="label-mono">기타</h3>
+            <div className="surface-inset p-3.5">
+              <div className="flex items-start gap-3">
+                <div className="pt-0.5">
+                  <Switch checked={draft.flags.fx_historical} onChange={(v) => setFlag('fx_historical', v)} label="매수 시점 환율로 수익률 계산" disabled={readOnly} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className={`text-sm font-medium ${draft.flags.fx_historical ? 'text-white' : 'text-zinc-400'}`}>매수 시점 환율로 수익률 계산</span>
+                  <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">해외 종목의 원화 수익률을 매수 당시 환율 기준으로 계산합니다. 거래 기록이 없는 수량은 현재 환율을 사용합니다.</p>
+                </div>
+              </div>
+            </div>
+            <div className="surface-inset p-3.5">
+              <div className="flex items-start gap-3">
+                <div className="pt-0.5">
+                  <Switch checked={draft.flags.tax_harvest_enabled} onChange={(v) => setFlag('tax_harvest_enabled', v)} label="연말 절세 힌트" disabled={readOnly} />
+                </div>
+                <div className="min-w-0 flex-1 sm:flex sm:items-start sm:justify-between sm:gap-4">
+                  <div className="min-w-0 sm:flex-1">
+                    <span className={`text-sm font-medium ${draft.flags.tax_harvest_enabled ? 'text-white' : 'text-zinc-400'}`}>연말 절세 힌트</span>
+                    <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">해외주식 양도세 기본공제 활용을 위한 이익 실현 / 손실 상계 힌트를 표시합니다.</p>
+                  </div>
+                  <div className={`mt-2.5 flex items-center gap-1.5 transition-opacity sm:mt-0 sm:shrink-0 ${draft.flags.tax_harvest_enabled ? '' : 'opacity-50'}`}>
+                    <select
+                      aria-label="절세 힌트 시작 월"
+                      value={draft.month}
+                      disabled={readOnly}
+                      onChange={(e) => setDraft((d) => ({ ...d, month: e.target.value }))}
+                      className="input-field num !w-20 !py-1.5"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                        <option key={m} value={m}>{m}월</option>
+                      ))}
+                    </select>
+                    <span className="label-mono !text-zinc-400">부터</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
 
           {submitError && (
