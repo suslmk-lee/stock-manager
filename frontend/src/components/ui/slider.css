@@ -1,0 +1,71 @@
+/* 설정 슬라이더 — 두꺼운 트랙 + 세로 알약 썸. 색은 테마 변수만 사용 */
+.ui-slider {
+  --pct: 0%;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  outline: none;
+  border: 1px solid rgb(var(--c-white) / 0.1);
+  /* 왼쪽부터 썸까지 채움(강조색) + 위쪽 광택 */
+  background-image:
+    linear-gradient(180deg, rgb(var(--c-white) / 0.14), transparent),
+    linear-gradient(90deg, rgb(var(--c-mint-400) / 0.55), rgb(var(--c-mint-400) / 0.3));
+  background-size: var(--pct) 100%, var(--pct) 100%;
+  background-repeat: no-repeat;
+  background-color: rgb(var(--c-white) / 0.06);
+}
+.ui-slider:focus-visible {
+  box-shadow: 0 0 0 2px rgb(var(--c-mint-400) / 0.6);
+}
+.ui-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ui-slider::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  height: 100%;
+  background: transparent;
+}
+.ui-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 20px;
+  margin-top: 5px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--c-ink-900) / 0.25);
+  background: rgb(var(--c-white));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+}
+.ui-slider::-moz-range-track {
+  height: 100%;
+  background: transparent;
+}
+.ui-slider::-moz-range-thumb {
+  width: 8px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--c-ink-900) / 0.25);
+  background: rgb(var(--c-white));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+}
+
+/* 값 표시 상자 */
+.ui-slider-value {
+  min-width: 3.5rem;
+  padding: 0 0.625rem;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid rgb(var(--c-white) / 0.1);
+  background: rgb(var(--c-ink-900) / 0.5);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  color: rgb(var(--c-white));
+}
