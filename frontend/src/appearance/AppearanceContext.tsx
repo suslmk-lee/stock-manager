@@ -3,7 +3,7 @@ import { buildThemeVars, getTheme, hexToRgb, rgbToHex, DEFAULT_THEME_ID, AppThem
 import {
   DEFAULT_CARD_STYLE, DEFAULT_FONT_SIZE, DEFAULT_MONO, DEFAULT_SANS, FONT_SIZES, FontSizeId,
   MONO_FALLBACK, MONO_FONTS, SANS_FALLBACK, SANS_FONTS, CARD_STYLES, CURSOR_TRAIL_LIMITS,
-  CARD_GLOW_LIMITS,
+  CARD_GLOW_LIMITS, POINTER_PRESETS, TRAIL_PRESETS, type PointerPresetId, type TrailPresetId,
 } from './options';
 
 // 커서를 따라다니는 점 체인 효과 (장식용, 기본 꺼짐)
@@ -14,11 +14,19 @@ export interface CursorTrailSettings {
   headSize: number; // 머리 점 지름(px)
   taper: number; // 꼬리로 갈수록 작아지는 정도 (0~1)
   gradient: boolean; // 체인을 따라 mint → sky 그라디언트
+  style: TrailPresetId; // 트레일 프리셋 (수치 설정은 모든 프리셋이 공유)
 }
 
 export const DEFAULT_CURSOR_TRAIL: CursorTrailSettings = {
-  enabled: false, nodes: 14, ease: 0.34, headSize: 24, taper: 0.8, gradient: false,
+  enabled: false, nodes: 14, ease: 0.34, headSize: 24, taper: 0.8, gradient: false, style: 'dots',
 };
+
+// 마우스 포인터 자체를 바꾸는 프리셋 ('native' = 운영체제 커서)
+export interface CursorPointerSettings {
+  style: PointerPresetId;
+}
+
+export const DEFAULT_CURSOR_POINTER: CursorPointerSettings = { style: 'native' };
 
 // 카드에 덧입히는 원형 광원 그라데이션 (기본 꺼짐 → 카드 스타일 본래 모양)
 export interface CardGlowSettings {
@@ -42,6 +50,7 @@ export interface AppearanceSettings {
   monoFont: string;
   fontSize: FontSizeId;
   cursorTrail: CursorTrailSettings;
+  cursorPointer: CursorPointerSettings;
   cardGlow: CardGlowSettings;
 }
 
@@ -52,6 +61,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   monoFont: DEFAULT_MONO,
   fontSize: DEFAULT_FONT_SIZE,
   cursorTrail: DEFAULT_CURSOR_TRAIL,
+  cursorPointer: DEFAULT_CURSOR_POINTER,
   cardGlow: DEFAULT_CARD_GLOW,
 };
 
@@ -73,6 +83,14 @@ function sanitizeCursorTrail(raw: unknown): CursorTrailSettings {
     headSize: clampNum(r.headSize, L.headSize, d.headSize),
     taper: clampNum(r.taper, L.taper, d.taper),
     gradient: typeof r.gradient === 'boolean' ? r.gradient : d.gradient,
+    style: TRAIL_PRESETS.some((p) => p.id === r.style) ? (r.style as TrailPresetId) : d.style,
+  };
+}
+
+function sanitizeCursorPointer(raw: unknown): CursorPointerSettings {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  return {
+    style: POINTER_PRESETS.some((p) => p.id === r.style) ? (r.style as PointerPresetId) : DEFAULT_CURSOR_POINTER.style,
   };
 }
 
@@ -113,6 +131,7 @@ function loadSettings(): AppearanceSettings {
     if (!MONO_FONTS.some((f) => f.id === merged.monoFont)) merged.monoFont = DEFAULT_MONO;
     if (!FONT_SIZES.some((f) => f.id === merged.fontSize)) merged.fontSize = DEFAULT_FONT_SIZE;
     merged.cursorTrail = sanitizeCursorTrail(saved.cursorTrail);
+    merged.cursorPointer = sanitizeCursorPointer(saved.cursorPointer);
     merged.cardGlow = sanitizeCardGlow(saved.cardGlow);
     return merged;
   } catch {

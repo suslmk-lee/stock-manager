@@ -74,3 +74,22 @@ export const CARD_GLOW_LIMITS = {
   x: { min: 0, max: 100, step: 5 }, // 광원 위치 가로(%)
   y: { min: 0, max: 100, step: 5 }, // 광원 위치 세로(%)
 } as const;
+
+// 커서 프리셋 (모양 설정 > 효과 갤러리)
+export const POINTER_PRESETS = [
+  { id: 'native', name: '기본 커서', description: '운영체제 커서 그대로' },
+  { id: 'dot-ring', name: '점과 링', description: '작은 점 + 늦게 따라오는 링, 버튼 위에서 커짐' },
+  { id: 'squish', name: '속도 찌그러짐', description: '움직이는 방향으로 늘어나는 원' },
+  { id: 'crosshair', name: '크로스헤어', description: '십자선과 좌표 표시' },
+  { id: 'eyes', name: '눈', description: '움직이는 쪽을 바라보는 두 눈' },
+] as const;
+export type PointerPresetId = (typeof POINTER_PRESETS)[number]['id'];
+
+export const TRAIL_PRESETS = [
+  { id: 'dots', name: '점 사슬', description: '점이 사슬처럼 이어짐' },
+  { id: 'ribbon', name: '리본', description: '부드럽게 휘어지는 띠' },
+  { id: 'pixel', name: '픽셀', description: '격자에 맞춘 네모 조각' },
+  { id: 'ghost', name: '잔상', description: '커서 모양 잔상이 겹침' },
+  { id: 'comet', name: '혜성', description: '빛나는 머리와 흩어지는 꼬리' },
+] as const;
+export type TrailPresetId = (typeof TRAIL_PRESETS)[number]['id'];
