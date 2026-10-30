@@ -421,6 +421,6 @@ export const apiClient = {
 
   SaveNotificationSettings: async (s: NotificationSetting): Promise<NotificationSetting> => {
     if (isWeb) return fetchApi<NotificationSetting>('/notification-settings', { method: 'PUT', body: JSON.stringify(s) });
-    return (await WailsApp.SaveNotificationSettings(s)) as NotificationSetting;
+    return (await WailsApp.SaveNotificationSettings(s as unknown as Parameters<typeof WailsApp.SaveNotificationSettings>[0])) as NotificationSetting;
   },
 };

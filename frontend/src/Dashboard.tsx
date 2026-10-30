@@ -59,9 +59,9 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-3">
           {/* 상단 바: 브랜드 pill · 환율 pill */}
           <div className="flex items-center justify-between gap-3 mb-4">
-            <div className="glass-pill flex items-center gap-2.5 pl-1.5 pr-4 py-1.5">
+            <div className="glass-pill flex items-center gap-2.5 pl-1.5 pr-1.5 min-[440px]:pr-4 py-1.5">
               <IconTile icon={LineChart} tone="mint" size="sm" />
-              <span className="text-[15px] font-semibold tracking-tight">Stock Manager</span>
+              <span className="hidden min-[440px]:inline text-[15px] font-semibold tracking-tight whitespace-nowrap">Stock Manager</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="glass-pill flex items-center gap-2 px-3.5 py-2">
