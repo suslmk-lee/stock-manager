@@ -30,12 +30,33 @@ type SignalRule struct {
 	HighYieldEnabled bool    `json:"high_yield_enabled"`
 	HighYieldPct     float64 `json:"high_yield_pct"`
 
+	// 2단계: 시세 추세 / 배당 삭감 / 양도세 / 매수 시점 환율
+	FromHighEnabled bool    `json:"from_high_enabled"`
+	FromHighPct     float64 `json:"from_high_pct"` // <= 0, 52주 고점 대비
+	BelowMAEnabled  bool    `json:"below_ma_enabled"`
+	BelowMAPct      float64 `json:"below_ma_pct"` // <= 0, 200일 이평 대비
+	AboveMAEnabled  bool    `json:"above_ma_enabled"`
+	AboveMAPct      float64 `json:"above_ma_pct"` // >= 0
+
+	DividendCutEnabled bool    `json:"dividend_cut_enabled"`
+	DividendCutPct     float64 `json:"dividend_cut_pct"` // >= 0
+
+	TaxHarvestEnabled   bool `json:"tax_harvest_enabled"`
+	TaxHarvestFromMonth int  `json:"tax_harvest_from_month"` // 1~12
+	FxHistorical        bool `json:"fx_historical"`
+
+	// RuleVersion 은 스키마 버전이다. 1단계 행(0)은 로드 시 한 번만 새 기본값으로 보정된다.
+	RuleVersion int `json:"rule_version"`
+
 	SellMode string `gorm:"size:10" json:"sell_mode"`
 	BuyMode  string `gorm:"size:10" json:"buy_mode"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// SignalRuleVersion 은 현재 규칙 스키마 버전이다.
+const SignalRuleVersion = 2
 
 // DefaultSignalRule 은 "균형" 기본 규칙(저장 전)을 반환한다.
 func DefaultSignalRule() SignalRule {
@@ -57,6 +78,14 @@ func DefaultSignalRule() SignalRule {
 		BuyDipPct:                   -10,
 		HighYieldEnabled:            false,
 		HighYieldPct:                5,
+		FromHighPct:                 -20,
+		BelowMAPct:                  -5,
+		AboveMAPct:                  25,
+		DividendCutPct:              10,
+		TaxHarvestEnabled:           true,
+		TaxHarvestFromMonth:         11,
+		FxHistorical:                true,
+		RuleVersion:                 SignalRuleVersion,
 		SellMode:                    "any",
 		BuyMode:                     "any",
 	}

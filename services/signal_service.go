@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"stock-manager/models"
@@ -45,6 +46,10 @@ func ValidateSignalRule(r *models.SignalRule) error {
 		"low_yield_pct":                   r.LowYieldPct,
 		"buy_dip_pct":                     r.BuyDipPct,
 		"high_yield_pct":                  r.HighYieldPct,
+		"from_high_pct":                   r.FromHighPct,
+		"below_ma_pct":                    r.BelowMAPct,
+		"above_ma_pct":                    r.AboveMAPct,
+		"dividend_cut_pct":                r.DividendCutPct,
 	}
 	for k, v := range fin {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -59,6 +64,24 @@ func ValidateSignalRule(r *models.SignalRule) error {
 	}
 	if r.WeightBandPct < 0 {
 		return &ErrInvalidSignalRule{"weight_band_pct must be >= 0"}
+	}
+	if r.FromHighPct > 0 {
+		return &ErrInvalidSignalRule{"from_high_pct must be <= 0"}
+	}
+	if r.BelowMAPct > 0 {
+		return &ErrInvalidSignalRule{"below_ma_pct must be <= 0"}
+	}
+	if r.AboveMAPct < 0 {
+		return &ErrInvalidSignalRule{"above_ma_pct must be >= 0"}
+	}
+	if r.DividendCutPct < 0 {
+		return &ErrInvalidSignalRule{"dividend_cut_pct must be >= 0"}
+	}
+	if r.TaxHarvestFromMonth == 0 {
+		r.TaxHarvestFromMonth = defaultTaxHarvestMonth
+	}
+	if r.TaxHarvestFromMonth < 1 || r.TaxHarvestFromMonth > 12 {
+		return &ErrInvalidSignalRule{"tax_harvest_from_month must be 1..12"}
 	}
 	var err error
 	if r.SellMode, err = normalizeSignalMode("sell_mode", r.SellMode); err != nil {
@@ -97,14 +120,59 @@ func (s *SignalService) getOrCreateDefault() (models.SignalRule, error) {
 	return r, nil
 }
 
+const defaultTaxHarvestMonth = 11
+
+// migrateSignalRule 은 1단계(RuleVersion < 2) 규칙의 0 값 필드를 새 기본값으로 한 번만 보정한다.
+// 보정했으면 true.
+func migrateSignalRule(r *models.SignalRule) bool {
+	if r.RuleVersion >= models.SignalRuleVersion {
+		return false
+	}
+	def := models.DefaultSignalRule()
+	if r.FromHighPct == 0 {
+		r.FromHighPct = def.FromHighPct
+	}
+	if r.BelowMAPct == 0 {
+		r.BelowMAPct = def.BelowMAPct
+	}
+	if r.AboveMAPct == 0 {
+		r.AboveMAPct = def.AboveMAPct
+	}
+	if r.DividendCutPct == 0 {
+		r.DividendCutPct = def.DividendCutPct
+	}
+	if r.TaxHarvestFromMonth == 0 {
+		r.TaxHarvestFromMonth = defaultTaxHarvestMonth
+	}
+	r.FxHistorical = true
+	r.TaxHarvestEnabled = true
+	r.RuleVersion = models.SignalRuleVersion
+	return true
+}
+
+func (s *SignalService) persistMigrated(r *models.SignalRule) error {
+	if !migrateSignalRule(r) {
+		return nil
+	}
+	return s.db.Omit(clause.Associations).Save(r).Error
+}
+
 func (s *SignalService) GetSignalRules() (*SignalRules, error) {
 	def, err := s.getOrCreateDefault()
 	if err != nil {
 		return nil, err
 	}
+	if err := s.persistMigrated(&def); err != nil {
+		return nil, err
+	}
 	overrides := []models.SignalRule{}
 	if err := s.db.Where("asset_id <> ?", 0).Order("asset_id").Find(&overrides).Error; err != nil {
 		return nil, err
+	}
+	for i := range overrides {
+		if err := s.persistMigrated(&overrides[i]); err != nil {
+			return nil, err
+		}
 	}
 	return &SignalRules{Default: def, Overrides: overrides}, nil
 }
@@ -114,6 +182,7 @@ func (s *SignalService) saveRule(assetID uint, rule models.SignalRule) (models.S
 		return rule, err
 	}
 	rule.AssetID = assetID
+	rule.RuleVersion = models.SignalRuleVersion // 클라이언트가 보낸 값과 무관하게 최신 스키마로 저장 (재보정 방지)
 	var existing models.SignalRule
 	err := s.db.Where("asset_id = ?", assetID).First(&existing).Error
 	switch {
@@ -221,21 +290,49 @@ func (s *SignalService) GetSignals() (*SignalReport, error) {
 		})
 	}
 
-	if len(order) > 0 {
-		var pnls []models.RealizedPnL
-		if err := s.db.Where("asset_id IN ?", order).Find(&pnls).Error; err != nil {
-			return nil, fmt.Errorf("실현손익 조회 실패: %w", err)
+	now := time.Now()
+
+	// 시세/일봉/환율 이력은 네트워크 호출이므로 DB 조회와 무관하게 동시에 가져온다.
+	tickers := make([]string, 0, len(order))
+	for _, id := range order {
+		tickers = append(tickers, inputs[id].Ticker)
+	}
+	var (
+		wg        sync.WaitGroup
+		prices    = map[string]*CurrentPrice{}
+		histories = map[string]*PriceHistory{}
+		fxHist    *PriceHistory
+	)
+	if len(tickers) > 0 {
+		wg.Add(2)
+		go func() { defer wg.Done(); prices = s.ticker.GetCurrentPrices(tickers) }()
+		go func() { defer wg.Done(); histories = s.ticker.GetDailyHistoriesCached(tickers) }()
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if h, err := s.ticker.GetFxHistoryCached(); err == nil {
+			fxHist = h
 		}
-		for _, p := range pnls {
-			if _, ok := accMap[p.AccountID]; !ok {
+	}()
+
+	if len(order) > 0 {
+		var txns []models.Transaction
+		if err := s.db.Where("asset_id IN ?", order).Find(&txns).Error; err != nil {
+			wg.Wait()
+			return nil, fmt.Errorf("거래 조회 실패: %w", err)
+		}
+		for _, t := range txns {
+			if _, ok := accMap[t.AccountID]; !ok {
 				continue
 			}
-			inputs[p.AssetID].PnLs = append(inputs[p.AssetID].PnLs, SignalPnLInput{
-				Profit: p.Profit, BuyAvgPrice: p.BuyAvgPrice, Quantity: p.Quantity, Currency: p.Currency,
+			inputs[t.AssetID].Txns = append(inputs[t.AssetID].Txns, SignalTxnInput{
+				AccountID: t.AccountID, Type: t.Type, Date: t.Date, Quantity: t.Quantity, Price: t.Price, Fee: t.Fee,
 			})
 		}
 		var divs []models.Dividend
 		if err := s.db.Where("asset_id IN ?", order).Find(&divs).Error; err != nil {
+			wg.Wait()
 			return nil, fmt.Errorf("배당 조회 실패: %w", err)
 		}
 		for _, d := range divs {
@@ -243,24 +340,31 @@ func (s *SignalService) GetSignals() (*SignalReport, error) {
 				continue
 			}
 			inputs[d.AssetID].Dividends = append(inputs[d.AssetID].Dividends, SignalDividendInput{
-				Amount: d.Amount, Tax: d.Tax, Currency: d.Currency, Date: d.Date,
+				AccountID: d.AccountID, Amount: d.Amount, Tax: d.Tax, Currency: d.Currency, Date: d.Date,
 			})
 		}
 	}
 
-	tickers := make([]string, 0, len(order))
-	for _, id := range order {
-		tickers = append(tickers, inputs[id].Ticker)
+	// 실현손익: 양도세는 보유 여부와 무관하게 전 종목이 필요하다.
+	var allPnls []models.RealizedPnL
+	if err := s.db.Find(&allPnls).Error; err != nil {
+		wg.Wait()
+		return nil, fmt.Errorf("실현손익 조회 실패: %w", err)
 	}
-	prices := map[string]*CurrentPrice{}
-	if len(tickers) > 0 {
-		prices = s.ticker.GetCurrentPrices(tickers)
-	}
-	for _, id := range order {
-		in := inputs[id]
-		if p := lookupPrice(prices, in.Ticker); p != nil && p.Price > 0 {
-			in.Price = p.Price
-			in.PriceCurrency = p.Currency
+	var taxPnls []TaxPnL
+	for _, p := range allPnls {
+		acc, ok := accMap[p.AccountID]
+		if !ok {
+			continue
+		}
+		ticker := assetMap[p.AssetID].Ticker
+		taxPnls = append(taxPnls, TaxPnL{
+			Date: p.Date, ProfitLocal: p.Profit, Currency: p.Currency, Ticker: ticker, AccountType: acc.AccountType,
+		})
+		if in := inputs[p.AssetID]; in != nil {
+			in.PnLs = append(in.PnLs, SignalPnLInput{
+				Date: p.Date, Profit: p.Profit, BuyAvgPrice: p.BuyAvgPrice, Quantity: p.Quantity, Currency: p.Currency,
+			})
 		}
 	}
 
@@ -268,11 +372,32 @@ func (s *SignalService) GetSignals() (*SignalReport, error) {
 	if usdKRW <= 0 {
 		usdKRW = 1300 // 환율 조회 실패 시 서비스 기본값과 동일
 	}
+	wg.Wait()
+
+	for _, id := range order {
+		in := inputs[id]
+		if p := lookupPrice(prices, in.Ticker); p != nil && p.Price > 0 {
+			in.Price = p.Price
+			in.PriceCurrency = p.Currency
+		}
+		if h := histories[strings.ToUpper(in.Ticker)]; h != nil {
+			in.History = h.Points
+		}
+	}
+
+	ctx := SignalContext{FxAt: NewFxLookup(fxHist, usdKRW), FxOK: fxHist != nil && len(fxHist.Points) > 0}
+	month := rules.Default.TaxHarvestFromMonth
+	if month < 1 || month > 12 {
+		month = defaultTaxHarvestMonth
+	}
+	tax := ComputeOverseasTax(taxPnls, ctx.FxAt, now, month)
+	ctx.Tax = &tax
+
 	list := make([]SignalAssetInput, 0, len(order))
 	for _, id := range order {
 		list = append(list, *inputs[id])
 	}
-	report := BuildSignalReport(list, usdKRW, time.Now())
+	report := BuildSignalReport(list, usdKRW, now, ctx)
 	sanitizeSignalReport(&report)
 	return &report, nil
 }

@@ -24,7 +24,7 @@ func krwAsset(id uint, price, qty, avg float64, rule models.SignalRule) SignalAs
 
 func evalOne(t *testing.T, in SignalAssetInput) SignalItem {
 	t.Helper()
-	r := BuildSignalReport([]SignalAssetInput{in}, 1000, sigNow)
+	r := BuildSignalReport([]SignalAssetInput{in}, 1000, sigNow, SignalContext{})
 	if len(r.Items) != 1 {
 		t.Fatalf("items=%d", len(r.Items))
 	}
@@ -201,20 +201,20 @@ func TestWeightRules(t *testing.T) {
 		t.Fatal("missing")
 		return SignalItem{}
 	}
-	r := BuildSignalReport(mk(60, 40), 1000, sigNow) // 60 >= 60 -> sell; 40 <= 40 -> buy
+	r := BuildSignalReport(mk(60, 40), 1000, sigNow, SignalContext{}) // 60 >= 60 -> sell; 40 <= 40 -> buy
 	if find(r, 1).Action != SignalSell || find(r, 2).Action != SignalBuy {
 		t.Errorf("%+v", r.Summary)
 	}
 	if th := find(r, 1).SellChecks[0].Threshold; !approx(th, 60) {
 		t.Errorf("threshold %v", th)
 	}
-	r = BuildSignalReport(mk(59, 41), 1000, sigNow)
+	r = BuildSignalReport(mk(59, 41), 1000, sigNow, SignalContext{})
 	if find(r, 1).Action != SignalHold || find(r, 2).Action != SignalHold {
 		t.Errorf("%+v", r.Summary)
 	}
 	// target 0 -> no weight checks
 	rule.TargetWeightPct = 0
-	r = BuildSignalReport(mk(60, 40), 1000, sigNow)
+	r = BuildSignalReport(mk(60, 40), 1000, sigNow, SignalContext{})
 	if len(find(r, 1).SellChecks)+len(find(r, 1).BuyChecks) != 0 {
 		t.Error("target 0 should disable")
 	}
@@ -247,7 +247,7 @@ func TestModesAndConflict(t *testing.T) {
 	}
 	// conflict: stop_loss and buy_dip both met at price 80
 	c := models.SignalRule{StopLossEnabled: true, StopLossPct: -20, BuyDipEnabled: true, BuyDipPct: -10, SellMode: "any", BuyMode: "any"}
-	r := BuildSignalReport([]SignalAssetInput{krwAsset(1, 80, 1, 100, c)}, 1000, sigNow)
+	r := BuildSignalReport([]SignalAssetInput{krwAsset(1, 80, 1, 100, c)}, 1000, sigNow, SignalContext{})
 	if r.Items[0].Action != SignalConflict || r.Summary.Conflict != 1 {
 		t.Errorf("%+v", r)
 	}
@@ -258,7 +258,7 @@ func TestNoPriceAndGuards(t *testing.T) {
 	in := krwAsset(1, 0, 5, 100, rule)
 	in.Dividends = []SignalDividendInput{{Amount: 10, Date: sigNow}}
 	other := krwAsset(2, 100, 1, 100, noRules())
-	r := BuildSignalReport([]SignalAssetInput{in, other}, 1000, sigNow)
+	r := BuildSignalReport([]SignalAssetInput{in, other}, 1000, sigNow, SignalContext{})
 	if r.Summary.NoPrice != 1 || r.Summary.Hold != 1 {
 		t.Errorf("%+v", r.Summary)
 	}
@@ -278,7 +278,7 @@ func TestNoPriceAndGuards(t *testing.T) {
 	}
 	// zero quantity excluded
 	q := krwAsset(4, 100, 0, 100, noRules())
-	if r := BuildSignalReport([]SignalAssetInput{q}, 1000, sigNow); len(r.Items) != 0 {
+	if r := BuildSignalReport([]SignalAssetInput{q}, 1000, sigNow, SignalContext{}); len(r.Items) != 0 {
 		t.Error("qty 0 should be excluded")
 	}
 }
@@ -305,7 +305,7 @@ func TestRuleSourceAndSorting(t *testing.T) {
 	b.RuleSource = "asset"
 	c := krwAsset(3, 120, 100, 100, tp)    // sell, bigger MV
 	d := krwAsset(4, 0, 1, 100, noRules()) // no price
-	r := BuildSignalReport([]SignalAssetInput{d, a, b, c}, 1000, sigNow)
+	r := BuildSignalReport([]SignalAssetInput{d, a, b, c}, 1000, sigNow, SignalContext{})
 	got := []uint{}
 	for _, it := range r.Items {
 		got = append(got, it.AssetID)

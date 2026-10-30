@@ -16,7 +16,7 @@ func TestSanitizeSignalReportAllowsJSON(t *testing.T) {
 		Rule: models.DefaultSignalRule(), RuleSource: "default",
 		Holdings: []SignalHoldingInput{{AccountID: 1, Quantity: 10, AvgPrice: math.NaN()}},
 	}}
-	report := BuildSignalReport(in, 1300, time.Now())
+	report := BuildSignalReport(in, 1300, time.Now(), SignalContext{})
 	if _, err := json.Marshal(report); err == nil {
 		t.Fatalf("precondition: expected NaN to break json before sanitizing")
 	}
