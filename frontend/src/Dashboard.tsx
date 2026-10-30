@@ -37,7 +37,7 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-ink-950 text-zinc-100">
+    <div className="relative min-h-screen app-bg text-zinc-100">
       {/* 상단 은은한 광원 */}
       <div
         aria-hidden
