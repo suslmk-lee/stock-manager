@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Lightbulb } from 'lucide-react';
 import type { SignalEvent } from '../../types/models';
 import { useAlerts } from './AlertsProvider';
-import { eventTone, shortLabel } from './alertMeta';
+import { eventTone, isSuggestion, shortLabel } from './alertMeta';
 
 const MAX_VISIBLE = 3;
 const DURATION_MS = 6000;
@@ -32,7 +32,11 @@ function Toast({ event }: { event: SignalEvent }) {
       onMouseLeave={() => setPaused(false)}
     >
       <button type="button" className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={() => openEvent(event)}>
-        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tone.dot}`} />
+        {isSuggestion(event) ? (
+          <Lightbulb className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${tone.text}`} />
+        ) : (
+          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tone.dot}`} />
+        )}
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className="truncate text-sm font-medium text-white">{event.name}</span>

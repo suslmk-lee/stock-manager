@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ChevronDown, History } from 'lucide-react';
+import { ArrowRight, ChevronDown, History, Lightbulb } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { SignalEvent } from '../../types/models';
 import { useAlerts } from './AlertsProvider';
-import { clockTime, dayKey, dayLabel, eventTone, isCleared, shortLabel, toneOf } from './alertMeta';
+import { clockTime, dayKey, dayLabel, eventTone, isCleared, isSuggestion, shortLabel, toneOf } from './alertMeta';
 
 function HistoryItem({ event }: { event: SignalEvent }) {
   const cleared = isCleared(event);
   const to = eventTone(event);
-  const from = event.from_action ? toneOf(event.from_action) : null;
+  const suggestion = isSuggestion(event);
+  const from = !suggestion && event.from_action ? toneOf(event.from_action) : null;
   return (
     <li className={`flex items-start gap-3 py-3 ${cleared ? 'opacity-60' : ''}`}>
       <span className="num w-11 shrink-0 pt-0.5 text-xs text-zinc-500">{clockTime(event.created_at)}</span>
       <span className="relative mt-1.5 flex shrink-0 items-center">
-        <span className={`h-2 w-2 rounded-full ${to.dot}`} />
+        {suggestion ? <Lightbulb className={`-ml-0.5 h-3 w-3 ${to.text}`} /> : <span className={`h-2 w-2 rounded-full ${to.dot}`} />}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

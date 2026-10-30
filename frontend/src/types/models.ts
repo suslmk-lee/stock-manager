@@ -189,10 +189,72 @@ export interface SignalRule {
   tax_harvest_enabled?: boolean;
   tax_harvest_from_month?: number; // 1~12
   fx_historical?: boolean;
+  crash_enabled?: boolean;
+  crash_pct?: number; // <= 0 (큰 폭락 경고)
   sell_mode: SignalMode;
   buy_mode: SignalMode;
   created_at?: string;
   updated_at?: string;
+}
+
+export type ProfileKind = 'standard' | 'dividend';
+
+export interface SignalProfile {
+  id: number;
+  key: string;
+  name: string;
+  description: string;
+  kind: ProfileKind;
+  built_in: boolean;
+  sort_order: number;
+  asset_count: number;
+  rule: SignalRule;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ProfileAssignment {
+  asset_id: number;
+  profile_id: number;
+}
+
+export interface SignalProfilesResponse {
+  profiles: SignalProfile[];
+  assignments: ProfileAssignment[];
+}
+
+export interface CreateProfileRequest {
+  name: string;
+  description?: string;
+  kind: ProfileKind;
+  copy_from_profile_id?: number;
+}
+
+export interface UpdateProfileRequest {
+  name?: string;
+  description?: string;
+  kind?: ProfileKind;
+  rule?: SignalRule;
+}
+
+export interface CandidateReason {
+  code: string;
+  label: string;
+  met: boolean;
+  detail: string;
+}
+
+export interface ProfileCandidate {
+  asset_id: number;
+  ticker: string;
+  name: string;
+  score: number;
+  max_score: number;
+  is_candidate: boolean;
+  reasons: CandidateReason[];
+  profile_id: number;
+  profile_name: string;
+  has_override: boolean;
 }
 
 export interface SignalRulesResponse {
@@ -226,7 +288,12 @@ export interface SignalItem {
   name: string;
   currency: string;
   action: SignalAction;
-  rule_source: 'default' | 'asset';
+  rule_source: 'default' | 'asset' | 'profile';
+  profile_id?: number;
+  profile_key?: string;
+  profile_name?: string;
+  profile_kind?: ProfileKind;
+  sell_disabled?: boolean;
   restricted_only: boolean;
   quantity: number;
   avg_price: number;
@@ -303,7 +370,9 @@ export interface SignalEvent {
   ticker: string;
   name: string;
   from_action: SignalAction | '';
-  to_action: SignalAction;
+  to_action: SignalAction | 'SUGGEST';
+  kind?: 'signal' | 'suggestion';
+  suggested_profile_id?: number;
   met_codes: string; // 쉼표로 구분
   message: string;
   total_return_pct: number;

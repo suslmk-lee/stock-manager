@@ -11,24 +11,31 @@ const TONES: Record<string, AlertTone> = {
   SELL: { label: '매도 검토', dot: 'bg-rose-400', text: 'text-rose-300', badge: 'border border-rose-400/30 bg-rose-500/10 text-rose-200' },
   BUY: { label: '매수 검토', dot: 'bg-mint-400', text: 'text-mint-300', badge: 'border border-mint-400/30 bg-mint-400/10 text-mint-300' },
   CONFLICT: { label: '신호 충돌', dot: 'bg-amber-400', text: 'text-amber-300', badge: 'border border-amber-400/30 bg-amber-400/10 text-amber-200' },
+  SUGGEST: { label: '제안', dot: 'bg-sky-400', text: 'text-sky-300', badge: 'border border-sky-400/30 bg-sky-400/10 text-sky-200' },
   CLEARED: { label: '해제', dot: 'bg-zinc-500', text: 'text-zinc-400', badge: 'border border-white/10 bg-white/[0.04] text-zinc-400' },
 };
 
 /** 신호가 해제(관망·시세 없음 등 매도/매수/충돌이 아닌 상태)로 돌아간 이벤트인지 */
-export function isCleared(e: Pick<SignalEvent, 'to_action'>): boolean {
+export function isSuggestion(e: Pick<SignalEvent, 'to_action' | 'kind'>): boolean {
+  return e.kind === 'suggestion' || e.to_action === 'SUGGEST';
+}
+
+export function isCleared(e: Pick<SignalEvent, 'to_action' | 'kind'>): boolean {
+  if (isSuggestion(e)) return false;
   return e.to_action !== 'SELL' && e.to_action !== 'BUY' && e.to_action !== 'CONFLICT';
 }
 
-export function toneOf(action: SignalAction | ''): AlertTone {
+export function toneOf(action: SignalAction | 'SUGGEST' | ''): AlertTone {
   return TONES[action as string] ?? TONES.CLEARED;
 }
 
 export function eventTone(e: SignalEvent): AlertTone {
+  if (isSuggestion(e)) return TONES.SUGGEST;
   return isCleared(e) ? TONES.CLEARED : TONES[e.to_action];
 }
 
-const SHORT: Record<string, string> = { SELL: '매도', BUY: '매수', CONFLICT: '충돌', HOLD: '관망', NO_PRICE: '시세 없음', '': '신규' };
-export function shortLabel(a: SignalAction | ''): string {
+const SHORT: Record<string, string> = { SELL: '매도', BUY: '매수', CONFLICT: '충돌', HOLD: '관망', NO_PRICE: '시세 없음', '': '신규', SUGGEST: '제안' };
+export function shortLabel(a: SignalAction | 'SUGGEST' | ''): string {
   return SHORT[a] ?? a;
 }
 
