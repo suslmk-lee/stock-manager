@@ -158,8 +158,9 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       // 월별 차트 데이터
       const monthlyMap = new Map<string, number>();
       for (let i = 11; i >= 0; i--) {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
+        // 1일 기준으로 계산해야 31일·30일에 짧은 달(2월 등)을 건너뛰지 않는다
+        const now = new Date();
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         monthlyMap.set(key, 0);
       }
