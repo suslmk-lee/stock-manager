@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState, CSSProperties } from 'react';
-import { buildThemeVars, getTheme, rgbToHex, DEFAULT_THEME_ID, AppTheme } from './themes';
+import { buildThemeVars, getTheme, hexToRgb, rgbToHex, DEFAULT_THEME_ID, AppTheme } from './themes';
 import {
   DEFAULT_CARD_STYLE, DEFAULT_FONT_SIZE, DEFAULT_MONO, DEFAULT_SANS, FONT_SIZES, FontSizeId,
   MONO_FALLBACK, MONO_FONTS, SANS_FALLBACK, SANS_FONTS, CARD_STYLES,
@@ -118,6 +118,20 @@ export interface ThemeColors {
   tooltip: { contentStyle: CSSProperties; labelStyle: CSSProperties; itemStyle: CSSProperties };
 }
 
+// 앞에서부터 고르되, 이미 고른 색과 너무 비슷한 색은 건너뛴다 (강조색이 상태색과 겹치는 테마 대비)
+function distinctColors(colors: string[], minDist = 70): string[] {
+  const picked: string[] = [];
+  for (const col of colors) {
+    const [r, g, b] = hexToRgb(col);
+    const close = picked.some((p) => {
+      const [pr, pg, pb] = hexToRgb(p);
+      return Math.hypot(r - pr, g - pg, b - pb) < minDist;
+    });
+    if (!close) picked.push(col);
+  }
+  return picked;
+}
+
 const hexOf = (vars: Record<string, string>, name: string) =>
   rgbToHex(vars[`--c-${name}`].split(' ').map(Number) as [number, number, number]);
 
@@ -141,7 +155,7 @@ export function useThemeColors(): ThemeColors {
       axis: c('zinc-500'),
       grid: c('ink-600'),
       surface,
-      palette: [c('mint-400'), c('sky-400'), c('amber-400'), c('rose-400'), c('orange-400'), c('mint-200'), c('sky-200'), c('amber-200'), c('rose-200'), c('zinc-400')],
+      palette: distinctColors([c('mint-400'), c('sky-400'), c('amber-400'), c('rose-400'), c('orange-400'), c('emerald-400'), c('mint-200'), c('sky-200'), c('amber-200'), c('rose-200'), c('zinc-400')]),
       tooltip: {
         contentStyle: { background: c('ink-850'), border: `1px solid ${border}`, borderRadius: 12, fontSize: 12, color: c('zinc-100') },
         labelStyle: { color: c('zinc-300') },

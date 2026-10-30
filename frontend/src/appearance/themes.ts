@@ -13,21 +13,23 @@ export interface AppTheme {
   fg: string; // 최대 대비 글자색 (다크 테마의 "white")
   accent: string; // 포인트 색
   surface?: string; // 카드 바탕 (기본: bg 에서 fg 쪽으로 살짝)
+  // 상태 색 덮어쓰기 — 강조색이 주황·노랑 계열이면 '인출 제한'(amber)과 겹치지 않게 바꾼다
+  status?: Partial<Record<'amber' | 'rose' | 'emerald' | 'sky' | 'orange', string>>;
 }
 
 export const THEMES: AppTheme[] = [
   { id: 'default', name: '기본 (블랙 · 민트)', mode: 'dark', bg: '#060607', fg: '#ffffff', accent: '#7ddfb0' },
   { id: 'graphite-blue', name: '그라파이트 · 파랑', mode: 'dark', bg: '#111113', fg: '#f4f4f5', accent: '#6aa8ff' },
-  { id: 'graphite-orange', name: '그라파이트 · 주황', mode: 'dark', bg: '#111113', fg: '#f4f4f5', accent: '#f59e6b' },
+  { id: 'graphite-orange', name: '그라파이트 · 주황', mode: 'dark', bg: '#111113', fg: '#f4f4f5', accent: '#f59e6b', status: { amber: '#a5b4fc', orange: '#f472b6' } },
   { id: 'monochrome', name: '모노크롬', mode: 'dark', bg: '#0a0a0a', fg: '#fafafa', accent: '#d4d4d8' },
   { id: 'mauve', name: '모브 (회보라)', mode: 'dark', bg: '#16131b', fg: '#f3eef7', accent: '#c4a7e7' },
-  { id: 'mocha', name: '모카 (갈색)', mode: 'dark', bg: '#191411', fg: '#f5ede6', accent: '#d9a46f' },
+  { id: 'mocha', name: '모카 (갈색)', mode: 'dark', bg: '#191411', fg: '#f5ede6', accent: '#d9a46f', status: { amber: '#9fc4d9', orange: '#e48fa8' } },
   { id: 'slate', name: '슬레이트 (청회색)', mode: 'dark', bg: '#0e131a', fg: '#e8eef5', accent: '#7fb0d9' },
   { id: 'dracula', name: 'Dracula', mode: 'dark', bg: '#21222c', fg: '#f8f8f2', accent: '#bd93f9' },
   { id: 'nord', name: 'Nord', mode: 'dark', bg: '#2e3440', fg: '#eceff4', accent: '#88c0d0' },
   { id: 'tokyo-night', name: 'Tokyo Night', mode: 'dark', bg: '#1a1b26', fg: '#c0caf5', accent: '#7aa2f7' },
   { id: 'catppuccin-mocha', name: 'Catppuccin Mocha', mode: 'dark', bg: '#1e1e2e', fg: '#cdd6f4', accent: '#cba6f7' },
-  { id: 'gruvbox', name: 'Gruvbox', mode: 'dark', bg: '#1d2021', fg: '#ebdbb2', accent: '#fe8019' },
+  { id: 'gruvbox', name: 'Gruvbox', mode: 'dark', bg: '#1d2021', fg: '#ebdbb2', accent: '#fe8019', status: { amber: '#d3869b', orange: '#83a598', emerald: '#b8bb26', rose: '#fb4934' } },
   { id: 'rose-pine', name: 'Rosé Pine', mode: 'dark', bg: '#191724', fg: '#e0def4', accent: '#ebbcba' },
   { id: 'solarized-dark', name: 'Solarized Dark', mode: 'dark', bg: '#002b36', fg: '#eee8d5', accent: '#2aa198' },
   { id: 'light', name: '라이트 (민트)', mode: 'light', bg: '#f4f5f7', fg: '#111113', accent: '#0f9f6e', surface: '#ffffff' },
@@ -37,7 +39,7 @@ export const THEMES: AppTheme[] = [
 
 export const DEFAULT_THEME_ID = 'default';
 
-// 상태 색 기준값 (Tailwind 400 수준). 라이트 테마에서는 단계 계산 시 자동으로 어두워진다.
+// 상태 색 기준값 (Tailwind 400 수준). 라이트 테마에서는 글자로 읽히도록 fg 쪽으로 어둡게 옮긴다.
 const STATUS_BASE = {
   amber: '#fbbf24',
   rose: '#fb7185',
@@ -110,7 +112,9 @@ export function buildThemeVars(theme: AppTheme): Record<string, string> {
 
   Object.entries(scale(accent, fg, bg)).forEach(([k, v]) => set(`mint-${k}`, v));
   (Object.keys(STATUS_BASE) as (keyof typeof STATUS_BASE)[]).forEach((name) => {
-    Object.entries(scale(STATUS_BASE[name], fg, bg)).forEach(([k, v]) => set(`${name}-${k}`, v));
+    const raw = theme.status?.[name] ?? STATUS_BASE[name];
+    const base = theme.mode === 'light' ? mix(raw, fg, 0.38) : raw;
+    Object.entries(scale(base, fg, bg)).forEach(([k, v]) => set(`${name}-${k}`, v));
   });
 
   vars['--shadow-k'] = theme.mode === 'dark' ? '1' : '0.18';
