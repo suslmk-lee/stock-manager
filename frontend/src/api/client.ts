@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport } from '../types/models';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -348,5 +348,40 @@ export const apiClient = {
   GetRealizedPnLSummary: async () => {
     if (isWeb) return fetchApi<any>('/realized-pnl/summary');
     return WailsApp.GetRealizedPnLSummary();
+  },
+
+  // ==========================================
+  // Trade Signals
+  // ==========================================
+  GetSignals: async (): Promise<SignalReport> => {
+    if (isWeb) return fetchApi<SignalReport>('/signals');
+    return (await WailsApp.GetSignals()) as SignalReport;
+  },
+
+  GetSignalRules: async (): Promise<SignalRulesResponse> => {
+    if (isWeb) return fetchApi<SignalRulesResponse>('/signal-rules');
+    return (await WailsApp.GetSignalRules()) as SignalRulesResponse;
+  },
+
+  SaveDefaultSignalRule: async (rule: SignalRule): Promise<SignalRule> => {
+    if (isWeb) {
+      return fetchApi<SignalRule>('/signal-rules/default', { method: 'PUT', body: JSON.stringify(rule) });
+    }
+    return (await WailsApp.SaveDefaultSignalRule(rule)) as SignalRule;
+  },
+
+  SaveAssetSignalRule: async (assetId: number, rule: SignalRule): Promise<SignalRule> => {
+    if (isWeb) {
+      return fetchApi<SignalRule>(`/signal-rules/asset/${assetId}`, { method: 'PUT', body: JSON.stringify(rule) });
+    }
+    return (await WailsApp.SaveAssetSignalRule(assetId, rule)) as SignalRule;
+  },
+
+  DeleteAssetSignalRule: async (assetId: number) => {
+    if (isWeb) {
+      await fetchApi(`/signal-rules/asset/${assetId}`, { method: 'DELETE' });
+      return;
+    }
+    return WailsApp.DeleteAssetSignalRule(assetId);
   },
 };

@@ -1,24 +1,26 @@
 import { useEffect, useState } from 'react';
-import { Wallet, TrendingUp, DollarSign, BarChart3, Calendar, Camera, ArrowLeftRight, LineChart, Settings2 } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, BarChart3, Calendar, Camera, ArrowLeftRight, LineChart, Settings2, Radar } from 'lucide-react';
 import AppearanceSettings from './components/settings/AppearanceSettings';
 import App from './App';
 import AssetManager from './components/AssetManager';
 import DividendManager from './components/DividendManager';
 import DividendDashboard from './pages/DividendDashboard';
+import SignalsDashboard from './pages/SignalsDashboard';
 import DividendYearlyOverview from './components/DividendYearlyOverview';
 import PortfolioSnapshots from './components/PortfolioSnapshots';
 import TransactionManager from './components/TransactionManager';
 import IconTile from './components/ui/IconTile';
 import { apiClient } from './api/client';
 
-type TabType = 'accounts' | 'assets' | 'trades' | 'dividends' | 'stats' | 'yearly' | 'portfolio';
+type TabType = 'accounts' | 'assets' | 'trades' | 'dividends' | 'stats' | 'signals' | 'yearly' | 'portfolio';
 
 const tabs = [
   { id: 'accounts' as TabType, label: '계좌 관리', icon: Wallet },
   { id: 'assets' as TabType, label: '주식/ETF', icon: TrendingUp },
   { id: 'trades' as TabType, label: '매매', icon: ArrowLeftRight },
   { id: 'dividends' as TabType, label: '배당금', icon: DollarSign },
-  { id: 'stats' as TabType, label: '통계', icon: BarChart3, isNew: true },
+  { id: 'stats' as TabType, label: '통계', icon: BarChart3 },
+  { id: 'signals' as TabType, label: '매매 신호', icon: Radar, isNew: true },
   { id: 'yearly' as TabType, label: '연간 현황', icon: Calendar },
   { id: 'portfolio' as TabType, label: '포트폴리오', icon: Camera },
 ];
@@ -113,6 +115,7 @@ export default function Dashboard() {
         {activeTab === 'trades' && <TransactionManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}
         {activeTab === 'dividends' && <DividendManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}
         {activeTab === 'stats' && <DividendDashboard />}
+        {activeTab === 'signals' && <SignalsDashboard />}
         {activeTab === 'yearly' && <DividendYearlyOverview />}
         {activeTab === 'portfolio' && <PortfolioSnapshots />}
       </main>
