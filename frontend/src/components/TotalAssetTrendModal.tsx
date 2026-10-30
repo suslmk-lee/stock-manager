@@ -129,6 +129,21 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
     });
   }, [points]);
 
+  // 세로축 범위: 0부터 그리면 변화가 납작해 보이므로 값이 있는 구간에 맞춘다 (쌓은 영역 보기는 0 기준 유지)
+  const yDomain = useMemo<[number, number] | [number, 'auto']>(() => {
+    if (view === 'split' || points.length === 0) return [0, 'auto'];
+    const vals = points.flatMap((p) =>
+      view === 'dividend' ? [p.total_krw, p.cost_krw, p.total_krw + p.dividends_cum_krw] : [p.total_krw, p.cost_krw],
+    ).filter((v) => v > 0);
+    if (vals.length === 0) return [0, 'auto'];
+    const lo = Math.min(...vals);
+    const hi = Math.max(...vals);
+    const pad = Math.max((hi - lo) * 0.12, hi * 0.01);
+    // 눈금이 깔끔하도록 자릿수에 맞춰 내림/올림
+    const step = Math.pow(10, Math.max(0, Math.floor(Math.log10(Math.max(hi - lo + pad * 2, 1))) - 1));
+    return [Math.max(0, Math.floor((lo - pad) / step) * step), Math.ceil((hi + pad) / step) * step];
+  }, [points, view]);
+
   // 연속된 추정 구간
   const estimatedRuns = useMemo(() => {
     const runs: { x1: string; x2: string }[] = [];
@@ -298,7 +313,7 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
                   <p className="label-mono mb-1.5">기간 증감</p>
                   <p className={`num text-sm sm:text-base font-light break-all ${deltaColor(stats.change)}`}>
                     {signed(stats.change)}
-                    {stats.changePct !== null && <span className="ml-1 text-xs">({signedPct(stats.changePct)})</span>}
+                    {stats.changePct !== null && <span className="block text-xs">{signedPct(stats.changePct)}</span>}
                   </p>
                 </div>
                 <div className={tile}>
@@ -321,7 +336,7 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
                   <p className="label-mono mb-1.5">원금 대비 손익</p>
                   <p className={`num text-sm sm:text-base font-light break-all ${deltaColor(stats.pl)}`}>
                     {signed(stats.pl)}
-                    {stats.plPct !== null && <span className="ml-1 text-xs">({signedPct(stats.plPct)})</span>}
+                    {stats.plPct !== null && <span className="block text-xs">{signedPct(stats.plPct)}</span>}
                   </p>
                 </div>
               </div>
@@ -357,7 +372,7 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
                       axisLine={{ stroke: tc.grid }}
                       tickLine={false}
                     />
-                    <YAxis tick={axisTick} domain={[0, 'auto']} width={55} axisLine={false} tickLine={false} tickFormatter={compactKRW} />
+                    <YAxis tick={axisTick} domain={yDomain} allowDataOverflow width={55} axisLine={false} tickLine={false} tickFormatter={compactKRW} />
                     <Tooltip content={renderTooltip} />
                     <Legend wrapperStyle={{ fontSize: 11, color: tc.muted }} iconType="circle" iconSize={8} />
                     {estimatedRuns.map((r) => (
