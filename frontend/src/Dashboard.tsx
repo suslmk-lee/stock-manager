@@ -10,6 +10,8 @@ import DividendYearlyOverview from './components/DividendYearlyOverview';
 import PortfolioSnapshots from './components/PortfolioSnapshots';
 import TransactionManager from './components/TransactionManager';
 import IconTile from './components/ui/IconTile';
+import AlertsBell from './components/alerts/AlertsBell';
+import { useAlerts } from './components/alerts/AlertsProvider';
 import { apiClient } from './api/client';
 
 type TabType = 'accounts' | 'assets' | 'trades' | 'dividends' | 'stats' | 'signals' | 'yearly' | 'portfolio';
@@ -30,6 +32,12 @@ export default function Dashboard() {
   const [selectedAccountId, setSelectedAccountId] = useState<number>(0);
   const [usdKrw, setUsdKrw] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { focusRequest } = useAlerts();
+
+  // 알림을 눌러 특정 종목으로 이동하면 매매 신호 탭으로 전환
+  useEffect(() => {
+    if (focusRequest) setActiveTab('signals');
+  }, [focusRequest]);
 
   useEffect(() => {
     apiClient
@@ -63,6 +71,7 @@ export default function Dashboard() {
                   {usdKrw ? usdKrw.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) : '—'}
                 </span>
               </div>
+              <AlertsBell />
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
@@ -115,7 +124,7 @@ export default function Dashboard() {
         {activeTab === 'trades' && <TransactionManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}
         {activeTab === 'dividends' && <DividendManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}
         {activeTab === 'stats' && <DividendDashboard />}
-        {activeTab === 'signals' && <SignalsDashboard />}
+        {activeTab === 'signals' && <SignalsDashboard focusAssetId={focusRequest?.assetId} focusNonce={focusRequest?.nonce} />}
         {activeTab === 'yearly' && <DividendYearlyOverview />}
         {activeTab === 'portfolio' && <PortfolioSnapshots />}
       </main>

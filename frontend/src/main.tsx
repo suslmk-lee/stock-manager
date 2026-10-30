@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Dashboard from './Dashboard';
 import { AppearanceProvider, initAppearance } from './appearance/AppearanceContext';
+import { AlertsProvider } from './components/alerts/AlertsProvider';
 import './index.css';
 
 initAppearance();
@@ -9,7 +10,9 @@ initAppearance();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppearanceProvider>
-      <Dashboard />
+      <AlertsProvider>
+        <Dashboard />
+      </AlertsProvider>
     </AppearanceProvider>
   </React.StrictMode>
 );

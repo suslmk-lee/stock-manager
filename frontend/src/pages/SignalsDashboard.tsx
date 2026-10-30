@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2 } from 'lucide-react';
+import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell } from 'lucide-react';
+import { useAlerts } from '../components/alerts/AlertsProvider';
+import SignalHistory from '../components/alerts/SignalHistory';
 import { apiClient } from '../api/client';
 import { SignalAction, SignalCheck, SignalItem, SignalReport, SignalRule, SignalRulesResponse, SignalTaxSummary } from '../types/models';
 import IconTile from '../components/ui/IconTile';
@@ -202,7 +204,7 @@ function CheckGroup({ title, checks, tone, mode }: { title: string; checks: Sign
   );
 }
 
-function SignalCard({ item, rule, onEdit }: { item: SignalItem; rule?: SignalRule; onEdit: () => void }) {
+function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: SignalRule; onEdit: () => void; flash?: boolean }) {
   const [open, setOpen] = useState(false);
   const meta = ACTION_META[item.action];
   const actionLabel = item.action === 'SELL' && item.restricted_only ? '리밸런싱 검토' : meta.label;
@@ -215,7 +217,7 @@ function SignalCard({ item, rule, onEdit }: { item: SignalItem; rule?: SignalRul
   const hint = !noPrice ? item.tax_hint : null;
 
   return (
-    <article className="surface flex flex-col p-5 sm:p-6">
+    <article id={'signal-card-' + item.asset_id} className={`surface flex scroll-mt-48 flex-col p-5 sm:p-6 ${flash ? 'focus-flash' : ''}`}>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold tracking-tight text-white">{item.name}</h3>
@@ -422,7 +424,17 @@ function Skeleton() {
 
 type EditorState = { mode: 'default' } | { mode: 'asset'; item: SignalItem } | null;
 
-export default function SignalsDashboard() {
+// 이미 처리한 포커스 요청 (탭 전환으로 다시 마운트돼도 재실행하지 않도록)
+let handledFocusNonce = 0;
+
+interface SignalsDashboardProps {
+  focusAssetId?: number;
+  focusNonce?: number;
+}
+
+export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDashboardProps = {}) {
+  const { openSettings } = useAlerts();
+  const [flashId, setFlashId] = useState<number | null>(null);
   const [report, setReport] = useState<SignalReport | null>(null);
   const [rules, setRules] = useState<SignalRulesResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -453,6 +465,27 @@ export default function SignalsDashboard() {
   useEffect(() => {
     load(true);
   }, [load]);
+
+  // 알림에서 넘어온 종목 카드로 스크롤하고 잠깐 강조
+  useEffect(() => {
+    if (!report || !focusAssetId || !focusNonce || focusNonce === handledFocusNonce) return;
+    const target = report.items.find((i) => i.asset_id === focusAssetId);
+    if (!target) return;
+    if (filter !== 'all' && target.action !== filter) {
+      setFilter('all'); // 필터를 풀고 난 뒤 다시 실행된다
+      return;
+    }
+    const t1 = window.setTimeout(() => {
+      handledFocusNonce = focusNonce;
+      document.getElementById('signal-card-' + focusAssetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setFlashId(focusAssetId);
+    }, 150);
+    const t2 = window.setTimeout(() => setFlashId(null), 2800);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [report, focusAssetId, focusNonce, filter]);
 
   const ruleFor = (item: SignalItem): SignalRule | undefined =>
     rules?.overrides?.find((o) => o.asset_id === item.asset_id) ?? rules?.default;
@@ -492,6 +525,10 @@ export default function SignalsDashboard() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button type="button" className="btn-ghost" onClick={openSettings}>
+            <Bell className="h-4 w-4" />
+            알림 설정
+          </button>
           <button type="button" className="btn-ghost" disabled={!rules} onClick={() => setEditor({ mode: 'default' })}>
             <SlidersHorizontal className="h-4 w-4" />
             기본 전략
@@ -558,7 +595,7 @@ export default function SignalsDashboard() {
           ) : (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {visible.map((item) => (
-                <SignalCard key={item.asset_id} item={item} rule={ruleFor(item)} onEdit={() => rules && setEditor({ mode: 'asset', item })} />
+                <SignalCard key={item.asset_id} item={item} rule={ruleFor(item)} onEdit={() => rules && setEditor({ mode: 'asset', item })} flash={flashId === item.asset_id} />
               ))}
             </div>
           )}
@@ -568,6 +605,8 @@ export default function SignalsDashboard() {
           )}
         </>
       ) : null}
+
+      <SignalHistory />
 
       {editor && rules && (
         <SignalRuleEditor

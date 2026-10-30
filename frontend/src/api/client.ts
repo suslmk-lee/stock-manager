@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting } from '../types/models';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -384,5 +384,43 @@ export const apiClient = {
       return;
     }
     return WailsApp.DeleteAssetSignalRule(assetId);
+  },
+
+  // ==========================================
+  // Signal Alerts
+  // ==========================================
+  GetSignalEvents: async (limit: number, unreadOnly: boolean): Promise<SignalEventsResponse> => {
+    if (isWeb) return fetchApi<SignalEventsResponse>(`/signal-events?limit=${limit}&unread_only=${unreadOnly}`);
+    return (await WailsApp.GetSignalEvents(limit, unreadOnly)) as SignalEventsResponse;
+  },
+
+  MarkSignalEventsRead: async (ids: number[], all: boolean): Promise<{ unread_count: number }> => {
+    if (isWeb) {
+      return fetchApi<{ unread_count: number }>('/signal-events/read', {
+        method: 'POST',
+        body: JSON.stringify(all ? { all: true } : { ids }),
+      });
+    }
+    return (await WailsApp.MarkSignalEventsRead(ids, all)) as { unread_count: number };
+  },
+
+  GetUnreadSignalCount: async (): Promise<{ unread_count: number }> => {
+    if (isWeb) return fetchApi<{ unread_count: number }>('/signal-events/unread-count');
+    return (await WailsApp.GetUnreadSignalCount()) as { unread_count: number };
+  },
+
+  CheckSignals: async (): Promise<{ new_events: SignalEvent[]; unread_count: number }> => {
+    if (isWeb) return fetchApi<{ new_events: SignalEvent[]; unread_count: number }>('/signals/check', { method: 'POST' });
+    return (await WailsApp.CheckSignals()) as { new_events: SignalEvent[]; unread_count: number };
+  },
+
+  GetNotificationSettings: async (): Promise<NotificationSetting> => {
+    if (isWeb) return fetchApi<NotificationSetting>('/notification-settings');
+    return (await WailsApp.GetNotificationSettings()) as NotificationSetting;
+  },
+
+  SaveNotificationSettings: async (s: NotificationSetting): Promise<NotificationSetting> => {
+    if (isWeb) return fetchApi<NotificationSetting>('/notification-settings', { method: 'PUT', body: JSON.stringify(s) });
+    return (await WailsApp.SaveNotificationSettings(s)) as NotificationSetting;
   },
 };
