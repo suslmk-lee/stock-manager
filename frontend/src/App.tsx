@@ -3,6 +3,7 @@ import { apiClient } from './api/client';
 import { Account, AccountType } from './types/models';
 import { Plus, Trash2, Wallet, Pencil, Lock } from 'lucide-react';
 import AccountDashboard from './components/AccountDashboard';
+import IconTile from './components/ui/IconTile';
 import { ACCOUNT_TYPES, getAccountType, getAccountTypeMeta, isRestrictedAccount } from './utils/accountType';
 
 const DOMESTIC_BROKERS = [
@@ -157,8 +158,8 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">로딩 중...</div>
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="label-mono text-sm">로딩 중...</div>
       </div>
     );
   }
@@ -180,14 +181,14 @@ function App() {
       <div
         key={account.id}
         onClick={() => setSelectedAccountDetail(account)}
-        className={`bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 sm:p-6 border hover:border-blue-500 transition-colors cursor-pointer ${
-          restricted ? 'border-slate-700 border-l-4 border-l-amber-500/70' : 'border-slate-700'
+        className={`surface surface-interactive p-4 sm:p-6 ${
+          restricted ? 'border-l-2 !border-l-amber-300/60' : ''
         }`}
       >
         <div className="flex items-start justify-between mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
-            <div className={`w-28 h-10 sm:w-36 sm:h-12 rounded-lg flex items-center justify-center overflow-hidden shrink-0 ${
-              logo ? 'bg-white' : 'bg-gradient-to-br from-blue-500 to-purple-500'
+            <div className={`w-28 h-10 sm:w-36 sm:h-12 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden shrink-0 ${
+              logo ? 'bg-white' : 'surface-inset text-zinc-400'
             }`}>
               {logo ? (
                 <img
@@ -200,43 +201,43 @@ function App() {
               )}
             </div>
             <div>
-              <h3 className="text-xl font-semibold">{account.name}</h3>
+              <h3 className="text-lg font-medium tracking-tight text-white">{account.name}</h3>
               <div className="flex flex-wrap items-center gap-2 mt-1">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">
+                <span className="chip">
                   {account.market_type === 'Domestic' ? '국내' : '해외'}
                 </span>
                 <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${typeMeta.badgeClass}`}>
                   {restricted && <Lock className="w-3 h-3" />}
                   {typeMeta.short}
                 </span>
-                <p className="text-sm text-slate-400">{account.currency}</p>
+                <span className="chip">{account.currency}</span>
               </div>
               {account.broker && (
-                <p className="text-xs text-slate-500 mt-1">{account.broker}</p>
+                <p className="label-mono mt-1.5">{account.broker}</p>
               )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-2">
             <button
               onClick={(e) => { e.stopPropagation(); handleEditAccount(account); }}
-              className="text-slate-400 hover:text-blue-300 transition-colors"
+              className="btn-icon"
               title="계좌 수정"
             >
-              <Pencil className="w-5 h-5" />
+              <Pencil className="w-4 h-4" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); handleDeleteAccount(account.id); }}
-              className="text-red-400 hover:text-red-300 transition-colors"
+              className="btn-icon hover:!border-rose-400/40 hover:!text-rose-300"
               title="계좌 삭제"
             >
-              <Trash2 className="w-5 h-5" />
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
         {account.description && (
-          <p className="text-slate-300 text-sm mb-4">{account.description}</p>
+          <p className="text-zinc-400 text-sm mb-4">{account.description}</p>
         )}
-        <div className="text-xs text-slate-500">
+        <div className="label-mono">
           생성일: {new Date(account.created_at).toLocaleDateString('ko-KR')}
         </div>
       </div>
@@ -245,11 +246,17 @@ function App() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-white">계좌 관리</h2>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3 min-w-0">
+          <IconTile icon={Wallet} tone="mint" />
+          <div className="min-w-0">
+            <h2 className="text-2xl font-light tracking-tight text-white">계좌 관리</h2>
+            <p className="label-mono">{accounts.length} accounts</p>
+          </div>
+        </div>
         <button
           onClick={handleToggleCreateForm}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+          className="btn-primary shrink-0"
         >
           <Plus className="w-5 h-5" />
           계좌 추가
@@ -257,22 +264,22 @@ function App() {
       </div>
 
         {error && (
-          <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6">
+          <div className="rounded-2xl border border-rose-400/25 bg-rose-500/10 text-rose-200 text-sm px-4 py-3 mb-6">
             {error}
           </div>
         )}
 
         {showForm && (
-          <div className="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700">
-            <h2 className="text-2xl font-semibold mb-4">{editingId !== null ? '계좌 수정' : '새 계좌 추가'}</h2>
+          <div className="surface p-5 sm:p-6 mb-6">
+            <h2 className="section-title text-lg mb-4">{editingId !== null ? '계좌 수정' : '새 계좌 추가'}</h2>
             <form onSubmit={handleSubmitAccount} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">증권사 *</label>
+                  <label className="field-label">증권사 *</label>
                   <select
                     value={formData.broker}
                     onChange={(e) => setFormData({ ...formData, broker: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-field"
                     required
                   >
                     <option value="">증권사를 선택하세요</option>
@@ -284,7 +291,7 @@ function App() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">시장 구분 *</label>
+                  <label className="field-label">시장 구분 *</label>
                   <select
                     value={formData.marketType}
                     onChange={(e) => {
@@ -295,7 +302,7 @@ function App() {
                         currency: market === 'Domestic' ? 'KRW' : 'USD'
                       });
                     }}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-field"
                   >
                     <option value="Domestic">국내</option>
                     <option value="International">해외</option>
@@ -303,11 +310,11 @@ function App() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">계좌 유형 *</label>
+                <label className="field-label">계좌 유형 *</label>
                 <select
                   value={formData.accountType}
                   onChange={(e) => setFormData({ ...formData, accountType: e.target.value as AccountType })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input-field"
                   required
                 >
                   {ACCOUNT_TYPES.map((t) => (
@@ -317,7 +324,7 @@ function App() {
                   ))}
                 </select>
                 {selectedTypeMeta?.restricted && (
-                  <p className="flex items-center gap-1 text-xs text-amber-300 mt-1">
+                  <p className="flex items-center gap-1 text-xs text-amber-300 mt-1.5">
                     <Lock className="w-3 h-3" />
                     중도 인출이 제한되는 계좌로 분류됩니다
                   </p>
@@ -325,33 +332,33 @@ function App() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">계좌명 *</label>
+                  <label className="field-label">계좌명 *</label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-field"
                     placeholder="예: 미국 주식 계좌"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">계좌번호</label>
+                  <label className="field-label">계좌번호</label>
                   <input
                     type="text"
                     value={formData.accountNumber}
                     onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-field"
                     placeholder="예: 123-45-678901"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">통화</label>
+                <label className="field-label">통화</label>
                 <select
                   value={formData.currency}
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input-field"
                 >
                   <option value="KRW">KRW (원)</option>
                   <option value="USD">USD (달러)</option>
@@ -360,11 +367,11 @@ function App() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">설명</label>
+                <label className="field-label">설명</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input-field"
                   placeholder="계좌에 대한 설명을 입력하세요"
                   rows={3}
                 />
@@ -372,14 +379,14 @@ function App() {
               <div className="flex gap-3">
                 <button
                   type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+                  className="btn-primary flex-1"
                 >
                   {editingId !== null ? '저장' : '생성'}
                 </button>
                 <button
                   type="button"
                   onClick={closeForm}
-                  className="flex-1 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors"
+                  className="btn-ghost flex-1"
                 >
                   취소
                 </button>
@@ -389,19 +396,19 @@ function App() {
         )}
 
         {accounts.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">
-            <Wallet className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 opacity-50" />
-            <p className="text-base sm:text-lg">등록된 계좌가 없습니다.</p>
-            <p className="text-xs sm:text-sm mt-2">위의 "계좌 추가" 버튼을 눌러 새 계좌를 생성하세요.</p>
+          <div className="surface text-center py-14 px-4 text-zinc-400">
+            <IconTile icon={Wallet} tone="mint" className="mx-auto mb-4" />
+            <p className="text-base sm:text-lg text-zinc-200">등록된 계좌가 없습니다.</p>
+            <p className="label-mono mt-2">위의 "계좌 추가" 버튼을 눌러 새 계좌를 생성하세요.</p>
           </div>
         ) : (
           <div className="space-y-8">
             {liquidAccounts.length > 0 && (
               <section>
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-emerald-500/30">
-                  <Wallet className="w-5 h-5 text-emerald-400" />
-                  <h3 className="text-lg font-semibold text-emerald-300">인출 가능 계좌</h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
+                <div className="flex items-center gap-3 mb-4">
+                  <IconTile icon={Wallet} tone="mint" size="sm" />
+                  <h3 className="section-title">인출 가능 계좌</h3>
+                  <span className="chip">
                     {liquidAccounts.length}개
                   </span>
                 </div>
@@ -412,10 +419,10 @@ function App() {
             )}
             {restrictedAccounts.length > 0 && (
               <section>
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-amber-500/30">
-                  <Lock className="w-5 h-5 text-amber-400" />
-                  <h3 className="text-lg font-semibold text-amber-300">인출 제한 계좌 · 연금/IRP</h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">
+                <div className="flex items-center gap-3 mb-4">
+                  <IconTile icon={Lock} tone="amber" size="sm" />
+                  <h3 className="section-title">인출 제한 계좌 · 연금/IRP</h3>
+                  <span className="chip !text-amber-300">
                     {restrictedAccounts.length}개
                   </span>
                 </div>

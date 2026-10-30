@@ -142,95 +142,95 @@ export default function AssetDetailView({ assetId, ticker, name, accountId, acco
     close: p.close,
   }));
 
-  const pnlClass = (v: number) => (v >= 0 ? 'text-emerald-400' : 'text-red-400');
+  const pnlClass = (v: number) => (v >= 0 ? 'text-mint-400' : 'text-rose-300');
   const yAxisFmt = (v: number) => (cur === 'USD' ? `$${v.toFixed(0)}` : `₩${Math.round(v).toLocaleString('ko-KR')}`);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-5 sm:p-6 w-full max-w-3xl border border-slate-700 max-h-[92vh] overflow-y-auto"
+        className="surface p-5 sm:p-6 w-full max-w-3xl max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
         <div className="flex items-start justify-between mb-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-xl font-bold text-white truncate">{name}</h3>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 whitespace-nowrap">
+              <h3 className="text-xl font-medium tracking-tight text-white truncate">{name}</h3>
+              <span className="chip">
                 {accountId ? (accountName || '계좌') : '전체 계좌'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">{ticker}</p>
+            <p className="label-mono mt-1">{ticker}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white shrink-0">
+          <button onClick={onClose} className="btn-icon shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* 현재가 */}
         <div className="flex items-baseline gap-3 mb-4">
-          <span className="text-2xl font-bold text-white">{hasPrice ? formatMoney(curPrice, cur) : '—'}</span>
+          <span className="num text-3xl font-light tracking-tight text-white">{hasPrice ? formatMoney(curPrice, cur) : '—'}</span>
           {hasPrice && price!.changePercent !== 0 && (
             <span className={`text-sm font-medium ${pnlClass(price!.changePercent)}`}>
               {price!.changePercent > 0 ? '+' : ''}{price!.changePercent.toFixed(2)}%
             </span>
           )}
-          {price?.marketState && <span className="text-[11px] text-slate-500">{price.marketState}</span>}
+          {price?.marketState && <span className="label-mono">{price.marketState}</span>}
         </div>
 
         {/* 기간 선택 + 주가 차트 */}
-        <div className="flex gap-1.5 mb-2">
+        <div className="glass-pill mb-3 inline-flex p-1">
           {RANGES.map((r) => (
             <button
               key={r.key}
               onClick={() => setRange(r.key)}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                range === r.key ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              className={`pill-item !px-3 !py-1 !text-xs font-mono ${
+                range === r.key ? 'pill-item-active' : ''
               }`}
             >
               {r.label}
             </button>
           ))}
         </div>
-        <div className="bg-slate-900/50 rounded-lg p-3 mb-5 h-[200px] flex items-center justify-center">
+        <div className="surface-inset p-3 mb-5 h-[200px] flex items-center justify-center">
           {historyLoading ? (
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <div className="w-4 h-4 border border-slate-500 border-t-transparent rounded-full animate-spin" /> 차트 로딩 중...
+            <div className="flex items-center gap-2 text-sm text-zinc-500">
+              <div className="w-4 h-4 border border-zinc-500 border-t-transparent rounded-full animate-spin" /> 차트 로딩 중...
             </div>
           ) : priceChart.length === 0 ? (
-            <p className="text-sm text-slate-500">시세 데이터를 가져올 수 없습니다.</p>
+            <p className="text-sm text-zinc-500">시세 데이터를 가져올 수 없습니다.</p>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={priceChart} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#94a3b8' }} minTickGap={40} axisLine={{ stroke: '#334155' }} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} domain={['auto', 'auto']} width={60} axisLine={false} tickLine={false} tickFormatter={yAxisFmt} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} minTickGap={40} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#71717a' }} domain={['auto', 'auto']} width={60} axisLine={false} tickLine={false} tickFormatter={yAxisFmt} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                  labelStyle={{ color: '#cbd5e1' }} itemStyle={{ color: '#e2e8f0' }}
+                  contentStyle={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
+                  labelStyle={{ color: '#a1a1aa' }} itemStyle={{ color: '#f4f4f5' }}
                   formatter={(v: number) => [formatMoney(v, cur), '종가']}
                 />
-                <Line type="monotone" dataKey="close" stroke="#a78bfa" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="close" stroke="#7ddfb0" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* 현황 */}
-        <div className="rounded-lg border border-slate-700 bg-slate-900/30 p-4 mb-5">
-          <p className="text-xs text-slate-500 mb-3">현황</p>
+        <div className="surface-inset p-4 mb-5">
+          <p className="label-mono mb-3">현황</p>
           {loading ? (
-            <div className="h-16 flex items-center text-sm text-slate-500">불러오는 중...</div>
+            <div className="h-16 flex items-center text-sm text-zinc-500">불러오는 중...</div>
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
-                <div><p className="text-xs text-slate-500 mb-0.5">보유 수량</p><p className="text-white font-medium">{formatNumber(stats.qty, 4)}주</p></div>
-                <div><p className="text-xs text-slate-500 mb-0.5">평단가</p><p className="text-white font-medium">{stats.qty > 0 ? formatMoney(stats.costHolding / stats.qty, cur) : '—'}</p></div>
-                <div><p className="text-xs text-slate-500 mb-0.5">평가금</p><p className="text-white font-medium">{hasPrice && stats.qty > 0 ? formatMoney(marketValue, cur) : '—'}</p></div>
-                <div><p className="text-xs text-slate-500 mb-0.5">평가손익</p><p className={`font-medium ${pnlClass(unrealized)}`}>{stats.qty > 0 && hasPrice ? signed(unrealized, cur) : '—'}</p></div>
-                <div><p className="text-xs text-slate-500 mb-0.5">실현손익</p><p className={`font-medium ${pnlClass(stats.realized)}`}>{stats.realized !== 0 ? signed(stats.realized, cur) : '—'}</p></div>
-                <div><p className="text-xs text-slate-500 mb-0.5">배당(세후)</p><p className="font-medium text-emerald-400">{stats.dividend !== 0 ? signed(stats.dividend, cur) : '—'}</p></div>
-                <div><p className="text-xs text-slate-500 mb-0.5">실질손익</p><p className={`font-semibold ${pnlClass(total)}`}>{signed(total, cur)}</p></div>
-                <div><p className="text-xs text-slate-500 mb-0.5">수익률</p><p className={`font-semibold ${pnlClass(yieldPct)}`}>{investCost > 0 ? `${yieldPct >= 0 ? '+' : ''}${yieldPct.toFixed(2)}%` : '—'}</p></div>
+                <div><p className="label-mono mb-0.5">보유 수량</p><p className="num text-zinc-100 font-medium">{formatNumber(stats.qty, 4)}주</p></div>
+                <div><p className="label-mono mb-0.5">평단가</p><p className="num text-zinc-100 font-medium">{stats.qty > 0 ? formatMoney(stats.costHolding / stats.qty, cur) : '—'}</p></div>
+                <div><p className="label-mono mb-0.5">평가금</p><p className="num text-zinc-100 font-medium">{hasPrice && stats.qty > 0 ? formatMoney(marketValue, cur) : '—'}</p></div>
+                <div><p className="label-mono mb-0.5">평가손익</p><p className={`num font-medium ${pnlClass(unrealized)}`}>{stats.qty > 0 && hasPrice ? signed(unrealized, cur) : '—'}</p></div>
+                <div><p className="label-mono mb-0.5">실현손익</p><p className={`num font-medium ${pnlClass(stats.realized)}`}>{stats.realized !== 0 ? signed(stats.realized, cur) : '—'}</p></div>
+                <div><p className="label-mono mb-0.5">배당(세후)</p><p className="num font-medium text-mint-400">{stats.dividend !== 0 ? signed(stats.dividend, cur) : '—'}</p></div>
+                <div><p className="label-mono mb-0.5">실질손익</p><p className={`num font-semibold ${pnlClass(total)}`}>{signed(total, cur)}</p></div>
+                <div><p className="label-mono mb-0.5">수익률</p><p className={`num font-semibold ${pnlClass(yieldPct)}`}>{investCost > 0 ? `${yieldPct >= 0 ? '+' : ''}${yieldPct.toFixed(2)}%` : '—'}</p></div>
               </div>
             </>
           )}
@@ -238,29 +238,29 @@ export default function AssetDetailView({ assetId, ticker, name, accountId, acco
 
         {/* 평가금 추세 */}
         <div className="mb-5">
-          <p className="text-xs text-slate-500 mb-2">평가금 추세 ({accountId ? (accountName || '계좌') : '전체 계좌'})</p>
-          <div className="bg-slate-900/50 rounded-lg p-3 h-[180px] flex items-center justify-center">
+          <p className="label-mono mb-2">평가금 추세 ({accountId ? (accountName || '계좌') : '전체 계좌'})</p>
+          <div className="surface-inset p-3 h-[180px] flex items-center justify-center">
             {loading ? (
-              <p className="text-sm text-slate-500">불러오는 중...</p>
+              <p className="text-sm text-zinc-500">불러오는 중...</p>
             ) : trend.length === 0 ? (
-              <p className="text-sm text-slate-500">스냅샷 추세 데이터가 없습니다. (월별 자동 기록)</p>
+              <p className="text-sm text-zinc-500">스냅샷 추세 데이터가 없습니다. (월별 자동 기록)</p>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#7ddfb0" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#7ddfb0" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#94a3b8' }} minTickGap={30} axisLine={{ stroke: '#334155' }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} domain={['auto', 'auto']} width={60} axisLine={false} tickLine={false} tickFormatter={yAxisFmt} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} minTickGap={30} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#71717a' }} domain={['auto', 'auto']} width={60} axisLine={false} tickLine={false} tickFormatter={yAxisFmt} />
                   <Tooltip
-                    contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                    labelStyle={{ color: '#cbd5e1' }} itemStyle={{ color: '#e2e8f0' }}
+                    contentStyle={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
+                    labelStyle={{ color: '#a1a1aa' }} itemStyle={{ color: '#f4f4f5' }}
                     formatter={(v: number) => [formatMoney(v, cur), '평가금']}
                   />
-                  <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fill="url(#trendFill)" />
+                  <Area type="monotone" dataKey="value" stroke="#7ddfb0" strokeWidth={2} fill="url(#trendFill)" />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -269,23 +269,23 @@ export default function AssetDetailView({ assetId, ticker, name, accountId, acco
 
         {/* 거래 이력 */}
         <div>
-          <p className="text-xs text-slate-500 mb-2">거래 이력 ({txs.length}건)</p>
+          <p className="label-mono mb-2">거래 이력 ({txs.length}건)</p>
           {txs.length === 0 ? (
-            <p className="text-sm text-slate-500">거래 내역이 없습니다.</p>
+            <p className="text-sm text-zinc-500">거래 내역이 없습니다.</p>
           ) : (
             <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
               {txs.map((tx) => {
                 const isBuy = tx.type === 'Buy';
                 return (
-                  <div key={tx.id} className="flex items-center justify-between bg-slate-800/60 rounded-lg px-3 py-2 text-sm">
+                  <div key={tx.id} className="flex items-center justify-between surface-inset !rounded-xl px-3 py-2 text-sm">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${isBuy ? 'bg-blue-500/20 text-blue-300' : 'bg-red-500/20 text-red-300'}`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${isBuy ? 'bg-mint-400/15 text-mint-300' : 'bg-rose-500/15 text-rose-300'}`}>
                         {isBuy ? '매수' : '매도'}
                       </span>
-                      <span className="text-slate-400 text-xs">{new Date(tx.date).toLocaleDateString('ko-KR')}</span>
-                      {!accountId && <span className="text-slate-500 text-xs truncate">· {tx.account?.name || `#${tx.account_id}`}</span>}
+                      <span className="text-zinc-400 text-xs">{new Date(tx.date).toLocaleDateString('ko-KR')}</span>
+                      {!accountId && <span className="text-zinc-500 text-xs truncate">· {tx.account?.name || `#${tx.account_id}`}</span>}
                     </div>
-                    <div className="text-right whitespace-nowrap text-slate-300 text-xs">
+                    <div className="num text-right whitespace-nowrap text-zinc-300 text-xs">
                       {formatMoney(tx.price, cur)} × {formatNumber(tx.quantity, 4)}주
                     </div>
                   </div>
