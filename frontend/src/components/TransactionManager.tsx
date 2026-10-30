@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Asset, Transaction, Holding, RealizedPnL, TickerInfo, PricePoint, PriceHistory } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
+import { useThemeColors } from '../appearance/AppearanceContext';
 import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, TrendingDown, History, X, Search, Info } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { calculateFee, roundFee } from '../utils/fees';
@@ -37,6 +38,7 @@ const SECTORS = [
 ];
 
 export default function TransactionManager({ selectedAccountId = 0, onAccountChange }: TransactionManagerProps) {
+  const tc = useThemeColors();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -1677,13 +1679,13 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                       <XAxis
                         dataKey="label"
-                        tick={{ fontSize: 10, fill: '#71717a' }}
+                        tick={{ fontSize: 10, fill: tc.axis }}
                         minTickGap={40}
-                        axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                        axisLine={{ stroke: tc.grid }}
                         tickLine={false}
                       />
                       <YAxis
-                        tick={{ fontSize: 10, fill: '#71717a' }}
+                        tick={{ fontSize: 10, fill: tc.axis }}
                         domain={['auto', 'auto']}
                         width={60}
                         axisLine={false}
@@ -1693,12 +1695,12 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                         }
                       />
                       <Tooltip
-                        contentStyle={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
-                        labelStyle={{ color: '#a1a1aa' }}
-                        itemStyle={{ color: '#f4f4f5' }}
+                        contentStyle={{ ...tc.tooltip.contentStyle, fontSize: 12 }}
+                        labelStyle={tc.tooltip.labelStyle}
+                        itemStyle={tc.tooltip.itemStyle}
                         formatter={(v: number) => [formatMoney(v, cur), '종가']}
                       />
-                      <Line type="monotone" dataKey="close" stroke="#7ddfb0" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="close" stroke={tc.accent} strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 )}
