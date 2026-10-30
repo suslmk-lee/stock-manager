@@ -17,7 +17,10 @@ export default defineConfig(({ mode }) => {
     publicDir: 'images',
     resolve: {
       alias: isWebBuild
-        ? { '../../wailsjs/go/main/App': path.resolve(__dirname, 'src/api/wails-stub.ts') }
+        ? {
+            '../../wailsjs/go/main/App': path.resolve(__dirname, 'src/api/wails-stub.ts'),
+            '../../wailsjs/runtime/runtime': path.resolve(__dirname, 'src/api/wails-runtime-stub.ts'),
+          }
         : {},
     },
   };

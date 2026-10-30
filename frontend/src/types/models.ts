@@ -293,3 +293,39 @@ export interface SignalReport {
   items: SignalItem[];
   tax?: SignalTaxSummary | null;
 }
+
+// ==========================================
+// Signal alerts
+// ==========================================
+export interface SignalEvent {
+  id: number;
+  asset_id: number;
+  ticker: string;
+  name: string;
+  from_action: SignalAction | '';
+  to_action: SignalAction;
+  met_codes: string; // 쉼표로 구분
+  message: string;
+  total_return_pct: number;
+  current_price: number;
+  currency: string;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface SignalEventsResponse {
+  events: SignalEvent[];
+  unread_count: number;
+}
+
+export type NotifyIntervalMinutes = 15 | 30 | 60 | 180 | 360;
+
+export interface NotificationSetting {
+  enabled: boolean;
+  interval_minutes: NotifyIntervalMinutes;
+  os_notify: boolean;
+  notify_sell: boolean;
+  notify_buy: boolean;
+  notify_conflict: boolean;
+  updated_at?: string;
+}
