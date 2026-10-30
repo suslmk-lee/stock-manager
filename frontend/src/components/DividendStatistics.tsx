@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import { TrendingUp, DollarSign, Calendar, PieChart, Receipt } from 'lucide-react';
 import IconTile from './ui/IconTile';
+import { useThemeColors } from '../appearance/AppearanceContext';
 import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
 
 interface DividendStatisticsProps {
@@ -22,6 +23,7 @@ interface DividendStats {
 }
 
 export default function DividendStatistics({ accountId, marketType, liquidity = 'all', months = 12 }: DividendStatisticsProps) {
+  const tc = useThemeColors();
   const [stats, setStats] = useState<DividendStats | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [exchangeRate, setExchangeRate] = useState(1300);
@@ -95,8 +97,8 @@ export default function DividendStatistics({ accountId, marketType, liquidity = 
   ];
 
   const marketCards = [
-    { label: '국내 시장', accounts: domesticAccounts, dot: '#7dd3fc' },
-    { label: '해외 시장', accounts: internationalAccounts, dot: '#7ddfb0' },
+    { label: '국내 시장', accounts: domesticAccounts, dot: tc.palette[1] },
+    { label: '해외 시장', accounts: internationalAccounts, dot: tc.accent },
   ];
 
   return (
@@ -120,7 +122,7 @@ export default function DividendStatistics({ accountId, marketType, liquidity = 
         {marketCards.map((m) => (
           <div key={m.label} className="surface p-5 sm:p-6">
             <h3 className="section-title mb-4 flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: m.dot, boxShadow: `0 0 8px ${m.dot}88` }}></span>
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: m.dot, boxShadow: `0 0 8px color-mix(in srgb, ${m.dot} 53%, transparent)` }}></span>
               {m.label}
             </h3>
             <div className="space-y-2">

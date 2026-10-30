@@ -188,7 +188,7 @@ function App() {
         <div className="flex items-start justify-between mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
             <div className={`w-28 h-10 sm:w-36 sm:h-12 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden shrink-0 ${
-              logo ? 'bg-white' : 'surface-inset text-zinc-400'
+              logo ? 'bg-paper' : 'surface-inset text-zinc-400'
             }`}>
               {logo ? (
                 <img

@@ -8,12 +8,8 @@ import CountUp from './CountUp';
 import IconTile from './ui/IconTile';
 import RingGauge from './ui/RingGauge';
 import Chip from './ui/Chip';
+import { useThemeColors } from '../appearance/AppearanceContext';
 
-const PALETTE = [
-  '#7ddfb0', '#7dd3fc', '#a78bfa', '#fbbf24', '#fb7185', '#2dd4bf',
-  '#f0abfc', '#bef264', '#fdba74', '#5eead4', '#c4b5fd', '#fde047',
-];
-const OTHER_COLOR = '#52525b';
 const TOP_N = 5; // 기본 축소보기에서 노출할 계좌 수
 
 interface AssetStatisticsProps {
@@ -34,6 +30,9 @@ interface AssetValue {
 }
 
 export default function AssetStatistics({ accountId, marketType = 'all', liquidity = 'all' }: AssetStatisticsProps) {
+  const tc = useThemeColors();
+  const PALETTE = tc.palette;
+  const OTHER_COLOR = tc.axis;
   const [loading, setLoading] = useState(true);
   const [totalValue, setTotalValue] = useState(0);
   const [accountValues, setAccountValues] = useState<Map<number, number>>(new Map());
@@ -237,14 +236,6 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
     { key: 'acc', label: '계좌 수', icon: Wallet, value: String(accountValues.size), unit: '개', sub: null as number | null },
   ];
 
-  const tooltipStyle = {
-    backgroundColor: '#0f0f11',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    color: '#fff',
-    fontSize: 12,
-  };
-
   return (
     <div className="space-y-6">
       {/* 총 자산 히어로 */}
@@ -276,7 +267,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                 <RingGauge
                   size={104}
                   value={pct(liquidValue)}
-                  color="#7ddfb0"
+                  color="rgb(var(--c-mint-400))"
                   label={
                     <>
                       <span className="block">인출 가능</span>
@@ -289,7 +280,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                 <RingGauge
                   size={104}
                   value={pct(restrictedValue)}
-                  color="#fbbf24"
+                  color="rgb(var(--c-amber-400))"
                   label={
                     <>
                       <span className="block">인출 제한</span>
@@ -353,9 +344,9 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
                       `${formatCurrency(value)} (${totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : 0}%)`,
                       name,
                     ]}
-                    contentStyle={tooltipStyle}
-                    itemStyle={{ color: '#e4e4e7' }}
-                    labelStyle={{ color: '#e4e4e7' }}
+                    contentStyle={tc.tooltip.contentStyle}
+                    itemStyle={tc.tooltip.itemStyle}
+                    labelStyle={tc.tooltip.labelStyle}
                   />
                 </PieChart>
               </ResponsiveContainer>

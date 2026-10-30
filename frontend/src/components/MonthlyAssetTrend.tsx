@@ -5,6 +5,7 @@ import { LiquidityFilter, matchesLiquidity, isRestrictedAccount } from '../utils
 import { ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceArea } from 'recharts';
 import CountUp from './CountUp';
+import { useThemeColors } from '../appearance/AppearanceContext';
 import IconTile from './ui/IconTile';
 import Chip from './ui/Chip';
 
@@ -24,9 +25,6 @@ interface MonthPoint {
   estimated: boolean;
 }
 
-const LIQUID_COLOR = '#7ddfb0';
-const RESTRICTED_COLOR = '#fbbf24';
-const SINGLE_COLOR = '#7dd3fc';
 
 const formatKRW = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
 const compactKRW = (v: number) => {
@@ -72,6 +70,10 @@ export default function MonthlyAssetTrend({
   liquidity = 'all',
   months,
 }: MonthlyAssetTrendProps) {
+  const tc = useThemeColors();
+  const LIQUID_COLOR = tc.accent;
+  const RESTRICTED_COLOR = tc.restricted;
+  const SINGLE_COLOR = tc.palette[1];
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<MonthlySnapshotSummary[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -291,23 +293,23 @@ export default function MonthlyAssetTrend({
                 <stop offset="100%" stopColor={SINGLE_COLOR} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#71717a', fontFamily: 'JetBrains Mono, monospace' }} minTickGap={30} axisLine={{ stroke: 'rgba(255,255,255,0.08)' }} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#71717a', fontFamily: 'JetBrains Mono, monospace' }} domain={[0, 'auto']} width={55} axisLine={false} tickLine={false} tickFormatter={compactKRW} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: tc.axis, fontFamily: 'JetBrains Mono, monospace' }} minTickGap={30} axisLine={{ stroke: tc.grid }} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: tc.axis, fontFamily: 'JetBrains Mono, monospace' }} domain={[0, 'auto']} width={55} axisLine={false} tickLine={false} tickFormatter={compactKRW} />
             <Tooltip
-              contentStyle={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
-              labelStyle={{ color: '#d4d4d8' }}
-              itemStyle={{ color: '#e4e4e7' }}
+              contentStyle={tc.tooltip.contentStyle}
+              labelStyle={tc.tooltip.labelStyle}
+              itemStyle={tc.tooltip.itemStyle}
               content={({ active, payload, label }) => {
                 if (!active || !payload || payload.length === 0) return null;
                 const p = payload[0].payload as MonthPoint;
                 return (
-                  <div style={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12, padding: '10px 12px' }}>
-                    <p style={{ color: '#d4d4d8', marginBottom: 4 }}>{label}{p.estimated ? ' (추정)' : ''}</p>
+                  <div style={{ ...tc.tooltip.contentStyle, padding: '10px 12px' }}>
+                    <p style={{ color: tc.tooltip.labelStyle.color, marginBottom: 4 }}>{label}{p.estimated ? ' (추정)' : ''}</p>
                     {stacked ? (
                       <>
                         <p style={{ color: LIQUID_COLOR }}>인출 가능: {formatKRW(p.liquid)}</p>
                         {showRestricted && <p style={{ color: RESTRICTED_COLOR }}>인출 제한: {formatKRW(p.restricted)}</p>}
-                        <p style={{ color: '#e2e8f0', marginTop: 2 }}>합계: {formatKRW(p.total)}</p>
+                        <p style={{ color: tc.text, marginTop: 2 }}>합계: {formatKRW(p.total)}</p>
                       </>
                     ) : (
                       <p style={{ color: SINGLE_COLOR }}>평가액: {formatKRW(p.total)}</p>
@@ -321,16 +323,16 @@ export default function MonthlyAssetTrend({
                 key={r.x1}
                 x1={r.x1}
                 x2={r.x2}
-                fill="#ffffff"
+                fill={tc.text}
                 fillOpacity={0.04}
                 stroke="none"
                 ifOverflow="extendDomain"
-                label={{ value: '추정', position: 'insideTop', fill: '#71717a', fontSize: 10 }}
+                label={{ value: '추정', position: 'insideTop', fill: tc.axis, fontSize: 10 }}
               />
             ))}
             {stacked ? (
               <>
-                <Legend wrapperStyle={{ fontSize: 11, color: '#a1a1aa' }} iconType="circle" iconSize={8} />
+                <Legend wrapperStyle={{ fontSize: 11, color: tc.muted }} iconType="circle" iconSize={8} />
                 <Area type="monotone" dataKey="liquid" name="인출 가능" stackId="a" stroke={LIQUID_COLOR} strokeWidth={1.75} fill="url(#mat-liquid)" />
                 {showRestricted && (
                   <Area type="monotone" dataKey="restricted" name="인출 제한" stackId="a" stroke={RESTRICTED_COLOR} strokeWidth={1.75} fill="url(#mat-restricted)" />

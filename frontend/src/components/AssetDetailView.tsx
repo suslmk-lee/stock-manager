@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Holding, RealizedPnL, Dividend, Transaction, PricePoint, PriceHistory } from '../types/models';
 import { X } from 'lucide-react';
+import { useThemeColors } from '../appearance/AppearanceContext';
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -38,6 +39,7 @@ const RANGES = [
 ];
 
 export default function AssetDetailView({ assetId, ticker, name, accountId, accountName, onClose }: AssetDetailViewProps) {
+  const tc = useThemeColors();
   const cur = currencyOf(ticker);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState('6mo');
@@ -202,14 +204,14 @@ export default function AssetDetailView({ assetId, ticker, name, accountId, acco
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={priceChart} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} minTickGap={40} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#71717a' }} domain={['auto', 'auto']} width={60} axisLine={false} tickLine={false} tickFormatter={yAxisFmt} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: tc.axis }} minTickGap={40} axisLine={{ stroke: tc.grid }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: tc.axis }} domain={['auto', 'auto']} width={60} axisLine={false} tickLine={false} tickFormatter={yAxisFmt} />
                 <Tooltip
-                  contentStyle={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
-                  labelStyle={{ color: '#a1a1aa' }} itemStyle={{ color: '#f4f4f5' }}
+                  contentStyle={tc.tooltip.contentStyle}
+                  labelStyle={tc.tooltip.labelStyle} itemStyle={tc.tooltip.itemStyle}
                   formatter={(v: number) => [formatMoney(v, cur), '종가']}
                 />
-                <Line type="monotone" dataKey="close" stroke="#7ddfb0" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="close" stroke={tc.accent} strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -249,18 +251,18 @@ export default function AssetDetailView({ assetId, ticker, name, accountId, acco
                 <AreaChart data={trend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#7ddfb0" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#7ddfb0" stopOpacity={0} />
+                      <stop offset="0%" stopColor={tc.accent} stopOpacity={0.4} />
+                      <stop offset="100%" stopColor={tc.accent} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} minTickGap={30} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#71717a' }} domain={['auto', 'auto']} width={60} axisLine={false} tickLine={false} tickFormatter={yAxisFmt} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: tc.axis }} minTickGap={30} axisLine={{ stroke: tc.grid }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: tc.axis }} domain={['auto', 'auto']} width={60} axisLine={false} tickLine={false} tickFormatter={yAxisFmt} />
                   <Tooltip
-                    contentStyle={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
-                    labelStyle={{ color: '#a1a1aa' }} itemStyle={{ color: '#f4f4f5' }}
+                    contentStyle={tc.tooltip.contentStyle}
+                    labelStyle={tc.tooltip.labelStyle} itemStyle={tc.tooltip.itemStyle}
                     formatter={(v: number) => [formatMoney(v, cur), '평가금']}
                   />
-                  <Area type="monotone" dataKey="value" stroke="#7ddfb0" strokeWidth={2} fill="url(#trendFill)" />
+                  <Area type="monotone" dataKey="value" stroke={tc.accent} strokeWidth={2} fill="url(#trendFill)" />
                 </AreaChart>
               </ResponsiveContainer>
             )}

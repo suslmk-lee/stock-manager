@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } fro
 import { apiClient } from '../api/client';
 import { TrendingUp, Calendar } from 'lucide-react';
 import IconTile from './ui/IconTile';
+import { useThemeColors } from '../appearance/AppearanceContext';
 
 interface MonthlyDividend {
   year: number;
@@ -20,6 +21,7 @@ interface DividendChartProps {
 }
 
 export default function DividendChart({ accountId, months = 12 }: DividendChartProps) {
+  const tc = useThemeColors();
   const [data, setData] = useState<MonthlyDividend[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
       return (
         <div
           className="p-3 shadow-lg"
-          style={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12 }}
+          style={{ background: tc.tooltip.contentStyle.background, border: tc.tooltip.contentStyle.border, borderRadius: 12 }}
         >
           <p className="text-white font-medium mb-1 text-sm">{data.label}</p>
           <p className="text-mint-300 text-sm num">배당금: {formatCurrency(data.total)}</p>
@@ -145,25 +147,25 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
           <BarChart data={data} margin={{ top: 16, right: 16, left: 8, bottom: 5 }}>
             <defs>
               <linearGradient id="colorDividend" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#7ddfb0" stopOpacity={0.9}/>
-                <stop offset="100%" stopColor="#7ddfb0" stopOpacity={0.15}/>
+                <stop offset="0%" stopColor={tc.accent} stopOpacity={0.9}/>
+                <stop offset="100%" stopColor={tc.accent} stopOpacity={0.15}/>
               </linearGradient>
             </defs>
             <XAxis
               dataKey="label"
-              axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+              axisLine={{ stroke: tc.grid }}
               tickLine={false}
-              tick={{ fill: '#71717a', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+              tick={{ fill: tc.axis, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
             />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#71717a', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+              tick={{ fill: tc.axis, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
               tickFormatter={(value) => `₩${value.toLocaleString()}`}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: tc.text, fillOpacity: 0.04 }} />
             <Legend
-              wrapperStyle={{ color: '#a1a1aa', fontSize: 11 }}
+              wrapperStyle={{ color: tc.muted, fontSize: 11 }}
               iconType="circle"
               iconSize={8}
               formatter={() => '배당금'}
