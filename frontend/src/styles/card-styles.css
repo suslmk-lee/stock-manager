@@ -579,6 +579,7 @@
 
 /* ---------------------------------------------------------------- aurora */
 [data-card='aurora'] {
+  --header-bg: rgb(var(--c-ink-950) / 0.2);
   --app-bg:
     radial-gradient(900px 620px at 8% -8%, rgb(var(--c-mint-400) / 0.4), transparent 62%),
     radial-gradient(800px 600px at 96% 4%, rgb(var(--c-sky-400) / 0.32), transparent 62%),

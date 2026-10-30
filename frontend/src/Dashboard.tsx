@@ -45,7 +45,7 @@ export default function Dashboard() {
         style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgb(var(--c-white) / 0.06) 0%, transparent 70%)' }}
       />
 
-      <header className="sticky top-0 z-20 bg-ink-950/70 backdrop-blur-xl">
+      <header className="app-header sticky top-0 z-20 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-3">
           {/* 상단 바: 브랜드 pill · 환율 pill */}
           <div className="flex items-center justify-between gap-3 mb-4">
