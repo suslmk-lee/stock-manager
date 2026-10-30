@@ -294,16 +294,16 @@ export default function AssetManager() {
   });
 
   if (loading) {
-    return <div className="text-center py-12 text-slate-400">로딩 중...</div>;
+    return <div className="text-center py-12 text-zinc-400">로딩 중...</div>;
   }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-white">주식/ETF 관리</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-white">주식/ETF 관리</h2>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+          className="btn-primary flex items-center gap-2 px-4 py-2"
         >
           <Plus className="w-5 h-5" />
           자산 추가
@@ -313,39 +313,39 @@ export default function AssetManager() {
       {/* 검색 바 */}
       <div className="mb-6">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-zinc-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="티커, 이름, 섹터로 검색... (예: TI, Apple, Technology)"
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            className="input-field pl-10 pr-4 py-3"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-white"
             >
               ✕
             </button>
           )}
         </div>
         {searchQuery && (
-          <p className="text-sm text-slate-400 mt-2">
+          <p className="text-sm text-zinc-400 mt-2">
             {filteredAssets.length}개의 자산이 검색되었습니다.
           </p>
         )}
       </div>
 
       {error && (
-        <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6">
+        <div className="bg-rose-500/10 border border-rose-400/30 text-rose-200 px-4 py-3 rounded-2xl mb-6">
           {error}
         </div>
       )}
 
       {showForm && (
         <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => {
             setShowForm(false);
             setEditingAsset(null);
@@ -360,7 +360,7 @@ export default function AssetManager() {
           }}
         >
           <div 
-            className="bg-slate-800 rounded-xl p-6 border border-slate-700 max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            className="surface p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -379,7 +379,7 @@ export default function AssetManager() {
                     quantity: '',
                   });
                 }}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-zinc-400 hover:text-white transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -389,14 +389,14 @@ export default function AssetManager() {
             <form onSubmit={handleCreateAsset} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">티커 심볼 *</label>
+                <label className="field-label">티커 심볼 *</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={formData.ticker}
                     onChange={(e) => setFormData({ ...formData, ticker: e.target.value })}
                     onKeyPress={(e) => e.key === 'Enter' && !editingAsset && (e.preventDefault(), handleTickerSearch())}
-                    className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 uppercase"
+                    className="input-field flex-1 px-4 py-2 uppercase"
                     placeholder="예: AAPL, 005930"
                     required
                     disabled={!!editingAsset}
@@ -406,22 +406,22 @@ export default function AssetManager() {
                       type="button"
                       onClick={handleTickerSearch}
                       disabled={searching || !formData.ticker}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 px-4 py-2 rounded-lg transition-colors"
+                      className="btn-primary px-4 py-2"
                     >
                       {searching ? '검색중...' : <Search className="w-5 h-5" />}
                     </button>
                   )}
                 </div>
-                {!editingAsset && <p className="text-xs text-slate-400 mt-1">티커 입력 후 검색 버튼 클릭 (검색 실패 시 수동 입력 가능)</p>}
-                {editingAsset && <p className="text-xs text-slate-400 mt-1">티커는 수정할 수 없습니다</p>}
+                {!editingAsset && <p className="text-xs text-zinc-400 mt-1">티커 입력 후 검색 버튼 클릭 (검색 실패 시 수동 입력 가능)</p>}
+                {editingAsset && <p className="text-xs text-zinc-400 mt-1">티커는 수정할 수 없습니다</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">자산명 * (한글 가능)</label>
+                <label className="field-label">자산명 * (한글 가능)</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="input-field w-full px-4 py-2"
                   placeholder="예: SOL골드커버드콜액티브, Apple Inc."
                   required
                 />
@@ -429,22 +429,22 @@ export default function AssetManager() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">타입 *</label>
+                <label className="field-label">타입 *</label>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value as 'Stock' | 'ETF' })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="input-field w-full px-4 py-2"
                 >
                   <option value="Stock">주식 (Stock)</option>
                   <option value="ETF">ETF</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">섹터</label>
+                <label className="field-label">섹터</label>
                 <select
                   value={formData.sector}
                   onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="input-field w-full px-4 py-2"
                 >
                   <option value="">선택하세요</option>
                   {SECTORS.map((sector) => (
@@ -456,15 +456,15 @@ export default function AssetManager() {
               </div>
             </div>
             {editingAsset ? (
-              <div className="border-t border-slate-600 pt-4 mt-2">
-                <h4 className="text-sm font-medium mb-3 text-slate-300">현재 보유 내역</h4>
+              <div className="border-t border-white/[0.08] pt-4 mt-2">
+                <h4 className="text-sm font-medium mb-3 text-zinc-300">현재 보유 내역</h4>
                 {editingAsset.holdings && editingAsset.holdings.length > 0 ? (
                   <div className="space-y-2">
                     {editingAsset.holdings.map((holding) => {
                       const account = accounts.find(acc => acc.id === holding.account_id);
                       return (
-                        <div key={holding.id} className="bg-slate-700/30 rounded p-2 flex justify-between items-center">
-                          <span className="text-sm text-slate-300">
+                        <div key={holding.id} className="bg-white/[0.04] rounded p-2 flex justify-between items-center">
+                          <span className="text-sm text-zinc-300">
                             {account?.name || '알 수 없음'}
                           </span>
                           <span className="text-sm text-white font-medium">
@@ -473,24 +473,24 @@ export default function AssetManager() {
                         </div>
                       );
                     })}
-                    <p className="text-xs text-blue-400 mt-2">
+                    <p className="text-xs text-mint-400 mt-2">
                       💡 보유 수량을 수정하려면 자산 카드의 계좌별 보유 내역에서 수정 버튼(✏️)을 클릭하세요.
                     </p>
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-400">보유 내역이 없습니다.</p>
+                  <p className="text-sm text-zinc-400">보유 내역이 없습니다.</p>
                 )}
               </div>
             ) : (
-              <div className="border-t border-slate-600 pt-4 mt-2">
-                <h4 className="text-sm font-medium mb-3 text-slate-300">보유 정보 (선택)</h4>
+              <div className="border-t border-white/[0.08] pt-4 mt-2">
+                <h4 className="text-sm font-medium mb-3 text-zinc-300">보유 정보 (선택)</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">계좌</label>
+                  <label className="field-label">계좌</label>
                   <select
                     value={formData.accountId}
                     onChange={(e) => setFormData({ ...formData, accountId: Number(e.target.value) })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="input-field w-full px-4 py-2"
                   >
                     <option value={0}>선택 안함</option>
                     {accounts.map((account) => (
@@ -501,31 +501,31 @@ export default function AssetManager() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">보유 수량</label>
+                  <label className="field-label">보유 수량</label>
                   <input
                     type="number"
                     step="0.0001"
                     value={formData.quantity}
                     onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="input-field w-full px-4 py-2"
                     placeholder="0"
                   />
                 </div>
               </div>
-                <p className="text-xs text-slate-400 mt-2">계좌와 수량을 입력하면 보유 내역이 생성됩니다. 평단가는 거래 내역을 통해 자동 계산됩니다.</p>
+                <p className="text-xs text-zinc-400 mt-2">계좌와 수량을 입력하면 보유 내역이 생성됩니다. 평단가는 거래 내역을 통해 자동 계산됩니다.</p>
               </div>
             )}
             <div className="flex gap-3">
               <button
                 type="submit"
-                className="flex-1 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+                className="btn-primary flex-1 px-4 py-2"
               >
                 {editingAsset ? '수정' : '등록'}
               </button>
               <button
                 type="button"
                 onClick={handleCancelEdit}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors"
+                className="btn-ghost flex-1 px-4 py-2"
               >
                 취소
               </button>
@@ -538,7 +538,7 @@ export default function AssetManager() {
       {/* 자산 목록 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {filteredAssets.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-slate-400">
+          <div className="col-span-full text-center py-12 text-zinc-400">
             <TrendingUp className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 opacity-50" />
             <p className="text-base sm:text-lg">등록된 자산이 없습니다.</p>
             {searchQuery ? (
@@ -551,32 +551,32 @@ export default function AssetManager() {
           filteredAssets.map((asset) => (
             <div
               key={asset.id}
-              className="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-green-500 transition-colors"
+              className="surface p-4 hover:border-white/[0.2] transition-colors"
             >
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-bold text-white">{asset.name}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-300">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-mint-400/15 text-mint-300">
                       {asset.type}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-400 mt-1">{asset.ticker}</p>
+                  <p className="text-sm text-zinc-400 mt-1">{asset.ticker}</p>
                   {asset.sector && (
-                    <p className="text-xs text-slate-500 mt-1">{asset.sector}</p>
+                    <p className="text-xs text-zinc-500 mt-1">{asset.sector}</p>
                   )}
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEditAsset(asset)}
-                    className="text-blue-400 hover:text-blue-300 transition-colors"
+                    className="text-mint-400 hover:text-mint-300 transition-colors"
                     title="수정"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteAsset(asset.id)}
-                    className="text-red-400 hover:text-red-300 transition-colors"
+                    className="text-rose-400 hover:text-rose-300 transition-colors"
                     title="삭제"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -585,15 +585,15 @@ export default function AssetManager() {
               </div>
               
               {/* 가격 및 보유 정보 */}
-              <div className="mt-4 pt-4 border-t border-slate-700 space-y-2">
+              <div className="mt-4 pt-4 border-t border-white/[0.08] space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-400">현재가</span>
+                  <span className="text-sm text-zinc-400">현재가</span>
                   <div className="text-right">
                     <span className="text-lg font-semibold text-white">
                       ₩{asset.currentPrice?.toLocaleString('ko-KR', { maximumFractionDigits: 0 }) || '-'}
                     </span>
                     {asset.changePercent !== undefined && asset.changePercent !== 0 && (
-                      <span className={`ml-2 text-xs ${asset.changePercent > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      <span className={`ml-2 text-xs ${asset.changePercent > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {asset.changePercent > 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
                       </span>
                     )}
@@ -603,13 +603,13 @@ export default function AssetManager() {
                 {/* 계좌별 보유 내역 */}
                 <div className="mt-3 space-y-2">
                   <div className="flex justify-between items-center">
-                    <p className="text-xs text-slate-500 font-medium">계좌별 보유 내역</p>
+                    <p className="text-xs text-zinc-500 font-medium">계좌별 보유 내역</p>
                     <button
                       onClick={() => {
                         setAddingHoldingForAsset(asset.id);
                         setNewHoldingData({accountId: 0, quantity: '', averagePrice: ''});
                       }}
-                      className="text-xs text-green-400 hover:text-green-300 flex items-center gap-1"
+                      className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
                     >
                       <Plus className="w-3 h-3" />
                       추가
@@ -617,13 +617,13 @@ export default function AssetManager() {
                   </div>
                   
                   {addingHoldingForAsset === asset.id && (
-                    <div className="bg-slate-700/50 rounded p-3 space-y-2">
+                    <div className="bg-white/[0.04] rounded p-3 space-y-2">
                       <div>
-                        <label className="text-xs text-slate-400 block mb-1">계좌</label>
+                        <label className="field-label">계좌</label>
                         <select
                           value={newHoldingData.accountId}
                           onChange={(e) => setNewHoldingData({...newHoldingData, accountId: Number(e.target.value)})}
-                          className="w-full bg-slate-600 border border-slate-500 rounded px-2 py-1 text-xs text-white"
+                          className="input-field w-full rounded px-2 py-1 text-xs"
                         >
                           <option value={0}>선택하세요</option>
                           {accounts.map((account) => (
@@ -634,31 +634,31 @@ export default function AssetManager() {
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs text-slate-400 block mb-1">보유 수량</label>
+                        <label className="field-label">보유 수량</label>
                         <input
                           type="number"
                           step="0.0001"
                           value={newHoldingData.quantity}
                           onChange={(e) => setNewHoldingData({...newHoldingData, quantity: e.target.value})}
-                          className="w-full bg-slate-600 border border-slate-500 rounded px-2 py-1 text-xs text-white"
+                          className="input-field w-full rounded px-2 py-1 text-xs"
                           placeholder="수량"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-slate-400 block mb-1">평균 단가 (선택)</label>
+                        <label className="field-label">평균 단가 (선택)</label>
                         <input
                           type="number"
                           step="0.01"
                           value={newHoldingData.averagePrice}
                           onChange={(e) => setNewHoldingData({...newHoldingData, averagePrice: e.target.value})}
-                          className="w-full bg-slate-600 border border-slate-500 rounded px-2 py-1 text-xs text-white"
+                          className="input-field w-full rounded px-2 py-1 text-xs"
                           placeholder="0"
                         />
                       </div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleAddHolding(asset.id)}
-                          className="flex-1 bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs text-white"
+                          className="btn-primary flex-1 px-3 py-1 text-xs"
                         >
                           추가
                         </button>
@@ -667,7 +667,7 @@ export default function AssetManager() {
                             setAddingHoldingForAsset(null);
                             setNewHoldingData({accountId: 0, quantity: '', averagePrice: ''});
                           }}
-                          className="flex-1 bg-slate-600 hover:bg-slate-500 px-3 py-1 rounded text-xs text-white"
+                          className="btn-ghost flex-1 px-3 py-1 text-xs"
                         >
                           취소
                         </button>
@@ -682,9 +682,9 @@ export default function AssetManager() {
                         const holdingValue = (asset.currentPrice || 0) * holding.quantity;
                         const isEditing = editingHolding?.id === holding.id;
                         return (
-                          <div key={holding.id || index} className="bg-slate-700/30 rounded p-2 space-y-1">
+                          <div key={holding.id || index} className="bg-white/[0.04] rounded p-2 space-y-1">
                             <div className="flex justify-between items-center">
-                              <span className="text-xs text-slate-400">
+                              <span className="text-xs text-zinc-400">
                                 {account?.name || '알 수 없음'} ({account?.broker || '-'})
                               </span>
                               <div className="flex items-center gap-2">
@@ -694,11 +694,11 @@ export default function AssetManager() {
                                     step="0.0001"
                                     value={editingHolding.quantity}
                                     onChange={(e) => setEditingHolding({...editingHolding, quantity: parseFloat(e.target.value) || 0})}
-                                    className="w-20 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-xs text-white"
+                                    className="input-field w-20 rounded px-2 py-1 text-xs"
                                     placeholder="수량"
                                   />
                                 ) : (
-                                  <span className="text-xs text-slate-300">
+                                  <span className="text-xs text-zinc-300">
                                     {holding.quantity.toLocaleString()} 주
                                   </span>
                                 )}
@@ -706,13 +706,13 @@ export default function AssetManager() {
                                   <>
                                     <button
                                       onClick={() => handleUpdateHolding(holding.id, editingHolding.quantity, editingHolding.averagePrice)}
-                                      className="text-green-400 hover:text-green-300 text-xs"
+                                      className="text-emerald-400 hover:text-emerald-300 text-xs"
                                     >
                                       저장
                                     </button>
                                     <button
                                       onClick={() => setEditingHolding(null)}
-                                      className="text-slate-400 hover:text-slate-300 text-xs"
+                                      className="text-zinc-400 hover:text-zinc-300 text-xs"
                                     >
                                       취소
                                     </button>
@@ -721,14 +721,14 @@ export default function AssetManager() {
                                   <>
                                     <button
                                       onClick={() => handleEditHolding(holding)}
-                                      className="text-blue-400 hover:text-blue-300"
+                                      className="text-mint-400 hover:text-mint-300"
                                       title="수정"
                                     >
                                       <Edit2 className="w-3 h-3" />
                                     </button>
                                     <button
                                       onClick={() => handleDeleteHolding(holding.id)}
-                                      className="text-red-400 hover:text-red-300"
+                                      className="text-rose-400 hover:text-rose-300"
                                       title="삭제"
                                     >
                                       <Trash2 className="w-3 h-3" />
@@ -738,8 +738,8 @@ export default function AssetManager() {
                               </div>
                             </div>
                             <div className="flex justify-between items-center">
-                              <span className="text-xs text-slate-500">평가금액</span>
-                              <span className="text-sm font-semibold text-green-400">
+                              <span className="text-xs text-zinc-500">평가금액</span>
+                              <span className="text-sm font-semibold text-emerald-400">
                                 ₩{holdingValue.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
                               </span>
                             </div>
@@ -751,16 +751,16 @@ export default function AssetManager() {
                   
                   {/* 총 보유 정보 */}
                   {asset.holdings && asset.holdings.length > 1 && (
-                    <div className="mt-3 pt-3 border-t border-slate-600">
+                    <div className="mt-3 pt-3 border-t border-white/[0.08]">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-slate-300">총 보유수량</span>
+                        <span className="text-sm font-medium text-zinc-300">총 보유수량</span>
                         <span className="text-sm font-semibold text-white">
                           {asset.holdings.reduce((sum, h) => sum + h.quantity, 0).toLocaleString()} 주
                         </span>
                       </div>
                       <div className="flex justify-between items-center mt-1">
-                        <span className="text-sm font-medium text-slate-300">총 평가금액</span>
-                        <span className="text-lg font-bold text-green-400">
+                        <span className="text-sm font-medium text-zinc-300">총 평가금액</span>
+                        <span className="text-lg font-bold text-emerald-400">
                           ₩{asset.totalValue?.toLocaleString('ko-KR', { maximumFractionDigits: 0 }) || '-'}
                         </span>
                       </div>

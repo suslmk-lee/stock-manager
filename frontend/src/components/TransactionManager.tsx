@@ -592,11 +592,11 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
     return summary;
   }, [pnls]);
 
-  if (loading) return <div className="text-center py-12 text-slate-400">로딩 중...</div>;
+  if (loading) return <div className="text-center py-12 text-zinc-400">로딩 중...</div>;
 
   if (accounts.length === 0) {
     return (
-      <div className="text-center py-12 text-slate-400">
+      <div className="text-center py-12 text-zinc-400">
         <TrendingUp className="w-16 h-16 mx-auto mb-4 opacity-50" />
         <p className="text-lg">먼저 계좌를 등록해주세요.</p>
       </div>
@@ -608,7 +608,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="text-2xl font-bold text-white">매매 관리</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-white">매매 관리</h2>
           <select
             value={selectedAccount}
             onChange={(e) => {
@@ -616,7 +616,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               setSelectedAccount(id);
               onAccountChange?.(id);
             }}
-            className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input-field w-auto px-3 py-2 text-sm"
           >
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
@@ -631,7 +631,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               resetAssetForm();
               setShowAssetForm(true);
             }}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+            className="btn-ghost flex items-center gap-2 px-4 py-2"
           >
             <Plus className="w-5 h-5" />
             자산 추가
@@ -641,7 +641,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               resetForm();
               setShowForm(true);
             }}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+            className="btn-primary flex items-center gap-2 px-4 py-2"
           >
             <Plus className="w-5 h-5" />
             거래 기록
@@ -650,7 +650,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       </div>
 
       {error && (
-        <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6">{error}</div>
+        <div className="bg-rose-500/10 border border-rose-400/30 text-rose-200 px-4 py-3 rounded-2xl mb-6">{error}</div>
       )}
 
       {/* 실현 손익 요약 카드 */}
@@ -663,15 +663,15 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               <div
                 key={cur}
                 className={`rounded-xl p-4 border ${
-                  isProfit ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
+                  isProfit ? 'bg-mint-400/10 border-mint-400/30' : 'bg-rose-500/10 border-rose-400/30'
                 }`}
               >
-                <p className="text-xs text-slate-400 mb-1">실현 손익 ({cur})</p>
-                <p className={`text-2xl font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                <p className="text-xs text-zinc-400 mb-1">실현 손익 ({cur})</p>
+                <p className={`text-2xl font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {isProfit ? '+' : ''}
                   {formatMoney(s.total, cur)}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-zinc-500 mt-1">
                   {s.count}건 매도 · 승률 {winRate}%
                 </p>
               </div>
@@ -681,13 +681,13 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       )}
 
       {/* 탭 */}
-      <div className="flex gap-2 mb-4 border-b border-slate-700">
+      <div className="flex gap-2 mb-4 border-b border-white/[0.08]">
         <button
           onClick={() => setViewTab('history')}
           className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
             viewTab === 'history'
-              ? 'text-white border-b-2 border-blue-500'
-              : 'text-slate-400 hover:text-white'
+              ? 'text-white border-b-2 border-mint-400/30'
+              : 'text-zinc-400 hover:text-white'
           }`}
         >
           <History className="w-4 h-4" />
@@ -697,8 +697,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
           onClick={() => setViewTab('pnl')}
           className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
             viewTab === 'pnl'
-              ? 'text-white border-b-2 border-emerald-500'
-              : 'text-slate-400 hover:text-white'
+              ? 'text-white border-b-2 border-mint-400/30'
+              : 'text-zinc-400 hover:text-white'
           }`}
         >
           <TrendingUp className="w-4 h-4" />
@@ -708,8 +708,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
           onClick={() => setViewTab('holdings')}
           className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
             viewTab === 'holdings'
-              ? 'text-white border-b-2 border-purple-500'
-              : 'text-slate-400 hover:text-white'
+              ? 'text-white border-b-2 border-mint-400/30'
+              : 'text-zinc-400 hover:text-white'
           }`}
         >
           <TrendingUp className="w-4 h-4" />
@@ -721,10 +721,10 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       {viewTab === 'history' && (
         <div className="space-y-3">
           {transactions.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-zinc-400">
               <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>거래 내역이 없습니다.</p>
-              <p className="text-sm mt-1 text-slate-500">'거래 기록' 버튼으로 매수/매도를 등록하세요.</p>
+              <p className="text-sm mt-1 text-zinc-500">'거래 기록' 버튼으로 매수/매도를 등록하세요.</p>
             </div>
           ) : (
             [...transactions]
@@ -743,15 +743,15 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                 <div
                   key={tx.id}
                   onClick={() => openTxDetail(tx)}
-                  className="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-blue-500/50 transition-colors cursor-pointer"
+                  className="surface p-4 hover:border-white/[0.2] transition-colors cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                        className={`icon-tile ${
                           isBuy
-                            ? 'bg-gradient-to-br from-blue-500 to-cyan-500'
-                            : 'bg-gradient-to-br from-red-500 to-orange-500'
+                            ? 'icon-tile-mint text-mint-300'
+                            : 'icon-tile-amber text-rose-300'
                         }`}
                       >
                         {isBuy ? <ArrowDownCircle className="w-5 h-5" /> : <ArrowUpCircle className="w-5 h-5" />}
@@ -763,36 +763,36 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                           </h3>
                           <span
                             className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
-                              isBuy ? 'bg-blue-500/20 text-blue-300' : 'bg-red-500/20 text-red-300'
+                              isBuy ? 'bg-mint-400/15 text-mint-300' : 'bg-rose-500/10 text-rose-300'
                             }`}
                           >
                             {isBuy ? '매수' : '매도'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-1">
+                        <p className="text-xs text-zinc-400 mt-1">
                           {tx.asset?.ticker} · {new Date(tx.date).toLocaleDateString('ko-KR')}
                         </p>
-                        <p className="text-xs text-slate-300 mt-0.5">
-                          <span className="text-slate-500">{isBuy ? '매수가' : '매도가'}</span>{' '}
+                        <p className="text-xs text-zinc-300 mt-0.5">
+                          <span className="text-zinc-500">{isBuy ? '매수가' : '매도가'}</span>{' '}
                           <span className="font-medium">{formatMoney(tx.price, txCurrency)}</span>
-                          <span className="text-slate-500"> × </span>
+                          <span className="text-zinc-500"> × </span>
                           <span className="font-medium">{formatNumber(tx.quantity, 4)}주</span>
                         </p>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`text-base font-bold ${isBuy ? 'text-blue-400' : 'text-red-400'}`}>
+                      <p className={`text-base font-bold ${isBuy ? 'text-mint-400' : 'text-rose-400'}`}>
                         {formatMoney(total, txCurrency)}
                       </p>
-                      <p className="text-[10px] text-slate-500">
+                      <p className="text-[10px] text-zinc-500">
                         {isBuy ? '총 지불액' : '실수령액'}
                       </p>
                       {tx.fee > 0 && (
-                        <p className="text-[11px] text-slate-500 mt-0.5">수수료 {formatMoney(tx.fee, txCurrency)}</p>
+                        <p className="text-[11px] text-zinc-500 mt-0.5">수수료 {formatMoney(tx.fee, txCurrency)}</p>
                       )}
                     </div>
                   </div>
-                  {tx.notes && <p className="text-xs text-slate-400 mt-2 pl-13 ml-13">{tx.notes}</p>}
+                  {tx.notes && <p className="text-xs text-zinc-400 mt-2 pl-13 ml-13">{tx.notes}</p>}
                 </div>
               );
             })
@@ -804,10 +804,10 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       {viewTab === 'pnl' && (
         <div className="space-y-3">
           {pnls.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-zinc-400">
               <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>실현 손익 내역이 없습니다.</p>
-              <p className="text-sm mt-1 text-slate-500">매도 거래가 기록되면 자동으로 표시됩니다.</p>
+              <p className="text-sm mt-1 text-zinc-500">매도 거래가 기록되면 자동으로 표시됩니다.</p>
             </div>
           ) : (
             [...pnls]
@@ -825,19 +825,19 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                 <div
                   key={p.id}
                   onClick={() => setSelectedPnl(p)}
-                  className={`rounded-lg p-4 border transition-colors cursor-pointer ${
+                  className={`rounded-2xl p-4 border transition-colors cursor-pointer ${
                     isProfit
-                      ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40'
-                      : 'bg-red-500/5 border-red-500/20 hover:border-red-500/40'
+                      ? 'bg-mint-400/[0.04] border-mint-400/20 hover:border-mint-400/40'
+                      : 'bg-rose-500/[0.04] border-rose-400/20 hover:border-rose-400/40'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                        className={`icon-tile ${
                           isProfit
-                            ? 'bg-gradient-to-br from-emerald-500 to-teal-500'
-                            : 'bg-gradient-to-br from-red-500 to-pink-500'
+                            ? 'icon-tile-mint text-mint-300'
+                            : 'icon-tile-amber text-rose-300'
                         }`}
                       >
                         {isProfit ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
@@ -846,20 +846,20 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                         <h3 className="text-base font-semibold text-white truncate">
                           {p.asset?.name || p.asset?.ticker || `Asset #${p.asset_id}`}
                         </h3>
-                        <p className="text-xs text-slate-400 mt-0.5">
+                        <p className="text-xs text-zinc-400 mt-0.5">
                           {p.asset?.ticker} · {new Date(p.date).toLocaleDateString('ko-KR')} · {formatNumber(p.quantity, 4)}주
                         </p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
+                        <p className="text-[11px] text-zinc-500 mt-0.5">
                           평단 {formatMoney(p.buy_avg_price, pnlCurrency)} → 매도 {formatMoney(p.sell_price, pnlCurrency)}
                         </p>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`text-lg font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <p className={`text-lg font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {isProfit ? '+' : ''}
                         {formatMoney(p.profit, pnlCurrency)}
                       </p>
-                      <p className={`text-xs ${isProfit ? 'text-emerald-300' : 'text-red-300'}`}>
+                      <p className={`text-xs ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>
                         {isProfit ? '+' : ''}
                         {p.profit_percent.toFixed(2)}%
                       </p>
@@ -876,16 +876,16 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       {viewTab === 'holdings' && (
         <div>
           {priceLoading && (
-            <div className="text-xs text-slate-500 mb-3 flex items-center gap-2">
-              <div className="w-3 h-3 border border-slate-500 border-t-transparent rounded-full animate-spin" />
+            <div className="text-xs text-zinc-500 mb-3 flex items-center gap-2">
+              <div className="w-3 h-3 border border-white/[0.08] border-t-transparent rounded-full animate-spin" />
               시세 로딩 중...
             </div>
           )}
           {holdings.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-zinc-400">
               <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>보유 종목이 없습니다.</p>
-              <p className="text-sm mt-1 text-slate-500">매매 기록을 등록하거나 주식/ETF 탭에서 보유를 등록하세요.</p>
+              <p className="text-sm mt-1 text-zinc-500">매매 기록을 등록하거나 주식/ETF 탭에서 보유를 등록하세요.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -896,12 +896,12 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   value={holdingSearch}
                   onChange={(e) => setHoldingSearch(e.target.value)}
                   placeholder="종목 검색 (티커 또는 종목명)"
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="input-field w-full px-3 py-2 text-sm"
                 />
                 {holdingSearch && (
                   <button
                     onClick={() => setHoldingSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white px-1"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-white px-1"
                   >
                     ✕
                   </button>
@@ -920,8 +920,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     onClick={() => setHoldingMarket(m.key)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                       holdingMarket === m.key
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        ? 'bg-mint-400/20 text-mint-200'
+                        : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
                     }`}
                   >
                     {m.label}
@@ -930,10 +930,10 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               </div>
 
               {/* 보유 테이블 */}
-              <div className="overflow-x-auto rounded-lg border border-slate-700">
+              <div className="overflow-x-auto rounded-2xl border border-white/[0.08]">
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="bg-slate-800/70 text-xs text-slate-400 border-b border-slate-700">
+                    <tr className="table-head border-b border-white/[0.08]">
                       {([
                         { key: 'name', label: '종목', align: 'left' },
                         { key: 'quantity', label: '수량', align: 'right' },
@@ -945,13 +945,13 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                         <th
                           key={col.key}
                           onClick={() => toggleHoldingSort(col.key)}
-                          className={`font-medium px-3 py-2.5 cursor-pointer select-none hover:text-slate-200 transition-colors ${
+                          className={`font-medium px-3 py-2.5 cursor-pointer select-none hover:text-zinc-200 transition-colors ${
                             col.align === 'left' ? 'text-left' : 'text-right'
                           }`}
                         >
                           <span className={`inline-flex items-center gap-1 ${col.align === 'right' ? 'flex-row-reverse' : ''}`}>
                             {col.label}
-                            <span className={holdingSort.key === col.key ? 'text-purple-400' : 'text-slate-600'}>
+                            <span className={holdingSort.key === col.key ? 'text-mint-300' : 'text-zinc-600'}>
                               {holdingSort.key === col.key ? (holdingSort.dir === 'asc' ? '▲' : '▼') : '⇅'}
                             </span>
                           </span>
@@ -960,7 +960,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       <th className="text-right font-medium px-3 py-2.5">액션</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/60">
+                  <tbody className="divide-y divide-white/[0.06]">
                     {(() => {
                       const filtered = [...holdings]
                         .filter((h) => {
@@ -1006,7 +1006,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       if (filtered.length === 0) {
                         return (
                           <tr>
-                            <td colSpan={7} className="text-center py-8 text-slate-400 text-sm">
+                            <td colSpan={7} className="text-center py-8 text-zinc-400 text-sm">
                               검색 결과가 없습니다.
                             </td>
                           </tr>
@@ -1025,7 +1025,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                         const currency = getCurrencyFromTicker(ticker);
 
                         return (
-                          <tr key={h.id} className="hover:bg-slate-800/50 transition-colors">
+                          <tr key={h.id} className="hover:bg-white/[0.025] transition-colors">
                             {/* 종목 */}
                             <td className="px-3 py-2.5 min-w-[160px]">
                               <button
@@ -1033,10 +1033,10 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                                 className="text-left group"
                                 title="차트 및 주식정보 보기"
                               >
-                                <p className="text-white font-medium truncate group-hover:text-purple-400 transition-colors">
+                                <p className="text-white font-medium truncate group-hover:text-mint-300 transition-colors">
                                   {h.asset?.name || ticker}
                                 </p>
-                                <p className="text-xs text-slate-500">{ticker}</p>
+                                <p className="text-xs text-zinc-500">{ticker}</p>
                               </button>
                             </td>
 
@@ -1059,17 +1059,17 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                                         setEditHoldingField(null);
                                       }
                                     }}
-                                    className="w-20 bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-xs text-right"
+                                    className="input-field w-20 rounded px-1 py-0.5 text-xs text-right"
                                   />
                                   <button
                                     onClick={() => handleUpdateHolding(h.id, 'quantity', editHoldingQty)}
-                                    className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 rounded text-[10px] text-white font-medium leading-none"
+                                    className="btn-primary px-1.5 py-0.5 text-[10px] leading-none"
                                   >
                                     저장
                                   </button>
                                   <button
                                     onClick={() => { setEditingHoldingId(null); setEditHoldingField(null); }}
-                                    className="px-1.5 py-0.5 bg-slate-600 hover:bg-slate-500 rounded text-[10px] text-white font-medium leading-none"
+                                    className="btn-ghost px-1.5 py-0.5 text-[10px] leading-none"
                                   >
                                     취소
                                   </button>
@@ -1081,7 +1081,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                                     setEditHoldingField('quantity');
                                     setEditHoldingQty('');
                                   }}
-                                  className="text-slate-300 hover:text-white underline decoration-slate-600 underline-offset-2"
+                                  className="text-zinc-300 hover:text-white underline decoration-white/20 underline-offset-2"
                                 >
                                   {formatNumber(h.quantity, 4)}주
                                 </button>
@@ -1107,17 +1107,17 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                                         setEditHoldingField(null);
                                       }
                                     }}
-                                    className="w-20 bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-xs text-right"
+                                    className="input-field w-20 rounded px-1 py-0.5 text-xs text-right"
                                   />
                                   <button
                                     onClick={() => handleUpdateHolding(h.id, 'price', editHoldingPrice)}
-                                    className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 rounded text-[10px] text-white font-medium leading-none"
+                                    className="btn-primary px-1.5 py-0.5 text-[10px] leading-none"
                                   >
                                     저장
                                   </button>
                                   <button
                                     onClick={() => { setEditingHoldingId(null); setEditHoldingField(null); }}
-                                    className="px-1.5 py-0.5 bg-slate-600 hover:bg-slate-500 rounded text-[10px] text-white font-medium leading-none"
+                                    className="btn-ghost px-1.5 py-0.5 text-[10px] leading-none"
                                   >
                                     취소
                                   </button>
@@ -1129,7 +1129,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                                     setEditHoldingField('price');
                                     setEditHoldingPrice('');
                                   }}
-                                  className="text-slate-300 hover:text-white underline decoration-slate-600 underline-offset-2"
+                                  className="text-zinc-300 hover:text-white underline decoration-white/20 underline-offset-2"
                                 >
                                   {formatMoney(h.average_price, currency)}
                                 </button>
@@ -1137,7 +1137,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                             </td>
 
                             {/* 현재가 */}
-                            <td className="px-3 py-2.5 text-right whitespace-nowrap text-slate-300">
+                            <td className="px-3 py-2.5 text-right whitespace-nowrap text-zinc-300">
                               {hasPrice ? formatMoney(curPrice, currency) : '—'}
                             </td>
 
@@ -1150,15 +1150,15 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                             <td className="px-3 py-2.5 text-right whitespace-nowrap">
                               {hasPrice ? (
                                 <>
-                                  <p className={`font-medium ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  <p className={`font-medium ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                                     {isProfit ? '+' : ''}{formatMoney(profit, currency)}
                                   </p>
-                                  <p className={`text-xs ${isProfit ? 'text-emerald-300' : 'text-red-300'}`}>
+                                  <p className={`text-xs ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>
                                     {isProfit ? '+' : ''}{profitPercent.toFixed(2)}%
                                   </p>
                                 </>
                               ) : (
-                                <span className="text-slate-500">—</span>
+                                <span className="text-zinc-500">—</span>
                               )}
                             </td>
 
@@ -1167,13 +1167,13 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                               <div className="flex items-center justify-end gap-1.5">
                                 <button
                                   onClick={() => openBuyForm(h.asset_id)}
-                                  className="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 rounded text-xs transition-colors"
+                                  className="btn-primary px-2 py-1 text-xs"
                                 >
                                   매수
                                 </button>
                                 <button
                                   onClick={() => openSellForm(h.asset_id)}
-                                  className="px-2 py-1 bg-red-600/80 hover:bg-red-600 rounded text-xs transition-colors"
+                                  className="btn-danger px-2 py-1 text-xs"
                                 >
                                   매도
                                 </button>
@@ -1201,7 +1201,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                 });
 
                 return (
-                  <div className="mt-4 bg-slate-800/80 rounded-lg p-4 border border-slate-700 space-y-3">
+                  <div className="surface-inset mt-4 p-4 space-y-3">
                     {Object.entries(byCurrency).map(([cur, { cost, value }]) => {
                       const profit = value - cost;
                       const isProfit = profit >= 0;
@@ -1209,21 +1209,21 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                         <div key={cur} className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex gap-6 flex-wrap">
                             <div>
-                              <p className="text-xs text-slate-500">총 매입원가 ({cur})</p>
+                              <p className="text-xs text-zinc-500">총 매입원가 ({cur})</p>
                               <p className="text-base font-bold text-white">{formatMoney(cost, cur)}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-slate-500">총 평가금 ({cur})</p>
+                              <p className="text-xs text-zinc-500">총 평가금 ({cur})</p>
                               <p className="text-base font-bold text-white">{formatMoney(value, cur)}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-slate-500">총 손익 ({cur})</p>
-                              <p className={`text-base font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                              <p className="text-xs text-zinc-500">총 손익 ({cur})</p>
+                              <p className={`text-base font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {isProfit ? '+' : ''}{formatMoney(profit, cur)}
                               </p>
                             </div>
                           </div>
-                          <div className={`text-lg font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <div className={`text-lg font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                             {cost > 0 ? `${isProfit ? '+' : ''}${((profit / cost) * 100).toFixed(2)}%` : ''}
                           </div>
                         </div>
@@ -1246,20 +1246,20 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
         const proceeds = p.sell_price * p.quantity;
         return (
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={() => setSelectedPnl(null)}
           >
             <div
-              className="bg-slate-800 rounded-xl p-6 w-full max-w-lg border border-slate-700 max-h-[90vh] overflow-y-auto"
+              className="surface p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between mb-5">
                 <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${
+                    className={`icon-tile w-11 h-11 ${
                       isProfit
-                        ? 'bg-gradient-to-br from-emerald-500 to-teal-500'
-                        : 'bg-gradient-to-br from-red-500 to-pink-500'
+                        ? 'icon-tile-mint text-mint-300'
+                        : 'icon-tile-amber text-rose-300'
                     }`}
                   >
                     {isProfit ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
@@ -1268,14 +1268,14 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     <h3 className="text-xl font-semibold text-white truncate">
                       {p.asset?.name || p.asset?.ticker || `Asset #${p.asset_id}`}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-zinc-400 mt-0.5">
                       {p.asset?.ticker} · {new Date(p.date).toLocaleDateString('ko-KR')}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setSelectedPnl(null)}
-                  className="text-slate-400 hover:text-white shrink-0"
+                  className="text-zinc-400 hover:text-white shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1283,16 +1283,16 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
 
               {/* 실현 손익 강조 */}
               <div
-                className={`rounded-lg p-4 mb-5 border ${
-                  isProfit ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
+                className={`rounded-2xl p-4 mb-5 border ${
+                  isProfit ? 'bg-mint-400/10 border-mint-400/30' : 'bg-rose-500/10 border-rose-400/30'
                 }`}
               >
-                <p className="text-xs text-slate-400 mb-1">실현 손익 ({cur})</p>
+                <p className="text-xs text-zinc-400 mb-1">실현 손익 ({cur})</p>
                 <div className="flex items-baseline gap-2">
-                  <span className={`text-2xl font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-2xl font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {isProfit ? '+' : ''}{formatMoney(p.profit, cur)}
                   </span>
-                  <span className={`text-sm font-medium ${isProfit ? 'text-emerald-300' : 'text-red-300'}`}>
+                  <span className={`text-sm font-medium ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>
                     ({isProfit ? '+' : ''}{p.profit_percent.toFixed(2)}%)
                   </span>
                 </div>
@@ -1301,47 +1301,47 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               {/* 상세 항목 */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 <div>
-                  <p className="text-xs text-slate-500 mb-0.5">매도 수량</p>
+                  <p className="label-mono mb-0.5">매도 수량</p>
                   <p className="text-white font-medium">{formatNumber(p.quantity, 4)}주</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 mb-0.5">매도일</p>
+                  <p className="label-mono mb-0.5">매도일</p>
                   <p className="text-white font-medium">{new Date(p.date).toLocaleDateString('ko-KR')}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 mb-0.5">평균 매수가</p>
+                  <p className="label-mono mb-0.5">평균 매수가</p>
                   <p className="text-white font-medium">{formatMoney(p.buy_avg_price, cur)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 mb-0.5">매도가</p>
+                  <p className="label-mono mb-0.5">매도가</p>
                   <p className="text-white font-medium">{formatMoney(p.sell_price, cur)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 mb-0.5">매입 원가</p>
+                  <p className="label-mono mb-0.5">매입 원가</p>
                   <p className="text-white font-medium">{formatMoney(costBasis, cur)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 mb-0.5">매도 금액</p>
+                  <p className="label-mono mb-0.5">매도 금액</p>
                   <p className="text-white font-medium">{formatMoney(proceeds, cur)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 mb-0.5">수수료</p>
+                  <p className="label-mono mb-0.5">수수료</p>
                   <p className="text-white font-medium">{formatMoney(p.fee, cur)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 mb-0.5">계좌</p>
+                  <p className="label-mono mb-0.5">계좌</p>
                   <p className="text-white font-medium truncate">{p.account?.name || `#${p.account_id}`}</p>
                 </div>
                 <div className="col-span-2">
-                  <p className="text-xs text-slate-500 mb-0.5">등록 시각 (KST)</p>
+                  <p className="label-mono mb-0.5">등록 시각 (KST)</p>
                   <p className="text-white font-medium">{formatDateTimeKST(p.created_at)}</p>
                 </div>
               </div>
 
               {p.notes && (
-                <div className="mt-5 pt-4 border-t border-slate-700">
-                  <p className="text-xs text-slate-500 mb-1">메모</p>
-                  <p className="text-sm text-slate-300 whitespace-pre-wrap">{p.notes}</p>
+                <div className="mt-5 pt-4 border-t border-white/[0.08]">
+                  <p className="text-xs text-zinc-500 mb-1">메모</p>
+                  <p className="text-sm text-zinc-300 whitespace-pre-wrap">{p.notes}</p>
                 </div>
               )}
             </div>
@@ -1358,20 +1358,20 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
         const total = gross + (isBuy ? tx.fee : -tx.fee);
         return (
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={() => { if (!txActionLoading) { setSelectedTx(null); setTxEditMode(false); } }}
           >
             <div
-              className="bg-slate-800 rounded-xl p-6 w-full max-w-lg border border-slate-700 max-h-[90vh] overflow-y-auto"
+              className="surface p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between mb-5">
                 <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${
+                    className={`icon-tile w-11 h-11 ${
                       isBuy
-                        ? 'bg-gradient-to-br from-blue-500 to-cyan-500'
-                        : 'bg-gradient-to-br from-red-500 to-orange-500'
+                        ? 'icon-tile-mint text-mint-300'
+                        : 'icon-tile-amber text-rose-300'
                     }`}
                   >
                     {isBuy ? <ArrowDownCircle className="w-6 h-6" /> : <ArrowUpCircle className="w-6 h-6" />}
@@ -1383,20 +1383,20 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       </h3>
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
-                          isBuy ? 'bg-blue-500/20 text-blue-300' : 'bg-red-500/20 text-red-300'
+                          isBuy ? 'bg-mint-400/15 text-mint-300' : 'bg-rose-500/10 text-rose-300'
                         }`}
                       >
                         {isBuy ? '매수' : '매도'}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-zinc-400 mt-0.5">
                       {tx.asset?.ticker} · {new Date(tx.date).toLocaleDateString('ko-KR')}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => { setSelectedTx(null); setTxEditMode(false); }}
-                  className="text-slate-400 hover:text-white shrink-0"
+                  className="text-zinc-400 hover:text-white shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1405,7 +1405,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               {txEditMode ? (
                 /* ===== 수정 폼 ===== */
                 <div className="space-y-4">
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-zinc-400">
                     {tx.asset?.ticker} · {tx.account?.name || `#${tx.account_id}`} 거래를 수정합니다. (종목/계좌는 변경할 수 없습니다)
                   </p>
 
@@ -1415,7 +1415,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       type="button"
                       onClick={() => setTxEditData({ ...txEditData, type: 'Buy' })}
                       className={`py-2 rounded-lg font-medium transition-colors ${
-                        txEditData.type === 'Buy' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        txEditData.type === 'Buy' ? 'bg-mint-400/20 text-mint-200 ring-1 ring-mint-400/40' : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
                       }`}
                     >
                       매수
@@ -1424,7 +1424,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       type="button"
                       onClick={() => setTxEditData({ ...txEditData, type: 'Sell' })}
                       className={`py-2 rounded-lg font-medium transition-colors ${
-                        txEditData.type === 'Sell' ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        txEditData.type === 'Sell' ? 'bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/40' : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
                       }`}
                     >
                       매도
@@ -1433,53 +1433,53 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">거래일</label>
+                      <label className="field-label">거래일</label>
                       <input
                         type="date"
                         value={txEditData.date}
                         onChange={(e) => setTxEditData({ ...txEditData, date: e.target.value })}
-                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-field w-full px-3 py-2 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">{txEditData.type === 'Buy' ? '매수가' : '매도가'} ({cur})</label>
+                      <label className="field-label">{txEditData.type === 'Buy' ? '매수가' : '매도가'} ({cur})</label>
                       <input
                         type="number"
                         step="any"
                         value={txEditData.price}
                         onChange={(e) => setTxEditData({ ...txEditData, price: e.target.value })}
-                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-field w-full px-3 py-2 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">수량</label>
+                      <label className="field-label">수량</label>
                       <input
                         type="number"
                         step="any"
                         value={txEditData.quantity}
                         onChange={(e) => setTxEditData({ ...txEditData, quantity: e.target.value })}
-                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-field w-full px-3 py-2 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">수수료 ({cur})</label>
+                      <label className="field-label">수수료 ({cur})</label>
                       <input
                         type="number"
                         step="any"
                         value={txEditData.fee}
                         onChange={(e) => setTxEditData({ ...txEditData, fee: e.target.value })}
-                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-field w-full px-3 py-2 text-sm"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">메모</label>
+                    <label className="field-label">메모</label>
                     <input
                       type="text"
                       value={txEditData.notes}
                       onChange={(e) => setTxEditData({ ...txEditData, notes: e.target.value })}
-                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="input-field w-full px-3 py-2 text-sm"
                     />
                   </div>
 
@@ -1491,14 +1491,14 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     <button
                       onClick={handleUpdateTransaction}
                       disabled={txActionLoading}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 px-4 py-2 rounded-lg text-white font-medium transition-colors"
+                      className="btn-primary flex-1 px-4 py-2"
                     >
                       {txActionLoading ? '저장 중...' : '저장'}
                     </button>
                     <button
                       onClick={() => setTxEditMode(false)}
                       disabled={txActionLoading}
-                      className="flex-1 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-white transition-colors"
+                      className="btn-ghost flex-1 px-4 py-2"
                     >
                       취소
                     </button>
@@ -1509,12 +1509,12 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                 <>
                   {/* 금액 강조 */}
                   <div
-                    className={`rounded-lg p-4 mb-5 border ${
-                      isBuy ? 'bg-blue-500/10 border-blue-500/30' : 'bg-red-500/10 border-red-500/30'
+                    className={`rounded-2xl p-4 mb-5 border ${
+                      isBuy ? 'bg-mint-400/15 border-mint-400/30' : 'bg-rose-500/10 border-rose-400/30'
                     }`}
                   >
-                    <p className="text-xs text-slate-400 mb-1">{isBuy ? '총 지불액' : '실수령액'} ({cur})</p>
-                    <span className={`text-2xl font-bold ${isBuy ? 'text-blue-400' : 'text-red-400'}`}>
+                    <p className="text-xs text-zinc-400 mb-1">{isBuy ? '총 지불액' : '실수령액'} ({cur})</p>
+                    <span className={`text-2xl font-bold ${isBuy ? 'text-mint-400' : 'text-rose-400'}`}>
                       {formatMoney(total, cur)}
                     </span>
                   </div>
@@ -1522,54 +1522,54 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   {/* 상세 항목 */}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                     <div>
-                      <p className="text-xs text-slate-500 mb-0.5">{isBuy ? '매수가' : '매도가'}</p>
+                      <p className="label-mono mb-0.5">{isBuy ? '매수가' : '매도가'}</p>
                       <p className="text-white font-medium">{formatMoney(tx.price, cur)}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 mb-0.5">수량</p>
+                      <p className="label-mono mb-0.5">수량</p>
                       <p className="text-white font-medium">{formatNumber(tx.quantity, 4)}주</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 mb-0.5">거래 금액</p>
+                      <p className="label-mono mb-0.5">거래 금액</p>
                       <p className="text-white font-medium">{formatMoney(gross, cur)}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 mb-0.5">수수료</p>
+                      <p className="label-mono mb-0.5">수수료</p>
                       <p className="text-white font-medium">{formatMoney(tx.fee, cur)}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 mb-0.5">거래일</p>
+                      <p className="label-mono mb-0.5">거래일</p>
                       <p className="text-white font-medium">{new Date(tx.date).toLocaleDateString('ko-KR')}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 mb-0.5">계좌</p>
+                      <p className="label-mono mb-0.5">계좌</p>
                       <p className="text-white font-medium truncate">{tx.account?.name || `#${tx.account_id}`}</p>
                     </div>
                     <div className="col-span-2">
-                      <p className="text-xs text-slate-500 mb-0.5">등록 시각 (KST)</p>
+                      <p className="label-mono mb-0.5">등록 시각 (KST)</p>
                       <p className="text-white font-medium">{formatDateTimeKST(tx.created_at)}</p>
                     </div>
                   </div>
 
                   {tx.notes && (
-                    <div className="mt-5 pt-4 border-t border-slate-700">
-                      <p className="text-xs text-slate-500 mb-1">메모</p>
-                      <p className="text-sm text-slate-300 whitespace-pre-wrap">{tx.notes}</p>
+                    <div className="mt-5 pt-4 border-t border-white/[0.08]">
+                      <p className="text-xs text-zinc-500 mb-1">메모</p>
+                      <p className="text-sm text-zinc-300 whitespace-pre-wrap">{tx.notes}</p>
                     </div>
                   )}
 
                   {/* 액션 */}
-                  <div className="flex gap-3 mt-6 pt-4 border-t border-slate-700">
+                  <div className="flex gap-3 mt-6 pt-4 border-t border-white/[0.08]">
                     <button
                       onClick={() => startTxEdit(tx)}
-                      className="flex-1 bg-blue-600/80 hover:bg-blue-600 px-4 py-2 rounded-lg text-white font-medium transition-colors"
+                      className="btn-primary flex-1 px-4 py-2"
                     >
                       수정
                     </button>
                     <button
                       onClick={handleDeleteTransaction}
                       disabled={txActionLoading}
-                      className="flex-1 bg-red-600/80 hover:bg-red-600 disabled:bg-slate-600 px-4 py-2 rounded-lg text-white font-medium transition-colors"
+                      className="btn-danger flex-1 px-4 py-2"
                     >
                       {txActionLoading ? '삭제 중...' : '삭제'}
                     </button>
@@ -1609,24 +1609,24 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
         ];
         return (
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={() => setDetailHolding(null)}
           >
             <div
-              className="bg-slate-800 rounded-xl p-6 w-full max-w-2xl border border-slate-700 max-h-[90vh] overflow-y-auto"
+              className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               {/* 헤더 */}
               <div className="flex items-start justify-between mb-4">
                 <div className="min-w-0">
                   <h3 className="text-xl font-semibold text-white truncate">{h.asset?.name || ticker}</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-zinc-400 mt-0.5">
                     {ticker}
                     {info?.exchange ? ` · ${info.exchange}` : ''}
                     {info?.sector ? ` · ${info.sector}` : ''}
                   </p>
                 </div>
-                <button onClick={() => setDetailHolding(null)} className="text-slate-400 hover:text-white shrink-0">
+                <button onClick={() => setDetailHolding(null)} className="text-zinc-400 hover:text-white shrink-0">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1637,12 +1637,12 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   {hasPrice ? formatMoney(curPrice, cur) : '—'}
                 </span>
                 {hasPrice && changePercent !== 0 && (
-                  <span className={`text-sm font-medium ${changePercent > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-sm font-medium ${changePercent > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {changePercent > 0 ? '+' : ''}{changePercent.toFixed(2)}%
                   </span>
                 )}
                 {price?.market_state && (
-                  <span className="text-[11px] text-slate-500">{price.market_state}</span>
+                  <span className="text-[11px] text-zinc-500">{price.market_state}</span>
                 )}
               </div>
 
@@ -1654,8 +1654,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     onClick={() => setDetailRange(r.key)}
                     className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
                       detailRange === r.key
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        ? 'bg-mint-400/20 text-mint-200'
+                        : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
                     }`}
                   >
                     {r.label}
@@ -1664,26 +1664,26 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               </div>
 
               {/* 차트 */}
-              <div className="bg-slate-900/50 rounded-lg p-3 mb-4 h-[240px] flex items-center justify-center">
+              <div className="bg-black/30 rounded-lg p-3 mb-4 h-[240px] flex items-center justify-center">
                 {detailLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-slate-500">
-                    <div className="w-4 h-4 border border-slate-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="flex items-center gap-2 text-sm text-zinc-500">
+                    <div className="w-4 h-4 border border-white/[0.08] border-t-transparent rounded-full animate-spin" />
                     차트 로딩 중...
                   </div>
                 ) : chartData.length === 0 ? (
-                  <p className="text-sm text-slate-500">시세 데이터를 가져올 수 없습니다.</p>
+                  <p className="text-sm text-zinc-500">시세 데이터를 가져올 수 없습니다.</p>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                       <XAxis
                         dataKey="label"
-                        tick={{ fontSize: 10, fill: '#94a3b8' }}
+                        tick={{ fontSize: 10, fill: '#71717a' }}
                         minTickGap={40}
-                        axisLine={{ stroke: '#334155' }}
+                        axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
                         tickLine={false}
                       />
                       <YAxis
-                        tick={{ fontSize: 10, fill: '#94a3b8' }}
+                        tick={{ fontSize: 10, fill: '#71717a' }}
                         domain={['auto', 'auto']}
                         width={60}
                         axisLine={false}
@@ -1693,55 +1693,55 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                         }
                       />
                       <Tooltip
-                        contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                        labelStyle={{ color: '#cbd5e1' }}
-                        itemStyle={{ color: '#e2e8f0' }}
+                        contentStyle={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
+                        labelStyle={{ color: '#a1a1aa' }}
+                        itemStyle={{ color: '#f4f4f5' }}
                         formatter={(v: number) => [formatMoney(v, cur), '종가']}
                       />
-                      <Line type="monotone" dataKey="close" stroke="#a78bfa" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="close" stroke="#7ddfb0" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 )}
               </div>
 
               {/* 내 보유 정보 */}
-              <div className="rounded-lg border border-slate-700 p-4">
-                <p className="text-xs text-slate-500 mb-3">내 보유 정보 ({currentAccount?.name})</p>
+              <div className="surface-inset p-4">
+                <p className="text-xs text-zinc-500 mb-3">내 보유 정보 ({currentAccount?.name})</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
                   <div>
-                    <p className="text-xs text-slate-500 mb-0.5">보유 수량</p>
+                    <p className="label-mono mb-0.5">보유 수량</p>
                     <p className="text-white font-medium">{formatNumber(h.quantity, 4)}주</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 mb-0.5">평단가</p>
+                    <p className="label-mono mb-0.5">평단가</p>
                     <p className="text-white font-medium">{formatMoney(h.average_price, cur)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 mb-0.5">평가금</p>
+                    <p className="label-mono mb-0.5">평가금</p>
                     <p className="text-white font-medium">{hasPrice ? formatMoney(marketValue, cur) : '—'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 mb-0.5">평가 손익</p>
+                    <p className="label-mono mb-0.5">평가 손익</p>
                     {hasPrice ? (
-                      <p className={`font-medium ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <p className={`font-medium ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {isProfit ? '+' : ''}{formatMoney(profit, cur)}
                         <span className="text-xs ml-1">({isProfit ? '+' : ''}{profitPercent.toFixed(2)}%)</span>
                       </p>
                     ) : (
-                      <p className="text-slate-500">—</p>
+                      <p className="text-zinc-500">—</p>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4">
                   <button
                     onClick={() => { setDetailHolding(null); openBuyForm(h.asset_id); }}
-                    className="flex-1 px-3 py-2 bg-blue-600/80 hover:bg-blue-600 rounded text-sm text-white font-medium transition-colors"
+                    className="btn-primary flex-1 px-3 py-2 text-sm"
                   >
                     매수
                   </button>
                   <button
                     onClick={() => { setDetailHolding(null); openSellForm(h.asset_id); }}
-                    className="flex-1 px-3 py-2 bg-red-600/80 hover:bg-red-600 rounded text-sm text-white font-medium transition-colors"
+                    className="btn-danger flex-1 px-3 py-2 text-sm"
                   >
                     매도
                   </button>
@@ -1755,11 +1755,11 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       {/* 자산 추가 모달 */}
       {showAssetForm && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => !submitting && (setShowAssetForm(false), resetAssetForm())}
         >
           <div
-            className="bg-slate-800 rounded-xl p-6 w-full max-w-2xl border border-slate-700 max-h-[90vh] overflow-y-auto"
+            className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-1">
@@ -1767,19 +1767,19 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               <button
                 onClick={() => { setShowAssetForm(false); resetAssetForm(); }}
                 disabled={submitting}
-                className="text-slate-400 hover:text-white"
+                className="text-zinc-400 hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-zinc-400 mb-4">
               {currentAccount ? `${currentAccount.broker} (${currentAccount.name})` : ''} 계좌에 자산이 추가됩니다.
             </p>
 
             <form onSubmit={handleCreateAsset} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-slate-300">티커 심볼 *</label>
+                  <label className="field-label">티커 심볼 *</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -1791,7 +1791,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                           handleAssetTickerSearch();
                         }
                       }}
-                      className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500 uppercase"
+                      className="input-field flex-1 px-4 py-2 uppercase"
                       placeholder="예: AAPL, 005930"
                       required
                     />
@@ -1799,20 +1799,20 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       type="button"
                       onClick={handleAssetTickerSearch}
                       disabled={assetSearching || !assetFormData.ticker}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 px-4 py-2 rounded-lg transition-colors"
+                      className="btn-primary px-4 py-2"
                     >
                       {assetSearching ? '검색중...' : <Search className="w-5 h-5" />}
                     </button>
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">티커 입력 후 검색 (실패 시 수동 입력 가능)</p>
+                  <p className="text-xs text-zinc-400 mt-1">티커 입력 후 검색 (실패 시 수동 입력 가능)</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-slate-300">자산명 * (한글 가능)</label>
+                  <label className="field-label">자산명 * (한글 가능)</label>
                   <input
                     type="text"
                     value={assetFormData.name}
                     onChange={(e) => setAssetFormData({ ...assetFormData, name: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="input-field w-full px-4 py-2"
                     placeholder="예: Apple Inc., 삼성전자"
                     required
                   />
@@ -1821,22 +1821,22 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-slate-300">타입 *</label>
+                  <label className="field-label">타입 *</label>
                   <select
                     value={assetFormData.type}
                     onChange={(e) => setAssetFormData({ ...assetFormData, type: e.target.value as 'Stock' | 'ETF' })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="input-field w-full px-4 py-2"
                   >
                     <option value="Stock">주식 (Stock)</option>
                     <option value="ETF">ETF</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-slate-300">섹터</label>
+                  <label className="field-label">섹터</label>
                   <select
                     value={assetFormData.sector}
                     onChange={(e) => setAssetFormData({ ...assetFormData, sector: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="input-field w-full px-4 py-2"
                   >
                     <option value="">선택하세요</option>
                     {SECTORS.map((sector) => (
@@ -1848,40 +1848,40 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                 </div>
               </div>
 
-              <div className="border-t border-slate-600 pt-4 mt-2">
-                <h4 className="text-sm font-medium mb-3 text-slate-300">보유 정보 (선택)</h4>
+              <div className="border-t border-white/[0.08] pt-4 mt-2">
+                <h4 className="text-sm font-medium mb-3 text-zinc-300">보유 정보 (선택)</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2 text-slate-300">보유 수량</label>
+                    <label className="field-label">보유 수량</label>
                     <input
                       type="number"
                       step="0.0001"
                       value={assetFormData.quantity}
                       onChange={(e) => setAssetFormData({ ...assetFormData, quantity: e.target.value })}
-                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="input-field w-full px-4 py-2"
                       placeholder="0"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2 text-slate-300">평균 단가</label>
+                    <label className="field-label">평균 단가</label>
                     <input
                       type="number"
                       step="0.01"
                       value={assetFormData.averagePrice}
                       onChange={(e) => setAssetFormData({ ...assetFormData, averagePrice: e.target.value })}
-                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="input-field w-full px-4 py-2"
                       placeholder="0"
                     />
                   </div>
                 </div>
-                <p className="text-xs text-slate-400 mt-2">수량을 입력하면 현재 계좌에 보유 내역이 함께 생성됩니다.</p>
+                <p className="text-xs text-zinc-400 mt-2">수량을 입력하면 현재 계좌에 보유 내역이 함께 생성됩니다.</p>
               </div>
 
               <div className="flex gap-3">
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 px-4 py-2 rounded-lg transition-colors text-white font-medium"
+                  className="btn-primary flex-1 px-4 py-2"
                 >
                   {submitting ? '처리 중...' : '등록'}
                 </button>
@@ -1889,7 +1889,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   type="button"
                   onClick={() => { setShowAssetForm(false); resetAssetForm(); }}
                   disabled={submitting}
-                  className="flex-1 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors text-white"
+                  className="btn-ghost flex-1 px-4 py-2"
                 >
                   취소
                 </button>
@@ -1902,11 +1902,11 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       {/* 거래 기록 모달 */}
       {showForm && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => !submitting && setShowForm(false)}
         >
           <div
-            className="bg-slate-800 rounded-xl p-6 w-full max-w-2xl border border-slate-700 max-h-[90vh] overflow-y-auto"
+            className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -1914,7 +1914,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               <button
                 onClick={() => setShowForm(false)}
                 disabled={submitting}
-                className="text-slate-400 hover:text-white"
+                className="text-zinc-400 hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1931,8 +1931,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   }}
                   className={`flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${
                     formData.type === 'Buy'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      ? 'bg-mint-400/20 text-mint-200 ring-1 ring-mint-400/40'
+                      : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
                   }`}
                 >
                   <ArrowDownCircle className="w-5 h-5" />
@@ -1946,8 +1946,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   }}
                   className={`flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${
                     formData.type === 'Sell'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      ? 'bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/40'
+                      : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
                   }`}
                 >
                   <ArrowUpCircle className="w-5 h-5" />
@@ -1957,14 +1957,14 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
 
               {/* 종목 검색 */}
               <div className="relative">
-                <label className="block text-sm font-medium mb-2">
+                <label className="field-label">
                   종목 *
                   {formData.type === 'Sell' && (
-                    <span className="text-xs text-slate-500 ml-2">(보유 종목만 표시)</span>
+                    <span className="text-xs text-zinc-500 ml-2">(보유 종목만 표시)</span>
                   )}
                 </label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                   <input
                     type="text"
                     value={selectedAsset ? `${selectedAsset.ticker} - ${selectedAsset.name}` : assetSearch}
@@ -1975,12 +1975,12 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     }}
                     onFocus={() => setShowAssetDropdown(true)}
                     placeholder={formData.type === 'Sell' ? '보유 종목 선택...' : '종목 검색...'}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-field w-full pl-10 pr-4 py-2"
                     required
                   />
                 </div>
                 {showAssetDropdown && filteredAssetOptions.length > 0 && !selectedAsset && (
-                  <div className="absolute z-10 w-full mt-1 bg-slate-700 border border-slate-600 rounded-lg max-h-48 overflow-y-auto shadow-lg">
+                  <div className="absolute z-10 w-full mt-1 bg-white/[0.07] border border-white/[0.08] rounded-lg max-h-48 overflow-y-auto shadow-lg">
                     {filteredAssetOptions.map((a) => {
                       const h = holdings.find((x) => x.asset_id === a.id);
                       return (
@@ -1992,13 +1992,13 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                             setShowAssetDropdown(false);
                             setAssetSearch('');
                           }}
-                          className="w-full text-left px-3 py-2 hover:bg-slate-600 text-sm flex items-center justify-between"
+                          className="w-full text-left px-3 py-2 hover:bg-white/[0.1] text-sm flex items-center justify-between"
                         >
                           <span className="text-white">
                             <span className="font-medium">{a.ticker}</span> · {a.name}
                           </span>
                           {h && (
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-zinc-400">
                               {formatNumber(h.quantity, 4)}주 · 평단 {formatMoney(h.average_price, getCurrencyFromTicker(a.ticker))}
                             </span>
                           )}
@@ -2008,7 +2008,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   </div>
                 )}
                 {formData.type === 'Sell' && selectedHolding && (
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-zinc-400 mt-1">
                     보유 수량: {formatNumber(selectedHolding.quantity, 4)}주 · 평단:{' '}
                     {formatMoney(selectedHolding.average_price, getCurrencyFromTicker(selectedAsset?.ticker || ''))}
                   </p>
@@ -2017,12 +2017,12 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium mb-2">거래일 *</label>
+                  <label className="field-label">거래일 *</label>
                   <input
                     type="date"
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-field w-full px-3 py-2"
                     required
                   />
                 </div>
@@ -2031,7 +2031,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     <label className="text-sm font-medium">
                       {formData.type === 'Sell' ? '주당 매도가' : '주당 매수가'} ({formCurrencySymbol}) *
                       {formData.type === 'Sell' && formData.price && sellPriceAutoMode && (
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">시세</span>
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-mint-400/15 text-mint-300">시세</span>
                       )}
                     </label>
                   </div>
@@ -2043,7 +2043,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       setSellPriceAutoMode(false);
                       setFormData({ ...formData, price: e.target.value });
                     }}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-field w-full px-3 py-2"
                     placeholder="1주당 가격"
                     required
                   />
@@ -2054,20 +2054,20 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                         setSellPriceAutoMode(true);
                         setFormData({ ...formData, price: '' });
                       }}
-                      className="text-[10px] text-blue-400 hover:text-blue-300 mt-1"
+                      className="text-[10px] text-mint-400 hover:text-mint-300 mt-1"
                     >
                       현재 시세 다시 가져오기
                     </button>
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">수량 *</label>
+                  <label className="field-label">수량 *</label>
                   <input
                     type="number"
                     step="any"
                     value={formData.quantity}
                     onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-field w-full px-3 py-2"
                     placeholder="0"
                     required
                     max={formData.type === 'Sell' && selectedHolding ? selectedHolding.quantity : undefined}
@@ -2078,12 +2078,12 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     <label className="text-sm font-medium">
                       수수료 ({formCurrencySymbol})
                       {feeAutoMode ? (
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">자동</span>
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-mint-400/10 text-emerald-300">자동</span>
                       ) : (
                         <button
                           type="button"
                           onClick={() => setFeeAutoMode(true)}
-                          className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500"
+                          className="btn-ghost ml-2 text-[10px] px-1.5 py-0.5 text-zinc-300"
                         >
                           자동 복귀
                         </button>
@@ -2098,7 +2098,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       setFeeAutoMode(false);
                       setFormData({ ...formData, fee: e.target.value });
                     }}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-field w-full px-3 py-2"
                     placeholder="0"
                   />
                   {(() => {
@@ -2109,7 +2109,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     const bd = calculateFee(p, q, cur, formData.type);
                     if (bd.total <= 0) return null;
                     return (
-                      <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                      <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1">
                         <Info className="w-3 h-3" />
                         {bd.rateDescription}
                       </p>
@@ -2127,9 +2127,9 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                 const gross = p * q;
                 const net = formData.type === 'Buy' ? gross + f : gross - f;
                 return (
-                  <div className="bg-slate-700/40 border border-slate-600 rounded-lg p-3">
+                  <div className="surface-inset p-3">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-400">
+                      <span className="text-zinc-400">
                         {formatMoney(p, previewCurrency)} × {formatNumber(q, 4)}주
                       </span>
                       <span className="text-white font-semibold">
@@ -2137,11 +2137,11 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       </span>
                     </div>
                     {f > 0 && (
-                      <div className="flex items-center justify-between text-xs text-slate-500 mt-1 pt-1 border-t border-slate-600/50">
+                      <div className="flex items-center justify-between text-xs text-zinc-500 mt-1 pt-1 border-t border-white/[0.06]">
                         <span>{formData.type === 'Buy' ? '+ 수수료' : '- 수수료'}</span>
                         <span>
                           {formData.type === 'Buy' ? '실제 지불액' : '실수령액'}:{' '}
-                          <span className={`font-semibold ${formData.type === 'Buy' ? 'text-blue-300' : 'text-red-300'}`}>
+                          <span className={`font-semibold ${formData.type === 'Buy' ? 'text-mint-300' : 'text-rose-300'}`}>
                             {formatMoney(net, previewCurrency)}
                           </span>
                         </span>
@@ -2156,15 +2156,15 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                 <div
                   className={`rounded-lg p-3 border ${
                     pnlPreview.profit >= 0
-                      ? 'bg-emerald-500/10 border-emerald-500/30'
-                      : 'bg-red-500/10 border-red-500/30'
+                      ? 'bg-mint-400/10 border-mint-400/30'
+                      : 'bg-rose-500/10 border-rose-400/30'
                   }`}
                 >
-                  <p className="text-xs text-slate-400 mb-1">예상 실현 손익</p>
+                  <p className="text-xs text-zinc-400 mb-1">예상 실현 손익</p>
                   <div className="flex items-baseline gap-2">
                     <p
                       className={`text-xl font-bold ${
-                        pnlPreview.profit >= 0 ? 'text-emerald-400' : 'text-red-400'
+                        pnlPreview.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'
                       }`}
                     >
                       {pnlPreview.profit >= 0 ? '+' : ''}
@@ -2172,25 +2172,25 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     </p>
                     <p
                       className={`text-sm ${
-                        pnlPreview.profit >= 0 ? 'text-emerald-300' : 'text-red-300'
+                        pnlPreview.profit >= 0 ? 'text-emerald-300' : 'text-rose-300'
                       }`}
                     >
                       ({pnlPreview.profit >= 0 ? '+' : ''}
                       {pnlPreview.profitPercent.toFixed(2)}%)
                     </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-zinc-500 mt-1">
                     매입원가 {formatMoney(pnlPreview.costBasis, previewCurrency)} (평단 {formatMoney(pnlPreview.buyAvg, previewCurrency)})
                   </p>
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium mb-2">메모</label>
+                <label className="field-label">메모</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input-field w-full px-3 py-2"
                   rows={2}
                   placeholder="추가 메모 (선택)"
                 />
@@ -2201,7 +2201,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   type="button"
                   onClick={() => setShowForm(false)}
                   disabled={submitting}
-                  className="flex-1 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                  className="btn-ghost flex-1 px-4 py-2 disabled:opacity-50"
                 >
                   취소
                 </button>
@@ -2209,7 +2209,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   type="submit"
                   disabled={submitting}
                   className={`flex-1 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ${
-                    formData.type === 'Buy' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'
+                    formData.type === 'Buy' ? 'bg-mint-400/20 hover:bg-mint-400/30' : 'bg-rose-500/20 hover:bg-rose-500/30'
                   }`}
                 >
                   {submitting ? '처리 중...' : formData.type === 'Buy' ? '매수 기록' : '매도 기록'}
