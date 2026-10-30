@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Dividend } from '../types/models';
+import IconTile from './ui/IconTile';
 import { Calendar, X } from 'lucide-react';
 
 interface MonthlyData {
@@ -168,8 +169,8 @@ export default function DividendYearlyOverview() {
 
   if (loading) {
     return (
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <div className="text-center py-8 text-slate-400">데이터 로딩 중...</div>
+      <div className="surface p-6">
+        <div className="text-center py-8 text-zinc-400">데이터 로딩 중...</div>
       </div>
     );
   }
@@ -179,15 +180,15 @@ export default function DividendYearlyOverview() {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Calendar className="w-6 h-6 text-blue-400" />
-          <h2 className="text-2xl font-bold">연간 배당금 현황</h2>
+          <IconTile icon={Calendar} tone="mint" />
+          <h2 className="text-xl font-semibold tracking-tight text-white">연간 배당금 현황</h2>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-400">연도:</label>
+          <label className="label-mono">연도:</label>
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input-field !w-auto !py-2"
           >
             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
               <option key={year} value={year}>{year}년</option>
@@ -197,26 +198,26 @@ export default function DividendYearlyOverview() {
       </div>
 
       {/* 테이블 */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+      <div className="surface overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-700/50 border-b border-slate-600">
-                <th className="px-4 py-3 text-left font-semibold text-slate-200 sticky left-0 bg-slate-700/50 z-20 min-w-[150px]">
+              <tr className="border-b border-white/[0.08]">
+                <th className="px-4 py-3 text-left table-head sticky left-0 bg-ink-900 z-20 min-w-[150px]">
                   계좌
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-200 min-w-[120px]">
+                <th className="px-4 py-3 text-left table-head min-w-[120px]">
                   증권사
                 </th>
                 {monthNames.map((month, index) => (
-                  <th key={index} className="px-4 py-3 text-right font-semibold text-slate-200 min-w-[100px]">
+                  <th key={index} className="px-4 py-3 text-right table-head min-w-[100px]">
                     {month}
                   </th>
                 ))}
-                <th className="px-4 py-3 text-right font-semibold text-blue-300 min-w-[120px] bg-slate-700/70">
+                <th className="px-4 py-3 text-right table-head !text-mint-300 min-w-[120px]">
                   합계
                 </th>
-                <th className="px-4 py-3 text-right font-semibold text-slate-200 min-w-[80px]">
+                <th className="px-4 py-3 text-right table-head min-w-[80px]">
                   건수
                 </th>
               </tr>
@@ -229,33 +230,33 @@ export default function DividendYearlyOverview() {
                 return (
                   <tr 
                     key={account.id} 
-                    className={`border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors ${
-                      idx % 2 === 0 ? 'bg-slate-800/50' : 'bg-slate-800/30'
+                    className={`table-row ${
+                      idx % 2 === 0 ? 'bg-white/[0.02]' : ''
                     }`}
                   >
                     <td 
-                      className="px-4 py-3 font-medium text-white sticky left-0 bg-inherit z-20 cursor-pointer hover:text-blue-400 transition-colors"
+                      className="px-4 py-3 font-medium text-white sticky left-0 bg-ink-900 z-20 cursor-pointer hover:text-mint-300 transition-colors"
                       onClick={() => loadAssetDetails(account)}
                     >
                       {data.accountName}
                     </td>
-                    <td className="px-4 py-3 text-slate-300">
+                    <td className="px-4 py-3 text-zinc-300">
                       {data.broker}
                     </td>
                     {data.months.map((amount, monthIdx) => (
                       <td 
                         key={monthIdx} 
                         className={`px-4 py-3 text-right ${
-                          amount > 0 ? 'text-green-400 font-medium' : 'text-slate-500'
+                          amount > 0 ? 'num text-mint-300 bg-mint-400/[0.07] font-medium' : 'num text-zinc-600'
                         }`}
                       >
                         {formatCurrency(amount)}
                       </td>
                     ))}
-                    <td className="px-4 py-3 text-right font-bold text-blue-400 bg-slate-700/30">
+                    <td className="px-4 py-3 text-right num font-medium text-white bg-white/[0.03]">
                       {formatCurrency(data.total)}
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-400">
+                    <td className="px-4 py-3 text-right num text-zinc-500">
                       {data.count}건
                     </td>
                   </tr>
@@ -263,8 +264,8 @@ export default function DividendYearlyOverview() {
               })}
               
               {/* 합계 행 */}
-              <tr className="bg-slate-700/50 font-bold border-t-2 border-slate-600">
-                <td className="px-4 py-3 text-white sticky left-0 bg-slate-700/50 z-20">
+              <tr className="bg-white/[0.04] font-medium border-t border-white/[0.14]">
+                <td className="px-4 py-3 text-white sticky left-0 bg-ink-900 z-20">
                   월별 합계
                 </td>
                 <td className="px-4 py-3"></td>
@@ -274,14 +275,14 @@ export default function DividendYearlyOverview() {
                     <td 
                       key={monthIdx} 
                       className={`px-4 py-3 text-right ${
-                        total > 0 ? 'text-green-400' : 'text-slate-500'
+                        total > 0 ? 'num text-mint-300' : 'num text-zinc-600'
                       }`}
                     >
                       {formatCurrency(total)}
                     </td>
                   );
                 })}
-                <td className="px-4 py-3 text-right text-blue-400 bg-slate-700/50">
+                <td className="px-4 py-3 text-right num text-white bg-white/[0.06]">
                   {formatCurrency(getGrandTotal())}
                 </td>
                 <td className="px-4 py-3"></td>
@@ -292,72 +293,76 @@ export default function DividendYearlyOverview() {
       </div>
 
       {/* 요약 통계 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl p-6 border border-blue-500/30">
-          <p className="text-sm text-slate-400 mb-2">총 배당금</p>
-          <p className="text-2xl font-bold text-white">{formatCurrency(getGrandTotal())}</p>
-        </div>
-        <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-6 border border-green-500/30">
-          <p className="text-sm text-slate-400 mb-2">월평균 배당금</p>
-          <p className="text-2xl font-bold text-white">
-            {formatCurrency(getGrandTotal() / (new Date().getMonth() + 1))}
-          </p>
-        </div>
-        <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-6 border border-purple-500/30">
-          <p className="text-sm text-slate-400 mb-2">활성 계좌</p>
-          <p className="text-2xl font-bold text-white">
-            {Object.values(monthlyData).filter(d => d.total > 0).length}개
-          </p>
+      <div className="surface p-5 sm:p-6">
+        <div className="grid grid-cols-1 md:flex md:items-stretch gap-5 md:gap-0">
+          <div className="md:flex-1 md:pr-6">
+            <p className="label-mono mb-2">총 배당금</p>
+            <p className="num text-3xl font-light tracking-tight text-white">{formatCurrency(getGrandTotal())}</p>
+          </div>
+          <div className="divider-v hidden md:block" />
+          <div className="md:flex-1 md:px-6">
+            <p className="label-mono mb-2">월평균 배당금</p>
+            <p className="num text-3xl font-light tracking-tight text-white">
+              {formatCurrency(getGrandTotal() / (new Date().getMonth() + 1))}
+            </p>
+          </div>
+          <div className="divider-v hidden md:block" />
+          <div className="md:flex-1 md:pl-6">
+            <p className="label-mono mb-2">활성 계좌</p>
+            <p className="num text-3xl font-light tracking-tight text-white">
+              {Object.values(monthlyData).filter(d => d.total > 0).length}개
+            </p>
+          </div>
         </div>
       </div>
 
       {/* 종목별 상세 모달 */}
       {showAssetModal && selectedAccount && (
         <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setShowAssetModal(false)}
         >
           <div 
-            className="bg-slate-800 rounded-xl border border-slate-700 max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            className="surface max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 모달 헤더 */}
-            <div className="flex items-center justify-between p-6 border-b border-slate-700">
+            <div className="flex items-center justify-between p-6 border-b border-white/[0.08]">
               <div>
-                <h3 className="text-xl font-bold text-white">{selectedAccount.name} - 종목별 배당금</h3>
-                <p className="text-sm text-slate-400 mt-1">{selectedAccount.broker} · {selectedYear}년</p>
+                <h3 className="section-title !text-lg">{selectedAccount.name} - 종목별 배당금</h3>
+                <p className="label-mono mt-1">{selectedAccount.broker} · {selectedYear}년</p>
               </div>
               <button
                 onClick={() => setShowAssetModal(false)}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="btn-icon"
               >
-                <X className="w-6 h-6" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* 모달 내용 */}
             <div className="flex-1 overflow-auto p-6">
               {modalLoading ? (
-                <div className="text-center py-8 text-slate-400">데이터 로딩 중...</div>
+                <div className="text-center py-8 text-zinc-400">데이터 로딩 중...</div>
               ) : assetMonthlyData.length === 0 ? (
-                <div className="text-center py-8 text-slate-400">배당금 기록이 없습니다.</div>
+                <div className="text-center py-8 text-zinc-400">배당금 기록이 없습니다.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-slate-700/50 border-b border-slate-600">
-                        <th className="px-4 py-3 text-left font-semibold text-slate-200 sticky left-0 bg-slate-700/50 z-20 min-w-[200px]">
+                      <tr className="border-b border-white/[0.08]">
+                        <th className="px-4 py-3 text-left table-head sticky left-0 bg-ink-900 z-20 min-w-[200px]">
                           종목
                         </th>
                         {monthNames.map((month, index) => (
-                          <th key={index} className="px-4 py-3 text-right font-semibold text-slate-200 min-w-[100px]">
+                          <th key={index} className="px-4 py-3 text-right table-head min-w-[100px]">
                             {month}
                           </th>
                         ))}
-                        <th className="px-4 py-3 text-right font-semibold text-blue-300 min-w-[120px] bg-slate-700/70">
+                        <th className="px-4 py-3 text-right table-head !text-mint-300 min-w-[120px]">
                           합계
                         </th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-200 min-w-[80px]">
+                        <th className="px-4 py-3 text-right table-head min-w-[80px]">
                           건수
                         </th>
                       </tr>
@@ -366,17 +371,17 @@ export default function DividendYearlyOverview() {
                       {assetMonthlyData.map((asset, idx) => (
                         <tr 
                           key={asset.assetId}
-                          className={`border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors ${
-                            idx % 2 === 0 ? 'bg-slate-800/50' : 'bg-slate-800/30'
+                          className={`table-row ${
+                            idx % 2 === 0 ? 'bg-white/[0.02]' : ''
                           }`}
                         >
-                          <td className="px-4 py-3 sticky left-0 bg-inherit z-20">
+                          <td className="px-4 py-3 sticky left-0 bg-ink-900 z-20">
                             <p className="font-medium text-white">
                               {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ') 
                                 ? asset.assetName 
                                 : asset.ticker}
                             </p>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-zinc-400">
                               {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ')
                                 ? asset.ticker
                                 : asset.assetName}
@@ -386,24 +391,24 @@ export default function DividendYearlyOverview() {
                             <td 
                               key={monthIdx}
                               className={`px-4 py-3 text-right ${
-                                amount > 0 ? 'text-green-400 font-medium' : 'text-slate-500'
+                                amount > 0 ? 'num text-mint-300 bg-mint-400/[0.07] font-medium' : 'num text-zinc-600'
                               }`}
                             >
                               {formatCurrency(amount)}
                             </td>
                           ))}
-                          <td className="px-4 py-3 text-right font-bold text-blue-400 bg-slate-700/30">
+                          <td className="px-4 py-3 text-right num font-medium text-white bg-white/[0.03]">
                             {formatCurrency(asset.total)}
                           </td>
-                          <td className="px-4 py-3 text-right text-slate-400">
+                          <td className="px-4 py-3 text-right num text-zinc-500">
                             {asset.count}건
                           </td>
                         </tr>
                       ))}
 
                       {/* 합계 행 */}
-                      <tr className="bg-slate-700/50 font-bold border-t-2 border-slate-600">
-                        <td className="px-4 py-3 text-white sticky left-0 bg-slate-700/50 z-20">
+                      <tr className="bg-white/[0.04] font-medium border-t border-white/[0.14]">
+                        <td className="px-4 py-3 text-white sticky left-0 bg-ink-900 z-20">
                           월별 합계
                         </td>
                         {monthNames.map((_, monthIdx) => {
@@ -412,14 +417,14 @@ export default function DividendYearlyOverview() {
                             <td 
                               key={monthIdx}
                               className={`px-4 py-3 text-right ${
-                                total > 0 ? 'text-green-400' : 'text-slate-500'
+                                total > 0 ? 'num text-mint-300' : 'num text-zinc-600'
                               }`}
                             >
                               {formatCurrency(total)}
                             </td>
                           );
                         })}
-                        <td className="px-4 py-3 text-right text-blue-400 bg-slate-700/50">
+                        <td className="px-4 py-3 text-right num text-white bg-white/[0.06]">
                           {formatCurrency(assetMonthlyData.reduce((sum, asset) => sum + asset.total, 0))}
                         </td>
                         <td className="px-4 py-3"></td>

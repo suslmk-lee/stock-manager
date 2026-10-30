@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
+import IconTile from './ui/IconTile';
 import { Camera, TrendingUp, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 
 interface SnapshotItem {
@@ -150,8 +151,8 @@ export default function PortfolioSnapshots() {
 
   if (loading) {
     return (
-      <div className="text-center py-20 text-slate-400">
-        <div className="animate-spin w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full mx-auto mb-4" />
+      <div className="text-center py-20 text-zinc-400">
+        <div className="animate-spin w-8 h-8 border-2 border-mint-400 border-t-transparent rounded-full mx-auto mb-4" />
         데이터 로딩 중...
       </div>
     );
@@ -162,14 +163,14 @@ export default function PortfolioSnapshots() {
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Camera className="w-6 h-6 text-purple-400" />
-          <h2 className="text-xl font-bold text-white">포트폴리오 스냅샷</h2>
+          <IconTile icon={Camera} tone="mint" />
+          <h2 className="section-title !text-lg">포트폴리오 스냅샷</h2>
         </div>
         <div className="flex items-center gap-3">
           <select
             value={selectedAccount}
             onChange={(e) => setSelectedAccount(Number(e.target.value))}
-            className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+            className="input-field !w-auto !py-2"
           >
             {accounts.map((acc) => (
               <option key={acc.id} value={acc.id}>
@@ -180,7 +181,7 @@ export default function PortfolioSnapshots() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg text-sm transition-colors"
+            className="btn-primary"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? '기록 중...' : '이번달 기록'}
@@ -189,18 +190,18 @@ export default function PortfolioSnapshots() {
       </div>
 
       {snapshots.length === 0 ? (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-12 text-center">
-          <Camera className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-          <p className="text-slate-400 mb-2">스냅샷 데이터가 없습니다.</p>
-          <p className="text-sm text-slate-500">'이번달 기록' 버튼을 눌러 현재 보유 종목의 평가금을 기록하세요.</p>
+        <div className="surface p-12 text-center">
+          <Camera className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
+          <p className="text-zinc-400 mb-2">스냅샷 데이터가 없습니다.</p>
+          <p className="text-sm text-zinc-500">'이번달 기록' 버튼을 눌러 현재 보유 종목의 평가금을 기록하세요.</p>
         </div>
       ) : (
         <>
           {/* 월별 평가금 추이 차트 */}
           {chartData.length > 1 && (
-            <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-5">
-              <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-purple-400" />
+            <div className="surface p-5">
+              <h3 className="section-title mb-4 flex items-center gap-3">
+                <IconTile icon={TrendingUp} tone="mint" size="sm" />
                 월별 총 평가금 추이
               </h3>
               <div className="flex items-end gap-2 h-40">
@@ -208,16 +209,16 @@ export default function PortfolioSnapshots() {
                   const height = g.totalKRW > 0 ? Math.max((g.totalKRW / chartMax) * 100, 4) : 0;
                   return (
                     <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                      <span className="text-[9px] text-slate-400 whitespace-nowrap">
+                      <span className="label-mono !text-[9px] whitespace-nowrap">
                         {formatCurrency(g.totalKRW)}
                       </span>
                       <div className="w-full flex items-end justify-center" style={{ height: '110px' }}>
                         <div
-                          className="w-full max-w-[28px] rounded-t bg-gradient-to-t from-purple-600 to-purple-400 transition-all duration-300"
+                          className="w-full max-w-[28px] rounded-t-md bg-gradient-to-t from-mint-600/60 to-mint-300 transition-all duration-300"
                           style={{ height: `${height}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-slate-500">{g.month}월</span>
+                      <span className="label-mono !text-[10px]">{g.month}월</span>
                     </div>
                   );
                 })}
@@ -237,39 +238,37 @@ export default function PortfolioSnapshots() {
               });
 
               return (
-                <div key={key} className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+                <div key={key} className="surface overflow-hidden">
                   <button
                     onClick={() => toggleMonth(key)}
-                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-700/30 transition-colors"
+                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.03] transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                        <Camera className="w-5 h-5 text-purple-400" />
-                      </div>
+                      <IconTile icon={Camera} tone="mint" />
                       <div className="text-left">
                         <p className="text-base font-semibold text-white">{group.label}</p>
-                        <p className="text-xs text-slate-400">{group.items.length}개 종목</p>
+                        <p className="label-mono mt-0.5">{group.items.length}개 종목</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <p className="text-lg font-bold text-purple-400">{formatCurrencyFull(group.totalKRW)}</p>
+                      <p className="num text-lg font-medium text-mint-300">{formatCurrencyFull(group.totalKRW)}</p>
                       {isExpanded ? (
-                        <ChevronUp className="w-5 h-5 text-slate-400" />
+                        <ChevronUp className="w-5 h-5 text-zinc-400" />
                       ) : (
-                        <ChevronDown className="w-5 h-5 text-slate-400" />
+                        <ChevronDown className="w-5 h-5 text-zinc-400" />
                       )}
                     </div>
                   </button>
 
                   {isExpanded && (
-                    <div className="border-t border-slate-700">
-                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-5 py-2 text-xs text-slate-500 font-medium border-b border-slate-700/50">
+                    <div className="border-t border-white/[0.08]">
+                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-5 py-2 table-head border-b border-white/[0.08]">
                         <span>종목</span>
                         <span className="text-right">수량</span>
                         <span className="text-right">시세</span>
                         <span className="text-right">평가금</span>
                       </div>
-                      <div className="divide-y divide-slate-700/30">
+                      <div className="divide-y divide-white/[0.05]">
                         {sortedItems.map((item) => {
                           const valKRW = item.currency === 'USD'
                             ? item.market_value * exchangeRate
@@ -283,20 +282,20 @@ export default function PortfolioSnapshots() {
                             : item.asset?.name;
 
                           return (
-                            <div key={item.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-5 py-3 items-center hover:bg-slate-700/20">
+                            <div key={item.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-5 py-3 items-center hover:bg-white/[0.03]">
                               <div>
                                 <p className="text-sm font-medium text-white truncate">{displayName}</p>
                                 {displaySub && (
-                                  <p className="text-xs text-slate-500 truncate">{displaySub}</p>
+                                  <p className="text-xs text-zinc-500 truncate">{displaySub}</p>
                                 )}
                               </div>
-                              <p className="text-sm text-slate-300 text-right whitespace-nowrap">
+                              <p className="num text-sm text-zinc-300 text-right whitespace-nowrap">
                                 {item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(2)}주
                               </p>
-                              <p className="text-sm text-slate-300 text-right whitespace-nowrap">
+                              <p className="num text-sm text-zinc-300 text-right whitespace-nowrap">
                                 {item.currency === 'USD' ? `$${item.price.toFixed(2)}` : `₩${item.price.toLocaleString()}`}
                               </p>
-                              <p className="text-sm font-semibold text-purple-400 text-right whitespace-nowrap">
+                              <p className="num text-sm font-medium text-mint-300 text-right whitespace-nowrap">
                                 {formatCurrencyFull(valKRW)}
                               </p>
                             </div>

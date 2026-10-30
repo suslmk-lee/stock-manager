@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Dividend, Holding, Transaction } from '../types/models';
+import IconTile from './ui/IconTile';
+import RingGauge from './ui/RingGauge';
 import { DollarSign, TrendingUp, Calendar, PieChart, Percent } from 'lucide-react';
 
 interface DividendQuickStatsProps {
@@ -264,8 +266,8 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
 
   if (loading) {
     return (
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <div className="text-center py-8 text-slate-400">통계 로딩 중...</div>
+      <div className="surface p-6">
+        <div className="text-center py-8 text-zinc-400">통계 로딩 중...</div>
       </div>
     );
   }
@@ -273,89 +275,91 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
   return (
     <div className="space-y-6">
       {/* 주요 통계 카드 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 총 배당금 */}
-        <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-4 sm:p-6 border border-green-500/30">
-          <div className="flex items-center gap-2 sm:gap-3 mb-2">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
+      <div className="surface p-5 sm:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:items-stretch gap-5 lg:gap-0">
+          {/* 총 배당금 */}
+          <div className="lg:flex-1 lg:pr-6">
+            <div className="flex items-center gap-3 mb-3">
+              <IconTile icon={DollarSign} tone="mint" size="sm" />
+              <p className="label-mono">총 배당금</p>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400">총 배당금</p>
+            <p className="num text-2xl sm:text-3xl font-light tracking-tight text-white">{formatCurrency(totalDividend)}</p>
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-white">{formatCurrency(totalDividend)}</p>
-        </div>
+          <div className="divider-v hidden lg:block" />
 
-        {/* 올해 배당금 */}
-        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl p-4 sm:p-6 border border-blue-500/30">
-          <div className="flex items-center gap-2 sm:gap-3 mb-2">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+          {/* 올해 배당금 */}
+          <div className="lg:flex-1 lg:px-6">
+            <div className="flex items-center gap-3 mb-3">
+              <IconTile icon={Calendar} tone="sky" size="sm" />
+              <p className="label-mono">{new Date().getFullYear()}년 배당금</p>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400">{new Date().getFullYear()}년 배당금</p>
-          </div>
-          <p className="text-xl sm:text-2xl font-bold text-white">{formatCurrency(yearlyTotal)}</p>
-          <p className="text-xs text-slate-400 mt-1">
-            예상 연배당금 {formatCurrency(expectedAnnualDividend)}
-          </p>
-        </div>
-
-        {/* 평균 배당금 */}
-        <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-4 sm:p-6 border border-purple-500/30">
-          <div className="flex items-center gap-2 sm:gap-3 mb-2">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
-            </div>
-            <p className="text-xs sm:text-sm text-slate-400">월평균 배당금</p>
-          </div>
-          <p className="text-xl sm:text-2xl font-bold text-white">
-            {formatCurrency(monthlyStats.length > 0 ? yearlyTotal / (new Date().getMonth() + 1) : 0)}
-          </p>
-        </div>
-
-        {/* 연배당률 */}
-        <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-xl p-4 sm:p-6 border border-amber-500/30">
-          <div className="flex items-center gap-2 sm:gap-3 mb-2">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
-              <Percent className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
-            </div>
-            <p className="text-xs sm:text-sm text-slate-400">올해 누적 연배당률</p>
-          </div>
-          <div className="flex items-end gap-2">
-            <p className="text-xl sm:text-2xl font-bold text-white">
-              {totalInvestment > 0 ? `${annualYield.toFixed(2)}%` : '-'}
-            </p>
-            <p className="text-xs text-amber-300/90 mb-1">
-              {totalInvestment > 0 ? `예상 ${expectedAnnualYield.toFixed(2)}%` : ''}
+            <p className="num text-2xl sm:text-3xl font-light tracking-tight text-white">{formatCurrency(yearlyTotal)}</p>
+            <p className="label-mono mt-1.5">
+              예상 연배당금 {formatCurrency(expectedAnnualDividend)}
             </p>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            투자금({investmentBasisLabel}) {formatCurrency(totalInvestment)}
-          </p>
+          <div className="divider-v hidden lg:block" />
+
+          {/* 평균 배당금 */}
+          <div className="lg:flex-1 lg:px-6">
+            <div className="flex items-center gap-3 mb-3">
+              <IconTile icon={TrendingUp} size="sm" />
+              <p className="label-mono">월평균 배당금</p>
+            </div>
+            <p className="num text-2xl sm:text-3xl font-light tracking-tight text-white">
+              {formatCurrency(monthlyStats.length > 0 ? yearlyTotal / (new Date().getMonth() + 1) : 0)}
+            </p>
+          </div>
+          <div className="divider-v hidden lg:block" />
+
+          {/* 연배당률 */}
+          <div className="lg:flex-1 lg:pl-6">
+            <div className="flex items-center gap-3 mb-3">
+              <IconTile icon={Percent} tone="amber" size="sm" />
+              <p className="label-mono">올해 누적 연배당률</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <RingGauge
+                size={72}
+                value={totalInvestment > 0 && expectedAnnualYield > 0 ? (annualYield / expectedAnnualYield) * 100 : 0}
+              >
+                <span className="text-sm">{totalInvestment > 0 ? `${annualYield.toFixed(1)}%` : '-'}</span>
+              </RingGauge>
+              <div>
+                <p className="num text-2xl sm:text-3xl font-light tracking-tight text-white">
+                  {totalInvestment > 0 ? `${annualYield.toFixed(2)}%` : '-'}
+                </p>
+                <p className="text-xs text-amber-300/90 mt-0.5">
+                  {totalInvestment > 0 ? `예상 ${expectedAnnualYield.toFixed(2)}%` : ''}
+                </p>
+              </div>
+            </div>
+            <p className="label-mono mt-2">
+              투자금({investmentBasisLabel}) {formatCurrency(totalInvestment)}
+            </p>
+          </div>
         </div>
       </div>
 
       {children}
 
       {/* 월별 배당금 통계 */}
-      <div className="relative overflow-hidden bg-slate-800/90 rounded-2xl p-6 border border-slate-700/80">
-        <div className="absolute -top-40 -right-32 w-[28rem] h-[28rem] bg-emerald-500/10 blur-3xl pointer-events-none" />
-        <div className="relative flex items-center justify-between gap-3 mb-5">
+      <div className="relative overflow-hidden surface p-6">
+                <div className="relative flex items-center justify-between gap-3 mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center">
-              <PieChart className="w-5 h-5 text-emerald-400" />
-            </div>
+            <IconTile icon={PieChart} tone="mint" />
             <div>
-              <h3 className="text-lg font-semibold text-white leading-none">월별 배당금</h3>
-              <p className="text-xs text-slate-400 mt-1">최근 6개월 흐름</p>
+              <h3 className="section-title leading-none">월별 배당금</h3>
+              <p className="label-mono mt-1">최근 6개월 흐름</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs text-slate-400">6개월 합계</p>
-            <p className="text-sm font-semibold text-emerald-300">{formatCurrency(sixMonthTotal)}</p>
+            <p className="label-mono">6개월 합계</p>
+            <p className="num text-sm font-medium text-mint-300">{formatCurrency(sixMonthTotal)}</p>
           </div>
         </div>
         {monthlyStats.length === 0 ? (
-          <p className="text-center py-8 text-slate-400">배당금 기록이 없습니다.</p>
+          <p className="text-center py-8 text-zinc-400">배당금 기록이 없습니다.</p>
         ) : (
           <div className="space-y-3">
             {monthlyStats.map((stat) => {
@@ -365,26 +369,26 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
               return (
               <div
                 key={stat.month}
-                className="group rounded-xl border border-slate-600/40 bg-slate-700/30 px-4 py-3 hover:border-emerald-400/40 transition-all"
+                className="group surface-inset px-4 py-3 hover:border-mint-400/30 transition-all"
               >
                 <div className="flex justify-between items-center mb-2.5">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium text-white">{formatMonth(stat.month)}</p>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-600/50 text-slate-300">
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.08] text-zinc-300">
                       {stat.count}건
                     </span>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-emerald-300">{formatCurrency(stat.total)}</p>
-                    <p className="text-[11px] text-slate-400">{sharePercent.toFixed(1)}%</p>
+                    <p className="num text-lg font-medium text-mint-300">{formatCurrency(stat.total)}</p>
+                    <p className="label-mono">{sharePercent.toFixed(1)}%</p>
                   </div>
                 </div>
-                <div className="w-full bg-slate-700/80 rounded-full h-2.5 overflow-hidden">
+                <div className="w-full bg-white/[0.06] rounded-full h-2.5 overflow-hidden">
                   <div 
-                    className="h-2.5 rounded-full transition-all duration-500 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400"
+                    className="h-2.5 rounded-full transition-all duration-500 bg-gradient-to-r from-mint-400 to-mint-200"
                     style={{ 
                       width: `${Math.max(widthByMax, 4)}%`,
-                      boxShadow: '0 0 12px rgba(52,211,153,0.45)',
+                      boxShadow: '0 0 12px rgba(125,223,176,0.4)',
                     }}
                   />
                 </div>
@@ -397,24 +401,24 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
       {/* 배당금 Top10 & 분포 차트 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 배당금 Top10 */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-yellow-400" />
-            <h3 className="text-lg font-semibold text-white">배당금 Top 10</h3>
+        <div className="surface p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <IconTile icon={TrendingUp} tone="amber" size="sm" />
+            <h3 className="section-title">배당금 Top 10</h3>
           </div>
           {topAssets.length === 0 ? (
-            <p className="text-center py-8 text-slate-400">배당금 기록이 없습니다.</p>
+            <p className="text-center py-8 text-zinc-400">배당금 기록이 없습니다.</p>
           ) : (
             <div className="space-y-2">
               {topAssets.map((asset, index) => (
-                <div key={asset.ticker} className="bg-slate-700/50 rounded-lg p-4 hover:bg-slate-700 transition-colors">
+                <div key={asset.ticker} className="surface-inset p-4 hover:bg-white/[0.04] transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                        index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                        index === 1 ? 'bg-slate-400/20 text-slate-300' :
-                        index === 2 ? 'bg-orange-500/20 text-orange-400' :
-                        'bg-slate-600/50 text-slate-400'
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-sm ${
+                        index === 0 ? 'bg-amber-400/15 text-amber-300' :
+                        index === 1 ? 'bg-white/[0.1] text-zinc-200' :
+                        index === 2 ? 'bg-orange-400/15 text-orange-300' :
+                        'bg-white/[0.08] text-zinc-400'
                       }`}>
                         {index + 1}
                       </div>
@@ -424,7 +428,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                             ? asset.assetName 
                             : asset.ticker}
                         </p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-zinc-400">
                           {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ')
                             ? `${asset.ticker} · ${asset.count}건`
                             : `${asset.assetName} · ${asset.count}건`}
@@ -432,14 +436,14 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-green-400">{formatCurrency(asset.total)}</p>
+                      <p className="num text-lg font-medium text-mint-300">{formatCurrency(asset.total)}</p>
                       <div className="flex items-center gap-2 justify-end">
                         {asset.yield > 0 && (
-                          <span className="text-xs font-medium text-amber-400">
+                          <span className="text-xs font-medium text-amber-300">
                             배당률 {asset.yield.toFixed(2)}%
                           </span>
                         )}
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-zinc-400">
                           {totalDividend > 0 ? `비중 ${((asset.total / totalDividend) * 100).toFixed(1)}%` : '0%'}
                         </span>
                       </div>
@@ -452,13 +456,13 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
         </div>
 
         {/* 배당금 분포 원그래프 */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <div className="flex items-center gap-2 mb-4">
-            <PieChart className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-semibold text-white">배당금 분포</h3>
+        <div className="surface p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <IconTile icon={PieChart} tone="sky" size="sm" />
+            <h3 className="section-title">배당금 분포</h3>
           </div>
           {topAssets.length === 0 ? (
-            <p className="text-center py-8 text-slate-400">배당금 기록이 없습니다.</p>
+            <p className="text-center py-8 text-zinc-400">배당금 기록이 없습니다.</p>
           ) : (
             <div className="space-y-4">
               {/* SVG 원그래프 */}
@@ -466,8 +470,8 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                 <svg viewBox="0 0 200 200" className="w-64 h-64">
                   {(() => {
                     const colors = [
-                      '#eab308', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6',
-                      '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'
+                      '#7ddfb0', '#7dd3fc', '#fcd34d', '#c4b5fd', '#fda4af',
+                      '#34d399', '#38bdf8', '#fdba74', '#a5b4fc', '#d4d4d8'
                     ];
                     let currentAngle = -90;
                     
@@ -511,8 +515,8 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
               <div className="grid grid-cols-2 gap-2">
                 {topAssets.map((asset, index) => {
                   const colors = [
-                    '#eab308', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6',
-                    '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'
+                    '#7ddfb0', '#7dd3fc', '#fcd34d', '#c4b5fd', '#fda4af',
+                    '#34d399', '#38bdf8', '#fdba74', '#a5b4fc', '#d4d4d8'
                   ];
                   const percentage = (asset.total / totalDividend) * 100;
                   
@@ -522,7 +526,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                         className="w-3 h-3 rounded-full" 
                         style={{ backgroundColor: colors[index % colors.length] }}
                       />
-                      <span className="text-xs text-slate-300 truncate">
+                      <span className="text-xs text-zinc-300 truncate">
                         {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ') 
                           ? asset.assetName 
                           : asset.ticker} ({percentage.toFixed(1)}%)
