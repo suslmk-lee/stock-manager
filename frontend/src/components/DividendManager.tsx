@@ -39,6 +39,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
     totalAmount: number;
     holdingInfo: { accountName: string; quantity: number; marketValue: number; avgPrice: number; costKRW: number }[];
     currency: string; // 평단가 통화 (KRW / USD)
+    dividendsToDateKRW: number; // 모든 계좌에서 지금까지 받은 세후 배당금 합계
     yieldPercent: number;
   } | null>(null);
   const [assetDetailLoading, setAssetDetailLoading] = useState(false);
@@ -179,7 +180,15 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       }, 0);
 
       // 보유 정보 조회 (모든 계좌에서 이 종목 보유현황)
-      const holdingsData = await apiClient.GetAllHoldings() as any[];
+      const [holdingsData, everyDividend] = await Promise.all([
+        apiClient.GetAllHoldings() as Promise<any[]>,
+        // 전체 계좌의 누적 배당 (실패해도 상세는 보여 준다)
+        apiClient.GetAllDividends().then((d) => (d ?? []) as Dividend[]).catch(() => null),
+      ]);
+      // 지금까지 받은 세후 배당 (매매 신호의 누적 배당과 같은 기준: 금액 - 세금)
+      const dividendsToDateKRW = (everyDividend ?? allDivs)
+        .filter((d) => d.asset_id === assetId && d.is_received)
+        .reduce((sum, d) => sum + (d.currency === 'USD' ? (d.amount - d.tax) * exchangeRate : d.amount - d.tax), 0);
       const assetHoldings = holdingsData.filter((h: any) => h.asset_id === assetId && (h.quantity || 0) > 0);
 
       // 시세 조회
@@ -217,6 +226,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
         totalAmount,
         holdingInfo,
         currency,
+        dividendsToDateKRW,
         yieldPercent,
       });
     } catch (err) {
@@ -1077,9 +1087,14 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                     const pnl = value - cost;
                     const pnlPct = cost > 0 ? (pnl / cost) * 100 : 0;
                     const pnlTone = value <= 0 ? 'text-zinc-400' : pnl >= 0 ? 'text-mint-300' : 'text-rose-300';
+                    const divs = assetDetailData.dividendsToDateKRW;
+                    const total = pnl + divs; // 배당 포함 손익
+                    const totalPct = cost > 0 ? (total / cost) * 100 : 0;
+                    const totalTone = value <= 0 ? 'text-zinc-400' : total >= 0 ? 'text-mint-300' : 'text-rose-300';
                     const won = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
+                    const signed = (v: number) => `${v >= 0 ? '+' : '-'}${won(Math.abs(v))}`;
                     return (
-                      <div className="surface-inset flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
+                      <div className="surface-inset flex flex-col gap-4 p-5">
                         <div>
                           <div className="flex items-center gap-2">
                             <Wallet className="h-4 w-4 text-zinc-300" />
@@ -1091,7 +1106,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                             {assetDetailData.currency === 'USD' && ' · 현재 환율 기준'}
                           </p>
                         </div>
-                        <div className="flex gap-6 sm:text-right">
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-white/[0.06] pt-4 sm:grid-cols-4">
                           <div>
                             <div className="label-mono">평가금액</div>
                             <p className="num mt-1 text-lg font-medium text-white">{value > 0 ? won(value) : '-'}</p>
@@ -1101,11 +1116,19 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                             <p className={`num mt-1 text-lg font-medium ${pnlTone}`}>
                               {value > 0 ? `${pnl >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%` : '-'}
                             </p>
-                            {value > 0 && (
-                              <p className={`num text-xs ${pnlTone}`}>
-                                {pnl >= 0 ? '+' : '-'}{won(Math.abs(pnl))}
-                              </p>
-                            )}
+                            {value > 0 && <p className={`num text-xs ${pnlTone}`}>{signed(pnl)}</p>}
+                          </div>
+                          <div>
+                            <div className="label-mono">누적 배당</div>
+                            <p className="num mt-1 text-lg font-medium text-sky-300">{won(divs)}</p>
+                            <p className="label-mono">세후 · 전체 계좌</p>
+                          </div>
+                          <div className="sm:border-l sm:border-white/[0.08] sm:pl-4">
+                            <div className="label-mono">배당 포함 손익</div>
+                            <p className={`num mt-1 text-lg font-semibold ${totalTone}`}>
+                              {value > 0 ? `${total >= 0 ? '+' : ''}${totalPct.toFixed(2)}%` : '-'}
+                            </p>
+                            {value > 0 && <p className={`num text-xs ${totalTone}`}>{signed(total)}</p>}
                           </div>
                         </div>
                       </div>
