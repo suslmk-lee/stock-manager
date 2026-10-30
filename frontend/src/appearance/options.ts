@@ -58,3 +58,11 @@ export const FONT_SIZES = [
 
 export type FontSizeId = (typeof FONT_SIZES)[number]['id'];
 export const DEFAULT_FONT_SIZE: FontSizeId = 'md';
+
+// 커서 트레일(Cascading Dots) 설정 범위 — 설정 UI 슬라이더도 이 값으로 만든다
+export const CURSOR_TRAIL_LIMITS = {
+  nodes: { min: 3, max: 30, step: 1 },
+  ease: { min: 0.05, max: 0.9, step: 0.01 },
+  headSize: { min: 6, max: 48, step: 1 },
+  taper: { min: 0, max: 1, step: 0.05 },
+} as const;

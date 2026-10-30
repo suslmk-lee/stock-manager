@@ -2,8 +2,22 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { buildThemeVars, getTheme, hexToRgb, rgbToHex, DEFAULT_THEME_ID, AppTheme } from './themes';
 import {
   DEFAULT_CARD_STYLE, DEFAULT_FONT_SIZE, DEFAULT_MONO, DEFAULT_SANS, FONT_SIZES, FontSizeId,
-  MONO_FALLBACK, MONO_FONTS, SANS_FALLBACK, SANS_FONTS, CARD_STYLES,
+  MONO_FALLBACK, MONO_FONTS, SANS_FALLBACK, SANS_FONTS, CARD_STYLES, CURSOR_TRAIL_LIMITS,
 } from './options';
+
+// 커서를 따라다니는 점 체인 효과 (장식용, 기본 꺼짐)
+export interface CursorTrailSettings {
+  enabled: boolean;
+  nodes: number; // 점 개수
+  ease: number; // 앞 점을 따라가는 빠르기 (클수록 빠름)
+  headSize: number; // 머리 점 지름(px)
+  taper: number; // 꼬리로 갈수록 작아지는 정도 (0~1)
+  gradient: boolean; // 체인을 따라 mint → sky 그라디언트
+}
+
+export const DEFAULT_CURSOR_TRAIL: CursorTrailSettings = {
+  enabled: false, nodes: 14, ease: 0.34, headSize: 24, taper: 0.8, gradient: false,
+};
 
 export interface AppearanceSettings {
   themeId: string;
@@ -11,6 +25,7 @@ export interface AppearanceSettings {
   sansFont: string;
   monoFont: string;
   fontSize: FontSizeId;
+  cursorTrail: CursorTrailSettings;
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -19,10 +34,29 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   sansFont: DEFAULT_SANS,
   monoFont: DEFAULT_MONO,
   fontSize: DEFAULT_FONT_SIZE,
+  cursorTrail: DEFAULT_CURSOR_TRAIL,
 };
 
 // index.html 의 첫 페인트 전 스크립트도 이 키를 읽는다 (깜빡임 방지)
 const STORAGE_KEY = 'sm-appearance';
+
+const clampNum = (v: unknown, lim: { min: number; max: number }, def: number) =>
+  typeof v === 'number' && Number.isFinite(v) ? Math.min(lim.max, Math.max(lim.min, v)) : def;
+
+// 저장값(없거나 깨졌을 수 있음)을 기본값과 합치고 범위로 보정
+function sanitizeCursorTrail(raw: unknown): CursorTrailSettings {
+  const d = DEFAULT_CURSOR_TRAIL;
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const L = CURSOR_TRAIL_LIMITS;
+  return {
+    enabled: typeof r.enabled === 'boolean' ? r.enabled : d.enabled,
+    nodes: Math.round(clampNum(r.nodes, L.nodes, d.nodes)),
+    ease: clampNum(r.ease, L.ease, d.ease),
+    headSize: clampNum(r.headSize, L.headSize, d.headSize),
+    taper: clampNum(r.taper, L.taper, d.taper),
+    gradient: typeof r.gradient === 'boolean' ? r.gradient : d.gradient,
+  };
+}
 
 function loadSettings(): AppearanceSettings {
   try {
@@ -35,6 +69,7 @@ function loadSettings(): AppearanceSettings {
     if (!SANS_FONTS.some((f) => f.id === merged.sansFont)) merged.sansFont = DEFAULT_SANS;
     if (!MONO_FONTS.some((f) => f.id === merged.monoFont)) merged.monoFont = DEFAULT_MONO;
     if (!FONT_SIZES.some((f) => f.id === merged.fontSize)) merged.fontSize = DEFAULT_FONT_SIZE;
+    merged.cursorTrail = sanitizeCursorTrail(saved.cursorTrail);
     return merged;
   } catch {
     return DEFAULT_APPEARANCE;
