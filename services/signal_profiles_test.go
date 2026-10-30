@@ -687,3 +687,45 @@ func TestSignalEventKindDefaultsForOldRows(t *testing.T) {
 		t.Fatalf("%+v %v", ev, err)
 	}
 }
+
+// 첫 기록 전에 사용자가 한 종목을 무시해도, 다음 첫 기록은 기준점으로 처리되어
+// 나머지 기존 후보에 제안 알림이 한꺼번에 생기지 않아야 한다.
+func TestSuggestionBaselineSurvivesEarlyDismiss(t *testing.T) {
+	svc, db := newProfileSvc(t)
+	ids := mkAssets(t, db, 3)
+
+	if err := svc.DismissProfileSuggestion(ids[0]); err != nil {
+		t.Fatal(err)
+	}
+	rep := candidateReport(ids[1], true, true, true)
+	rep2 := candidateReport(ids[2], true, true, true)
+	rep.Items = append(rep.Items, rep2.Items...)
+	rep.Candidates = append(rep.Candidates, rep2.Candidates...)
+	ev, err := svc.recordReport(rep)
+	if err != nil || len(ev) != 0 {
+		t.Fatalf("early dismiss must not skip baseline: %v %v", ev, err)
+	}
+	// 기준점 이후 새로 생긴 후보는 정상적으로 제안된다
+	if err := db.Create(&models.Asset{Ticker: "JEPI", Name: "JEPI", Type: "ETF"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	var jepi models.Asset
+	db.Where("ticker = ?", "JEPI").First(&jepi)
+	ev, err = svc.recordReport(candidateReport(jepi.ID, true, true, true))
+	if err != nil || len(ev) != 1 {
+		t.Fatalf("new candidate after baseline should be suggested once: %v %v", ev, err)
+	}
+}
+
+// 첫 기록 때 후보가 하나도 없어도 기준점 표시가 남아, 이후 생긴 후보는 제안된다.
+func TestSuggestionBaselineMarkerWithNoCandidates(t *testing.T) {
+	svc, db := newProfileSvc(t)
+	ids := mkAssets(t, db, 1)
+	if _, err := svc.recordReport(candidateReport(ids[0], false, true, true)); err != nil {
+		t.Fatal(err)
+	}
+	ev, err := svc.recordReport(candidateReport(ids[0], true, true, true))
+	if err != nil || len(ev) != 1 {
+		t.Fatalf("expected suggestion after empty baseline: %v %v", ev, err)
+	}
+}

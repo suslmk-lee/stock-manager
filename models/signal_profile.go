@@ -11,6 +11,8 @@ const (
 
 	SuggestionBaseline  = "baseline"
 	SuggestionSuggested = "suggested"
+	// 기준점 처리 완료 표시 (asset_id=0 인 한 행). 사용자의 지정/무시 행과 섞이지 않게 별도로 둔다.
+	SuggestionBaselineMarker = "baseline-marker"
 	SuggestionDismissed = "dismissed"
 	SuggestionAccepted  = "accepted"
 
