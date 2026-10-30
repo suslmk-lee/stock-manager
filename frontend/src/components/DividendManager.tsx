@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { Account, Asset, Dividend, Transaction } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
 import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock, TrendingUp, Wallet, X } from 'lucide-react';
+import IconTile from './ui/IconTile';
 import DividendQuickStats from './DividendQuickStats';
 
 interface DividendManagerProps {
@@ -334,10 +335,10 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       <div className="animate-pulse">
         {/* 헤더 스켈레톤 */}
         <div className="flex items-center justify-between mb-6">
-          <div className="h-7 w-40 rounded bg-slate-700" />
+          <div className="h-7 w-40 rounded bg-white/[0.08]" />
           <div className="flex gap-2">
-            <div className="h-10 w-32 rounded-lg bg-slate-700" />
-            <div className="h-10 w-28 rounded-lg bg-slate-700" />
+            <div className="h-10 w-32 rounded-xl bg-white/[0.06]" />
+            <div className="h-10 w-28 rounded-xl bg-white/[0.06]" />
           </div>
         </div>
 
@@ -346,27 +347,27 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700"
+              className="surface p-6"
             >
-              <div className="h-3 w-20 rounded bg-slate-700 mb-3" />
-              <div className="h-6 w-28 rounded bg-slate-700 mb-2" />
-              <div className="h-2.5 w-16 rounded bg-slate-700" />
+              <div className="h-3 w-20 rounded bg-white/[0.08] mb-3" />
+              <div className="h-6 w-28 rounded bg-white/[0.08] mb-2" />
+              <div className="h-2.5 w-16 rounded bg-white/[0.08]" />
             </div>
           ))}
         </div>
 
         {/* 최근 배당금 리스트 스켈레톤 */}
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-slate-700">
-          <div className="h-4 w-32 rounded bg-slate-700 mb-4" />
+        <div className="surface p-6">
+          <div className="h-4 w-32 rounded bg-white/[0.08] mb-4" />
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 bg-slate-700/40 rounded-lg p-4">
-                <div className="w-10 h-10 rounded-lg bg-slate-600" />
+              <div key={i} className="flex items-center gap-3 bg-white/[0.03] rounded-lg p-4">
+                <div className="w-10 h-10 rounded-lg bg-white/[0.14]" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-3 w-40 rounded bg-slate-600" />
-                  <div className="h-2.5 w-24 rounded bg-slate-600" />
+                  <div className="h-3 w-40 rounded bg-white/[0.14]" />
+                  <div className="h-2.5 w-24 rounded bg-white/[0.14]" />
                 </div>
-                <div className="h-4 w-20 rounded bg-slate-600" />
+                <div className="h-4 w-20 rounded bg-white/[0.14]" />
               </div>
             ))}
           </div>
@@ -377,7 +378,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
 
   if (accounts.length === 0) {
     return (
-      <div className="text-center py-12 text-slate-400">
+      <div className="text-center py-12 text-zinc-400">
         <DollarSign className="w-16 h-16 mx-auto mb-4 opacity-50" />
         <p className="text-lg">먼저 계좌를 등록해주세요.</p>
       </div>
@@ -388,7 +389,10 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-          <h2 className="text-xl sm:text-2xl font-bold text-white">배당금 관리</h2>
+          <div className="flex items-center gap-3">
+            <IconTile icon={DollarSign} tone="mint" />
+            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">배당금 관리</h2>
+          </div>
           <select
             value={selectedAccount}
             onChange={(e) => {
@@ -398,7 +402,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 onAccountChange(accountId);
               }
             }}
-            className="w-full sm:w-auto bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="input-field sm:!w-auto"
           >
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -424,7 +428,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
             }
             setShowForm(!showForm);
           }}
-          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors w-full sm:w-auto"
+          className="btn-primary w-full sm:w-auto"
         >
           <Plus className="w-5 h-5" />
           배당금 기록
@@ -432,10 +436,10 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       </div>
 
       {error && (
-        <div className={`px-4 py-3 rounded-lg mb-6 flex items-start justify-between gap-2 ${
+        <div className={`px-4 py-3 rounded-2xl mb-6 flex items-start justify-between gap-2 ${
           error.includes('Google Sheets') || error.includes('GSYNC')
-            ? 'bg-yellow-500/20 border border-yellow-500 text-yellow-200'
-            : 'bg-red-500/20 border border-red-500 text-red-200'
+            ? 'bg-amber-400/10 border border-amber-400/30 text-amber-200'
+            : 'bg-rose-500/10 border border-rose-400/30 text-rose-200'
         }`}>
           <div>
             {(error.includes('Google Sheets') || error.includes('GSYNC')) && (
@@ -452,27 +456,29 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
         <div className="mb-6">
           <DividendQuickStats accountId={selectedAccount} refreshTrigger={statsKey}>
             {/* 최근 배당금 — 통계 카드 아래, 월별 차트 위 */}
-            <div className="relative overflow-hidden bg-slate-800 rounded-xl p-6 border border-slate-700">
-              <div className="absolute -top-40 -right-32 w-[28rem] h-[28rem] bg-green-500/10 blur-3xl pointer-events-none" />
+            <div className="relative overflow-hidden surface p-6">
               <div className="relative flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">최근 배당금 내역</h3>
+                <div className="flex items-center gap-3">
+                  <IconTile icon={Clock} tone="sky" size="sm" />
+                  <h3 className="section-title">최근 배당금 내역</h3>
+                </div>
                 <div className="flex items-center gap-2">
                   {viewMode === 'list' && dividends.length > 3 && (
                     <button
                       onClick={() => setShowAllDividends(true)}
-                      className="flex items-center gap-1 text-sm text-green-400 hover:text-green-300 transition-colors"
+                      className="flex items-center gap-1 text-sm text-mint-300 hover:text-white transition-colors"
                     >
                       전체 보기 ({dividends.length}건)
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   )}
-                  <div className="flex bg-slate-700 rounded-lg p-0.5">
+                  <div className="glass-pill flex p-0.5">
                     <button
                       onClick={() => setViewMode('timeline')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
                         viewMode === 'timeline'
-                          ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
-                          : 'text-slate-400 hover:text-slate-200'
+                          ? 'bg-white/[0.12] text-white'
+                          : 'text-zinc-400 hover:text-zinc-200'
                       }`}
                     >
                       <Clock className="w-3.5 h-3.5" />
@@ -480,10 +486,10 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                     </button>
                     <button
                       onClick={() => setViewMode('list')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
                         viewMode === 'list'
-                          ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
-                          : 'text-slate-400 hover:text-slate-200'
+                          ? 'bg-white/[0.12] text-white'
+                          : 'text-zinc-400 hover:text-zinc-200'
                       }`}
                     >
                       <LayoutList className="w-3.5 h-3.5" />
@@ -494,7 +500,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
               </div>
 
               {dividends.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
+                <div className="text-center py-12 text-zinc-400">
                   <Calendar className="w-16 h-16 mx-auto mb-4 opacity-50" />
                   <p className="text-lg">배당금 기록이 없습니다.</p>
                   <p className="text-sm mt-2">위의 "배당금 기록" 버튼을 눌러 배당금을 기록하세요.</p>
@@ -503,7 +509,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 /* ===== 타임라인 뷰 ===== */
                 <div className="relative">
                   {/* 타임라인 선 */}
-                  <div className="absolute top-[52px] left-0 right-0 h-0.5 bg-gradient-to-r from-slate-700 via-green-500/40 to-green-500 z-0" />
+                  <div className="absolute top-[52px] left-0 right-0 h-0.5 bg-gradient-to-r from-white/10 via-mint-400/30 to-mint-400 z-0" />
 
                   <div
                     ref={timelineRef}
@@ -524,51 +530,51 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                           }}
                         >
                           {/* 날짜 */}
-                          <p className="text-[11px] text-slate-400 mb-2 whitespace-nowrap">
+                          <p className="label-mono mb-2 whitespace-nowrap">
                             {divDate.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
                           </p>
 
                           {/* 도트 */}
-                          <div className="w-3 h-3 rounded-full bg-green-500 border-2 border-slate-800 z-10 mb-6 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                          <div className="w-3 h-3 rounded-full bg-mint-400 border-2 border-ink-950 z-10 mb-6 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(125,223,176,0.5)]" />
 
                           {/* 카드 */}
                           <div
                             onClick={() => openAssetDetail(dividend.asset_id, dividend.asset?.ticker || '', dividend.asset?.name || '')}
-                            className="w-full h-full bg-slate-700/60 backdrop-blur rounded-xl p-3 border border-slate-600/60 hover:border-green-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10 hover:-translate-y-1 cursor-pointer flex flex-col">
+                            className="w-full h-full surface-inset surface-interactive p-3 hover:border-mint-400/40 hover:-translate-y-1 cursor-pointer flex flex-col">
                             <div className="flex items-center gap-2 mb-2">
                               <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                                 dividend.is_received
-                                  ? 'bg-green-500/20 text-green-400'
-                                  : 'bg-yellow-500/20 text-yellow-400'
+                                  ? 'bg-mint-400/15 text-mint-300'
+                                  : 'bg-amber-400/15 text-amber-300'
                               }`}>
                                 <DollarSign className="w-3.5 h-3.5" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-white truncate">
+                                <p className="text-xs font-medium text-white truncate">
                                   {(dividend.asset?.ticker?.includes('.KS') || dividend.asset?.ticker?.includes('.KQ'))
                                     ? (dividend.asset?.name || 'N/A')
                                     : (dividend.asset?.ticker || 'N/A')}
                                 </p>
-                                <p className="text-[10px] text-slate-400 truncate">
+                                <p className="label-mono !text-[10px] truncate">
                                   {(dividend.asset?.ticker?.includes('.KS') || dividend.asset?.ticker?.includes('.KQ'))
                                     ? (dividend.asset?.ticker || '')
                                     : (dividend.asset?.name || 'N/A')}
                                 </p>
                               </div>
                             </div>
-                            <p className="text-sm font-bold text-green-400 mb-1">
+                            <p className="num text-sm font-medium text-mint-300 mb-1">
                               ₩{amountKRW.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
                             </p>
                             {dividend.currency === 'USD' && (
-                              <p className="text-[10px] text-slate-500">
+                              <p className="text-[10px] text-zinc-500">
                                 ${dividend.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </p>
                             )}
-                            <div className="flex items-center gap-1 mt-auto pt-2 border-t border-slate-600/40">
+                            <div className="flex items-center gap-1 mt-auto pt-2 border-t border-white/[0.08]">
                               <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                                 dividend.is_received
-                                  ? 'bg-green-500/15 text-green-400'
-                                  : 'bg-yellow-500/15 text-yellow-400'
+                                  ? 'bg-mint-400/15 text-mint-300'
+                                  : 'bg-amber-400/15 text-amber-300'
                               }`}>
                                 {dividend.is_received ? '수령' : '예정'}
                               </span>
@@ -576,7 +582,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); handleEditDividend(dividend); }}
-                                className="text-slate-500 hover:text-blue-400 transition-colors p-0.5"
+                                className="text-zinc-500 hover:text-mint-300 transition-colors p-0.5"
                                 title="수정"
                               >
                                 <Edit2 className="w-3 h-3" />
@@ -584,7 +590,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); handleDeleteDividend(dividend, e); }}
-                                className="text-slate-500 hover:text-red-400 transition-colors p-0.5"
+                                className="text-zinc-500 hover:text-rose-300 transition-colors p-0.5"
                                 title="삭제"
                               >
                                 <Trash2 className="w-3 h-3" />
@@ -596,7 +602,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                     })}
                   </div>
                   {dividends.length > 6 && (
-                    <p className="text-xs text-slate-500 text-right mt-2">최근 6건 표시 중 (전체 {dividends.length}건)</p>
+                    <p className="text-xs text-zinc-500 text-right mt-2">최근 6건 표시 중 (전체 {dividends.length}건)</p>
                   )}
                 </div>
               ) : (
@@ -606,41 +612,39 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                   <div
                     key={dividend.id}
                     onClick={() => openAssetDetail(dividend.asset_id, dividend.asset?.ticker || '', dividend.asset?.name || '')}
-                    className="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-green-500 transition-all duration-300 animate-[fadeSlideIn_0.3s_ease-out] cursor-pointer"
+                    className="surface-inset surface-interactive p-4 hover:border-mint-400/40 animate-[fadeSlideIn_0.3s_ease-out]"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
-                          <DollarSign className="w-6 h-6" />
-                        </div>
+                        <IconTile icon={DollarSign} tone="mint" className="!w-12 !h-12" />
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold text-white">
+                            <h3 className="text-base font-medium text-white">
                               {dividend.asset?.name || 'N/A'}
                             </h3>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            <span className={`badge ${
                               dividend.is_received 
-                                ? 'bg-green-500/20 text-green-300' 
-                                : 'bg-yellow-500/20 text-yellow-300'
+                                ? 'bg-mint-400/15 text-mint-300' 
+                                : 'bg-amber-400/15 text-amber-300'
                             }`}>
                               {dividend.is_received ? '수령완료' : '수령예정'}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-400 mt-1">
+                          <p className="text-sm text-zinc-400 mt-1">
                             {dividend.asset?.ticker || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <p className="text-xl font-bold text-green-400">
+                          <p className="num text-xl font-medium text-mint-300">
                             ₩{(dividend.currency === 'USD' 
                               ? dividend.amount * exchangeRate 
                               : dividend.amount
                             ).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
                           </p>
                           {dividend.tax > 0 && (
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-zinc-500">
                               세금: ₩{(dividend.currency === 'USD' 
                                 ? dividend.tax * exchangeRate 
                                 : dividend.tax
@@ -648,7 +652,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                             </p>
                           )}
                           {dividend.currency === 'USD' && (
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-xs text-zinc-500 mt-1">
                               (USD ${dividend.amount.toLocaleString()})
                             </p>
                           )}
@@ -656,7 +660,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleEditDividend(dividend); }}
-                          className="text-blue-400 hover:text-blue-300 transition-colors"
+                          className="text-zinc-500 hover:text-mint-300 transition-colors"
                           title="수정"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -664,7 +668,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleDeleteDividend(dividend, e); }}
-                          className="text-red-400 hover:text-red-300 transition-colors"
+                          className="text-zinc-500 hover:text-rose-300 transition-colors"
                           title="삭제"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -672,7 +676,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                       </div>
                     </div>
                     {dividend.notes && (
-                      <p className="text-sm text-slate-400 mt-3 pl-16">{dividend.notes}</p>
+                      <p className="text-sm text-zinc-400 mt-3 pl-16">{dividend.notes}</p>
                     )}
                   </div>
                   ))}
@@ -685,21 +689,21 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
 
       {showForm && (
         <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={handleCancelEdit}
         >
           <div 
-            className="bg-slate-800 rounded-xl p-6 border border-slate-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="surface p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">배당금 기록</h3>
+              <h3 className="section-title !text-lg">배당금 기록</h3>
               <button
                 type="button"
                 onClick={handleCancelEdit}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="btn-icon"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -715,11 +719,11 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
             >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">계좌 *</label>
+                <label className="field-label">계좌 *</label>
                 <select
                   value={formData.accountId}
                   onChange={(e) => setFormData({ ...formData, accountId: Number(e.target.value) })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="input-field"
                   required
                 >
                   <option value={0}>계좌를 선택하세요</option>
@@ -731,7 +735,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">자산 *</label>
+                <label className="field-label">자산 *</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -777,11 +781,11 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                       }
                     }}
                     placeholder="티커 또는 자산명 검색..."
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="input-field"
                     required={formData.assetId === 0}
                   />
                   {showAssetDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-slate-700 border border-slate-600 rounded-lg max-h-60 overflow-y-auto shadow-lg">
+                    <div className="absolute z-10 w-full mt-1 bg-ink-900 border border-white/[0.12] rounded-xl max-h-60 overflow-y-auto shadow-2xl shadow-black/50">
                       {assets
                         .filter(asset => {
                           // 보유/거래/배당 이력이 있는 자산만 (전량 매도된 종목 포함)
@@ -808,10 +812,10 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                               setAssetSearchQuery(`${asset.ticker} - ${asset.name}`);
                               setShowAssetDropdown(false);
                             }}
-                            className="w-full text-left px-4 py-2 hover:bg-slate-600 transition-colors text-sm"
+                            className="w-full text-left px-4 py-2 hover:bg-white/[0.08] transition-colors text-sm"
                           >
-                            <span className="font-medium text-green-400">{asset.ticker}</span>
-                            <span className="text-slate-300"> - {asset.name}</span>
+                            <span className="font-medium text-mint-300">{asset.ticker}</span>
+                            <span className="text-zinc-300"> - {asset.name}</span>
                           </button>
                         ))}
                       {assets.filter(asset => {
@@ -825,7 +829,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                           asset.name.toLowerCase().includes(query)
                         );
                       }).length === 0 && (
-                        <div className="px-4 py-3 text-sm text-slate-400 text-center">
+                        <div className="px-4 py-3 text-sm text-zinc-400 text-center">
                           검색 결과가 없습니다.
                         </div>
                       )}
@@ -836,57 +840,57 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">지급일 *</label>
+                <label className="field-label">지급일 *</label>
                 <input
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="input-field"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">배당금액 *</label>
+                <label className="field-label">배당금액 *</label>
                 <input
                   type="number"
                   step="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="input-field"
                   placeholder="0.00"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">세금</label>
+                <label className="field-label">세금</label>
                 <input
                   type="number"
                   step="0.01"
                   value={formData.tax}
                   onChange={(e) => setFormData({ ...formData, tax: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="input-field"
                   placeholder="0.00"
                 />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">통화</label>
+                <label className="field-label">통화</label>
                 <select
                   value={formData.currency}
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="input-field"
                 >
                   <option value="USD">USD</option>
                   <option value="KRW">KRW</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">수령 여부</label>
+                <label className="field-label">수령 여부</label>
                 <select
                   value={formData.isReceived ? 'true' : 'false'}
                   onChange={(e) => setFormData({ ...formData, isReceived: e.target.value === 'true' })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="input-field"
                 >
                   <option value="true">수령 완료</option>
                   <option value="false">수령 예정</option>
@@ -894,11 +898,11 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">메모</label>
+              <label className="field-label">메모</label>
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="input-field"
                 placeholder="추가 메모"
                 rows={2}
               />
@@ -906,14 +910,14 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
             <div className="flex gap-3">
               <button
                 type="submit"
-                className="flex-1 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+                className="btn-primary flex-1"
               >
                 {editingDividend ? '수정' : '기록'}
               </button>
               <button
                 type="button"
                 onClick={handleCancelEdit}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors"
+                className="btn-ghost flex-1"
               >
                 취소
               </button>
@@ -926,20 +930,20 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       {/* 전체 배당금 모달 */}
       {showAllDividends && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setShowAllDividends(false)}
         >
           <div
-            className="relative bg-slate-800 rounded-xl border border-slate-700 max-w-3xl w-full max-h-[85vh] flex flex-col"
+            className="relative surface max-w-3xl w-full max-h-[85vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-700">
-              <h3 className="text-lg font-semibold text-white">배당금 전체 내역 ({dividends.length}건)</h3>
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-white/[0.08]">
+              <h3 className="section-title">배당금 전체 내역 ({dividends.length}건)</h3>
               <button
                 onClick={() => setShowAllDividends(false)}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="btn-icon"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -948,41 +952,39 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
               {dividends.map((dividend) => (
                 <div
                   key={dividend.id}
-                  className="bg-slate-700/50 rounded-lg p-4 border border-slate-600/60 hover:border-green-500/50 transition-all duration-200"
+                  className="surface-inset p-4 hover:border-mint-400/40 transition-all duration-200"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
-                        <DollarSign className="w-5 h-5" />
-                      </div>
+                      <IconTile icon={DollarSign} tone="mint" />
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-semibold text-white">
                             {dividend.asset?.name || 'N/A'}
                           </h4>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          <span className={`badge ${
                             dividend.is_received
-                              ? 'bg-green-500/20 text-green-300'
-                              : 'bg-yellow-500/20 text-yellow-300'
+                              ? 'bg-mint-400/15 text-mint-300'
+                              : 'bg-amber-400/15 text-amber-300'
                           }`}>
                             {dividend.is_received ? '수령완료' : '수령예정'}
                           </span>
                         </div>
-                        <p className="text-sm text-slate-400 mt-0.5">
+                        <p className="text-sm text-zinc-400 mt-0.5">
                           {dividend.asset?.ticker || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-lg font-bold text-green-400">
+                        <p className="num text-lg font-medium text-mint-300">
                           ₩{(dividend.currency === 'USD'
                             ? dividend.amount * exchangeRate
                             : dividend.amount
                           ).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
                         </p>
                         {dividend.currency === 'USD' && (
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-zinc-500">
                             (USD ${dividend.amount.toLocaleString()})
                           </p>
                         )}
@@ -990,7 +992,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                       <button
                         type="button"
                         onClick={() => { setShowAllDividends(false); handleEditDividend(dividend); }}
-                        className="text-blue-400 hover:text-blue-300 transition-colors"
+                        className="text-zinc-500 hover:text-mint-300 transition-colors"
                         title="수정"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -998,7 +1000,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                       <button
                         type="button"
                         onClick={(e) => { setShowAllDividends(false); handleDeleteDividend(dividend, e); }}
-                        className="text-red-400 hover:text-red-300 transition-colors"
+                        className="text-zinc-500 hover:text-rose-300 transition-colors"
                         title="삭제"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1006,7 +1008,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                     </div>
                   </div>
                   {dividend.notes && (
-                    <p className="text-sm text-slate-400 mt-2 pl-14">{dividend.notes}</p>
+                    <p className="text-sm text-zinc-400 mt-2 pl-14">{dividend.notes}</p>
                   )}
                 </div>
               ))}
@@ -1018,22 +1020,22 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       {/* 종목 상세 배당금 모달 */}
       {assetDetailModal && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setAssetDetailModal(null)}
         >
           <div
-            className="relative bg-slate-800 rounded-2xl border border-slate-700 max-w-2xl w-full max-h-[85vh] overflow-y-auto"
+            className="relative surface max-w-2xl w-full max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 헤더 */}
-            <div className="sticky top-0 bg-slate-800 border-b border-slate-700 rounded-t-2xl px-6 py-4 flex items-center justify-between z-10">
+            <div className="sticky top-0 bg-ink-900/95 backdrop-blur border-b border-white/[0.08] rounded-t-3xl px-6 py-4 flex items-center justify-between z-10">
               <div>
-                <h3 className="text-lg font-bold text-white">
+                <h3 className="section-title !text-lg">
                   {(assetDetailModal.ticker.includes('.KS') || assetDetailModal.ticker.includes('.KQ'))
                     ? assetDetailModal.name
                     : assetDetailModal.ticker}
                 </h3>
-                <p className="text-sm text-slate-400">
+                <p className="label-mono mt-0.5">
                   {(assetDetailModal.ticker.includes('.KS') || assetDetailModal.ticker.includes('.KQ'))
                     ? assetDetailModal.ticker
                     : assetDetailModal.name}
@@ -1042,50 +1044,50 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
               </div>
               <button
                 onClick={() => setAssetDetailModal(null)}
-                className="text-slate-400 hover:text-white transition-colors p-1"
+                className="btn-icon"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {assetDetailLoading ? (
-              <div className="p-12 text-center text-slate-400">데이터 로딩 중...</div>
+              <div className="p-12 text-center text-zinc-400">데이터 로딩 중...</div>
             ) : assetDetailData ? (
               <div className="p-6 space-y-6">
                 {/* 요약 카드 */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/40">
+                  <div className="surface-inset p-4">
                     <div className="flex items-center gap-2 mb-1">
-                      <DollarSign className="w-4 h-4 text-green-400" />
-                      <span className="text-xs text-slate-400">1년 배당금</span>
+                      <DollarSign className="w-4 h-4 text-mint-300" />
+                      <span className="label-mono">1년 배당금</span>
                     </div>
-                    <p className="text-lg font-bold text-green-400">
+                    <p className="num text-lg font-medium text-mint-300">
                       ₩{assetDetailData.totalAmount.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
                     </p>
                   </div>
-                  <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/40">
+                  <div className="surface-inset p-4">
                     <div className="flex items-center gap-2 mb-1">
-                      <TrendingUp className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs text-slate-400">투자 대비 배당률</span>
+                      <TrendingUp className="w-4 h-4 text-amber-300" />
+                      <span className="label-mono">투자 대비 배당률</span>
                     </div>
-                    <p className="text-lg font-bold text-amber-400">
+                    <p className="num text-lg font-medium text-amber-300">
                       {assetDetailData.yieldPercent > 0 ? `${assetDetailData.yieldPercent.toFixed(2)}%` : '-'}
                     </p>
                   </div>
-                  <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/40">
+                  <div className="surface-inset p-4">
                     <div className="flex items-center gap-2 mb-1">
-                      <Calendar className="w-4 h-4 text-blue-400" />
-                      <span className="text-xs text-slate-400">배당 횟수</span>
+                      <Calendar className="w-4 h-4 text-sky-300" />
+                      <span className="label-mono">배당 횟수</span>
                     </div>
-                    <p className="text-lg font-bold text-blue-400">
+                    <p className="num text-lg font-medium text-sky-300">
                       {assetDetailData.dividends.length}회
                     </p>
                   </div>
                 </div>
 
                 {/* 월별 배당금 차트 */}
-                <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/40">
-                  <h4 className="text-sm font-semibold text-white mb-4">월별 배당금 추이</h4>
+                <div className="surface-inset p-4">
+                  <h4 className="text-sm font-medium text-white mb-4">월별 배당금 추이</h4>
                   <div className="flex items-end gap-1 h-32">
                     {(() => {
                       const maxVal = Math.max(...assetDetailData.monthlyChart.map(m => m.total), 1);
@@ -1098,14 +1100,14 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                               <div
                                 className={`w-full max-w-[24px] rounded-t transition-all duration-300 ${
                                   item.total > 0
-                                    ? 'bg-gradient-to-t from-green-500 to-emerald-400'
-                                    : 'bg-slate-600/30'
+                                    ? 'bg-gradient-to-t from-mint-600/60 to-mint-300'
+                                    : 'bg-white/[0.08]'
                                 }`}
                                 style={{ height: item.total > 0 ? `${height}%` : '4px' }}
                                 title={`₩${item.total.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}`}
                               />
                             </div>
-                            <span className="text-[9px] text-slate-500">{parseInt(month)}월</span>
+                            <span className="label-mono !text-[9px]">{parseInt(month)}월</span>
                           </div>
                         );
                       });
@@ -1115,23 +1117,23 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
 
                 {/* 보유 현황 */}
                 {assetDetailData.holdingInfo.length > 0 && (
-                  <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/40">
+                  <div className="surface-inset p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <Wallet className="w-4 h-4 text-purple-400" />
-                      <h4 className="text-sm font-semibold text-white">보유 현황</h4>
+                      <Wallet className="w-4 h-4 text-zinc-300" />
+                      <h4 className="text-sm font-medium text-white">보유 현황</h4>
                     </div>
                     <div className="space-y-2">
                       {assetDetailData.holdingInfo.map((h, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-slate-600/30 rounded-lg px-4 py-3">
+                        <div key={idx} className="flex items-center justify-between bg-white/[0.04] rounded-xl px-4 py-3">
                           <div>
                             <p className="text-sm font-medium text-white">{h.accountName}</p>
-                            <p className="text-xs text-slate-400">{h.quantity}주 보유</p>
+                            <p className="text-xs text-zinc-400">{h.quantity}주 보유</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-semibold text-green-400">
+                            <p className="num text-sm font-medium text-mint-300">
                               ₩{h.marketValue.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
                             </p>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-zinc-400">
                               평단 ₩{h.avgPrice.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
                             </p>
                           </div>
@@ -1142,25 +1144,25 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 )}
 
                 {/* 배당금 내역 리스트 */}
-                <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/40">
-                  <h4 className="text-sm font-semibold text-white mb-3">배당금 내역 ({assetDetailData.dividends.length}건)</h4>
+                <div className="surface-inset p-4">
+                  <h4 className="text-sm font-medium text-white mb-3">배당금 내역 ({assetDetailData.dividends.length}건)</h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {assetDetailData.dividends.map(div => {
                       const amtKRW = div.currency === 'USD' ? div.amount * exchangeRate : div.amount;
                       return (
-                        <div key={div.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-600/20">
+                        <div key={div.id} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-white/[0.05]">
                           <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${div.is_received ? 'bg-green-400' : 'bg-yellow-400'}`} />
-                            <span className="text-sm text-slate-300">
+                            <div className={`w-2 h-2 rounded-full ${div.is_received ? 'bg-mint-400' : 'bg-amber-300'}`} />
+                            <span className="text-sm text-zinc-300">
                               {new Date(div.date).toLocaleDateString('ko-KR')}
                             </span>
                           </div>
                           <div className="text-right">
-                            <span className="text-sm font-medium text-green-400">
+                            <span className="num text-sm font-medium text-mint-300">
                               ₩{amtKRW.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
                             </span>
                             {div.currency === 'USD' && (
-                              <span className="text-xs text-slate-500 ml-2">
+                              <span className="text-xs text-zinc-500 ml-2">
                                 (${div.amount.toFixed(2)})
                               </span>
                             )}
@@ -1172,7 +1174,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 </div>
               </div>
             ) : (
-              <div className="p-12 text-center text-slate-400">데이터를 불러올 수 없습니다.</div>
+              <div className="p-12 text-center text-zinc-400">데이터를 불러올 수 없습니다.</div>
             )}
           </div>
         </div>
@@ -1180,15 +1182,15 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
 
       {deleteTarget && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => !deleting && setDeleteTarget(null)}
         >
           <div
-            className="bg-slate-800 rounded-xl p-6 border border-slate-700 max-w-md w-full"
+            className="surface p-6 max-w-md w-full"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold text-white mb-2">배당금 삭제</h3>
-            <p className="text-slate-300 mb-6">
+            <p className="text-zinc-300 mb-6">
               {`${deleteTarget.asset?.name || ''} 배당금 (${new Date(deleteTarget.date).toLocaleDateString('ko-KR')})을 삭제하시겠습니까?`}
             </p>
             <div className="flex gap-3">
@@ -1196,7 +1198,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 type="button"
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleting}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-4 py-2 rounded-lg transition-colors"
+                className="btn-ghost flex-1"
               >
                 취소
               </button>
@@ -1204,7 +1206,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 type="button"
                 onClick={confirmDeleteDividend}
                 disabled={deleting}
-                className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 px-4 py-2 rounded-lg transition-colors"
+                className="btn-danger flex-1"
               >
                 {deleting ? '삭제 중...' : '삭제'}
               </button>
