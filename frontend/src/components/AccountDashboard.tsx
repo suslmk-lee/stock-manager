@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import { getAccountTypeMeta } from '../utils/accountType';
-import { ArrowLeft, Wallet, Lock } from 'lucide-react';
+import { ArrowLeft, Wallet, Lock, TrendingUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import TotalReturnByAsset from './TotalReturnByAsset';
 import AssetDetailView from './AssetDetailView';
+import IconTile from './ui/IconTile';
 
 interface AccountDashboardProps {
   account: Account;
@@ -58,37 +59,37 @@ export default function AccountDashboard({ account, onBack }: AccountDashboardPr
   return (
     <div>
       {/* 헤더 */}
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors text-sm"
-        >
+      <div className="hero-grain p-4 sm:p-6 mb-6">
+        <button onClick={onBack} className="btn-ghost !px-3 !py-1.5 mb-4">
           <ArrowLeft className="w-4 h-4" /> 계좌 목록
         </button>
-        <div className="flex items-center gap-2 min-w-0">
-          <Wallet className="w-5 h-5 text-blue-400 shrink-0" />
-          <h2 className="text-xl sm:text-2xl font-bold text-white truncate">{account.name}</h2>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 whitespace-nowrap">
-            {account.broker}
-          </span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 whitespace-nowrap">
-            {account.market_type === 'Domestic' ? '국내' : '해외'}
-          </span>
-          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${getAccountTypeMeta(account).badgeClass}`}>
-            {getAccountTypeMeta(account).restricted && <Lock className="w-3 h-3" />}
-            {getAccountTypeMeta(account).short}
-          </span>
+        <div className="flex items-center gap-3 min-w-0">
+          <IconTile icon={Wallet} tone="mint" className="shrink-0" />
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-light tracking-tight text-white truncate">{account.name}</h2>
+            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+              <span className="chip">{account.broker}</span>
+              <span className="chip">{account.market_type === 'Domestic' ? '국내' : '해외'}</span>
+              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${getAccountTypeMeta(account).badgeClass}`}>
+                {getAccountTypeMeta(account).restricted && <Lock className="w-3 h-3" />}
+                {getAccountTypeMeta(account).short}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* 평가금 추세 */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 sm:p-6 border border-slate-700 mb-6">
-        <p className="text-sm font-semibold text-white mb-3">평가금 추세</p>
+      <div className="surface p-4 sm:p-6 mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <IconTile icon={TrendingUp} tone="mint" size="sm" />
+          <p className="section-title">평가금 추세</p>
+        </div>
         <div className="h-56">
           {trendLoading ? (
-            <div className="h-full flex items-center justify-center text-sm text-slate-500">추세 로딩 중...</div>
+            <div className="h-full flex items-center justify-center label-mono">추세 로딩 중...</div>
           ) : trend.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-sm text-slate-500">
+            <div className="h-full flex items-center justify-center label-mono">
               스냅샷 추세 데이터가 없습니다. (매월 자동 기록됩니다)
             </div>
           ) : (
@@ -96,18 +97,18 @@ export default function AccountDashboard({ account, onBack }: AccountDashboardPr
               <AreaChart data={trend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="acctTrendFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#7ddfb0" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#7ddfb0" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#94a3b8' }} minTickGap={30} axisLine={{ stroke: '#334155' }} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} domain={['auto', 'auto']} width={55} axisLine={false} tickLine={false} tickFormatter={compactKRW} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} minTickGap={30} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#71717a' }} domain={['auto', 'auto']} width={55} axisLine={false} tickLine={false} tickFormatter={compactKRW} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                  labelStyle={{ color: '#cbd5e1' }} itemStyle={{ color: '#e2e8f0' }}
+                  contentStyle={{ background: '#0f0f11', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
+                  labelStyle={{ color: '#a1a1aa' }} itemStyle={{ color: '#f4f4f5' }}
                   formatter={(v: number) => [formatKRW(v), '평가금(KRW)']}
                 />
-                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="url(#acctTrendFill)" />
+                <Area type="monotone" dataKey="value" stroke="#7ddfb0" strokeWidth={2} fill="url(#acctTrendFill)" />
               </AreaChart>
             </ResponsiveContainer>
           )}
