@@ -18,12 +18,14 @@ type Services struct {
 	ExchangeRate *services.ExchangeRateService
 	Snapshot     *services.PortfolioSnapshotService
 	RealizedPnL  *services.RealizedPnLService
+	Signal       *services.SignalService
 }
 
 // NewServices 는 기본 서비스 묶음을 생성한다.
 // database.InitDB() 가 끝난 뒤에 호출해야 한다 (Snapshot 이 DB 핸들을 필요로 함).
 func NewServices() *Services {
 	ticker := services.NewTickerService()
+	exchange := services.NewExchangeRateService()
 
 	return &Services{
 		Account:      services.NewAccountService(),
@@ -32,8 +34,9 @@ func NewServices() *Services {
 		Holding:      services.NewHoldingService(),
 		Dividend:     services.NewDividendService(),
 		Ticker:       ticker,
-		ExchangeRate: services.NewExchangeRateService(),
+		ExchangeRate: exchange,
 		Snapshot:     services.NewPortfolioSnapshotService(database.GetDB(), ticker),
 		RealizedPnL:  services.NewRealizedPnLService(),
+		Signal:       services.NewSignalService(database.GetDB(), ticker, exchange),
 	}
 }

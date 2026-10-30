@@ -298,3 +298,54 @@ X-API-Key: <API_KEY>
 ]
 ```
 - **Wails**: `GetMonthlySnapshotSummary(months)`
+
+## 8. 매매 신호 (Signals)
+
+규칙 기반 매매 신호. 지표는 "실질손익"(평가손익 + 실현손익 + 세후배당) 기준이며 금액은 각 값의 통화별로 현재 USD/KRW 환율로 KRW 환산합니다.
+
+### 8.1 규칙 조회
+- **Method/Path**: `GET /signal-rules`
+- **설명**: 전역 기본 규칙("균형")과 종목별 오버라이드를 반환합니다. 기본 규칙이 없으면 최초 조회 시 자동 생성됩니다.
+- **Response**: `{ "default": SignalRule, "overrides": [SignalRule] }`
+- **Wails**: `GetSignalRules()`
+
+### 8.2 기본 규칙 저장
+- **Method/Path**: `PUT /signal-rules/default` (body: SignalRule)
+- **Wails**: `SaveDefaultSignalRule(rule)`
+
+### 8.3 종목별 규칙 저장/삭제
+- **Method/Path**: `PUT /signal-rules/asset/:assetId` (body: SignalRule, 업서트) / `DELETE /signal-rules/asset/:assetId` -> `{"status":"success"}`
+- **Wails**: `SaveAssetSignalRule(assetID, rule)`, `DeleteAssetSignalRule(assetID)`
+
+SignalRule 필드: `id, asset_id(0=기본), take_profit_enabled, take_profit_pct, stop_loss_enabled, stop_loss_pct(<=0), weight_enabled, target_weight_pct, weight_band_pct(>=0), dividend_payback_enabled, dividend_payback_pct, dividend_payback_min_return_pct, low_yield_enabled, low_yield_pct, buy_dip_enabled, buy_dip_pct(<=0), high_yield_enabled, high_yield_pct, sell_mode("any"|"all"), buy_mode("any"|"all"), created_at, updated_at`
+
+검증 실패(모드 값 오류, NaN/Inf, 부호 위반 등)는 `400 {"error": "..."}`. 빈 모드는 `any`로 저장됩니다.
+
+### 8.4 신호 리포트
+- **Method/Path**: `GET /signals`
+- **Wails**: `GetSignals()`
+- **설명**: 현재 보유 수량이 있는 종목별 신호. 정렬: SELL, CONFLICT, BUY, HOLD, NO_PRICE 순, 같은 액션 내에서는 `market_value_krw` 내림차순.
+- **Response**:
+```json
+{
+  "generated_at": "2026-06-01T09:00:00+09:00",
+  "usd_krw": 1380.5,
+  "summary": { "sell": 1, "buy": 0, "hold": 3, "conflict": 0, "no_price": 0 },
+  "items": [
+    {
+      "asset_id": 1, "ticker": "AAPL", "name": "Apple", "currency": "USD",
+      "action": "SELL", "rule_source": "default", "restricted_only": false,
+      "quantity": 20, "avg_price": 110, "current_price": 150,
+      "market_value_krw": 4141500, "cost_krw": 3000000, "total_return_krw": 1200000,
+      "dividends_krw": 12800, "dividends_12m_krw": 8500,
+      "unrealized_pct": 36.3, "total_return_pct": 40, "dividend_payback_pct": 0.4,
+      "current_yield_pct": 0.2, "yield_on_cost_pct": 0.3, "weight_pct": 35, "from_avg_pct": 36.3,
+      "sell_checks": [ { "code": "take_profit", "label": "목표 수익률", "met": true, "value": 40, "threshold": 30, "unit": "%" } ],
+      "buy_checks": [],
+      "accounts": [ { "account_id": 1, "account_name": "메인", "broker": "토스", "account_type": "General", "restricted": false, "quantity": 20, "avg_price": 110, "market_value_krw": 4141500 } ]
+    }
+  ]
+}
+```
+- 체크 코드: 매도 `take_profit`, `stop_loss`, `weight_over`, `dividend_payback`, `low_yield` / 매수 `buy_dip`, `weight_under`, `high_yield`. 활성화된 규칙만 포함됩니다.
+- 시세가 없으면 `action: "NO_PRICE"`, 체크는 빈 배열이며 비중 계산에서 제외됩니다.

@@ -13,4 +13,5 @@ func RegisterRoutes(api *gin.RouterGroup, s *Services) {
 	registerTransactionRoutes(api, s)
 	registerDividendRoutes(api, s)
 	registerUtilityRoutes(api, s)
+	registerSignalRoutes(api, s)
 }
