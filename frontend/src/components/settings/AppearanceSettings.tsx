@@ -4,10 +4,12 @@ import {
   useAppearance,
   DEFAULT_CURSOR_TRAIL,
   DEFAULT_CARD_GLOW,
+  DEFAULT_CURSOR_POINTER,
   type CursorTrailSettings,
   type CardGlowSettings,
 } from '../../appearance/AppearanceContext';
 import Switch from '../ui/Switch';
+import CursorPresetGallery from './CursorPresetGallery';
 import { THEMES, mix, type AppTheme } from '../../appearance/themes';
 import Portal from '../ui/Portal';
 import Slider from '../ui/Slider';
@@ -18,6 +20,7 @@ import {
   MONO_FONTS,
   FONT_SIZES,
   CURSOR_TRAIL_LIMITS,
+  TRAIL_PRESETS,
   CARD_GLOW_LIMITS,
   type FontOption,
 } from '../../appearance/options';
@@ -261,6 +264,7 @@ function EffectsSection() {
   const trail = settings.cursorTrail;
   const set = (patch: Partial<CursorTrailSettings>) => update({ cursorTrail: { ...trail, ...patch } });
   const L = CURSOR_TRAIL_LIMITS;
+  const presetName = TRAIL_PRESETS.find((p) => p.id === trail.style)?.name ?? '';
   const sliders: { key: 'nodes' | 'ease' | 'headSize' | 'taper'; label: string; format: (v: number) => string }[] = [
     { key: 'nodes', label: '점 개수', format: (v) => String(v) },
     { key: 'ease', label: '따라오는 속도', format: (v) => v.toFixed(2) },
@@ -269,14 +273,15 @@ function EffectsSection() {
   ];
   return (
     <div className="space-y-4">
+      <CursorPresetGallery />
       <CardGlowGroup />
       <SettingsGroup
         icon={MousePointer2}
-        title="커서 트레일"
-        action={<Switch checked={trail.enabled} onChange={(v) => set({ enabled: v })} label="커서 트레일 켜기" />}
+        title="트레일 세부 조정"
+        action={<span className="label-mono">{trail.enabled ? presetName : '없음'}</span>}
       >
         <p className="text-xs leading-relaxed text-zinc-500">
-          마우스를 따라 점이 사슬처럼 이어집니다. 켠 상태에서 이 창 위로 마우스를 움직여 바로 확인할 수 있습니다.
+          위 프리셋에서 트레일을 고른 뒤 모양을 다듬을 수 있습니다. 트레일이 꺼져 있으면 조절할 수 없습니다.
         </p>
         {sliders.map((s) => (
           <SettingRow key={s.key} label={s.label}>
@@ -305,7 +310,7 @@ function EffectsSection() {
           </span>
         </SettingRow>
       </SettingsGroup>
-      <button type="button" className="btn-ghost w-full justify-center !rounded-full !py-2.5" onClick={() => update({ cursorTrail: DEFAULT_CURSOR_TRAIL, cardGlow: DEFAULT_CARD_GLOW })}>
+      <button type="button" className="btn-ghost w-full justify-center !rounded-full !py-2.5" onClick={() => update({ cursorTrail: DEFAULT_CURSOR_TRAIL, cursorPointer: DEFAULT_CURSOR_POINTER, cardGlow: DEFAULT_CARD_GLOW })}>
         <RotateCcw className="h-4 w-4" />
         효과 초기화
       </button>
