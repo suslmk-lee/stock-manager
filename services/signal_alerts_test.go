@@ -126,7 +126,7 @@ func newAlertSvc(t *testing.T) (*SignalService, *gorm.DB) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.SignalRule{}, &models.SignalState{}, &models.SignalEvent{}, &models.NotificationSetting{}); err != nil {
+	if err := db.AutoMigrate(&models.SignalRule{}, &models.SignalProfile{}, &models.AssetSignalProfile{}, &models.ProfileSuggestion{}, &models.Asset{}, &models.Holding{}, &models.SignalState{}, &models.SignalEvent{}, &models.NotificationSetting{}); err != nil {
 		t.Fatal(err)
 	}
 	return NewSignalService(db, nil, nil), db

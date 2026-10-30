@@ -20,7 +20,7 @@ func flatHistory(n int, close, spike float64) []PricePoint {
 	return pts
 }
 
-func ruleWith(f func(r *models.SignalRule)) models.SignalRule {
+func ruleWith(f func(r *models.SignalRuleConfig)) models.SignalRuleConfig {
 	r := noRules()
 	f(&r)
 	return r
@@ -38,7 +38,7 @@ func onlyCheck(t *testing.T, it SignalItem, code string) SignalCheck {
 }
 
 func TestPriceTrendChecks(t *testing.T) {
-	rule := ruleWith(func(r *models.SignalRule) {
+	rule := ruleWith(func(r *models.SignalRuleConfig) {
 		r.FromHighEnabled, r.FromHighPct = true, -20
 		r.BelowMAEnabled, r.BelowMAPct = true, -5
 		r.AboveMAEnabled, r.AboveMAPct = true, 25
@@ -99,7 +99,7 @@ func TestPriceTrendChecks(t *testing.T) {
 }
 
 func TestDividendCutCheck(t *testing.T) {
-	rule := ruleWith(func(r *models.SignalRule) { r.DividendCutEnabled, r.DividendCutPct = true, 10 })
+	rule := ruleWith(func(r *models.SignalRuleConfig) { r.DividendCutEnabled, r.DividendCutPct = true, 10 })
 	in := krwAsset(1, 100, 10, 100, rule)
 	in.Dividends = []SignalDividendInput{
 		{AccountID: 1, Amount: 100, Date: sigNow.AddDate(0, 0, -30)},
@@ -136,7 +136,7 @@ func TestDividendCutCheck(t *testing.T) {
 	}
 }
 
-func usdAsset(rule models.SignalRule, qty float64) SignalAssetInput {
+func usdAsset(rule models.SignalRuleConfig, qty float64) SignalAssetInput {
 	return SignalAssetInput{
 		AssetID: 1, Ticker: "AAPL", Name: "Apple", Price: 150, PriceCurrency: "USD",
 		Holdings: []SignalHoldingInput{{AccountID: 1, AccountType: models.AccountTypeGeneral, Quantity: qty, AvgPrice: 100}},
@@ -151,7 +151,7 @@ func TestReturnBasisAndFxEffect(t *testing.T) {
 	run := func(in SignalAssetInput, c SignalContext) SignalItem {
 		return BuildSignalReport([]SignalAssetInput{in}, 1500, sigNow, c).Items[0]
 	}
-	tp := ruleWith(func(r *models.SignalRule) { r.TakeProfitEnabled, r.TakeProfitPct = true, 100; r.FxHistorical = true })
+	tp := ruleWith(func(r *models.SignalRuleConfig) { r.TakeProfitEnabled, r.TakeProfitPct = true, 100; r.FxHistorical = true })
 
 	it := run(usdAsset(tp, 1), ctx)
 	// 현재 환율: MV 225000, cost 150000 -> 50%. 환율 반영: cost 100000 -> 125%
@@ -191,7 +191,7 @@ func TestReturnBasisAndFxEffect(t *testing.T) {
 func TestFxCoverageWithSeededHolding(t *testing.T) {
 	ctx := SignalContext{FxAt: func(time.Time) float64 { return 1000 }, FxOK: true}
 	// 보유 2주, 거래 기록은 1주뿐 -> 나머지 1주는 현재 환율로 시드, 커버리지 50%
-	in := usdAsset(ruleWith(func(r *models.SignalRule) { r.FxHistorical = true }), 2)
+	in := usdAsset(ruleWith(func(r *models.SignalRuleConfig) { r.FxHistorical = true }), 2)
 	it := BuildSignalReport([]SignalAssetInput{in}, 1500, sigNow, ctx).Items[0]
 	if !approx(it.FxCoveragePct, 50) {
 		t.Errorf("coverage %v", it.FxCoveragePct)
@@ -203,7 +203,7 @@ func TestFxCoverageWithSeededHolding(t *testing.T) {
 
 func TestFxRealizedAndDividendAtEventRate(t *testing.T) {
 	ctx := SignalContext{FxAt: func(time.Time) float64 { return 1200 }, FxOK: true}
-	in := usdAsset(ruleWith(func(r *models.SignalRule) { r.FxHistorical = true }), 1)
+	in := usdAsset(ruleWith(func(r *models.SignalRuleConfig) { r.FxHistorical = true }), 1)
 	in.PnLs = []SignalPnLInput{{Date: sigNow.AddDate(0, -1, 0), Profit: 20, BuyAvgPrice: 100, Quantity: 1, Currency: "USD"}}
 	in.Dividends = []SignalDividendInput{{AccountID: 1, Amount: 10, Tax: 1.5, Currency: "USD", Date: sigNow.AddDate(0, -2, 0)}}
 	it := BuildSignalReport([]SignalAssetInput{in}, 1500, sigNow, ctx).Items[0]
@@ -220,7 +220,7 @@ func TestFxRealizedAndDividendAtEventRate(t *testing.T) {
 func TestTaxHint(t *testing.T) {
 	sum := &TaxSummary{HarvestWindow: true, RemainingKRW: 1_000_000, ExemptionKRW: OverseasTaxExemptionKRW}
 	ctx := SignalContext{Tax: sum}
-	on := ruleWith(func(r *models.SignalRule) { r.TaxHarvestEnabled = true })
+	on := ruleWith(func(r *models.SignalRuleConfig) { r.TaxHarvestEnabled = true })
 	run := func(in SignalAssetInput, c SignalContext) SignalItem {
 		return BuildSignalReport([]SignalAssetInput{in}, 1500, sigNow, c).Items[0]
 	}

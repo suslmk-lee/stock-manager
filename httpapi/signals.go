@@ -16,6 +16,10 @@ func signalErrorStatus(err error) int {
 	if errors.As(err, &invalid) {
 		return http.StatusBadRequest
 	}
+	var nf *services.ErrSignalNotFound
+	if errors.As(err, &nf) {
+		return http.StatusNotFound
+	}
 	return http.StatusInternalServerError
 }
 

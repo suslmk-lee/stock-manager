@@ -374,6 +374,48 @@ func (a *App) GetSignals() (interface{}, error) {
 	return a.signalService.GetSignals()
 }
 
+// ===== 전략 프로필 =====
+
+func (a *App) GetSignalProfiles() (interface{}, error) {
+	return a.signalService.GetSignalProfiles()
+}
+
+func (a *App) CreateSignalProfile(req services.CreateSignalProfileRequest) (interface{}, error) {
+	return a.signalService.CreateSignalProfile(req)
+}
+
+func (a *App) UpdateSignalProfile(id uint, req services.UpdateSignalProfileRequest) (interface{}, error) {
+	return a.signalService.UpdateSignalProfile(id, req)
+}
+
+func (a *App) DeleteSignalProfile(id uint) error {
+	return a.signalService.DeleteSignalProfile(id)
+}
+
+func (a *App) ResetSignalProfile(id uint) (interface{}, error) {
+	return a.signalService.ResetSignalProfile(id)
+}
+
+func (a *App) AssignSignalProfile(id uint, assetIDs []uint) (interface{}, error) {
+	assignments, err := a.signalService.AssignSignalProfile(id, assetIDs)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{"assignments": assignments}, nil
+}
+
+func (a *App) GetProfileCandidates() (interface{}, error) {
+	cands, err := a.signalService.GetProfileCandidates()
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{"candidates": cands}, nil
+}
+
+func (a *App) DismissProfileSuggestion(assetID uint) error {
+	return a.signalService.DismissProfileSuggestion(assetID)
+}
+
 // ===== 매매 신호 알림 =====
 
 func (a *App) GetSignalEvents(limit int, unreadOnly bool) (interface{}, error) {

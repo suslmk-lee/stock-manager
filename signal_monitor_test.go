@@ -41,6 +41,21 @@ func TestNotificationBody(t *testing.T) {
 	}
 }
 
+func TestNotificationForSuggestions(t *testing.T) {
+	one := []models.SignalEvent{{Name: "SCHD", Kind: models.SignalEventKindSuggestion, Message: "배당 장기보유 프로필 후보 · 배당형 종목명"}}
+	if notificationTitle(one) != "전략 프로필 추천" || notificationBody(one) != "SCHD: 배당 장기보유 프로필 후보 · 배당형 종목명" {
+		t.Fatal(notificationTitle(one), notificationBody(one))
+	}
+	two := []models.SignalEvent{{Name: "A", Kind: "suggestion"}, {Name: "B", Kind: "suggestion"}}
+	if notificationBody(two) != "프로필 후보 2건 · A 외" {
+		t.Fatal(notificationBody(two))
+	}
+	mixed := []models.SignalEvent{{Name: "A", Kind: "suggestion"}, {Name: "B", Kind: "signal"}}
+	if notificationTitle(mixed) != "매매 신호" {
+		t.Fatal(notificationTitle(mixed))
+	}
+}
+
 func TestMonitorRunChecksNotifiesAndStops(t *testing.T) {
 	f := &fakeChecker{
 		set:    models.DefaultNotificationSetting(),
