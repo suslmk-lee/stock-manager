@@ -1,1 +1,765 @@
-/* 카드 스타일 변형: [data-card="…"] 규칙. 기본(glass)은 index.css 의 .surface 등. */
+/* 카드 스타일 8종 — 전부 CSS 변수로만 정의한다 (순수 CSS, @apply 없음).
+ *
+ * index.css 의 .surface / .btn-primary 등은 아래 변수만 읽는다. 변수는 data-card 를 가진
+ * 가장 가까운 조상에서 상속되므로, 설정 미리보기처럼 다른 스타일 안에 <div data-card="x"> 를
+ * 중첩해도 서로 충돌하지 않는다. 모든 스타일이 모든 변수를 정의해야 한다(누락 시 상속됨).
+ *
+ * 변수 목록
+ *   배경     --app-bg
+ *   카드     --card-radius --card-border-w --card-border --card-bg --card-shadow --card-blur
+ *            --card-hover-border --card-hover-shadow --card-hover-transform
+ *   패널     --inset-radius --inset-border-w --inset-border --inset-bg --inset-shadow
+ *   pill     --pill-radius --pill-border-w --pill-border --pill-bg --pill-shadow --pill-blur
+ *            --pill-active-bg --pill-active-fg --pill-active-border --pill-active-shadow
+ *   탭 카드  --tab-radius --tab-border-w --tab-border --tab-bg --tab-shadow --tab-hover-border
+ *            --tab-active-border --tab-active-bg --tab-active-shadow
+ *   버튼     --btn-radius --btn-icon-radius --btn-border-w
+ *            --btn-primary-fg/-bg/-hover-bg/-border/-shadow/-active-transform/-active-shadow
+ *            --btn-ghost-border/-bg/-shadow/-hover-border/-hover-bg
+ *            --btn-icon-border/-bg/-shadow
+ *   아이콘   --tile-radius --tile-border-w --tile-border --tile-base --tile-glow --tile-shadow
+ *   칩       --chip-radius --chip-border-w --chip-border --chip-bg --chip-shadow
+ *   입력     --input-radius --input-border-w --input-border --input-bg --input-shadow
+ *            --input-focus-border --input-focus-shadow
+ *   히어로   --hero-radius --hero-border-w --hero-border --hero-bg --hero-shadow --hero-grain-opacity
+ */
+
+/* ---------------------------------------------------------------- glass (기본) */
+:root,
+[data-card='glass'] {
+  --app-bg: rgb(var(--c-ink-950));
+
+  --card-radius: 1.5rem;
+  --card-border-w: 1px;
+  --card-border: rgb(var(--c-white) / 0.08);
+  --card-bg: linear-gradient(180deg, rgb(var(--c-white) / 0.045) 0%, rgb(var(--c-white) / 0.012) 100%), rgb(var(--c-surface));
+  --card-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.06), 0 24px 48px -24px rgb(var(--c-shadow) / calc(0.9 * var(--shadow-k)));
+  --card-blur: none;
+  --card-hover-border: rgb(var(--c-white) / 0.16);
+  --card-hover-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.09), 0 28px 56px -24px rgb(var(--c-shadow) / calc(0.95 * var(--shadow-k)));
+  --card-hover-transform: translateY(-1px);
+
+  --inset-radius: 1rem;
+  --inset-border-w: 1px;
+  --inset-border: rgb(var(--c-white) / 0.07);
+  --inset-bg: linear-gradient(180deg, rgb(var(--c-white) / 0.035), rgb(var(--c-white) / 0.015));
+  --inset-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.04);
+
+  --pill-radius: 9999px;
+  --pill-border-w: 1px;
+  --pill-border: rgb(var(--c-white) / 0.09);
+  --pill-bg: rgb(var(--c-white) / 0.035);
+  --pill-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.05);
+  --pill-blur: blur(24px);
+  --pill-active-bg: rgb(var(--c-white) / 0.09);
+  --pill-active-fg: rgb(var(--c-white));
+  --pill-active-border: transparent;
+  --pill-active-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.08);
+
+  --tab-radius: 1rem;
+  --tab-border-w: 1px;
+  --tab-border: rgb(var(--c-white) / 0.07);
+  --tab-bg: linear-gradient(180deg, rgb(var(--c-white) / 0.03), rgb(var(--c-white) / 0.008));
+  --tab-shadow: none;
+  --tab-hover-border: rgb(var(--c-white) / 0.14);
+  --tab-active-border: rgb(var(--c-white) / 0.22);
+  --tab-active-bg: linear-gradient(180deg, rgb(var(--c-white) / 0.075), rgb(var(--c-white) / 0.02));
+  --tab-active-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.1), 0 16px 32px -18px rgb(var(--c-shadow) / calc(0.9 * var(--shadow-k)));
+
+  --btn-radius: 9999px;
+  --btn-icon-radius: 9999px;
+  --btn-border-w: 1px;
+  --btn-primary-fg: rgb(var(--c-ink-950));
+  --btn-primary-bg: linear-gradient(180deg, rgb(var(--c-white)) 0%, rgb(var(--c-zinc-200)) 100%);
+  --btn-primary-hover-bg: linear-gradient(180deg, rgb(var(--c-white)) 0%, rgb(var(--c-zinc-100)) 100%);
+  --btn-primary-border: transparent;
+  --btn-primary-shadow: inset 0 -1px 0 rgb(var(--c-shadow) / calc(0.12 * var(--shadow-k))), 0 8px 20px -10px rgb(var(--c-white) / 0.35);
+  --btn-primary-active-transform: none;
+  --btn-primary-active-shadow: inset 0 -1px 0 rgb(var(--c-shadow) / calc(0.12 * var(--shadow-k))), 0 8px 20px -10px rgb(var(--c-white) / 0.35);
+  --btn-ghost-border: rgb(var(--c-white) / 0.14);
+  --btn-ghost-bg: linear-gradient(180deg, rgb(var(--c-white) / 0.06), rgb(var(--c-white) / 0.015));
+  --btn-ghost-shadow: none;
+  --btn-ghost-hover-border: rgb(var(--c-white) / 0.24);
+  --btn-ghost-hover-bg: rgb(var(--c-white) / 0.06);
+  --btn-icon-border: rgb(var(--c-white) / 0.08);
+  --btn-icon-bg: rgb(var(--c-white) / 0.03);
+  --btn-icon-shadow: none;
+
+  --tile-radius: 0.75rem;
+  --tile-border-w: 1px;
+  --tile-border: rgb(var(--c-white) / 0.1);
+  --tile-base: linear-gradient(180deg, rgb(var(--c-ink-600)) 0%, rgb(var(--c-ink-800)) 100%);
+  --tile-glow: 1;
+  --tile-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.1), 0 6px 16px -8px rgb(var(--c-shadow) / calc(0.9 * var(--shadow-k)));
+
+  --chip-radius: 0.5rem;
+  --chip-border-w: 1px;
+  --chip-border: rgb(var(--c-white) / 0.07);
+  --chip-bg: rgb(var(--c-white) / 0.045);
+  --chip-shadow: none;
+
+  --input-radius: 0.75rem;
+  --input-border-w: 1px;
+  --input-border: rgb(var(--c-white) / 0.1);
+  --input-bg: rgb(var(--c-white) / 0.035);
+  --input-shadow: none;
+  --input-focus-border: rgb(var(--c-mint-400) / 0.5);
+  --input-focus-shadow: 0 0 0 2px rgb(var(--c-mint-400) / 0.15);
+
+  --hero-radius: 2rem;
+  --hero-border-w: 1px;
+  --hero-border: rgb(var(--c-white) / 0.09);
+  --hero-bg:
+    radial-gradient(60% 120% at 8% 0%, rgb(var(--c-white) / 0.22) 0%, rgb(var(--c-white) / 0.06) 35%, transparent 65%),
+    linear-gradient(115deg, rgb(var(--c-white) / 0.16) 0%, rgb(var(--c-white) / 0.07) 28%, transparent 46%),
+    rgb(var(--c-ink-950));
+  --hero-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.08), 0 30px 60px -30px rgb(var(--c-shadow) / calc(0.95 * var(--shadow-k)));
+  --hero-grain-opacity: 0.22;
+}
+
+/* ---------------------------------------------------------------- minimal */
+[data-card='minimal'] {
+  --app-bg: rgb(var(--c-ink-950));
+
+  --card-radius: 10px;
+  --card-border-w: 1px;
+  --card-border: rgb(var(--c-white) / 0.13);
+  --card-bg: rgb(var(--c-ink-950));
+  --card-shadow: none;
+  --card-blur: none;
+  --card-hover-border: rgb(var(--c-white) / 0.35);
+  --card-hover-shadow: none;
+  --card-hover-transform: none;
+
+  --inset-radius: 8px;
+  --inset-border-w: 1px;
+  --inset-border: rgb(var(--c-white) / 0.1);
+  --inset-bg: transparent;
+  --inset-shadow: none;
+
+  --pill-radius: 8px;
+  --pill-border-w: 1px;
+  --pill-border: rgb(var(--c-white) / 0.13);
+  --pill-bg: transparent;
+  --pill-shadow: none;
+  --pill-blur: none;
+  --pill-active-bg: rgb(var(--c-white) / 0.07);
+  --pill-active-fg: rgb(var(--c-white));
+  --pill-active-border: rgb(var(--c-white) / 0.3);
+  --pill-active-shadow: none;
+
+  --tab-radius: 8px;
+  --tab-border-w: 1px;
+  --tab-border: rgb(var(--c-white) / 0.1);
+  --tab-bg: transparent;
+  --tab-shadow: none;
+  --tab-hover-border: rgb(var(--c-white) / 0.3);
+  --tab-active-border: rgb(var(--c-white) / 0.7);
+  --tab-active-bg: transparent;
+  --tab-active-shadow: none;
+
+  --btn-radius: 8px;
+  --btn-icon-radius: 8px;
+  --btn-border-w: 1px;
+  --btn-primary-fg: rgb(var(--c-ink-950));
+  --btn-primary-bg: rgb(var(--c-white));
+  --btn-primary-hover-bg: rgb(var(--c-white) / 0.85);
+  --btn-primary-border: rgb(var(--c-white));
+  --btn-primary-shadow: none;
+  --btn-primary-active-transform: none;
+  --btn-primary-active-shadow: none;
+  --btn-ghost-border: rgb(var(--c-white) / 0.22);
+  --btn-ghost-bg: transparent;
+  --btn-ghost-shadow: none;
+  --btn-ghost-hover-border: rgb(var(--c-white) / 0.55);
+  --btn-ghost-hover-bg: transparent;
+  --btn-icon-border: rgb(var(--c-white) / 0.13);
+  --btn-icon-bg: transparent;
+  --btn-icon-shadow: none;
+
+  --tile-radius: 8px;
+  --tile-border-w: 1px;
+  --tile-border: rgb(var(--c-white) / 0.18);
+  --tile-base: transparent;
+  --tile-glow: 0;
+  --tile-shadow: none;
+
+  --chip-radius: 6px;
+  --chip-border-w: 1px;
+  --chip-border: rgb(var(--c-white) / 0.14);
+  --chip-bg: transparent;
+  --chip-shadow: none;
+
+  --input-radius: 8px;
+  --input-border-w: 1px;
+  --input-border: rgb(var(--c-white) / 0.18);
+  --input-bg: transparent;
+  --input-shadow: none;
+  --input-focus-border: rgb(var(--c-white) / 0.7);
+  --input-focus-shadow: none;
+
+  --hero-radius: 14px;
+  --hero-border-w: 1px;
+  --hero-border: rgb(var(--c-white) / 0.15);
+  --hero-bg: rgb(var(--c-ink-900));
+  --hero-shadow: none;
+  --hero-grain-opacity: 0;
+}
+
+/* ---------------------------------------------------------------- flat */
+[data-card='flat'] {
+  --app-bg: rgb(var(--c-ink-950));
+
+  --card-radius: 20px;
+  --card-border-w: 0px;
+  --card-border: transparent;
+  --card-bg: rgb(var(--c-ink-800));
+  --card-shadow: none;
+  --card-blur: none;
+  --card-hover-border: transparent;
+  --card-hover-shadow: 0 0 0 2px rgb(var(--c-white) / 0.08);
+  --card-hover-transform: none;
+
+  --inset-radius: 14px;
+  --inset-border-w: 0px;
+  --inset-border: transparent;
+  --inset-bg: rgb(var(--c-ink-700));
+  --inset-shadow: none;
+
+  --pill-radius: 9999px;
+  --pill-border-w: 0px;
+  --pill-border: transparent;
+  --pill-bg: rgb(var(--c-ink-800));
+  --pill-shadow: none;
+  --pill-blur: none;
+  --pill-active-bg: rgb(var(--c-ink-500));
+  --pill-active-fg: rgb(var(--c-white));
+  --pill-active-border: transparent;
+  --pill-active-shadow: none;
+
+  --tab-radius: 16px;
+  --tab-border-w: 0px;
+  --tab-border: transparent;
+  --tab-bg: rgb(var(--c-ink-800));
+  --tab-shadow: none;
+  --tab-hover-border: transparent;
+  --tab-active-border: transparent;
+  --tab-active-bg: rgb(var(--c-ink-600));
+  --tab-active-shadow: none;
+
+  --btn-radius: 9999px;
+  --btn-icon-radius: 9999px;
+  --btn-border-w: 0px;
+  --btn-primary-fg: rgb(var(--c-ink-950));
+  --btn-primary-bg: rgb(var(--c-white));
+  --btn-primary-hover-bg: rgb(var(--c-white) / 0.88);
+  --btn-primary-border: transparent;
+  --btn-primary-shadow: none;
+  --btn-primary-active-transform: scale(0.98);
+  --btn-primary-active-shadow: none;
+  --btn-ghost-border: transparent;
+  --btn-ghost-bg: rgb(var(--c-ink-600));
+  --btn-ghost-shadow: none;
+  --btn-ghost-hover-border: transparent;
+  --btn-ghost-hover-bg: rgb(var(--c-ink-500));
+  --btn-icon-border: transparent;
+  --btn-icon-bg: rgb(var(--c-ink-700));
+  --btn-icon-shadow: none;
+
+  --tile-radius: 14px;
+  --tile-border-w: 0px;
+  --tile-border: transparent;
+  --tile-base: rgb(var(--c-ink-600));
+  --tile-glow: 0.6;
+  --tile-shadow: none;
+
+  --chip-radius: 9999px;
+  --chip-border-w: 0px;
+  --chip-border: transparent;
+  --chip-bg: rgb(var(--c-ink-600));
+  --chip-shadow: none;
+
+  --input-radius: 14px;
+  --input-border-w: 0px;
+  --input-border: transparent;
+  --input-bg: rgb(var(--c-ink-700));
+  --input-shadow: none;
+  --input-focus-border: transparent;
+  --input-focus-shadow: 0 0 0 2px rgb(var(--c-mint-400) / 0.5);
+
+  --hero-radius: 28px;
+  --hero-border-w: 0px;
+  --hero-border: transparent;
+  --hero-bg: linear-gradient(135deg, rgb(var(--c-mint-400) / 0.18), transparent 60%), rgb(var(--c-ink-800));
+  --hero-shadow: none;
+  --hero-grain-opacity: 0.06;
+}
+
+/* ---------------------------------------------------------------- neumorph */
+[data-card='neumorph'] {
+  --neu-hl: rgb(var(--c-white) / 0.09);
+  --neu-sh: rgb(var(--c-shadow) / 0.55);
+  --app-bg: rgb(var(--c-ink-950));
+
+  --card-radius: 22px;
+  --card-border-w: 0px;
+  --card-border: transparent;
+  --card-bg: rgb(var(--c-ink-950));
+  --card-shadow: 9px 9px 20px var(--neu-sh), -7px -7px 18px var(--neu-hl);
+  --card-blur: none;
+  --card-hover-border: transparent;
+  --card-hover-shadow: 12px 12px 26px var(--neu-sh), -9px -9px 22px var(--neu-hl);
+  --card-hover-transform: none;
+
+  --inset-radius: 16px;
+  --inset-border-w: 0px;
+  --inset-border: transparent;
+  --inset-bg: rgb(var(--c-ink-950));
+  --inset-shadow: inset 5px 5px 11px var(--neu-sh), inset -4px -4px 10px var(--neu-hl);
+
+  --pill-radius: 9999px;
+  --pill-border-w: 0px;
+  --pill-border: transparent;
+  --pill-bg: rgb(var(--c-ink-950));
+  --pill-shadow: inset 4px 4px 9px var(--neu-sh), inset -3px -3px 8px var(--neu-hl);
+  --pill-blur: none;
+  --pill-active-bg: rgb(var(--c-ink-950));
+  --pill-active-fg: rgb(var(--c-mint-400));
+  --pill-active-border: transparent;
+  --pill-active-shadow: 3px 3px 7px var(--neu-sh), -3px -3px 7px var(--neu-hl);
+
+  --tab-radius: 16px;
+  --tab-border-w: 0px;
+  --tab-border: transparent;
+  --tab-bg: rgb(var(--c-ink-950));
+  --tab-hover-border: transparent;
+  --tab-active-border: transparent;
+  --tab-active-bg: rgb(var(--c-ink-950));
+  --tab-active-shadow: inset 5px 5px 11px var(--neu-sh), inset -4px -4px 10px var(--neu-hl);
+  --tab-shadow: 5px 5px 12px var(--neu-sh), -4px -4px 10px var(--neu-hl);
+
+  --btn-radius: 14px;
+  --btn-icon-radius: 12px;
+  --btn-border-w: 0px;
+  --btn-primary-fg: rgb(var(--c-ink-950));
+  --btn-primary-bg: rgb(var(--c-mint-400));
+  --btn-primary-hover-bg: rgb(var(--c-mint-300));
+  --btn-primary-border: transparent;
+  --btn-primary-shadow: 5px 5px 12px var(--neu-sh), -4px -4px 10px var(--neu-hl);
+  --btn-primary-active-transform: none;
+  --btn-primary-active-shadow: inset 3px 3px 7px rgb(var(--c-shadow) / 0.4), inset -2px -2px 6px var(--neu-hl);
+  --btn-ghost-border: transparent;
+  --btn-ghost-bg: rgb(var(--c-ink-950));
+  --btn-ghost-shadow: 5px 5px 12px var(--neu-sh), -4px -4px 10px var(--neu-hl);
+  --btn-ghost-hover-border: transparent;
+  --btn-ghost-hover-bg: rgb(var(--c-ink-950));
+  --btn-icon-border: transparent;
+  --btn-icon-bg: rgb(var(--c-ink-950));
+  --btn-icon-shadow: 3px 3px 7px var(--neu-sh), -3px -3px 7px var(--neu-hl);
+
+  --tile-radius: 14px;
+  --tile-border-w: 0px;
+  --tile-border: transparent;
+  --tile-base: rgb(var(--c-ink-950));
+  --tile-glow: 0.5;
+  --tile-shadow: 5px 5px 11px var(--neu-sh), -4px -4px 9px var(--neu-hl);
+
+  --chip-radius: 9999px;
+  --chip-border-w: 0px;
+  --chip-border: transparent;
+  --chip-bg: rgb(var(--c-ink-950));
+  --chip-shadow: inset 2px 2px 5px var(--neu-sh), inset -2px -2px 5px var(--neu-hl);
+
+  --input-radius: 14px;
+  --input-border-w: 0px;
+  --input-border: transparent;
+  --input-bg: rgb(var(--c-ink-950));
+  --input-shadow: inset 4px 4px 9px var(--neu-sh), inset -3px -3px 8px var(--neu-hl);
+  --input-focus-border: transparent;
+  --input-focus-shadow: inset 4px 4px 9px var(--neu-sh), inset -3px -3px 8px var(--neu-hl), 0 0 0 2px rgb(var(--c-mint-400) / 0.45);
+
+  --hero-radius: 30px;
+  --hero-border-w: 0px;
+  --hero-border: transparent;
+  --hero-bg: linear-gradient(145deg, rgb(var(--c-mint-400) / 0.1), transparent 55%), rgb(var(--c-ink-950));
+  --hero-shadow: 12px 12px 26px var(--neu-sh), -9px -9px 22px var(--neu-hl);
+  --hero-grain-opacity: 0.06;
+}
+/* 라이트 테마: 밝은 하이라이트(흰색)와 옅은 그림자 */
+[data-theme-mode='light'] [data-card='neumorph'],
+[data-theme-mode='light'][data-card='neumorph'] {
+  --neu-hl: rgb(255 255 255 / 0.95);
+  --neu-sh: rgb(var(--c-shadow) / 0.32);
+}
+
+/* ---------------------------------------------------------------- paper */
+[data-card='paper'] {
+  --app-bg: rgb(var(--c-ink-950));
+
+  --card-radius: 14px;
+  --card-border-w: 1px;
+  --card-border: rgb(var(--c-white) / 0.06);
+  --card-bg: rgb(var(--c-surface));
+  --card-shadow:
+    0 1px 0 rgb(var(--c-white) / 0.06),
+    0 7px 0 -3px rgb(var(--c-ink-800)),
+    0 14px 24px -12px rgb(var(--c-shadow) / calc(0.8 * var(--shadow-k)));
+  --card-blur: none;
+  --card-hover-border: rgb(var(--c-white) / 0.1);
+  --card-hover-shadow:
+    0 1px 0 rgb(var(--c-white) / 0.08),
+    0 8px 0 -3px rgb(var(--c-ink-800)),
+    0 20px 30px -12px rgb(var(--c-shadow) / calc(0.9 * var(--shadow-k)));
+  --card-hover-transform: translateY(-2px);
+
+  --inset-radius: 10px;
+  --inset-border-w: 1px;
+  --inset-border: rgb(var(--c-white) / 0.05);
+  --inset-bg: rgb(var(--c-ink-900));
+  --inset-shadow: 0 1px 0 rgb(var(--c-white) / 0.05), 0 3px 0 -1px rgb(var(--c-ink-700));
+
+  --pill-radius: 12px;
+  --pill-border-w: 1px;
+  --pill-border: rgb(var(--c-white) / 0.06);
+  --pill-bg: rgb(var(--c-ink-900));
+  --pill-shadow: 0 3px 0 -1px rgb(var(--c-ink-700));
+  --pill-blur: none;
+  --pill-active-bg: rgb(var(--c-ink-600));
+  --pill-active-fg: rgb(var(--c-white));
+  --pill-active-border: rgb(var(--c-white) / 0.08);
+  --pill-active-shadow: 0 2px 4px rgb(var(--c-shadow) / calc(0.5 * var(--shadow-k)));
+
+  --tab-radius: 12px;
+  --tab-border-w: 1px;
+  --tab-border: rgb(var(--c-white) / 0.06);
+  --tab-bg: rgb(var(--c-ink-900));
+  --tab-shadow: none;
+  --tab-hover-border: rgb(var(--c-white) / 0.12);
+  --tab-active-border: rgb(var(--c-white) / 0.14);
+  --tab-active-bg: rgb(var(--c-ink-700));
+  --tab-active-shadow: 0 5px 0 -2px rgb(var(--c-ink-600)), 0 10px 16px -8px rgb(var(--c-shadow) / calc(0.8 * var(--shadow-k)));
+
+  --btn-radius: 10px;
+  --btn-icon-radius: 10px;
+  --btn-border-w: 1px;
+  --btn-primary-fg: rgb(var(--c-ink-950));
+  --btn-primary-bg: rgb(var(--c-white));
+  --btn-primary-hover-bg: rgb(var(--c-zinc-100));
+  --btn-primary-border: transparent;
+  --btn-primary-shadow: 0 3px 0 rgb(var(--c-zinc-500)), 0 8px 14px -6px rgb(var(--c-shadow) / calc(0.7 * var(--shadow-k)));
+  --btn-primary-active-transform: translateY(2px);
+  --btn-primary-active-shadow: 0 1px 0 rgb(var(--c-zinc-500));
+  --btn-ghost-border: rgb(var(--c-white) / 0.1);
+  --btn-ghost-bg: rgb(var(--c-ink-800));
+  --btn-ghost-shadow: 0 3px 0 -1px rgb(var(--c-ink-600));
+  --btn-ghost-hover-border: rgb(var(--c-white) / 0.2);
+  --btn-ghost-hover-bg: rgb(var(--c-ink-700));
+  --btn-icon-border: rgb(var(--c-white) / 0.08);
+  --btn-icon-bg: rgb(var(--c-ink-800));
+  --btn-icon-shadow: 0 2px 0 -1px rgb(var(--c-ink-600));
+
+  --tile-radius: 10px;
+  --tile-border-w: 1px;
+  --tile-border: rgb(var(--c-white) / 0.08);
+  --tile-base: rgb(var(--c-ink-700));
+  --tile-glow: 0.8;
+  --tile-shadow: 0 3px 0 -1px rgb(var(--c-ink-500));
+
+  --chip-radius: 6px;
+  --chip-border-w: 1px;
+  --chip-border: rgb(var(--c-white) / 0.07);
+  --chip-bg: rgb(var(--c-ink-700));
+  --chip-shadow: none;
+
+  --input-radius: 10px;
+  --input-border-w: 1px;
+  --input-border: rgb(var(--c-white) / 0.1);
+  --input-bg: rgb(var(--c-ink-900));
+  --input-shadow: inset 0 2px 3px rgb(var(--c-shadow) / calc(0.35 * var(--shadow-k)));
+  --input-focus-border: rgb(var(--c-mint-400) / 0.55);
+  --input-focus-shadow: inset 0 2px 3px rgb(var(--c-shadow) / calc(0.35 * var(--shadow-k))), 0 0 0 2px rgb(var(--c-mint-400) / 0.15);
+
+  --hero-radius: 20px;
+  --hero-border-w: 1px;
+  --hero-border: rgb(var(--c-white) / 0.08);
+  --hero-bg: linear-gradient(160deg, rgb(var(--c-white) / 0.09), transparent 50%), rgb(var(--c-ink-800));
+  --hero-shadow: 0 1px 0 rgb(var(--c-white) / 0.08), 0 9px 0 -4px rgb(var(--c-ink-700)), 0 18px 0 -8px rgb(var(--c-ink-800)), 0 26px 40px -16px rgb(var(--c-shadow) / calc(0.9 * var(--shadow-k)));
+  --hero-grain-opacity: 0.12;
+}
+
+/* ---------------------------------------------------------------- glow */
+[data-card='glow'] {
+  --glow-ring: 0 0 0 1px rgb(var(--c-mint-400) / 0.25), 0 0 24px -6px rgb(var(--c-mint-400) / 0.35);
+  --app-bg: rgb(var(--c-ink-950));
+
+  --card-radius: 16px;
+  --card-border-w: 1px;
+  --card-border: rgb(var(--c-white) / 0.1);
+  --card-bg: rgb(var(--c-surface));
+  --card-shadow: none;
+  --card-blur: none;
+  --card-hover-border: rgb(var(--c-mint-400) / 0.55);
+  --card-hover-shadow: var(--glow-ring);
+  --card-hover-transform: none;
+
+  --inset-radius: 12px;
+  --inset-border-w: 1px;
+  --inset-border: rgb(var(--c-white) / 0.07);
+  --inset-bg: transparent;
+  --inset-shadow: none;
+
+  --pill-radius: 9999px;
+  --pill-border-w: 1px;
+  --pill-border: rgb(var(--c-white) / 0.1);
+  --pill-bg: transparent;
+  --pill-shadow: none;
+  --pill-blur: none;
+  --pill-active-bg: rgb(var(--c-mint-400) / 0.1);
+  --pill-active-fg: rgb(var(--c-mint-300));
+  --pill-active-border: rgb(var(--c-mint-400) / 0.55);
+  --pill-active-shadow: var(--glow-ring);
+
+  --tab-radius: 12px;
+  --tab-border-w: 1px;
+  --tab-border: rgb(var(--c-white) / 0.09);
+  --tab-bg: transparent;
+  --tab-shadow: none;
+  --tab-hover-border: rgb(var(--c-mint-400) / 0.4);
+  --tab-active-border: rgb(var(--c-mint-400) / 0.6);
+  --tab-active-bg: rgb(var(--c-mint-400) / 0.07);
+  --tab-active-shadow: var(--glow-ring);
+
+  --btn-radius: 9999px;
+  --btn-icon-radius: 9999px;
+  --btn-border-w: 1px;
+  --btn-primary-fg: rgb(var(--c-mint-300));
+  --btn-primary-bg: rgb(var(--c-mint-400) / 0.1);
+  --btn-primary-hover-bg: rgb(var(--c-mint-400) / 0.2);
+  --btn-primary-border: rgb(var(--c-mint-400) / 0.6);
+  --btn-primary-shadow: var(--glow-ring);
+  --btn-primary-active-transform: none;
+  --btn-primary-active-shadow: 0 0 0 1px rgb(var(--c-mint-400) / 0.4), 0 0 32px -4px rgb(var(--c-mint-400) / 0.55);
+  --btn-ghost-border: rgb(var(--c-white) / 0.14);
+  --btn-ghost-bg: transparent;
+  --btn-ghost-shadow: none;
+  --btn-ghost-hover-border: rgb(var(--c-mint-400) / 0.5);
+  --btn-ghost-hover-bg: rgb(var(--c-mint-400) / 0.06);
+  --btn-icon-border: rgb(var(--c-white) / 0.1);
+  --btn-icon-bg: transparent;
+  --btn-icon-shadow: none;
+
+  --tile-radius: 12px;
+  --tile-border-w: 1px;
+  --tile-border: rgb(var(--c-mint-400) / 0.35);
+  --tile-base: rgb(var(--c-ink-900));
+  --tile-glow: 0.5;
+  --tile-shadow: none;
+
+  --chip-radius: 9999px;
+  --chip-border-w: 1px;
+  --chip-border: rgb(var(--c-white) / 0.12);
+  --chip-bg: transparent;
+  --chip-shadow: none;
+
+  --input-radius: 12px;
+  --input-border-w: 1px;
+  --input-border: rgb(var(--c-white) / 0.12);
+  --input-bg: transparent;
+  --input-shadow: none;
+  --input-focus-border: rgb(var(--c-mint-400) / 0.7);
+  --input-focus-shadow: var(--glow-ring);
+
+  --hero-radius: 24px;
+  --hero-border-w: 1px;
+  --hero-border: rgb(var(--c-mint-400) / 0.3);
+  --hero-bg: radial-gradient(60% 100% at 0% 0%, rgb(var(--c-mint-400) / 0.16), transparent 65%), rgb(var(--c-ink-900));
+  --hero-shadow: 0 0 40px -14px rgb(var(--c-mint-400) / 0.3);
+  --hero-grain-opacity: 0.08;
+}
+
+/* ---------------------------------------------------------------- aurora */
+[data-card='aurora'] {
+  --app-bg:
+    radial-gradient(900px 620px at 8% -8%, rgb(var(--c-mint-400) / 0.4), transparent 62%),
+    radial-gradient(800px 600px at 96% 4%, rgb(var(--c-sky-400) / 0.32), transparent 62%),
+    radial-gradient(760px 620px at 84% 98%, rgb(var(--c-rose-400) / 0.3), transparent 62%),
+    radial-gradient(700px 560px at 2% 92%, rgb(var(--c-amber-400) / 0.2), transparent 62%),
+    rgb(var(--c-ink-950));
+
+  --card-radius: 22px;
+  --card-border-w: 0px;
+  --card-border: transparent;
+  --card-bg: rgb(var(--c-ink-850) / 0.55);
+  --card-shadow: 0 20px 44px -26px rgb(var(--c-shadow) / calc(0.7 * var(--shadow-k)));
+  --card-blur: blur(18px) saturate(1.2);
+  --card-hover-border: transparent;
+  --card-hover-shadow: 0 26px 52px -26px rgb(var(--c-shadow) / calc(0.85 * var(--shadow-k)));
+  --card-hover-transform: translateY(-2px);
+
+  --inset-radius: 16px;
+  --inset-border-w: 0px;
+  --inset-border: transparent;
+  --inset-bg: rgb(var(--c-white) / 0.045);
+  --inset-shadow: none;
+
+  --pill-radius: 9999px;
+  --pill-border-w: 0px;
+  --pill-border: transparent;
+  --pill-bg: rgb(var(--c-ink-850) / 0.5);
+  --pill-shadow: none;
+  --pill-blur: blur(18px);
+  --pill-active-bg: rgb(var(--c-white) / 0.12);
+  --pill-active-fg: rgb(var(--c-white));
+  --pill-active-border: transparent;
+  --pill-active-shadow: none;
+
+  --tab-radius: 16px;
+  --tab-border-w: 0px;
+  --tab-border: transparent;
+  --tab-bg: rgb(var(--c-white) / 0.04);
+  --tab-shadow: none;
+  --tab-hover-border: transparent;
+  --tab-active-border: transparent;
+  --tab-active-bg: rgb(var(--c-white) / 0.12);
+  --tab-active-shadow: 0 14px 28px -18px rgb(var(--c-shadow) / calc(0.7 * var(--shadow-k)));
+
+  --btn-radius: 9999px;
+  --btn-icon-radius: 9999px;
+  --btn-border-w: 0px;
+  --btn-primary-fg: rgb(var(--c-ink-950));
+  --btn-primary-bg: linear-gradient(120deg, rgb(var(--c-mint-300)), rgb(var(--c-sky-400)));
+  --btn-primary-hover-bg: linear-gradient(120deg, rgb(var(--c-mint-400)), rgb(var(--c-sky-300)));
+  --btn-primary-border: transparent;
+  --btn-primary-shadow: 0 10px 24px -10px rgb(var(--c-mint-400) / 0.55);
+  --btn-primary-active-transform: scale(0.98);
+  --btn-primary-active-shadow: 0 6px 16px -8px rgb(var(--c-mint-400) / 0.5);
+  --btn-ghost-border: transparent;
+  --btn-ghost-bg: rgb(var(--c-white) / 0.08);
+  --btn-ghost-shadow: none;
+  --btn-ghost-hover-border: transparent;
+  --btn-ghost-hover-bg: rgb(var(--c-white) / 0.14);
+  --btn-icon-border: transparent;
+  --btn-icon-bg: rgb(var(--c-white) / 0.07);
+  --btn-icon-shadow: none;
+
+  --tile-radius: 14px;
+  --tile-border-w: 0px;
+  --tile-border: transparent;
+  --tile-base: rgb(var(--c-white) / 0.08);
+  --tile-glow: 1.2;
+  --tile-shadow: none;
+
+  --chip-radius: 9999px;
+  --chip-border-w: 0px;
+  --chip-border: transparent;
+  --chip-bg: rgb(var(--c-white) / 0.08);
+  --chip-shadow: none;
+
+  --input-radius: 14px;
+  --input-border-w: 0px;
+  --input-border: transparent;
+  --input-bg: rgb(var(--c-white) / 0.07);
+  --input-shadow: none;
+  --input-focus-border: transparent;
+  --input-focus-shadow: 0 0 0 2px rgb(var(--c-mint-400) / 0.5);
+
+  --hero-radius: 28px;
+  --hero-border-w: 0px;
+  --hero-border: transparent;
+  --hero-bg:
+    radial-gradient(70% 120% at 0% 0%, rgb(var(--c-mint-400) / 0.35), transparent 60%),
+    radial-gradient(60% 110% at 100% 100%, rgb(var(--c-rose-400) / 0.28), transparent 60%),
+    rgb(var(--c-ink-850) / 0.6);
+  --hero-shadow: 0 26px 52px -28px rgb(var(--c-shadow) / calc(0.8 * var(--shadow-k)));
+  --hero-grain-opacity: 0.1;
+}
+
+/* ---------------------------------------------------------------- brutal */
+[data-card='brutal'] {
+  --brutal-line: rgb(var(--c-white) / 0.92);
+  --app-bg: rgb(var(--c-ink-950));
+
+  --card-radius: 4px;
+  --card-border-w: 2px;
+  --card-border: var(--brutal-line);
+  --card-bg: rgb(var(--c-surface));
+  --card-shadow: 4px 4px 0 var(--brutal-line);
+  --card-blur: none;
+  --card-hover-border: var(--brutal-line);
+  --card-hover-shadow: 8px 8px 0 rgb(var(--c-mint-400));
+  --card-hover-transform: translate(-3px, -3px);
+
+  --inset-radius: 2px;
+  --inset-border-w: 2px;
+  --inset-border: rgb(var(--c-white) / 0.55);
+  --inset-bg: rgb(var(--c-ink-900));
+  --inset-shadow: none;
+
+  --pill-radius: 2px;
+  --pill-border-w: 2px;
+  --pill-border: var(--brutal-line);
+  --pill-bg: rgb(var(--c-ink-950));
+  --pill-shadow: 3px 3px 0 var(--brutal-line);
+  --pill-blur: none;
+  --pill-active-bg: rgb(var(--c-mint-400));
+  --pill-active-fg: rgb(var(--c-ink-950));
+  --pill-active-border: var(--brutal-line);
+  --pill-active-shadow: none;
+
+  --tab-radius: 2px;
+  --tab-border-w: 2px;
+  --tab-border: rgb(var(--c-white) / 0.5);
+  --tab-bg: transparent;
+  --tab-shadow: none;
+  --tab-hover-border: var(--brutal-line);
+  --tab-active-border: var(--brutal-line);
+  --tab-active-bg: rgb(var(--c-mint-400) / 0.16);
+  --tab-active-shadow: 4px 4px 0 var(--brutal-line);
+
+  --btn-radius: 2px;
+  --btn-icon-radius: 2px;
+  --btn-border-w: 2px;
+  --btn-primary-fg: rgb(var(--c-ink-950));
+  --btn-primary-bg: rgb(var(--c-mint-400));
+  --btn-primary-hover-bg: rgb(var(--c-mint-300));
+  --btn-primary-border: var(--brutal-line);
+  --btn-primary-shadow: 4px 4px 0 var(--brutal-line);
+  --btn-primary-active-transform: translate(4px, 4px);
+  --btn-primary-active-shadow: 0 0 0 var(--brutal-line);
+  --btn-ghost-border: var(--brutal-line);
+  --btn-ghost-bg: transparent;
+  --btn-ghost-shadow: none;
+  --btn-ghost-hover-border: var(--brutal-line);
+  --btn-ghost-hover-bg: rgb(var(--c-white) / 0.1);
+  --btn-icon-border: rgb(var(--c-white) / 0.6);
+  --btn-icon-bg: transparent;
+  --btn-icon-shadow: none;
+
+  --tile-radius: 2px;
+  --tile-border-w: 2px;
+  --tile-border: var(--brutal-line);
+  --tile-base: rgb(var(--c-ink-800));
+  --tile-glow: 0;
+  --tile-shadow: 3px 3px 0 var(--brutal-line);
+
+  --chip-radius: 2px;
+  --chip-border-w: 2px;
+  --chip-border: rgb(var(--c-white) / 0.6);
+  --chip-bg: transparent;
+  --chip-shadow: none;
+
+  --input-radius: 2px;
+  --input-border-w: 2px;
+  --input-border: var(--brutal-line);
+  --input-bg: rgb(var(--c-ink-950));
+  --input-shadow: none;
+  --input-focus-border: var(--brutal-line);
+  --input-focus-shadow: 4px 4px 0 rgb(var(--c-mint-400));
+
+  --hero-radius: 4px;
+  --hero-border-w: 2px;
+  --hero-border: var(--brutal-line);
+  --hero-bg: rgb(var(--c-ink-900));
+  --hero-shadow: 8px 8px 0 rgb(var(--c-mint-400));
+  --hero-grain-opacity: 0;
+}

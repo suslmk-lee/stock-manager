@@ -42,7 +42,9 @@ html {
 }
 
 body {
-  @apply font-sans bg-ink-950 text-zinc-100;
+  @apply font-sans text-zinc-100;
+  background: var(--app-bg);
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'tnum' 0;
@@ -58,22 +60,23 @@ body {
  * 화면 컴포넌트는 slate-* 대신 이 클래스와 ink/mint 토큰을 쓴다.
  * ------------------------------------------------------------------ */
 @layer components {
-  /* 최상위 카드: 얇은 테두리 + 위쪽 하이라이트 + 깊은 그림자 */
+  /* 최상위 카드 — 모양은 모두 --card-* 변수(styles/card-styles.css)가 정한다 */
   .surface {
-    @apply relative rounded-3xl border border-white/[0.08];
-    background:
-      linear-gradient(180deg, rgb(var(--c-white) / 0.045) 0%, rgb(var(--c-white) / 0.012) 100%),
-      rgb(var(--c-surface));
-    box-shadow:
-      inset 0 1px 0 rgb(var(--c-white) / 0.06),
-      0 24px 48px -24px rgb(var(--c-shadow) / calc(0.9 * var(--shadow-k)));
+    @apply relative;
+    border-radius: var(--card-radius);
+    border: var(--card-border-w) solid var(--card-border);
+    background: var(--card-bg);
+    box-shadow: var(--card-shadow);
+    -webkit-backdrop-filter: var(--card-blur);
+    backdrop-filter: var(--card-blur);
   }
 
-  /* 카드 안쪽 패널 (참고 이미지의 우측 지표 박스) */
+  /* 카드 안쪽 패널 */
   .surface-inset {
-    @apply rounded-2xl border border-white/[0.07];
-    background: linear-gradient(180deg, rgb(var(--c-white) / 0.035), rgb(var(--c-white) / 0.015));
-    box-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.04);
+    border-radius: var(--inset-radius);
+    border: var(--inset-border-w) solid var(--inset-border);
+    background: var(--inset-bg);
+    box-shadow: var(--inset-shadow);
   }
 
   /* 클릭 가능한 카드 */
@@ -81,59 +84,70 @@ body {
     @apply transition-all duration-300 cursor-pointer;
   }
   .surface-interactive:hover {
-    @apply border-white/[0.16];
-    box-shadow:
-      inset 0 1px 0 rgb(var(--c-white) / 0.09),
-      0 28px 56px -24px rgb(var(--c-shadow) / calc(0.95 * var(--shadow-k)));
-    transform: translateY(-1px);
+    border-color: var(--card-hover-border);
+    box-shadow: var(--card-hover-shadow);
+    transform: var(--card-hover-transform);
   }
 
-  /* 유리 pill (네비게이션, 필터 그룹) */
+  /* pill (네비게이션, 필터 그룹) */
   .glass-pill {
-    @apply rounded-full border border-white/[0.09] backdrop-blur-xl;
-    background: rgb(var(--c-white) / 0.035);
-    box-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.05);
+    border-radius: var(--pill-radius);
+    border: var(--pill-border-w) solid var(--pill-border);
+    background: var(--pill-bg);
+    box-shadow: var(--pill-shadow);
+    -webkit-backdrop-filter: var(--pill-blur);
+    backdrop-filter: var(--pill-blur);
   }
 
   /* pill 내부 세그먼트 버튼 */
   .pill-item {
-    @apply rounded-full px-3.5 py-1.5 text-sm text-zinc-400 transition-colors whitespace-nowrap;
+    @apply px-3.5 py-1.5 text-sm text-zinc-400 transition-colors whitespace-nowrap;
+    border-radius: var(--pill-radius);
+    border: var(--pill-border-w) solid transparent;
   }
   .pill-item:hover {
     @apply text-zinc-100;
   }
   .pill-item-active {
-    @apply bg-white/[0.09] text-white;
-    box-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.08);
+    color: var(--pill-active-fg);
+    background: var(--pill-active-bg);
+    border-color: var(--pill-active-border);
+    box-shadow: var(--pill-active-shadow);
   }
 
-  /* 아이콘 타일: 어두운 그라데이션 + 아래쪽 은은한 웜 글로우 */
+  /* 아이콘 타일 */
   .icon-tile {
-    @apply inline-flex items-center justify-center w-10 h-10 shrink-0 rounded-xl border border-white/[0.1] text-zinc-200;
+    @apply inline-flex items-center justify-center w-10 h-10 shrink-0 text-zinc-200;
+    border-radius: var(--tile-radius);
+    border: var(--tile-border-w) solid var(--tile-border);
     background:
-      radial-gradient(120% 80% at 50% 120%, rgb(var(--c-orange-400) / 0.28), transparent 60%),
-      linear-gradient(180deg, rgb(var(--c-ink-600)) 0%, rgb(var(--c-ink-800)) 100%);
-    box-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.1), 0 6px 16px -8px rgb(var(--c-shadow) / calc(0.9 * var(--shadow-k)));
+      radial-gradient(120% 80% at 50% 120%, rgb(var(--c-orange-400) / calc(0.28 * var(--tile-glow))), transparent 60%),
+      var(--tile-base);
+    box-shadow: var(--tile-shadow);
   }
   .icon-tile-mint {
     background:
-      radial-gradient(120% 80% at 50% 120%, rgb(var(--c-mint-400) / 0.3), transparent 60%),
-      linear-gradient(180deg, rgb(var(--c-ink-600)) 0%, rgb(var(--c-ink-800)) 100%);
+      radial-gradient(120% 80% at 50% 120%, rgb(var(--c-mint-400) / calc(0.3 * var(--tile-glow))), transparent 60%),
+      var(--tile-base);
   }
   .icon-tile-amber {
     background:
-      radial-gradient(120% 80% at 50% 120%, rgb(var(--c-amber-400) / 0.32), transparent 60%),
-      linear-gradient(180deg, rgb(var(--c-ink-600)) 0%, rgb(var(--c-ink-800)) 100%);
+      radial-gradient(120% 80% at 50% 120%, rgb(var(--c-amber-400) / calc(0.32 * var(--tile-glow))), transparent 60%),
+      var(--tile-base);
   }
   .icon-tile-sky {
     background:
-      radial-gradient(120% 80% at 50% 120%, rgb(var(--c-sky-300) / 0.28), transparent 60%),
-      linear-gradient(180deg, rgb(var(--c-ink-600)) 0%, rgb(var(--c-ink-800)) 100%);
+      radial-gradient(120% 80% at 50% 120%, rgb(var(--c-sky-300) / calc(0.28 * var(--tile-glow))), transparent 60%),
+      var(--tile-base);
   }
 
-  /* 고정폭 칩 (체크 아이콘과 함께) */
+  /* 고정폭 칩 */
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.045] px-2 py-1 font-mono text-[11px] text-zinc-300 whitespace-nowrap;
+    @apply inline-flex items-center gap-1.5 px-2 py-1 font-mono text-[11px] text-zinc-300 whitespace-nowrap;
+    border-radius: var(--chip-radius);
+    border: var(--chip-border-w) solid var(--chip-border);
+    background: var(--chip-bg);
+    box-shadow: var(--chip-shadow);
   }
 
   /* "New" 배지 */
@@ -146,7 +160,7 @@ body {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap;
   }
 
-  /* 고정폭 보조 라벨 (예: "Mobile median") */
+  /* 고정폭 보조 라벨 */
   .label-mono {
     @apply font-mono text-[11px] tracking-wide text-zinc-500;
   }
@@ -161,39 +175,71 @@ body {
     font-variant-numeric: tabular-nums;
   }
 
-  /* 버튼: 흰색 pill (주 행동) */
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-ink-950 transition-all disabled:opacity-50;
-    background: linear-gradient(180deg, rgb(var(--c-white)) 0%, rgb(var(--c-zinc-200)) 100%);
-    box-shadow: inset 0 -1px 0 rgb(var(--c-shadow) / calc(0.12 * var(--shadow-k))), 0 8px 20px -10px rgb(var(--c-white) / 0.35);
-  }
-  .btn-primary:hover {
-    background: linear-gradient(180deg, rgb(var(--c-white)) 0%, rgb(var(--c-zinc-100)) 100%);
+  /* 앱 배경 (설정 미리보기 등에서도 쓰는 유틸) */
+  .app-bg {
+    background: var(--app-bg);
   }
 
-  /* 버튼: 테두리 pill (보조 행동) */
+  /* 버튼: 주 행동 */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-all disabled:opacity-50;
+    color: var(--btn-primary-fg);
+    border-radius: var(--btn-radius);
+    border: var(--btn-border-w) solid var(--btn-primary-border);
+    background: var(--btn-primary-bg);
+    box-shadow: var(--btn-primary-shadow);
+  }
+  .btn-primary:hover {
+    background: var(--btn-primary-hover-bg);
+  }
+  .btn-primary:active {
+    transform: var(--btn-primary-active-transform);
+    box-shadow: var(--btn-primary-active-shadow);
+  }
+
+  /* 버튼: 보조 행동 */
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/[0.14] px-4 py-2 text-sm font-medium text-zinc-100 transition-colors disabled:opacity-50;
-    background: linear-gradient(180deg, rgb(var(--c-white) / 0.06), rgb(var(--c-white) / 0.015));
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-zinc-100 transition-colors disabled:opacity-50;
+    border-radius: var(--btn-radius);
+    border: var(--btn-border-w) solid var(--btn-ghost-border);
+    background: var(--btn-ghost-bg);
+    box-shadow: var(--btn-ghost-shadow);
   }
   .btn-ghost:hover {
-    @apply border-white/[0.24] bg-white/[0.06];
+    border-color: var(--btn-ghost-hover-border);
+    background: var(--btn-ghost-hover-bg);
   }
 
   /* 버튼: 위험 행동 */
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-rose-400/25 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-200 transition-colors hover:bg-rose-500/20;
+    @apply inline-flex items-center justify-center gap-2 border-rose-400/25 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-200 transition-colors hover:bg-rose-500/20;
+    border-radius: var(--btn-radius);
+    border-width: var(--btn-border-w);
   }
 
-  /* 아이콘 전용 원형 버튼 */
+  /* 아이콘 전용 버튼 */
   .btn-icon {
-    @apply inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-zinc-400 transition-colors hover:border-white/[0.16] hover:text-white;
+    @apply inline-flex h-8 w-8 items-center justify-center text-zinc-400 transition-colors hover:text-white;
+    border-radius: var(--btn-icon-radius);
+    border: var(--btn-border-w) solid var(--btn-icon-border);
+    background: var(--btn-icon-bg);
+    box-shadow: var(--btn-icon-shadow);
+  }
+  .btn-icon:hover {
+    border-color: var(--btn-ghost-hover-border);
   }
 
   /* 입력 필드 */
   .input-field {
-    @apply w-full rounded-xl border border-white/[0.1] bg-white/[0.035] px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 transition-colors;
-    @apply focus:outline-none focus:border-mint-400/50 focus:ring-2 focus:ring-mint-400/15;
+    @apply w-full px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 transition-colors focus:outline-none;
+    border-radius: var(--input-radius);
+    border: var(--input-border-w) solid var(--input-border);
+    background-color: var(--input-bg);
+    box-shadow: var(--input-shadow);
+  }
+  .input-field:focus {
+    border-color: var(--input-focus-border);
+    box-shadow: var(--input-focus-shadow);
   }
   select.input-field {
     @apply appearance-none pr-9;
@@ -222,21 +268,20 @@ body {
     @apply w-px self-stretch bg-white/[0.07];
   }
 
-  /* 그레인 질감 + 사선 광원 히어로 (참고 이미지 3) */
+  /* 그레인 질감 + 사선 광원 히어로 */
   .hero-grain {
-    @apply relative overflow-hidden rounded-4xl border border-white/[0.09];
-    background:
-      radial-gradient(60% 120% at 8% 0%, rgb(var(--c-white) / 0.22) 0%, rgb(var(--c-white) / 0.06) 35%, transparent 65%),
-      linear-gradient(115deg, rgb(var(--c-white) / 0.16) 0%, rgb(var(--c-white) / 0.07) 28%, transparent 46%),
-      rgb(var(--c-ink-950));
-    box-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.08), 0 30px 60px -30px rgb(var(--c-shadow) / calc(0.95 * var(--shadow-k)));
+    @apply relative overflow-hidden;
+    border-radius: var(--hero-radius);
+    border: var(--hero-border-w) solid var(--hero-border);
+    background: var(--hero-bg);
+    box-shadow: var(--hero-shadow);
   }
   .hero-grain::before {
     content: '';
     position: absolute;
     inset: 0;
     pointer-events: none;
-    opacity: 0.22;
+    opacity: var(--hero-grain-opacity);
     mix-blend-mode: overlay;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
@@ -244,18 +289,21 @@ body {
     position: relative;
   }
 
-  /* 탭 카드 (참고 이미지 2) */
+  /* 탭 카드 */
   .tab-card {
-    @apply relative flex min-w-[118px] flex-1 flex-col items-start gap-3 overflow-hidden rounded-2xl border border-white/[0.07] px-3.5 pb-3.5 pt-3 text-left transition-all duration-300;
-    background: linear-gradient(180deg, rgb(var(--c-white) / 0.03), rgb(var(--c-white) / 0.008));
+    @apply relative flex min-w-[118px] flex-1 flex-col items-start gap-3 overflow-hidden px-3.5 pb-3.5 pt-3 text-left transition-all duration-300;
+    border-radius: var(--tab-radius);
+    border: var(--tab-border-w) solid var(--tab-border);
+    background: var(--tab-bg);
+    box-shadow: var(--tab-shadow);
   }
   .tab-card:hover {
-    @apply border-white/[0.14];
+    border-color: var(--tab-hover-border);
   }
   .tab-card-active {
-    @apply border-white/[0.22];
-    background: linear-gradient(180deg, rgb(var(--c-white) / 0.075), rgb(var(--c-white) / 0.02));
-    box-shadow: inset 0 1px 0 rgb(var(--c-white) / 0.1), 0 16px 32px -18px rgb(var(--c-shadow) / calc(0.9 * var(--shadow-k)));
+    border-color: var(--tab-active-border);
+    background: var(--tab-active-bg);
+    box-shadow: var(--tab-active-shadow);
   }
 }
 
