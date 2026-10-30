@@ -10,7 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/fira-code": "^5.1.0",
+    "@fontsource/gowun-dodum": "^5.1.0",
+    "@fontsource/ibm-plex-mono": "^5.1.0",
+    "@fontsource/ibm-plex-sans-kr": "^5.1.0",
     "@fontsource/jetbrains-mono": "^5.1.0",
+    "@fontsource/nanum-gothic": "^5.1.0",
+    "@fontsource/nanum-gothic-coding": "^5.1.0",
+    "@fontsource/noto-sans-kr": "^5.1.0",
     "lucide-react": "^0.294.0",
     "pretendard": "^1.3.9",
     "react": "^18.2.0",

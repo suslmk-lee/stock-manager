@@ -15,8 +15,8 @@ export default function RingGauge({
   value,
   size = 88,
   stroke = 3,
-  color = '#7ddfb0',
-  trackColor = 'rgba(255,255,255,0.06)',
+  color = 'rgb(var(--c-mint-400))',
+  trackColor = 'rgb(var(--c-white) / 0.06)',
   children,
   label,
 }: RingGaugeProps) {
@@ -35,18 +35,17 @@ export default function RingGauge({
     <div className="inline-flex flex-col items-center gap-2">
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={trackColor} strokeWidth={stroke} />
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" style={{ stroke: trackColor }} strokeWidth={stroke} />
           <circle
             cx={size / 2}
             cy={size / 2}
             r={r}
             fill="none"
-            stroke={color}
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={c}
             strokeDashoffset={c * (1 - shown / 100)}
-            style={{ transition: 'stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1)', filter: `drop-shadow(0 0 6px ${color}55)` }}
+            style={{ stroke: color, transition: 'stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1)', filter: `drop-shadow(0 0 6px color-mix(in srgb, ${color} 35%, transparent))` }}
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center num font-semibold" style={{ color }}>

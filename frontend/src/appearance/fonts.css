@@ -1,0 +1,29 @@
+/* 선택 가능한 글꼴. 실제로 쓰이는 글꼴·글자 범위만 브라우저가 내려받는다. */
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+
+@import '@fontsource/noto-sans-kr/300.css';
+@import '@fontsource/noto-sans-kr/400.css';
+@import '@fontsource/noto-sans-kr/500.css';
+@import '@fontsource/noto-sans-kr/700.css';
+
+@import '@fontsource/ibm-plex-sans-kr/300.css';
+@import '@fontsource/ibm-plex-sans-kr/400.css';
+@import '@fontsource/ibm-plex-sans-kr/500.css';
+@import '@fontsource/ibm-plex-sans-kr/700.css';
+
+@import '@fontsource/nanum-gothic/400.css';
+@import '@fontsource/nanum-gothic/700.css';
+
+@import '@fontsource/gowun-dodum/400.css';
+
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+@import '@fontsource/fira-code/400.css';
+@import '@fontsource/fira-code/500.css';
+
+@import '@fontsource/nanum-gothic-coding/400.css';
+@import '@fontsource/nanum-gothic-coding/700.css';
