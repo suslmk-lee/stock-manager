@@ -319,6 +319,8 @@ X-API-Key: <API_KEY>
 
 SignalRule 필드: `id, asset_id(0=기본), take_profit_enabled, take_profit_pct, stop_loss_enabled, stop_loss_pct(<=0), weight_enabled, target_weight_pct, weight_band_pct(>=0), dividend_payback_enabled, dividend_payback_pct, dividend_payback_min_return_pct, low_yield_enabled, low_yield_pct, buy_dip_enabled, buy_dip_pct(<=0), high_yield_enabled, high_yield_pct, sell_mode("any"|"all"), buy_mode("any"|"all"), created_at, updated_at`
 
+2단계 추가 필드: `from_high_enabled, from_high_pct(<=0, 기본 -20), below_ma_enabled, below_ma_pct(<=0, 기본 -5, 200일 이평 대비), above_ma_enabled, above_ma_pct(>=0, 기본 25), dividend_cut_enabled, dividend_cut_pct(>=0, 기본 10), tax_harvest_enabled(기본 true), tax_harvest_from_month(1~12, 기본 11, 0은 11로 저장), fx_historical(기본 true), rule_version(현재 2)`. 신규 4개 시세/배당 규칙은 기본 비활성입니다. `rule_version < 2`인 1단계 규칙은 조회 시 한 번만 새 기본값(`fx_historical`·`tax_harvest_enabled`=true, 월=11, 0인 퍼센트는 기본값)으로 보정되어 저장되며, 이후 저장 시 `rule_version`은 항상 2로 기록됩니다.
+
 검증 실패(모드 값 오류, NaN/Inf, 부호 위반 등)는 `400 {"error": "..."}`. 빈 모드는 `any`로 저장됩니다.
 
 ### 8.4 신호 리포트
@@ -349,3 +351,20 @@ SignalRule 필드: `id, asset_id(0=기본), take_profit_enabled, take_profit_pct
 ```
 - 체크 코드: 매도 `take_profit`, `stop_loss`, `weight_over`, `dividend_payback`, `low_yield` / 매수 `buy_dip`, `weight_under`, `high_yield`. 활성화된 규칙만 포함됩니다.
 - 시세가 없으면 `action: "NO_PRICE"`, 체크는 빈 배열이며 비중 계산에서 제외됩니다.
+- 2단계 체크 코드: 매도 `above_ma`(장기 이평 과열), `dividend_cut`(배당 삭감) / 매수 `from_high`(52주 고점 대비 하락), `below_ma`(장기 이평 하회). 규칙이 활성화되어 있으면 항상 목록에 포함되며, 데이터가 없으면 `met=false`, `value=0`입니다.
+- 수익률 기반 체크(`take_profit`, `stop_loss`, `dividend_payback`의 최소 수익률)는 `return_basis=="fx"`이면 `total_return_pct_fx`, 아니면 `total_return_pct`로 평가하며 `value`도 같은 기준입니다.
+
+#### 8.4.1 2단계 추가 응답 필드
+
+SignalItem 추가 필드:
+- 시세 추세(종목 통화, 0=없음): `high_52w`, `low_52w`, `ma200`, `from_high_pct`((현재가/52주고점-1)x100), `from_low_pct`, `vs_ma200_pct`((현재가/MA200-1)x100), `price_history_ok`(52주 고점 존재 && 일봉 20개 이상). 일봉 이력이 없거나 20개 미만이면 `from_*`/`vs_ma200_pct`는 0입니다.
+- 배당 추세(전 계좌 세전 배당, 당시 계좌별 보유 수량으로 주당 환산): `dps_12m`, `dps_prev_12m`, `dividend_change_pct`, `dividend_trend_ok`(최근/직전 12개월 모두 지급 이력이 있을 때 true).
+- 매수 시점 환율 기준 수익: `cost_krw_fx`, `total_return_pct_fx`, `fx_effect_krw`(= fx 기준 총수익 - 현재 환율 기준 `total_return_krw`), `fx_coverage_pct`(거래 이력으로 복원된 수량 / 보유 수량 x100), `return_basis`(`"fx"` | `"current"`).
+  - 보유분 원가: 계좌별 이동평균 재생(매수일 환율, 이력에 없는 수량은 현재 환율·평단으로 보정). 매도분 원가: `buy_avg_price x 수량 x 매도일 환율`. 실현손익은 `profit x 매도일 환율`, 배당은 `(세전-세금) x 지급일 환율`.
+  - `return_basis`가 `"fx"`인 조건: 규칙의 `fx_historical=true` && USD 시세 종목 && 환율 이력 로드 성공. 그 외에는 `"current"`이며, KRW 종목이거나 환율 이력이 없으면 fx 필드는 현재 환율 기준 값과 같습니다(`fx_coverage_pct`는 KRW 종목 100, 환율 이력 없는 USD 종목 0).
+- `tax_hint`: `{ "kind": "harvest_gain" | "harvest_loss", "amount_krw": number, "message": string }` 또는 `null`. 규칙의 `tax_harvest_enabled`가 true, USD 상장 종목, 기본 규칙의 `tax_harvest_from_month` 이후 달, 일반계좌 평가손익 조건을 만족할 때만 표시됩니다.
+
+리포트 최상위 `tax`: 올해(KST) 일반계좌 해외주식(USD) 실현손익 기준 양도세 요약 (모든 종목 포함, 환율은 일별 이력 사용, 이력 실패 시 현재 환율).
+```json
+"tax": { "year": 2026, "realized_gain_krw": 0, "realized_loss_krw": 0, "net_krw": 0, "exemption_krw": 2500000, "remaining_krw": 2500000, "estimated_tax_krw": 0, "harvest_window": false, "count": 0 }
+```

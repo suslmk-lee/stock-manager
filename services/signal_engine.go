@@ -66,6 +66,30 @@ type SignalItem struct {
 	WeightPct       float64 `json:"weight_pct"`
 	FromAvgPct      float64 `json:"from_avg_pct"`
 
+	// 시세 추세 (종목 통화, 0 = 없음)
+	High52w        float64 `json:"high_52w"`
+	Low52w         float64 `json:"low_52w"`
+	MA200          float64 `json:"ma200"`
+	FromHighPct    float64 `json:"from_high_pct"`
+	FromLowPct     float64 `json:"from_low_pct"`
+	VsMA200Pct     float64 `json:"vs_ma200_pct"`
+	PriceHistoryOK bool    `json:"price_history_ok"`
+
+	// 주당 배당 추세 (세전, 종목 통화)
+	DPS12m            float64 `json:"dps_12m"`
+	DPSPrev12m        float64 `json:"dps_prev_12m"`
+	DividendChangePct float64 `json:"dividend_change_pct"`
+	DividendTrendOK   bool    `json:"dividend_trend_ok"`
+
+	// 매수 시점 환율 기준 수익
+	CostKRWFx        float64 `json:"cost_krw_fx"`
+	TotalReturnPctFx float64 `json:"total_return_pct_fx"`
+	FxEffectKRW      float64 `json:"fx_effect_krw"`
+	FxCoveragePct    float64 `json:"fx_coverage_pct"`
+	ReturnBasis      string  `json:"return_basis"` // "fx" | "current"
+
+	TaxHint *TaxHint `json:"tax_hint"`
+
 	SellChecks []SignalCheck            `json:"sell_checks"`
 	BuyChecks  []SignalCheck            `json:"buy_checks"`
 	Accounts   []SignalAccountBreakdown `json:"accounts"`
@@ -84,6 +108,14 @@ type SignalReport struct {
 	USDKRW      float64       `json:"usd_krw"`
 	Summary     SignalSummary `json:"summary"`
 	Items       []SignalItem  `json:"items"`
+	Tax         *TaxSummary   `json:"tax"`
+}
+
+// SignalContext 는 순수 엔진에 주입하는 외부 데이터(환율 이력, 양도세 요약)다.
+type SignalContext struct {
+	FxAt func(time.Time) float64 // 날짜별 USD/KRW. nil 이면 환율 이력 없음
+	FxOK bool                    // 환율 이력이 실제로 로드됐는가
+	Tax  *TaxSummary
 }
 
 // ---- 엔진 입력 (DB/네트워크와 무관한 순수 데이터) ----
@@ -97,7 +129,17 @@ type SignalHoldingInput struct {
 	AvgPrice    float64 // 종목 통화 기준
 }
 
+type SignalTxnInput struct {
+	AccountID uint
+	Type      models.TransactionType
+	Date      time.Time
+	Quantity  float64
+	Price     float64
+	Fee       float64
+}
+
 type SignalPnLInput struct {
+	Date        time.Time
 	Profit      float64
 	BuyAvgPrice float64
 	Quantity    float64
@@ -105,10 +147,11 @@ type SignalPnLInput struct {
 }
 
 type SignalDividendInput struct {
-	Amount   float64
-	Tax      float64
-	Currency string
-	Date     time.Time
+	AccountID uint
+	Amount    float64
+	Tax       float64
+	Currency  string
+	Date      time.Time
 }
 
 type SignalAssetInput struct {
@@ -120,6 +163,8 @@ type SignalAssetInput struct {
 	Holdings      []SignalHoldingInput
 	PnLs          []SignalPnLInput
 	Dividends     []SignalDividendInput
+	Txns          []SignalTxnInput
+	History       []PricePoint // 일봉 종가 (종목 통화). 비어 있으면 추세 지표 없음
 	Rule          models.SignalRule
 	RuleSource    string // "default" | "asset"
 }
@@ -153,13 +198,13 @@ func safeDiv(a, b float64) float64 {
 
 // BuildSignalReport 는 입력으로부터 지표를 계산하고 규칙을 평가한다 (순수 함수).
 // 수량이 0 이하인 종목은 제외한다.
-func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time) SignalReport {
+func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time, ctx SignalContext) SignalReport {
 	items := make([]SignalItem, 0, len(inputs))
 	rules := make(map[uint]models.SignalRule, len(inputs))
 	var totalMV float64
 
 	for _, in := range inputs {
-		item, ok := computeSignalMetrics(in, usdKRW, now)
+		item, ok := computeSignalMetrics(in, usdKRW, now, ctx)
 		if !ok {
 			continue
 		}
@@ -174,6 +219,7 @@ func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time)
 		GeneratedAt: now.Format(time.RFC3339),
 		USDKRW:      usdKRW,
 		Items:       items,
+		Tax:         ctx.Tax,
 	}
 
 	for i := range report.Items {
@@ -208,7 +254,7 @@ func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time)
 }
 
 // computeSignalMetrics 는 한 종목의 지표를 집계한다 (비중/규칙 평가 전).
-func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time) (SignalItem, bool) {
+func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time, ctx SignalContext) (SignalItem, bool) {
 	var qty, costHolding float64
 	for _, h := range in.Holdings {
 		qty += h.Quantity
@@ -234,6 +280,8 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time) (S
 		SellChecks: []SignalCheck{},
 		BuyChecks:  []SignalCheck{},
 		Accounts:   []SignalAccountBreakdown{},
+
+		ReturnBasis: "current",
 	}
 	if item.RuleSource == "" {
 		item.RuleSource = "default"
@@ -276,9 +324,32 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time) (S
 	item.DividendsKRW = dividendsKRW
 	item.Dividends12mKRW = div12mKRW
 
+	// 배당 추세: 전 계좌 세전 배당, 계좌별 현재 수량에서 역추적한 당시 수량 사용.
+	currentQty := map[uint]float64{}
+	for _, h := range in.Holdings {
+		currentQty[h.AccountID] += h.Quantity
+	}
+	acctTxns := make([]AcctTxn, 0, len(in.Txns))
+	for _, tx := range in.Txns {
+		acctTxns = append(acctTxns, AcctTxn{AccountID: tx.AccountID, Type: tx.Type, Date: tx.Date, Quantity: tx.Quantity})
+	}
+	divEvents := make([]DivEvent, 0, len(in.Dividends))
+	for _, d := range in.Dividends {
+		divEvents = append(divEvents, DivEvent{AccountID: d.AccountID, Date: d.Date, Amount: d.Amount})
+	}
+	if len(divEvents) > 0 {
+		tr := DividendTrendOf(divEvents, QuantityAtFunc(currentQty, acctTxns), now)
+		item.DPS12m, item.DPSPrev12m = tr.DPS12m, tr.DPSPrev12m
+		item.DividendTrendOK = tr.OK
+		if tr.OK {
+			item.DividendChangePct = tr.ChangePct
+		}
+	}
+
 	if in.Price <= 0 {
 		item.Action = SignalNoPrice
 		item.CostKRW = costHoldingKRW + costSoldKRW
+		item.CostKRWFx = item.CostKRW
 		item.DividendPayback = safeDiv(dividendsKRW, item.CostKRW) * 100
 		for i := range item.Accounts {
 			item.Accounts[i].MarketValueKRW = 0
@@ -300,7 +371,100 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time) (S
 		item.FromAvgPct = (in.Price - item.AvgPrice) / item.AvgPrice * 100
 	}
 	item.Action = SignalHold
+
+	// 시세 추세
+	if len(in.History) > 0 {
+		st := ComputePriceStats(in.History, now)
+		item.High52w, item.Low52w, item.MA200 = st.High52w, st.Low52w, st.MA200
+		item.PriceHistoryOK = st.High52w > 0 && st.Points >= 20
+		if item.PriceHistoryOK {
+			item.FromHighPct = (in.Price/st.High52w - 1) * 100
+		}
+		if item.PriceHistoryOK && st.Low52w > 0 {
+			item.FromLowPct = (in.Price/st.Low52w - 1) * 100
+		}
+		if st.MA200 > 0 {
+			item.VsMA200Pct = (in.Price/st.MA200 - 1) * 100
+		}
+	}
+
+	computeFxMetrics(&item, in, priceCur, usdKRW, ctx)
+
+	// 양도세 힌트: 해외상장(USD) 종목의 일반계좌 평가손익 기준
+	if ctx.Tax != nil && in.Rule.TaxHarvestEnabled {
+		var generalUnrealizedKRW float64
+		for _, h := range in.Holdings {
+			if h.AccountType == models.AccountTypeGeneral {
+				generalUnrealizedKRW += toKRW(h.Quantity*(in.Price-h.AvgPrice), priceCur, in.Ticker, usdKRW)
+			}
+		}
+		item.TaxHint = TaxHintFor(*ctx.Tax, priceCur == "USD", generalUnrealizedKRW)
+	}
 	return item, true
+}
+
+// computeFxMetrics 는 매수 시점 환율 기준 수익을 계산한다.
+// 단순화 규정: 보유분 원가는 ReplayKRWCost(이동평균, 매수일 환율), 매도분 원가는
+// BuyAvgPrice×수량×매도일 환율, 실현손익은 Profit×매도일 환율, 배당은 (세전-세)×지급일 환율.
+// USD 종목이 아니거나 환율 이력이 없으면 fx 필드는 현재 환율 기준 값과 같다.
+func computeFxMetrics(item *SignalItem, in SignalAssetInput, priceCur string, usdKRW float64, ctx SignalContext) {
+	item.CostKRWFx = item.CostKRW
+	item.TotalReturnPctFx = item.TotalReturnPct
+	item.FxEffectKRW = 0
+	if priceCur != "USD" {
+		item.FxCoveragePct = 100
+		return
+	}
+	if !ctx.FxOK || ctx.FxAt == nil {
+		return
+	}
+	fxAt := func(t time.Time) float64 {
+		if v := ctx.FxAt(t); finite(v) && v > 0 {
+			return v
+		}
+		return usdKRW
+	}
+	conv := func(amount float64, cur string, t time.Time) float64 {
+		c := strings.ToUpper(strings.TrimSpace(cur))
+		if c == "" {
+			c = CurrencyForTicker(in.Ticker)
+		}
+		if c == "USD" {
+			return amount * fxAt(t)
+		}
+		return amount
+	}
+
+	var holdCostFx, covered, totalQty float64
+	for _, h := range in.Holdings {
+		var txns []FxTxn
+		for _, tx := range in.Txns {
+			if tx.AccountID == h.AccountID {
+				txns = append(txns, FxTxn{Type: tx.Type, Date: tx.Date, Quantity: tx.Quantity, Price: tx.Price, Fee: tx.Fee})
+			}
+		}
+		c, cov := ReplayKRWCost(txns, h.Quantity, h.AvgPrice, "USD", fxAt, usdKRW)
+		holdCostFx += c
+		covered += cov
+		totalQty += h.Quantity
+	}
+	var realizedFx, soldCostFx, divFx float64
+	for _, p := range in.PnLs {
+		realizedFx += conv(p.Profit, p.Currency, p.Date)
+		soldCostFx += conv(p.BuyAvgPrice*p.Quantity, p.Currency, p.Date)
+	}
+	for _, d := range in.Dividends {
+		divFx += conv(d.Amount-d.Tax, d.Currency, d.Date)
+	}
+	costFx := holdCostFx + soldCostFx
+	totalFx := item.MarketValueKRW - holdCostFx + realizedFx + divFx
+	item.CostKRWFx = costFx
+	item.TotalReturnPctFx = safeDiv(totalFx, costFx) * 100
+	item.FxEffectKRW = totalFx - item.TotalReturnKRW
+	item.FxCoveragePct = safeDiv(covered, totalQty) * 100
+	if in.Rule.FxHistorical {
+		item.ReturnBasis = "fx"
+	}
 }
 
 // evaluateSignalRule 은 item 의 지표(비중 포함)로 규칙을 평가해 Checks 를 채우고 액션을 돌려준다.
@@ -308,23 +472,36 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRule) string {
 	sell := []SignalCheck{}
 	buy := []SignalCheck{}
 
+	ret := it.TotalReturnPct
+	if it.ReturnBasis == "fx" {
+		ret = it.TotalReturnPctFx
+	}
+
 	if r.TakeProfitEnabled {
-		sell = append(sell, SignalCheck{"take_profit", "목표 수익률", it.TotalReturnPct >= r.TakeProfitPct, it.TotalReturnPct, r.TakeProfitPct, "%"})
+		sell = append(sell, SignalCheck{"take_profit", "목표 수익률", ret >= r.TakeProfitPct, ret, r.TakeProfitPct, "%"})
 	}
 	if r.StopLossEnabled {
-		sell = append(sell, SignalCheck{"stop_loss", "손절선", it.TotalReturnPct <= r.StopLossPct, it.TotalReturnPct, r.StopLossPct, "%"})
+		sell = append(sell, SignalCheck{"stop_loss", "손절선", ret <= r.StopLossPct, ret, r.StopLossPct, "%"})
 	}
 	if r.WeightEnabled && r.TargetWeightPct > 0 {
 		th := r.TargetWeightPct + r.WeightBandPct
 		sell = append(sell, SignalCheck{"weight_over", "비중 초과", it.WeightPct >= th, it.WeightPct, th, "%"})
 	}
 	if r.DividendPaybackEnabled {
-		met := it.DividendPayback >= r.DividendPaybackPct && it.TotalReturnPct >= r.DividendPaybackMinReturnPct
+		met := it.DividendPayback >= r.DividendPaybackPct && ret >= r.DividendPaybackMinReturnPct
 		sell = append(sell, SignalCheck{"dividend_payback", "배당 회수", met, it.DividendPayback, r.DividendPaybackPct, "%"})
 	}
 	if r.LowYieldEnabled {
 		met := it.Dividends12mKRW > 0 && it.CurrentYieldPct <= r.LowYieldPct
 		sell = append(sell, SignalCheck{"low_yield", "배당수익률 하락", met, it.CurrentYieldPct, r.LowYieldPct, "%"})
+	}
+	if r.AboveMAEnabled {
+		met := it.PriceHistoryOK && it.MA200 > 0 && it.VsMA200Pct >= r.AboveMAPct
+		sell = append(sell, SignalCheck{"above_ma", "장기 이평 과열", met, it.VsMA200Pct, r.AboveMAPct, "%"})
+	}
+	if r.DividendCutEnabled {
+		met := it.DividendTrendOK && it.DividendChangePct <= -r.DividendCutPct
+		sell = append(sell, SignalCheck{"dividend_cut", "배당 삭감", met, it.DividendChangePct, -r.DividendCutPct, "%"})
 	}
 
 	if r.BuyDipEnabled {
@@ -336,6 +513,14 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRule) string {
 	}
 	if r.HighYieldEnabled {
 		buy = append(buy, SignalCheck{"high_yield", "배당수익률 상승", it.CurrentYieldPct >= r.HighYieldPct, it.CurrentYieldPct, r.HighYieldPct, "%"})
+	}
+	if r.FromHighEnabled {
+		met := it.PriceHistoryOK && it.FromHighPct <= r.FromHighPct
+		buy = append(buy, SignalCheck{"from_high", "52주 고점 대비 하락", met, it.FromHighPct, r.FromHighPct, "%"})
+	}
+	if r.BelowMAEnabled {
+		met := it.MA200 > 0 && it.VsMA200Pct <= r.BelowMAPct
+		buy = append(buy, SignalCheck{"below_ma", "장기 이평 하회", met, it.VsMA200Pct, r.BelowMAPct, "%"})
 	}
 
 	it.SellChecks = sell

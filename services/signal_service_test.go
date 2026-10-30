@@ -96,3 +96,79 @@ func TestValidateSignalRule(t *testing.T) {
 		t.Errorf("%v %+v", err, ok)
 	}
 }
+
+func TestSignalRuleMigrationV1(t *testing.T) {
+	db := newSignalTestDB(t)
+	// 1단계 행: 새 컬럼은 모두 0/false, RuleVersion 0
+	v1 := models.SignalRule{AssetID: 0, TakeProfitEnabled: true, TakeProfitPct: 30, StopLossEnabled: true, StopLossPct: -20, SellMode: "any", BuyMode: "any"}
+	ov := models.SignalRule{AssetID: 5, TakeProfitEnabled: true, TakeProfitPct: 12, SellMode: "any", BuyMode: "any"}
+	if err := db.Create(&v1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&ov).Error; err != nil {
+		t.Fatal(err)
+	}
+	svc := NewSignalService(db, nil, nil)
+	rules, err := svc.GetSignalRules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(r models.SignalRule) {
+		t.Helper()
+		if r.RuleVersion != 2 || r.FromHighPct != -20 || r.BelowMAPct != -5 || r.AboveMAPct != 25 || r.DividendCutPct != 10 ||
+			r.TaxHarvestFromMonth != 11 || !r.FxHistorical || !r.TaxHarvestEnabled ||
+			r.FromHighEnabled || r.BelowMAEnabled || r.AboveMAEnabled || r.DividendCutEnabled {
+			t.Errorf("migrated rule %+v", r)
+		}
+	}
+	check(rules.Default)
+	if len(rules.Overrides) != 1 || rules.Overrides[0].TakeProfitPct != 12 {
+		t.Fatalf("overrides %+v", rules.Overrides)
+	}
+	check(rules.Overrides[0])
+
+	// 영속화 확인
+	var stored models.SignalRule
+	if err := db.Where("asset_id = ?", 0).First(&stored).Error; err != nil {
+		t.Fatal(err)
+	}
+	check(stored)
+
+	// 사용자가 이후 값을 바꾸면(0 포함) 재보정되지 않는다: 버전은 저장 시 항상 2
+	if _, err := svc.SaveDefaultRule(models.SignalRule{FromHighPct: 0, FxHistorical: false, TaxHarvestFromMonth: 0}); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ = svc.GetSignalRules()
+	d := rules.Default
+	if d.RuleVersion != 2 || d.FromHighPct != 0 || d.FxHistorical || d.TaxHarvestEnabled || d.TaxHarvestFromMonth != 11 {
+		t.Errorf("must not re-migrate: %+v", d)
+	}
+}
+
+func TestValidateSignalRuleStage2(t *testing.T) {
+	bad := []models.SignalRule{
+		{FromHighPct: 1},
+		{BelowMAPct: 0.5},
+		{AboveMAPct: -1},
+		{DividendCutPct: -1},
+		{TaxHarvestFromMonth: 13},
+		{TaxHarvestFromMonth: -1},
+		{AboveMAPct: math.Inf(1)},
+		{DividendCutPct: math.NaN()},
+	}
+	for i, r := range bad {
+		var inv *ErrInvalidSignalRule
+		if err := ValidateSignalRule(&r); !errors.As(err, &inv) {
+			t.Errorf("case %d: expected invalid, got %v", i, err)
+		}
+	}
+	ok := models.SignalRule{FromHighPct: -30, AboveMAPct: 0, TaxHarvestFromMonth: 0}
+	if err := ValidateSignalRule(&ok); err != nil || ok.TaxHarvestFromMonth != 11 {
+		t.Errorf("%v %+v", err, ok)
+	}
+	def := models.DefaultSignalRule()
+	if err := ValidateSignalRule(&def); err != nil || def.FromHighEnabled || def.BelowMAEnabled || def.AboveMAEnabled || def.DividendCutEnabled ||
+		!def.TaxHarvestEnabled || !def.FxHistorical || def.RuleVersion != 2 {
+		t.Errorf("default %v %+v", err, def)
+	}
+}
