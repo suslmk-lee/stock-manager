@@ -22,6 +22,7 @@ type App struct {
 	snapshotService     *services.PortfolioSnapshotService
 	realizedPnLService  *services.RealizedPnLService
 	signalService       *services.SignalService
+	dailySnapService    *services.DailySnapshotService
 }
 
 // NewApp 은 서비스 인스턴스를 모두 구성한 App 을 반환한다.
@@ -40,6 +41,7 @@ func NewApp() *App {
 	a.snapshotService = services.NewPortfolioSnapshotService(database.GetDB(), a.tickerService)
 	a.realizedPnLService = services.NewRealizedPnLService()
 	a.signalService = services.NewSignalService(database.GetDB(), a.tickerService, a.exchangeRateService)
+	a.dailySnapService = services.NewDailySnapshotService(database.GetDB(), a.tickerService)
 	return a
 }
 
@@ -57,6 +59,7 @@ func (a *App) apiServices() *httpapi.Services {
 		Snapshot:     a.snapshotService,
 		RealizedPnL:  a.realizedPnLService,
 		Signal:       a.signalService,
+		DailySnap:    a.dailySnapService,
 	}
 }
 
@@ -65,6 +68,24 @@ func (a *App) startup(ctx context.Context) {
 
 	// 앱 시작 시 이번 달 스냅샷 자동 기록
 	a.snapshotService.EnsureCurrentMonthSnapshotAsync()
+
+	// 일별 총자산: 오늘 실측 보장 + 2년 추정 백필, 이후 실행 중에는 몇 시간마다 재확인 (ctx 종료 시 중단)
+	a.dailySnapService.EnsureTodayAsync()
+	a.dailySnapService.BackfillAsync(services.DefaultBackfillDays)
+	go func() {
+		t := time.NewTicker(4 * time.Hour)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if _, err := a.dailySnapService.EnsureToday("startup"); err != nil {
+					fmt.Printf("[DailySnapshot] 주기 점검 오류: %v\n", err)
+				}
+			}
+		}
+	}()
 
 	// 신호 백그라운드 점검 (ctx 종료 시 중단)
 	a.startSignalMonitor(ctx)
@@ -330,6 +351,21 @@ func (a *App) GetSnapshotsByAsset(assetID uint) (interface{}, error) {
 
 func (a *App) GetMonthlySnapshotByAccount(accountID uint) (interface{}, error) {
 	return a.snapshotService.GetMonthlyTotalByAccount(accountID)
+}
+
+// GetDailyAssetSeries 일별 총자산 시계열 (range: 1m|3m|6m|1y|2y|all, interval: auto|day|week)
+func (a *App) GetDailyAssetSeries(rangeStr string, interval string) (interface{}, error) {
+	return a.dailySnapService.GetSeries(rangeStr, interval)
+}
+
+// CaptureDailySnapshot 오늘 스냅샷을 수동 캡처하고 백필을 시작한다.
+func (a *App) CaptureDailySnapshot() (interface{}, error) {
+	snap, err := a.dailySnapService.CaptureToday("manual")
+	if err != nil {
+		return nil, err
+	}
+	started := a.dailySnapService.BackfillAsync(services.DefaultBackfillDays)
+	return map[string]interface{}{"snapshot": snap, "backfill_started": started}, nil
 }
 
 func (a *App) GetMonthlySnapshotSummary(months int) (interface{}, error) {
