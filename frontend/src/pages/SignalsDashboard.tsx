@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2 } from 'lucide-react';
 import { apiClient } from '../api/client';
-import { SignalAction, SignalCheck, SignalItem, SignalReport, SignalRule, SignalRulesResponse } from '../types/models';
+import { SignalAction, SignalCheck, SignalItem, SignalReport, SignalRule, SignalRulesResponse, SignalTaxSummary } from '../types/models';
 import IconTile from '../components/ui/IconTile';
 import RingGauge from '../components/ui/RingGauge';
 import Chip from '../components/ui/Chip';
@@ -37,6 +37,10 @@ const CHECK_OPS: Record<string, string> = {
   low_yield: '≤',
   buy_dip: '≤',
   high_yield: '≥',
+  above_ma: '≥',
+  dividend_cut: '≤',
+  from_high: '≤',
+  below_ma: '≤',
 };
 
 const fmtKrw = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
@@ -58,6 +62,18 @@ function checkText(c: SignalCheck) {
 
 function ringInfo(item: SignalItem): { value: number; text: string } | null {
   if (item.action === 'NO_PRICE') return null;
+  // 규칙이 사용한 수익률 기준과 일치시킨다
+  if (item.return_basis === 'fx' && item.total_return_pct_fx !== undefined) {
+    const fxPct = item.total_return_pct_fx;
+    if (item.action === 'BUY') {
+      const dip = item.buy_checks.find((c) => c.code === 'buy_dip');
+      if (!dip || !dip.threshold) return null;
+      return { value: (item.from_avg_pct / dip.threshold) * 100, text: fmtSignedPct(fxPct) };
+    }
+    const tp = item.sell_checks.find((c) => c.code === 'take_profit');
+    if (!tp || !tp.threshold) return null;
+    return { value: (fxPct / tp.threshold) * 100, text: fmtSignedPct(fxPct) };
+  }
   if (item.action === 'BUY') {
     const dip = item.buy_checks.find((c) => c.code === 'buy_dip');
     if (!dip || !dip.threshold) return null;
@@ -74,6 +90,81 @@ function Metric({ label, children, sub }: { label: string; children: React.React
       <div className="label-mono">{label}</div>
       <div className="num mt-1 truncate text-sm font-medium text-white">{children}</div>
       {sub && <div className="num mt-0.5 truncate text-[11px] text-zinc-500">{sub}</div>}
+    </div>
+  );
+}
+
+const TAX_RATE_NOTE = '일반(위탁) 계좌의 해외 상장 종목 기준 · 22% · 참고용';
+
+function TaxPanel({ tax }: { tax: SignalTaxSummary }) {
+  const exemption = tax.exemption_krw || 2500000;
+  const over = tax.net_krw > exemption;
+  const pct = Math.max(0, Math.min(100, (Math.max(tax.net_krw, 0) / exemption) * 100));
+  return (
+    <section className="surface mb-6 p-4 sm:p-5" aria-label="해외주식 양도세">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-medium text-white">해외주식 양도세</h2>
+          <span className="label-mono">{tax.year}년 · {tax.count}건</span>
+        </div>
+        {tax.harvest_window && (
+          <span className="badge border border-amber-400/30 bg-amber-400/10 text-amber-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+            연말 절세 구간
+          </span>
+        )}
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <Metric label="실현 이익"><span className="text-mint-300">{fmtKrw(tax.realized_gain_krw)}</span></Metric>
+        <Metric label="실현 손실"><span className="text-rose-300">{fmtSignedKrw(-Math.abs(tax.realized_loss_krw))}</span></Metric>
+        <Metric label="순이익"><span className={`${signTone(tax.net_krw)}`}>{fmtSignedKrw(tax.net_krw)}</span></Metric>
+      </div>
+
+      <div className="mt-4">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <span className="label-mono">기본공제 {fmtKrw(exemption)} 대비</span>
+          <span className={`num text-xs ${over ? 'text-amber-300' : 'text-mint-300'}`}>{fmtNum(exemption > 0 ? (Math.max(tax.net_krw, 0) / exemption) * 100 : 0, 0)}%</span>
+        </div>
+        <div
+          className="h-2 w-full overflow-hidden rounded-full bg-white/[0.07]"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(pct)}
+          aria-label="양도소득 기본공제 사용률"
+        >
+          <div className={`h-full rounded-full transition-all ${over ? 'bg-amber-400' : 'bg-mint-400'}`} style={{ width: `${pct}%` }} />
+        </div>
+        <div className="num mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
+          <span className="text-zinc-400">
+            남은 공제 <span className="text-zinc-100">{fmtKrw(Math.max(tax.remaining_krw, 0))}</span>
+          </span>
+          <span className="text-zinc-400">
+            예상 세액 <span className={tax.estimated_tax_krw > 0 ? 'text-rose-300' : 'text-zinc-100'}>{fmtKrw(tax.estimated_tax_krw)}</span>
+          </span>
+        </div>
+      </div>
+      <p className="mt-3 text-[11px] text-zinc-500">{TAX_RATE_NOTE}</p>
+    </section>
+  );
+}
+
+function RangeBar({ low, high, price, ma }: { low: number; high: number; price: number; ma?: number }) {
+  const span = high - low;
+  const pos = (v: number) => (span > 0 ? Math.max(0, Math.min(100, ((v - low) / span) * 100)) : 50);
+  return (
+    <div className="relative h-5">
+      <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-white/[0.08]" />
+      <div className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-sky-400/40" style={{ left: 0, width: `${pos(price)}%` }} />
+      {ma !== undefined && ma > 0 && ma >= low && ma <= high && (
+        <div className="absolute top-1/2 h-3 w-px -translate-y-1/2 bg-amber-300" style={{ left: `${pos(ma)}%` }} title="200일 이동평균" />
+      )}
+      <div
+        className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-sky-400"
+        style={{ left: `${pos(price)}%` }}
+        title="현재가"
+      />
     </div>
   );
 }
@@ -117,6 +208,11 @@ function SignalCard({ item, rule, onEdit }: { item: SignalItem; rule?: SignalRul
   const actionLabel = item.action === 'SELL' && item.restricted_only ? '리밸런싱 검토' : meta.label;
   const ring = ringInfo(item);
   const noPrice = item.action === 'NO_PRICE';
+  const fx = item.return_basis === 'fx' && item.total_return_pct_fx !== undefined;
+  const coverage = item.fx_coverage_pct ?? 100;
+  const showTrend = !noPrice && !!item.price_history_ok && !!item.high_52w && !!item.low_52w;
+  const showDiv = !noPrice && !!item.dividend_trend_ok;
+  const hint = !noPrice ? item.tax_hint : null;
 
   return (
     <article className="surface flex flex-col p-5 sm:p-6">
@@ -159,12 +255,35 @@ function SignalCard({ item, rule, onEdit }: { item: SignalItem; rule?: SignalRul
           ) : (
             <>
               <Metric label="평가금액">{fmtKrw(item.market_value_krw)}</Metric>
-              <Metric
-                label="실질 수익률"
-                sub={<span className={signTone(item.total_return_krw)}>{fmtSignedKrw(item.total_return_krw)}</span>}
-              >
-                <span className={signTone(item.total_return_pct)}>{fmtSignedPct(item.total_return_pct)}</span>
-              </Metric>
+              {fx ? (
+                <div className="surface-inset min-w-0 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="label-mono">실질 수익률</span>
+                    {coverage < 100 && (
+                      <span className="num rounded-full border border-amber-400/25 bg-amber-400/10 px-1.5 text-[10px] leading-4 text-amber-200" title="거래 기록이 없는 수량은 현재 환율로 계산합니다">
+                        환율 반영 {fmtNum(coverage, 0)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="num mt-1 truncate text-sm font-medium">
+                    <span className={signTone(item.total_return_pct_fx ?? 0)}>{fmtSignedPct(item.total_return_pct_fx ?? 0)}</span>
+                  </div>
+                  <div className="num mt-0.5 truncate text-[11px]">
+                    <span className={signTone(item.total_return_krw)}>{fmtSignedKrw(item.total_return_krw)}</span>
+                  </div>
+                  <div className="num truncate text-[11px] text-zinc-500">
+                    환율 효과 <span className={signTone(item.fx_effect_krw ?? 0)}>{fmtSignedKrw(item.fx_effect_krw ?? 0)}</span>
+                  </div>
+                  <div className="num truncate text-[11px] text-zinc-500">현재환율 기준 {fmtSignedPct(item.total_return_pct)}</div>
+                </div>
+              ) : (
+                <Metric
+                  label="실질 수익률"
+                  sub={<span className={signTone(item.total_return_krw)}>{fmtSignedKrw(item.total_return_krw)}</span>}
+                >
+                  <span className={signTone(item.total_return_pct)}>{fmtSignedPct(item.total_return_pct)}</span>
+                </Metric>
+              )}
               <Metric label="누적 배당" sub={`회수율 ${fmtPct(item.dividend_payback_pct)}`}>
                 {fmtKrw(item.dividends_krw)}
               </Metric>
@@ -179,6 +298,65 @@ function SignalCard({ item, rule, onEdit }: { item: SignalItem; rule?: SignalRul
           )}
         </div>
       </div>
+
+      {(showTrend || showDiv) && (
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {showTrend && (
+            <div className="surface-inset min-w-0 px-3 py-2.5 sm:col-span-2">
+              <div className="label-mono">추세</div>
+              <div className="num mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-zinc-400">
+                <span>
+                  52주 고점 대비 <span className={signTone(item.from_high_pct ?? 0)}>{fmtSignedPct(item.from_high_pct ?? 0)}</span>
+                </span>
+                {!!item.ma200 && (
+                  <span>
+                    200일선 대비 <span className={signTone(item.vs_ma200_pct ?? 0)}>{fmtSignedPct(item.vs_ma200_pct ?? 0)}</span>
+                  </span>
+                )}
+              </div>
+              <div className="mt-1.5">
+                <RangeBar low={item.low_52w!} high={item.high_52w!} price={item.current_price} ma={item.ma200} />
+                <div className="num flex items-center justify-between text-[10px] text-zinc-500">
+                  <span>저 {formatPrice(item.low_52w!, item.currency)}</span>
+                  <span className="text-zinc-300">{formatPrice(item.current_price, item.currency)}</span>
+                  <span>고 {formatPrice(item.high_52w!, item.currency)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {showDiv && (
+            <div className="surface-inset min-w-0 px-3 py-2.5 sm:col-span-2">
+              <div className="label-mono">배당 추세</div>
+              <div className="num mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-zinc-400">
+                <span>
+                  DPS 12개월 <span className="text-zinc-100">{formatPrice(item.dps_12m ?? 0, item.currency)}</span>
+                </span>
+                <span className="text-zinc-600">vs</span>
+                <span>
+                  직전 12개월 <span className="text-zinc-100">{formatPrice(item.dps_prev_12m ?? 0, item.currency)}</span>
+                </span>
+                <span className={`font-medium ${signTone(item.dividend_change_pct ?? 0)}`}>{fmtSignedPct(item.dividend_change_pct ?? 0)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {hint && (
+        <div
+          className={`mt-4 rounded-2xl border px-3.5 py-2.5 ${
+            hint.kind === 'harvest_gain' ? 'border-mint-400/30 bg-mint-400/10' : 'border-amber-400/30 bg-amber-400/10'
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+            <span className={`text-xs font-medium ${hint.kind === 'harvest_gain' ? 'text-mint-300' : 'text-amber-200'}`}>
+              {hint.kind === 'harvest_gain' ? '절세 이익 실현' : '손실 상계'}
+            </span>
+            <span className={`num text-xs ${hint.kind === 'harvest_gain' ? 'text-mint-300' : 'text-amber-200'}`}>{fmtKrw(hint.amount_krw)}</span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-300">{hint.message}</p>
+        </div>
+      )}
 
       {(item.sell_checks.length > 0 || item.buy_checks.length > 0) && (
         <div className="mt-4 space-y-3 border-t border-white/[0.06] pt-4">
@@ -325,7 +503,10 @@ export default function SignalsDashboard() {
       </div>
 
       <p className="mb-6 text-xs leading-relaxed text-zinc-500">
-        설정한 규칙에 따른 알림이며 투자 권유가 아닙니다. 수익률은 배당·실현손익 포함, 현재 환율 원화 기준.
+        설정한 규칙에 따른 알림이며 투자 권유가 아닙니다.{' '}
+        {report?.items.some((i) => i.return_basis === 'fx')
+          ? '수익률은 배당·실현손익 포함, 매수 시점 환율 원화 기준(거래 기록이 없는 수량은 현재 환율).'
+          : '수익률은 배당·실현손익 포함, 현재 환율 원화 기준.'}
       </p>
 
       {error && (
@@ -364,6 +545,8 @@ export default function SignalsDashboard() {
               ))}
             </div>
           </div>
+
+          {report.tax && <TaxPanel tax={report.tax} />}
 
           {items.length === 0 ? (
             <div className="surface py-16 text-center">

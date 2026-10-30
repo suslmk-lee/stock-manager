@@ -177,6 +177,18 @@ export interface SignalRule {
   buy_dip_pct: number; // <= 0
   high_yield_enabled: boolean;
   high_yield_pct: number;
+  // 2단계 (구 백엔드에서는 없을 수 있음)
+  from_high_enabled?: boolean;
+  from_high_pct?: number; // <= 0
+  below_ma_enabled?: boolean;
+  below_ma_pct?: number; // <= 0 (200일 이평 대비)
+  above_ma_enabled?: boolean;
+  above_ma_pct?: number; // >= 0
+  dividend_cut_enabled?: boolean;
+  dividend_cut_pct?: number; // >= 0
+  tax_harvest_enabled?: boolean;
+  tax_harvest_from_month?: number; // 1~12
+  fx_historical?: boolean;
   sell_mode: SignalMode;
   buy_mode: SignalMode;
   created_at?: string;
@@ -231,9 +243,47 @@ export interface SignalItem {
   yield_on_cost_pct: number;
   weight_pct: number;
   from_avg_pct: number;
+  // 추세 (현지 통화, 0 = 없음)
+  high_52w?: number;
+  low_52w?: number;
+  ma200?: number;
+  from_high_pct?: number;
+  from_low_pct?: number;
+  vs_ma200_pct?: number;
+  price_history_ok?: boolean;
+  // 배당 추세
+  dps_12m?: number;
+  dps_prev_12m?: number;
+  dividend_change_pct?: number;
+  dividend_trend_ok?: boolean;
+  // 환율 반영 수익률
+  cost_krw_fx?: number;
+  total_return_pct_fx?: number;
+  fx_effect_krw?: number;
+  fx_coverage_pct?: number;
+  return_basis?: 'fx' | 'current';
+  tax_hint?: SignalTaxHint | null;
   sell_checks: SignalCheck[];
   buy_checks: SignalCheck[];
   accounts: SignalAccount[];
+}
+
+export interface SignalTaxHint {
+  kind: 'harvest_gain' | 'harvest_loss';
+  amount_krw: number;
+  message: string;
+}
+
+export interface SignalTaxSummary {
+  year: number;
+  realized_gain_krw: number;
+  realized_loss_krw: number;
+  net_krw: number;
+  exemption_krw: number;
+  remaining_krw: number;
+  estimated_tax_krw: number;
+  harvest_window: boolean;
+  count: number;
 }
 
 export interface SignalReport {
@@ -241,4 +291,5 @@ export interface SignalReport {
   usd_krw: number;
   summary: { sell: number; buy: number; hold: number; conflict: number; no_price: number };
   items: SignalItem[];
+  tax?: SignalTaxSummary | null;
 }
