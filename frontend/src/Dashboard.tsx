@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Wallet, TrendingUp, DollarSign, BarChart3, Calendar, Camera, ArrowLeftRight, LineChart } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, BarChart3, Calendar, Camera, ArrowLeftRight, LineChart, Settings2 } from 'lucide-react';
+import AppearanceSettings from './components/settings/AppearanceSettings';
 import App from './App';
 import AssetManager from './components/AssetManager';
 import DividendManager from './components/DividendManager';
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('accounts');
   const [selectedAccountId, setSelectedAccountId] = useState<number>(0);
   const [usdKrw, setUsdKrw] = useState<number | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     apiClient
@@ -40,7 +42,7 @@ export default function Dashboard() {
       <div
         aria-hidden
         className="pointer-events-none fixed inset-x-0 top-0 h-[420px]"
-        style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,0.06) 0%, transparent 70%)' }}
+        style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgb(var(--c-white) / 0.06) 0%, transparent 70%)' }}
       />
 
       <header className="sticky top-0 z-20 bg-ink-950/70 backdrop-blur-xl">
@@ -51,12 +53,23 @@ export default function Dashboard() {
               <IconTile icon={LineChart} tone="mint" size="sm" />
               <span className="text-[15px] font-semibold tracking-tight">Stock Manager</span>
             </div>
-            <div className="glass-pill flex items-center gap-2 px-3.5 py-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-mint-400 shadow-[0_0_8px_rgba(125,223,176,0.8)]" />
-              <span className="label-mono !text-zinc-400">USD/KRW</span>
-              <span className="num text-sm font-medium text-white">
-                {usdKrw ? usdKrw.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) : '—'}
-              </span>
+            <div className="flex items-center gap-2">
+              <div className="glass-pill flex items-center gap-2 px-3.5 py-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-mint-400 shadow-[0_0_8px_rgb(var(--c-mint-400)/0.8)]" />
+                <span className="label-mono !text-zinc-400">USD/KRW</span>
+                <span className="num text-sm font-medium text-white">
+                  {usdKrw ? usdKrw.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) : '—'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                title="모양 설정"
+                aria-label="모양 설정"
+                className="glass-pill flex h-9 w-9 items-center justify-center text-zinc-400 hover:text-white transition-colors"
+              >
+                <Settings2 className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
@@ -103,6 +116,8 @@ export default function Dashboard() {
         {activeTab === 'yearly' && <DividendYearlyOverview />}
         {activeTab === 'portfolio' && <PortfolioSnapshots />}
       </main>
+
+      <AppearanceSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }
