@@ -33,7 +33,8 @@ interface SettingRowProps {
 export function SettingRow({ label, hint, children }: SettingRowProps) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <div className="min-w-0 shrink-0 max-w-[40%]">
+      {/* 라벨 폭을 고정해 여러 줄의 슬라이더 시작점을 맞춘다 */}
+      <div className="w-28 min-w-0 shrink-0 sm:w-32">
         <div className="text-sm text-white">{label}</div>
         {hint && <div className="label-mono mt-0.5">{hint}</div>}
       </div>

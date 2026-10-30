@@ -65,7 +65,8 @@ body {
     @apply relative;
     border-radius: var(--card-radius);
     border: var(--card-border-w) solid var(--card-border);
-    background: var(--card-bg);
+    /* --fx-glow-card: 모양 설정의 카드 그라데이션 (끄면 none) */
+    background: var(--fx-glow-card, none), var(--card-bg);
     box-shadow: var(--card-shadow);
     -webkit-backdrop-filter: var(--card-blur);
     backdrop-filter: var(--card-blur);
@@ -278,7 +279,7 @@ body {
     @apply relative overflow-hidden;
     border-radius: var(--hero-radius);
     border: var(--hero-border-w) solid var(--hero-border);
-    background: var(--hero-bg);
+    background: var(--fx-glow-hero, none), var(--hero-bg);
     box-shadow: var(--hero-shadow);
   }
   .hero-grain::before {
@@ -309,6 +310,54 @@ body {
     border-color: var(--tab-active-border);
     background: var(--tab-active-bg);
     box-shadow: var(--tab-active-shadow);
+  }
+  /* 스크롤 스택 카드 (components/ui/CardStack.tsx) */
+  .card-stack-item {
+    position: sticky;
+  }
+  .card-stack-card {
+    border-radius: var(--card-radius);
+    background: rgb(var(--c-ink-950)); /* 반투명 카드 뒤로 아래 카드가 비치지 않게 */
+    transform-origin: 50% 0;
+    will-change: transform;
+  }
+
+  /* 선택된 탭: 테두리를 따라 빛줄기가 도는 보더 빔 */
+  .tab-card-active::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    padding: 1.5px;
+    border-radius: max(0px, calc(var(--tab-radius) - var(--tab-border-w)));
+    background: conic-gradient(
+      from var(--beam-angle),
+      transparent 0deg,
+      transparent 200deg,
+      rgb(var(--c-mint-400) / 0.25) 260deg,
+      rgb(var(--c-mint-300) / 1) 335deg,
+      rgb(var(--c-white) / 1) 352deg,
+      transparent 360deg
+    );
+    filter: drop-shadow(0 0 3px rgb(var(--c-mint-400) / 0.8));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: beamSpin 3.2s linear infinite;
+  }
+}
+
+@property --beam-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes beamSpin {
+  to {
+    --beam-angle: 360deg;
   }
 }
 
@@ -390,5 +439,9 @@ body {
   .focus-flash {
     animation: none;
     box-shadow: 0 0 0 2px rgb(var(--c-mint-400) / 0.9);
+  }
+  .tab-card-active::before {
+    animation: none;
+    --beam-angle: 300deg;
   }
 }

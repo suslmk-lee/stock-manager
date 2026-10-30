@@ -3,6 +3,7 @@ import { buildThemeVars, getTheme, hexToRgb, rgbToHex, DEFAULT_THEME_ID, AppThem
 import {
   DEFAULT_CARD_STYLE, DEFAULT_FONT_SIZE, DEFAULT_MONO, DEFAULT_SANS, FONT_SIZES, FontSizeId,
   MONO_FALLBACK, MONO_FONTS, SANS_FALLBACK, SANS_FONTS, CARD_STYLES, CURSOR_TRAIL_LIMITS,
+  CARD_GLOW_LIMITS,
 } from './options';
 
 // 커서를 따라다니는 점 체인 효과 (장식용, 기본 꺼짐)
@@ -19,6 +20,21 @@ export const DEFAULT_CURSOR_TRAIL: CursorTrailSettings = {
   enabled: false, nodes: 14, ease: 0.34, headSize: 24, taper: 0.8, gradient: false,
 };
 
+// 카드에 덧입히는 원형 광원 그라데이션 (기본 꺼짐 → 카드 스타일 본래 모양)
+export interface CardGlowSettings {
+  enabled: boolean;
+  scope: 'hero' | 'all'; // 대표 카드(총 자산 등)만 / 모든 카드
+  intensity: number; // 0~0.5
+  size: number; // 광원 반경(%)
+  x: number; // 광원 중심 가로(%)
+  y: number; // 광원 중심 세로(%)
+  gradient: boolean; // 강조색 → 하늘색 두 광원
+}
+
+export const DEFAULT_CARD_GLOW: CardGlowSettings = {
+  enabled: false, scope: 'hero', intensity: 0.18, size: 65, x: 0, y: 0, gradient: false,
+};
+
 export interface AppearanceSettings {
   themeId: string;
   cardStyle: string;
@@ -26,6 +42,7 @@ export interface AppearanceSettings {
   monoFont: string;
   fontSize: FontSizeId;
   cursorTrail: CursorTrailSettings;
+  cardGlow: CardGlowSettings;
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -35,6 +52,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   monoFont: DEFAULT_MONO,
   fontSize: DEFAULT_FONT_SIZE,
   cursorTrail: DEFAULT_CURSOR_TRAIL,
+  cardGlow: DEFAULT_CARD_GLOW,
 };
 
 // index.html 의 첫 페인트 전 스크립트도 이 키를 읽는다 (깜빡임 방지)
@@ -58,6 +76,31 @@ function sanitizeCursorTrail(raw: unknown): CursorTrailSettings {
   };
 }
 
+function sanitizeCardGlow(raw: unknown): CardGlowSettings {
+  const d = DEFAULT_CARD_GLOW;
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const L = CARD_GLOW_LIMITS;
+  return {
+    enabled: typeof r.enabled === 'boolean' ? r.enabled : d.enabled,
+    scope: r.scope === 'all' || r.scope === 'hero' ? r.scope : d.scope,
+    intensity: clampNum(r.intensity, L.intensity, d.intensity),
+    size: clampNum(r.size, L.size, d.size),
+    x: clampNum(r.x, L.x, d.x),
+    y: clampNum(r.y, L.y, d.y),
+    gradient: typeof r.gradient === 'boolean' ? r.gradient : d.gradient,
+  };
+}
+
+// 카드 배경 맨 위에 겹칠 광원 레이어 (.surface / .hero-grain 이 --fx-glow-* 를 읽는다)
+function cardGlowLayer(g: CardGlowSettings) {
+  const a = g.intensity.toFixed(3);
+  const main = `radial-gradient(circle at ${g.x}% ${g.y}%, rgb(var(--c-mint-400) / ${a}) 0%, transparent ${g.size}%)`;
+  if (!g.gradient) return main;
+  // 두 번째 광원은 반대쪽 모서리에서 하늘색으로
+  const sub = `radial-gradient(circle at ${100 - g.x}% ${100 - g.y}%, rgb(var(--c-sky-400) / ${(g.intensity * 0.8).toFixed(3)}) 0%, transparent ${g.size}%)`;
+  return `${main}, ${sub}`;
+}
+
 function loadSettings(): AppearanceSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -70,6 +113,7 @@ function loadSettings(): AppearanceSettings {
     if (!MONO_FONTS.some((f) => f.id === merged.monoFont)) merged.monoFont = DEFAULT_MONO;
     if (!FONT_SIZES.some((f) => f.id === merged.fontSize)) merged.fontSize = DEFAULT_FONT_SIZE;
     merged.cursorTrail = sanitizeCursorTrail(saved.cursorTrail);
+    merged.cardGlow = sanitizeCardGlow(saved.cardGlow);
     return merged;
   } catch {
     return DEFAULT_APPEARANCE;
@@ -85,6 +129,9 @@ export function computeRootStyle(s: AppearanceSettings) {
   vars['--font-sans'] = `${sans.family}, ${SANS_FALLBACK}`;
   vars['--font-mono'] = `${mono.family}, ${MONO_FALLBACK}`;
   vars['font-size'] = `${FONT_SIZES.find((f) => f.id === s.fontSize)?.px ?? 16}px`;
+  const glow = s.cardGlow?.enabled ? cardGlowLayer(s.cardGlow) : 'none';
+  vars['--fx-glow-hero'] = glow;
+  vars['--fx-glow-card'] = s.cardGlow?.enabled && s.cardGlow.scope === 'all' ? glow : 'none';
   return { vars, attrs: { 'data-card': s.cardStyle, 'data-theme-mode': theme.mode, 'data-theme': theme.id } };
 }
 

@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Palette, LayoutTemplate, Type, RotateCcw } from 'lucide-react';
-import { useAppearance } from '../../appearance/AppearanceContext';
+import { X, Palette, LayoutTemplate, Type, RotateCcw, MousePointer2, Contrast, SunMedium } from 'lucide-react';
+import {
+  useAppearance,
+  DEFAULT_CURSOR_TRAIL,
+  DEFAULT_CARD_GLOW,
+  type CursorTrailSettings,
+  type CardGlowSettings,
+} from '../../appearance/AppearanceContext';
+import Switch from '../ui/Switch';
 import { THEMES, mix, type AppTheme } from '../../appearance/themes';
 import Portal from '../ui/Portal';
 import Slider from '../ui/Slider';
@@ -10,15 +17,18 @@ import {
   SANS_FONTS,
   MONO_FONTS,
   FONT_SIZES,
+  CURSOR_TRAIL_LIMITS,
+  CARD_GLOW_LIMITS,
   type FontOption,
 } from '../../appearance/options';
 
-type Section = 'theme' | 'card' | 'font';
+type Section = 'theme' | 'card' | 'font' | 'effects';
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'theme', label: '앱 테마' },
   { id: 'card', label: '카드 스타일' },
   { id: 'font', label: '글꼴' },
+  { id: 'effects', label: '효과' },
 ];
 
 const selectedCls = 'ring-2 ring-mint-400 bg-mint-400/10';
@@ -180,6 +190,129 @@ function FontSection() {
   );
 }
 
+function CardGlowGroup() {
+  const { settings, update } = useAppearance();
+  const glow = settings.cardGlow;
+  const set = (patch: Partial<CardGlowSettings>) => update({ cardGlow: { ...glow, ...patch } });
+  const L = CARD_GLOW_LIMITS;
+  const sliders: { key: 'intensity' | 'size' | 'x' | 'y'; label: string; format: (v: number) => string }[] = [
+    { key: 'intensity', label: '강도', format: (v) => `${Math.round(v * 100)}%` },
+    { key: 'size', label: '퍼짐', format: (v) => `${v}%` },
+    { key: 'x', label: '위치 (가로)', format: (v) => `${v}%` },
+    { key: 'y', label: '위치 (세로)', format: (v) => `${v}%` },
+  ];
+  return (
+    <SettingsGroup
+      icon={SunMedium}
+      title="카드 그라데이션"
+      action={<Switch checked={glow.enabled} onChange={(v) => set({ enabled: v })} label="카드 그라데이션 켜기" />}
+    >
+      <p className="text-xs leading-relaxed text-zinc-500">카드 위에 강조색 광원을 겹칩니다. 바뀐 모양은 뒤쪽 화면에 바로 반영됩니다.</p>
+      <SettingRow label="적용 범위">
+        <div className="glass-pill inline-flex gap-1 p-1">
+          {(
+            [
+              { value: 'hero', label: '대표 카드' },
+              { value: 'all', label: '모든 카드' },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              disabled={!glow.enabled}
+              onClick={() => set({ scope: o.value })}
+              className={`pill-item disabled:opacity-50 ${glow.scope === o.value ? 'pill-item-active' : ''}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </SettingRow>
+      {sliders.map((s) => (
+        <SettingRow key={s.key} label={s.label}>
+          <Slider
+            value={glow[s.key]}
+            min={L[s.key].min}
+            max={L[s.key].max}
+            step={L[s.key].step}
+            ariaLabel={`카드 그라데이션 ${s.label}`}
+            format={s.format}
+            disabled={!glow.enabled}
+            onChange={(v) => set({ [s.key]: v })}
+          />
+        </SettingRow>
+      ))}
+      <SettingRow label="두 가지 색" hint="반대쪽에 하늘색 광원">
+        <Switch checked={glow.gradient} onChange={(v) => set({ gradient: v })} label="두 가지 색 광원" disabled={!glow.enabled} />
+      </SettingRow>
+      {/* 미리보기: 대표 카드와 같은 클래스 */}
+      <div className="hero-grain flex h-24 items-end p-4" aria-hidden>
+        <div>
+          <div className="label-mono">총 자산 평가액</div>
+          <div className="mt-1 text-2xl font-light tracking-tight text-white">₩101,485,514</div>
+        </div>
+      </div>
+    </SettingsGroup>
+  );
+}
+
+function EffectsSection() {
+  const { settings, update } = useAppearance();
+  const trail = settings.cursorTrail;
+  const set = (patch: Partial<CursorTrailSettings>) => update({ cursorTrail: { ...trail, ...patch } });
+  const L = CURSOR_TRAIL_LIMITS;
+  const sliders: { key: 'nodes' | 'ease' | 'headSize' | 'taper'; label: string; format: (v: number) => string }[] = [
+    { key: 'nodes', label: '점 개수', format: (v) => String(v) },
+    { key: 'ease', label: '따라오는 속도', format: (v) => v.toFixed(2) },
+    { key: 'headSize', label: '머리 크기', format: (v) => `${v}px` },
+    { key: 'taper', label: '꼬리 줄어듦', format: (v) => v.toFixed(2) },
+  ];
+  return (
+    <div className="space-y-4">
+      <CardGlowGroup />
+      <SettingsGroup
+        icon={MousePointer2}
+        title="커서 트레일"
+        action={<Switch checked={trail.enabled} onChange={(v) => set({ enabled: v })} label="커서 트레일 켜기" />}
+      >
+        <p className="text-xs leading-relaxed text-zinc-500">
+          마우스를 따라 점이 사슬처럼 이어집니다. 켠 상태에서 이 창 위로 마우스를 움직여 바로 확인할 수 있습니다.
+        </p>
+        {sliders.map((s) => (
+          <SettingRow key={s.key} label={s.label}>
+            <Slider
+              value={trail[s.key]}
+              min={L[s.key].min}
+              max={L[s.key].max}
+              step={L[s.key].step}
+              ariaLabel={s.label}
+              format={s.format}
+              disabled={!trail.enabled}
+              onChange={(v) => set({ [s.key]: v })}
+            />
+          </SettingRow>
+        ))}
+      </SettingsGroup>
+      <SettingsGroup icon={Contrast} title="색상">
+        <SettingRow label="그라데이션" hint="강조색에서 하늘색으로">
+          <Switch checked={trail.gradient} onChange={(v) => set({ gradient: v })} label="그라데이션" disabled={!trail.enabled} />
+        </SettingRow>
+        <SettingRow label="색상">
+          <span className="inline-flex items-center gap-2 text-xs text-zinc-400">
+            <span className="h-5 w-5 rounded-md bg-mint-400 ring-1 ring-white/20" />
+            {trail.gradient && <span className="h-5 w-5 rounded-md bg-sky-400 ring-1 ring-white/20" />}
+            앱 테마 강조색을 따름
+          </span>
+        </SettingRow>
+      </SettingsGroup>
+      <button type="button" className="btn-ghost w-full justify-center !rounded-full !py-2.5" onClick={() => update({ cursorTrail: DEFAULT_CURSOR_TRAIL, cardGlow: DEFAULT_CARD_GLOW })}>
+        <RotateCcw className="h-4 w-4" />
+        효과 초기화
+      </button>
+    </div>
+  );
+}
+
 export default function AppearanceSettings({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { reset } = useAppearance();
   const [section, setSection] = useState<Section>('theme');
@@ -256,6 +389,7 @@ export default function AppearanceSettings({ open, onClose }: { open: boolean; o
               {section === 'theme' && <ThemeSection />}
               {section === 'card' && <CardSection />}
               {section === 'font' && <FontSection />}
+              {section === 'effects' && <EffectsSection />}
             </div>
           </div>
 

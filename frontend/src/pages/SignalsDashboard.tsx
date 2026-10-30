@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck } from 'lucide-react';
+import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck, LayoutGrid, Layers } from 'lucide-react';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import SignalHistory from '../components/alerts/SignalHistory';
 import { apiClient } from '../api/client';
@@ -8,6 +8,7 @@ import IconTile from '../components/ui/IconTile';
 import RingGauge from '../components/ui/RingGauge';
 import Chip from '../components/ui/Chip';
 import CountUp from '../components/CountUp';
+import CardStack from '../components/ui/CardStack';
 import SignalRuleEditor from '../components/signals/SignalRuleEditor';
 import ProfileManager from '../components/signals/ProfileManager';
 import ProfileChip from '../components/signals/ProfileChip';
@@ -456,6 +457,20 @@ interface SignalsDashboardProps {
   focusNonce?: number;
 }
 
+type SignalView = 'stack' | 'grid';
+const VIEW_KEY = 'sm-signal-view';
+const VIEWS = [
+  { value: 'stack', label: '스택', icon: Layers },
+  { value: 'grid', label: '그리드', icon: LayoutGrid },
+] as const;
+const loadView = (): SignalView => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'grid' ? 'grid' : 'stack';
+  } catch {
+    return 'stack';
+  }
+};
+
 export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDashboardProps = {}) {
   const { openSettings, openCandidates, profilesVersion } = useAlerts();
   const [flashId, setFlashId] = useState<number | null>(null);
@@ -469,6 +484,15 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
   const [profiles, setProfiles] = useState<SignalProfile[] | null>(null);
   const [profileFilter, setProfileFilter] = useState<number | 'all'>('all');
   const [managerOpen, setManagerOpen] = useState(false);
+  const [view, setView] = useState<SignalView>(loadView);
+  const changeView = (v: SignalView) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      // 저장하지 못해도 이번 화면에는 적용된다
+    }
+  };
 
   const load = useCallback(async (initial = false) => {
     try {
@@ -646,6 +670,21 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
                   </button>
                 ))}
               </div>
+              <div className="glass-pill flex self-start p-1 lg:self-auto" role="group" aria-label="카드 보기 방식">
+                {VIEWS.map((v) => (
+                  <button
+                    key={v.value}
+                    type="button"
+                    onClick={() => changeView(v.value)}
+                    className={`pill-item inline-flex items-center gap-1.5 ${view === v.value ? 'pill-item-active' : ''}`}
+                    aria-pressed={view === v.value}
+                    title={`${v.label} 보기`}
+                  >
+                    <v.icon className="h-3.5 w-3.5" />
+                    {v.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -659,11 +698,12 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
           ) : visible.length === 0 ? (
             <div className="surface py-16 text-center text-sm text-zinc-400">해당하는 신호가 없습니다.</div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {visible.map((item) => (
+            (() => {
+              const cards = visible.map((item) => (
                 <SignalCard key={item.asset_id} item={item} rule={ruleFor(item)} onEdit={() => profiles && setEditor({ item })} flash={flashId === item.asset_id} />
-              ))}
-            </div>
+              ));
+              return view === 'stack' ? <CardStack>{cards}</CardStack> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{cards}</div>;
+            })()
           )}
 
           {summary && summary.no_price > 0 && (

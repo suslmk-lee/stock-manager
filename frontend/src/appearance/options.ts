@@ -66,3 +66,11 @@ export const CURSOR_TRAIL_LIMITS = {
   headSize: { min: 6, max: 48, step: 1 },
   taper: { min: 0, max: 1, step: 0.05 },
 } as const;
+
+// 카드 그라데이션(광원) 설정 범위
+export const CARD_GLOW_LIMITS = {
+  intensity: { min: 0, max: 0.5, step: 0.01 }, // 광원 불투명도
+  size: { min: 20, max: 120, step: 5 }, // 광원 반경(%)
+  x: { min: 0, max: 100, step: 5 }, // 광원 위치 가로(%)
+  y: { min: 0, max: 100, step: 5 }, // 광원 위치 세로(%)
+} as const;
