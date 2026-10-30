@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Wallet, TrendingUp, DollarSign, BarChart3, Calendar, Camera, ArrowLeftRight, LineChart, Settings2, Radar } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, BarChart3, Calendar, Camera, ArrowLeftRight, Settings2, Radar } from 'lucide-react';
 import AppearanceSettings from './components/settings/AppearanceSettings';
 import App from './App';
 import AssetManager from './components/AssetManager';
@@ -10,6 +10,7 @@ import DividendYearlyOverview from './components/DividendYearlyOverview';
 import PortfolioSnapshots from './components/PortfolioSnapshots';
 import TransactionManager from './components/TransactionManager';
 import IconTile from './components/ui/IconTile';
+import Brand from './components/ui/Brand';
 import AlertsBell from './components/alerts/AlertsBell';
 import { useAlerts } from './components/alerts/AlertsProvider';
 import { apiClient } from './api/client';
@@ -59,10 +60,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-3">
           {/* 상단 바: 브랜드 pill · 환율 pill */}
           <div className="flex items-center justify-between gap-3 mb-4">
-            <div className="glass-pill flex items-center gap-2.5 pl-1.5 pr-1.5 min-[440px]:pr-4 py-1.5">
-              <IconTile icon={LineChart} tone="mint" size="sm" />
-              <span className="hidden min-[440px]:inline text-[15px] font-semibold tracking-tight whitespace-nowrap">Stock Manager</span>
-            </div>
+            <Brand />
             <div className="flex items-center gap-2">
               <div className="glass-pill flex items-center gap-2 px-3.5 py-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-mint-400 shadow-[0_0_8px_rgb(var(--c-mint-400)/0.8)]" />

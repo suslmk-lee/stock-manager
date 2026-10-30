@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
 //go:embed all:frontend/dist
@@ -31,8 +32,12 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
+		// 기본 테마 배경색 — 첫 화면이 그려지기 전 깜빡임을 줄인다 (이후 프론트엔드가 테마에 맞게 제목 표시줄 색을 바꾼다)
+		BackgroundColour: &options.RGBA{R: 6, G: 6, B: 7, A: 1},
+		Windows: &windows.Options{
+			Theme: windows.Dark,
+		},
+		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,
 		},

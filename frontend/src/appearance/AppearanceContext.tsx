@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState, CSSProperties } from 'react';
 import { buildThemeVars, getTheme, hexToRgb, rgbToHex, DEFAULT_THEME_ID, AppTheme } from './themes';
+import { apiClient } from '../api/client';
 import {
   DEFAULT_CARD_STYLE, DEFAULT_FONT_SIZE, DEFAULT_MONO, DEFAULT_SANS, FONT_SIZES, FontSizeId,
   MONO_FALLBACK, MONO_FONTS, SANS_FALLBACK, SANS_FONTS, CARD_STYLES, CURSOR_TRAIL_LIMITS,
@@ -237,6 +238,20 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyToRoot(settings);
   }, [settings]);
+
+  // 데스크톱 창 제목 표시줄을 앱 배경(ink-950)과 같은 색으로 맞춘다
+  useEffect(() => {
+    const theme = getTheme(settings.themeId);
+    const css = getComputedStyle(document.documentElement);
+    const triplet = (name: string) => css.getPropertyValue(name).trim().split(/\s+/).map(Number);
+    const toHex = (v: number[], fallback: string) =>
+      v.length === 3 && v.every(Number.isFinite) ? rgbToHex(v as [number, number, number]) : fallback;
+    const bg = toHex(triplet('--c-ink-950'), theme.bg);
+    const text = toHex(triplet('--c-zinc-300'), theme.fg);
+    apiClient.SetTitleBarColors(bg, text, theme.mode === 'dark').catch(() => {
+      // 지원하지 않는 OS·버전이면 기본 제목 표시줄 그대로 둔다
+    });
+  }, [settings.themeId]);
 
   const update = useCallback((patch: Partial<AppearanceSettings>) => setSettings((prev) => ({ ...prev, ...patch })), []);
   const reset = useCallback(() => setSettings(DEFAULT_APPEARANCE), []);
