@@ -55,4 +55,3 @@ export const GetProfileCandidates = stub;
 export const DismissProfileSuggestion = stub;
 export const GetDailyAssetSeries = stub;
 export const CaptureDailySnapshot = stub;
-export const SetTitleBarColors = stub;

@@ -2,7 +2,8 @@ import { useId } from 'react';
 
 // 상단 브랜드: 막대 + 상승선 마크와 두 굵기 워드마크 (테마 색을 따른다)
 export default function Brand() {
-  const gid = useId();
+  // useId 의 ':' 는 일부 WebKit 에서 url(#…) 참조를 깨뜨리므로 뺀다
+  const gid = `brand-${useId().replace(/:/g, '')}`;
   return (
     <div className="flex select-none items-center gap-3">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden className="shrink-0 drop-shadow-[0_4px_14px_rgb(var(--c-mint-400)/0.35)]">

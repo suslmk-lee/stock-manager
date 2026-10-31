@@ -353,6 +353,8 @@ body {
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     mask-composite: exclude;
     pointer-events: none;
+    /* @property 를 지원하지 않는 웹뷰(구버전 WebKitGTK 등)에서도 값이 비지 않게 기본값을 둔다 → 회전 없이 정지된 빛으로 보인다 */
+    --beam-angle: 0deg;
     animation: beamSpin 3.2s linear infinite;
   }
 }

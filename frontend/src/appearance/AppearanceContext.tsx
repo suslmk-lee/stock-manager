@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState, CSSProperties } from 'react';
 import { buildThemeVars, getTheme, hexToRgb, rgbToHex, DEFAULT_THEME_ID, AppTheme } from './themes';
-import { apiClient } from '../api/client';
+import { desktop } from '../platform/desktop';
 import {
   DEFAULT_CARD_STYLE, DEFAULT_FONT_SIZE, DEFAULT_MONO, DEFAULT_SANS, FONT_SIZES, FontSizeId,
   MONO_FALLBACK, MONO_FONTS, SANS_FALLBACK, SANS_FONTS, CARD_STYLES, CURSOR_TRAIL_LIMITS,
@@ -248,9 +248,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       v.length === 3 && v.every(Number.isFinite) ? rgbToHex(v as [number, number, number]) : fallback;
     const bg = toHex(triplet('--c-ink-950'), theme.bg);
     const text = toHex(triplet('--c-zinc-300'), theme.fg);
-    apiClient.SetTitleBarColors(bg, text, theme.mode === 'dark').catch(() => {
-      // 지원하지 않는 OS·버전이면 기본 제목 표시줄 그대로 둔다
-    });
+    desktop.setTitleBarColors(bg, text, theme.mode === 'dark');
   }, [settings.themeId]);
 
   const update = useCallback((patch: Partial<AppearanceSettings>) => setSettings((prev) => ({ ...prev, ...patch })), []);

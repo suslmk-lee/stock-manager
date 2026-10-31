@@ -336,13 +336,6 @@ export const apiClient = {
     if (isWeb) return fetchApi<DailyCaptureResult>('/snapshots/daily/capture?source=manual', { method: 'POST' });
     return WailsApp.CaptureDailySnapshot();
   },
-
-  // 데스크톱 창 제목 표시줄 색을 테마에 맞춘다 (웹에서는 아무것도 하지 않음)
-  SetTitleBarColors: async (background: string, text: string, dark: boolean): Promise<void> => {
-    if (isWeb) return;
-    await WailsApp.SetTitleBarColors(background, text, dark);
-  },
-
   // ==========================================
   // Realized P&L
   // ==========================================

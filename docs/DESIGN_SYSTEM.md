@@ -20,7 +20,7 @@
 7. 애니메이션 & 모션
 8. 효과 설정 (Effects)
 9. 모양 설정 화면 스펙
-10. 데스크톱 통합 (선택)
+10. 데스크톱 통합 (선택) — 웹 · Wails(Go) · Tauri(Rust), 웹뷰 호환성
 11. 차트 스타일 가이드 (Recharts)
 12. 함정 & 교훈
 13. 부록 — 파일 매니페스트 / 스타터 스니펫
@@ -72,7 +72,7 @@
 3. **`src/appearance/fonts.css`** 복사 (글꼴 `@import`) — §4.
 4. **`src/styles/card-styles.css`** 복사 (변수 계약 + 8개 스타일) — §5. 이 파일은 `@apply` 가 없는 순수 CSS.
 5. **`src/index.css`** 교체 — 맨 위에서 `fonts.css`, `card-styles.css` 를 `@import` 한 뒤 `@tailwind base/components/utilities`, 그 아래 `@layer components` 의 컴포넌트 클래스, 키프레임, reduced-motion 블록 — §6, §7.
-6. **`src/appearance/themes.ts`, `options.ts`, `AppearanceContext.tsx`** 복사 — §3, §8. (`AppearanceContext` 의 데스크톱 제목 표시줄 호출은 앱에 맞게 제거/연결.)
+6. **`src/appearance/themes.ts`, `options.ts`, `AppearanceContext.tsx`** 복사 — §3, §8. (`AppearanceContext` 의 제목 표시줄 호출은 `apiClient` 대신 §10.0 의 **데스크톱 브리지** `desktop.setTitleBarColors()` 로 연결 — 웹·Wails·Tauri 어디서나 같은 코드.)
 7. **`main.tsx`**: `import './index.css'` 후 **렌더 전에** `initAppearance()` 호출, 그 다음 `<AppearanceProvider>` 로 감싸고 효과 컴포넌트 3개(`CursorTrail`, `CursorPointer`, `CardTilt`)를 Provider 안쪽 최상단에 마운트 — §8.
 8. **`src/components/ui/*`** 복사: `IconTile`, `Chip`, `Switch`, `Slider(+slider.css)`, `SettingsGroup`(SettingsGroup/SettingRow), `Portal`, `CardStack`, `RingGauge`, `Brand` — §6.
 9. **`src/components/effects/*`** 복사 — §8.
@@ -80,7 +80,7 @@
 11. **앱 셸** 작성: 최상위 `app-bg` + 상단 은은한 광원 + sticky `app-header` + 탭 카드 + `main.animate-fade-up` — §6.1.
 12. **모달은 전부 `<Portal>`** 로 렌더링, 패널에 `role="dialog" aria-modal="true"`, 바깥 오버레이는 `fixed inset-0 z-50 bg-black/60 backdrop-blur-sm` — §6.9, §12.
 13. **차트**는 `useThemeColors()` 의 색만 사용 — §11.
-14. (선택) **데스크톱 셸**이면 제목 표시줄 색 동기화·초기 배경색 — §10.
+14. (선택) **데스크톱 셸**이면 §10.0 브리지 + 셸별 구현: Wails(Go) §10.2–10.3, **Tauri(Rust) §10.5**, 아이콘 §10.4/§10.5.6. WebKit 계열 웹뷰(macOS·Linux)에서 쓸 때는 §10.6 호환성 표를 확인.
 15. **검증**: 테마 17 × 카드 스타일 8 조합에서 (a) 라이트 테마에서 글자 대비, (b) 모달이 화면 중앙인지, (c) reduced-motion 에서 보더 빔이 멈추는지, (d) `tailwind.config.js` 변경 후 dev 서버를 **재시작**했는지 확인 (§12).
 
 > 이식 시 가장 흔한 실수: `index.css` 의 `@import` 를 `@tailwind` 뒤에 두는 것(CSS 사양상 `@import` 는 최상단), `initAppearance()` 를 첫 렌더 뒤에 부르는 것(깜빡임), 모달을 Portal 없이 카드 안에 렌더하는 것(중앙에서 어긋남).
@@ -1743,6 +1743,8 @@ body {
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     mask-composite: exclude;
     pointer-events: none;
+    /* @property 를 지원하지 않는 웹뷰(구버전 WebKitGTK 등)에서도 값이 비지 않게 기본값을 둔다 → 회전 없이 정지된 빛으로 보인다 */
+    --beam-angle: 0deg;
     animation: beamSpin 3.2s linear infinite;
   }
 }
@@ -1962,7 +1964,8 @@ import { useId } from 'react';
 
 // 상단 브랜드: 막대 + 상승선 마크(예시 도형)와 두 굵기 워드마크 (테마 색을 따른다)
 export default function Brand() {
-  const gid = useId();
+  // useId 의 ':' 는 일부 WebKit 에서 url(#…) 참조를 깨뜨리므로 뺀다
+  const gid = `brand-${useId().replace(/:/g, '')}`;
   return (
     <div className="flex select-none items-center gap-3">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden className="shrink-0 drop-shadow-[0_4px_14px_rgb(var(--c-mint-400)/0.35)]">
@@ -2899,6 +2902,8 @@ view === 'stack'
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
   pointer-events: none;
+  /* @property 를 지원하지 않는 웹뷰(구버전 WebKitGTK 등)에서도 값이 비지 않게 기본값을 둔다 → 회전 없이 정지된 빛으로 보인다 */
+  --beam-angle: 0deg;
   animation: beamSpin 3.2s linear infinite;
 }
 ```
@@ -4765,12 +4770,13 @@ export default function CursorPresetGallery() {
 
 핵심 함수: `sanitize*`(검증/clamp), `cardDepthShadow`/`cardGlowLayer`(효과 → CSS), `computeRootStyle`(설정 → 변수/속성), `applyToRoot`, `initAppearance`, `AppearanceProvider`/`useAppearance`, `useThemeColors`(차트용 색).
 
-> 원본의 제목 표시줄 호출은 `setTitleBarColors(bg, text, isDark)` 라는 **주입 가능한 브리지 함수**로 표기했습니다(데스크톱 셸이 아니면 해당 `useEffect` 를 통째로 삭제).
+> 제목 표시줄 호출은 §10.0 의 데스크톱 브리지 `desktop.setTitleBarColors()` 를 씁니다(`import { desktop } from '../platform/desktop'`). 웹·Wails·Tauri 를 실행 중에 감지하므로 셸이 바뀌어도 이 코드는 그대로이고, 웹에서는 아무 일도 하지 않습니다.
 
 ```tsx
 // frontend/src/appearance/AppearanceContext.tsx
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState, CSSProperties } from 'react';
 import { buildThemeVars, getTheme, hexToRgb, rgbToHex, DEFAULT_THEME_ID, AppTheme } from './themes';
+import { desktop } from '../platform/desktop';
 // 데스크톱 셸이 아니면 제목 표시줄 브리지(setTitleBarColors)와 아래 useEffect 를 삭제
 import {
   DEFAULT_CARD_STYLE, DEFAULT_FONT_SIZE, DEFAULT_MONO, DEFAULT_SANS, FONT_SIZES, FontSizeId,
@@ -5019,9 +5025,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       v.length === 3 && v.every(Number.isFinite) ? rgbToHex(v as [number, number, number]) : fallback;
     const bg = toHex(triplet('--c-ink-950'), theme.bg);
     const text = toHex(triplet('--c-zinc-300'), theme.fg);
-    setTitleBarColors(bg, text, theme.mode === 'dark').catch(() => {
-      // 지원하지 않는 OS·버전이면 기본 제목 표시줄 그대로 둔다
-    });
+    desktop.setTitleBarColors(bg, text, theme.mode === 'dark'); // §10.0 브리지 — 웹이면 아무것도 안 함
   }, [settings.themeId]);
 
   const update = useCallback((patch: Partial<AppearanceSettings>) => setSettings((prev) => ({ ...prev, ...patch })), []);
@@ -5106,9 +5110,70 @@ export function useThemeColors(): ThemeColors {
 
 ---
 
-## 10. 데스크톱 통합 (선택)
+## 10. 데스크톱 통합 (선택) — 웹 · Wails · Tauri 공통
 
-> 웹 전용 앱이면 이 장은 건너뛰어도 됩니다. Wails/Electron/Tauri 같은 데스크톱 셸에서 **창 제목 표시줄을 앱 테마와 같은 색**으로 맞추고 첫 화면의 흰색 번쩍임을 없애는 방법입니다. 아래 Go 코드는 Wails v2 기준이지만, 핵심은 Windows DWM 속성 호출이라 어느 셸에서도 동일합니다.
+> 웹 전용 앱이면 이 장은 건너뛰어도 됩니다. 데스크톱 셸에서 **창 제목 표시줄을 앱 테마와 같은 색**으로 맞추고, 첫 화면의 흰색 번쩍임을 없애고, 앱 아이콘을 만드는 방법입니다.
+> 디자인 코드(§3~§9)는 셸과 무관하게 **그대로** 씁니다. 셸마다 다른 것은 ① 프런트에서 네이티브를 부르는 방법, ② 네이티브 쪽 제목 표시줄 구현, ③ 창 초기 설정, ④ 아이콘 배치 네 가지뿐이고, ①은 아래 **데스크톱 브리지** 하나로 감춥니다.
+>
+> | 셸 | 웹뷰 | 네이티브 언어 | 이 문서 위치 |
+> |----|------|---------------|--------------|
+> | 웹(브라우저) | — | — | 브리지가 아무것도 하지 않음 |
+> | Wails v2 | Windows: WebView2(Chromium) · macOS: WKWebView · Linux: WebKitGTK | Go | §10.2, §10.3 |
+> | Tauri v2 | Windows: WebView2(Chromium) · macOS: WKWebView · Linux: WebKitGTK | Rust | §10.5 |
+> | Electron | Chromium 내장 | Node | §10.2 의 DWM 값으로 `BrowserWindow` 의 `titleBarOverlay`/`backgroundColor` 를 설정 |
+
+### 10.0 데스크톱 브리지 (`src/platform/desktop.ts`)
+
+디자인 코드는 네이티브 기능을 **이 파일로만** 부릅니다. 셸을 바꿀 때 이 파일만 고치면 됩니다. 실행 환경은 런타임에 감지합니다(Wails 는 `window.go`, Tauri v2 는 `window.__TAURI_INTERNALS__` 를 주입).
+
+```ts
+// 데스크톱 브리지 — 디자인 코드는 네이티브 기능을 이 파일로만 부른다.
+// 웹(아무것도 안 함) · Wails(window.go) · Tauri v2(window.__TAURI__ / __TAURI_INTERNALS__) 를 실행 중에 감지한다.
+
+type Shell = 'web' | 'wails' | 'tauri';
+
+type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+interface DesktopGlobals {
+  go?: { main?: { App?: { SetTitleBarColors?: (background: string, text: string, dark: boolean) => Promise<void> } } };
+  __TAURI__?: { core?: { invoke?: TauriInvoke } }; // tauri.conf.json 의 app.withGlobalTauri: true 일 때
+  __TAURI_INTERNALS__?: { invoke?: TauriInvoke };
+}
+
+const g = () => window as unknown as DesktopGlobals;
+
+export function detectShell(): Shell {
+  const w = g();
+  if (w.__TAURI__ || w.__TAURI_INTERNALS__) return 'tauri';
+  if (w.go) return 'wails';
+  return 'web';
+}
+
+function tauriInvoke(): TauriInvoke | undefined {
+  const w = g();
+  return w.__TAURI__?.core?.invoke ?? w.__TAURI_INTERNALS__?.invoke;
+}
+
+export const desktop = {
+  /** 제목 표시줄 배경·글자색(#rrggbb)과 어두운 모드 여부. 지원하지 않는 환경이면 조용히 무시한다. */
+  async setTitleBarColors(background: string, text: string, dark: boolean): Promise<void> {
+    try {
+      const shell = detectShell();
+      if (shell === 'tauri') {
+        await tauriInvoke()?.('set_title_bar_colors', { background, text, dark });
+      } else if (shell === 'wails') {
+        await g().go?.main?.App?.SetTitleBarColors?.(background, text, dark);
+      }
+    } catch {
+      // 지원하지 않는 OS·버전이면 기본 제목 표시줄 그대로 둔다
+    }
+  },
+};
+```
+
+- **의존성 없음**: Tauri 는 `@tauri-apps/api` 를 설치하지 않아도 `tauri.conf.json` 의 `app.withGlobalTauri: true` 로 노출되는 `window.__TAURI__.core.invoke` 를 쓴다(§10.5.4). 설정을 켜지 않았으면 내부 객체 `__TAURI_INTERNALS__.invoke` 로 대신 호출한다. `@tauri-apps/api` 를 이미 쓰는 프로젝트라면 `import { invoke } from '@tauri-apps/api/core'` 로 바꿔도 같다.
+- **Wails** 는 바인딩한 Go 메서드를 `window.go.<패키지>.<구조체>.<메서드>` 로 노출한다(생성 바인딩 `wailsjs/go/main/App.js` 도 내부적으로 같은 경로를 부른다). 그래서 웹 빌드에서 바인딩 파일을 스텁으로 바꿔 끼울 필요가 없다.
+- 웹 빌드에서는 두 전역이 모두 없으므로 아무 일도 하지 않는다.
+- 이후 기능(예: 알림, 창 최소화)도 같은 객체에 메서드로 추가한다.
 
 ### 10.1 동기화할 색
 
@@ -5117,23 +5182,26 @@ export function useThemeColors(): ThemeColors {
 | 제목 표시줄 배경 | `--c-ink-950` (= 앱 배경) | 창 상단과 본문이 끊김 없이 이어짐 |
 | 제목 글자 | `--c-zinc-300` | 가독성 있는 보조 글자색 |
 | 테두리 | 배경과 동일 | 창 외곽선이 튀지 않게 |
-| 어두운 모드 플래그 | `theme.mode === 'dark'` | 최소화/최대화/닫기 버튼 색, Windows 10 폴백 |
+| 어두운 모드 플래그 | `theme.mode === 'dark'` | 최소화/최대화/닫기 버튼 색, Windows 10·macOS·Linux 폴백 |
 
-프런트엔드 측(앞 §9.6 `useEffect`):
+프런트엔드 측(`AppearanceProvider` 안의 `useEffect`, 테마가 바뀔 때마다 실행):
 ```ts
-// 테마가 바뀔 때마다: CSS 변수 "R G B" → #hex → 네이티브 호출
-const css = getComputedStyle(document.documentElement);
-const triplet = (name: string) => css.getPropertyValue(name).trim().split(/\s+/).map(Number);
-const toHex = (v: number[], fallback: string) =>
-  v.length === 3 && v.every(Number.isFinite) ? rgbToHex(v as [number, number, number]) : fallback;
-const bg = toHex(triplet('--c-ink-950'), theme.bg);
-const text = toHex(triplet('--c-zinc-300'), theme.fg);
-setTitleBarColors(bg, text, theme.mode === 'dark').catch(() => {
-  // 지원하지 않는 OS·버전이면 기본 제목 표시줄 그대로 둔다
-});
+import { desktop } from '../platform/desktop';
+
+useEffect(() => {
+  const theme = getTheme(settings.themeId);
+  // CSS 변수 "R G B" → #hex → 네이티브 호출 (applyToRoot 가 먼저 실행된 뒤라 새 테마 값이 읽힌다)
+  const css = getComputedStyle(document.documentElement);
+  const triplet = (name: string) => css.getPropertyValue(name).trim().split(/\s+/).map(Number);
+  const toHex = (v: number[], fallback: string) =>
+    v.length === 3 && v.every(Number.isFinite) ? rgbToHex(v as [number, number, number]) : fallback;
+  const bg = toHex(triplet('--c-ink-950'), theme.bg);
+  const text = toHex(triplet('--c-zinc-300'), theme.fg);
+  desktop.setTitleBarColors(bg, text, theme.mode === 'dark');
+}, [settings.themeId]);
 ```
 
-### 10.2 Windows 구현 (`titlebar_windows.go`)
+### 10.2 [Wails · Go] Windows 구현 (`titlebar_windows.go`)
 
 - Windows 11(빌드 22000+)의 **DWM 캡션 색 API**: `DWMWA_CAPTION_COLOR(35)`, `DWMWA_TEXT_COLOR(36)`, `DWMWA_BORDER_COLOR(34)`.
 - **Windows 10 폴백**: 캡션 색 지정은 실패하므로 `DWMWA_USE_IMMERSIVE_DARK_MODE(20)` 만 먼저 적용(어두운/밝은 제목 표시줄만 맞춤). 캡션 색 호출이 에러면 조용히 `nil` 반환.
@@ -5272,7 +5340,7 @@ func (a *App) SetTitleBarColors(background, text string, dark bool) error {
 }
 ```
 
-### 10.3 초기 다크 테마 · 배경색 (깜빡임 방지)
+### 10.3 [Wails · Go] 초기 다크 테마 · 배경색 (깜빡임 방지)
 
 창이 만들어지는 순간(웹뷰가 렌더되기 전)의 색을 기본 테마와 맞춘다. 기본 테마 배경 `#060607` = RGB `(6, 6, 7)`.
 
@@ -5291,7 +5359,7 @@ err := wails.Run(&options.App{
     Bind: []interface{}{ app },   // app 의 SetTitleBarColors(background, text string, dark bool) error 가 프런트에 노출됨
 })
 ```
-- 프런트 `SetTitleBarColors` 는 Wails 가 생성하는 바인딩(`wailsjs/go/main/App`)으로 호출한다. 구조체 파라미터가 없는 이 함수는 바인딩 타입이 단순하다.
+- 프런트는 §10.0 브리지(`desktop.setTitleBarColors`)가 `window.go.main.App.SetTitleBarColors` 로 호출한다. 생성 바인딩(`wailsjs/go/main/App`)을 직접 import 해도 같다.
 - 라이트 테마로 시작하는 사용자는 첫 화면에서 잠깐 다크 제목 표시줄이 보일 수 있다 — 저장된 테마를 읽어 `BackgroundColour` 를 정하는 방법도 있지만 원본은 기본 테마 고정 + 이후 동기화로 단순화했다.
 
 ### 10.4 앱 아이콘 · 파비콘 가이드
@@ -5307,6 +5375,195 @@ err := wails.Run(&options.App{
   <link rel="icon" type="image/png" href="/favicon.png" />
   ```
 - 아이콘 색은 기본 테마(다크 + 민트) 기준으로 고정한다 — 아이콘은 테마를 따라 바뀌지 않는다.
+
+### 10.5 [Tauri v2 · Rust] 제목 표시줄 · 창 설정 · CSP · 아이콘
+
+Tauri 도 Windows 에서는 WebView2(Chromium)를 쓰므로 **화면은 Wails 와 픽셀 단위로 같습니다.** 아래만 Rust/설정으로 옮기면 됩니다. 프런트 호출은 §10.0 브리지가 `invoke('set_title_bar_colors', …)` 로 처리합니다.
+
+#### 10.5.1 의존성 (`src-tauri/Cargo.toml`)
+
+```toml
+[dependencies]
+tauri = { version = "2", features = [] }
+raw-window-handle = "0.6"   # Tauri 버전과 무관하게 HWND 를 얻기 위해
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }
+```
+프런트는 추가 패키지가 필요 없다(§10.0 브리지가 전역 `window.__TAURI__` 사용). 다른 Tauri API 를 쓸 계획이면 `npm i @tauri-apps/api`.
+
+#### 10.5.2 제목 표시줄 명령 (`src-tauri/src/titlebar.rs`)
+
+- **Windows 11**: Wails 버전(§10.2)과 같은 DWM 속성(34 테두리 / 35 캡션 / 36 글자 / 20 어두운 모드). 창 핸들은 `raw-window-handle` 로 바로 얻으므로 프로세스 창을 열거할 필요가 없다.
+- **Windows 10**: 캡션 색 지정이 실패하면 어두운/밝은 제목 표시줄만 맞춘 채 둔다(오류로 취급하지 않음).
+- **macOS**: 창 설정 `titleBarStyle: "Transparent"`(§10.5.4) + 창 배경색을 테마 배경으로 바꾸면 제목 표시줄이 같은 색으로 보인다.
+- **Linux**: 제목 표시줄은 창 관리자가 그리므로 어두운/밝은 테마 선호만 전달한다.
+
+```rust
+// src-tauri/src/titlebar.rs — 창 제목 표시줄을 앱 테마 색에 맞춘다
+use tauri::WebviewWindow;
+
+fn parse_hex(hex: &str) -> Result<(u8, u8, u8), String> {
+    let h = hex.trim().trim_start_matches('#');
+    if h.len() != 6 {
+        return Err(format!("invalid color {hex}"));
+    }
+    let v = u32::from_str_radix(h, 16).map_err(|_| format!("invalid color {hex}"))?;
+    Ok(((v >> 16) as u8, (v >> 8) as u8, v as u8))
+}
+
+#[tauri::command]
+pub fn set_title_bar_colors(window: WebviewWindow, background: String, text: String, dark: bool) -> Result<(), String> {
+    let bg = parse_hex(&background)?;
+    let fg = parse_hex(&text)?;
+    // 모든 OS: 어두운/밝은 창 테마 (Windows 10·Linux 는 여기까지만 적용된다)
+    let _ = window.set_theme(Some(if dark { tauri::Theme::Dark } else { tauri::Theme::Light }));
+
+    #[cfg(target_os = "windows")]
+    windows_caption(&window, bg, fg, dark)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        // titleBarStyle: "Transparent" 이면 제목 표시줄에 창 배경색이 비친다
+        let _ = window.set_background_color(Some(tauri::window::Color(bg.0, bg.1, bg.2, 255)));
+        let _ = fg;
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let _ = (bg, fg);
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn windows_caption(window: &WebviewWindow, bg: (u8, u8, u8), fg: (u8, u8, u8), dark: bool) -> Result<(), String> {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWINDOWATTRIBUTE, DWMWA_BORDER_COLOR, DWMWA_CAPTION_COLOR,
+        DWMWA_TEXT_COLOR, DWMWA_USE_IMMERSIVE_DARK_MODE,
+    };
+
+    let handle = window.window_handle().map_err(|e| e.to_string())?;
+    let RawWindowHandle::Win32(h) = handle.as_raw() else {
+        return Err("not a Win32 window".into());
+    };
+    let hwnd = HWND(h.hwnd.get() as _);
+    // COLORREF = 0x00BBGGRR
+    let colorref = |(r, g, b): (u8, u8, u8)| (b as u32) << 16 | (g as u32) << 8 | r as u32;
+    let set = |attr: DWMWINDOWATTRIBUTE, value: u32| unsafe {
+        DwmSetWindowAttribute(hwnd, attr, &value as *const u32 as *const _, std::mem::size_of::<u32>() as u32)
+    };
+
+    // 최소화/최대화/닫기 버튼 색이 배경에 맞도록 먼저 어두운 모드를 맞춘다
+    let _ = set(DWMWA_USE_IMMERSIVE_DARK_MODE, dark as u32);
+    // Windows 11 22000 미만에서는 실패한다 → 어두운 모드만 적용된 상태로 둔다
+    if set(DWMWA_CAPTION_COLOR, colorref(bg)).is_err() {
+        return Ok(());
+    }
+    let _ = set(DWMWA_TEXT_COLOR, colorref(fg));
+    let _ = set(DWMWA_BORDER_COLOR, colorref(bg));
+    Ok(())
+}
+```
+
+등록 (`src-tauri/src/lib.rs` — v2 기본 템플릿 기준):
+```rust
+mod titlebar;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![titlebar::set_title_bar_colors])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
+```
+- 앱이 직접 정의한 명령은 기본적으로 모든 창에서 호출할 수 있어 **추가 권한(capability)이 필요 없다.** 대신 JS 에서 `getCurrentWindow().setTheme()` 같은 내장 API 를 직접 부르는 방식을 쓰면 `capabilities/default.json` 에 `core:window:allow-set-theme` 등을 추가해야 한다.
+- 인자 이름은 Rust 의 `snake_case` 와 JS 의 `camelCase` 가 자동 변환된다. 여기서는 한 단어(`background`, `text`, `dark`)라 그대로 같다.
+- `set_background_color` 와 창 설정의 `backgroundColor` 는 Tauri 2.1 이상에서 제공된다. 더 낮은 버전이면 macOS 분기와 해당 설정을 빼고 `set_theme` 만 쓴다.
+- `windows` crate 버전에 따라 `HWND` 의 안쪽 타입이 `isize`(0.52 이하) 또는 `*mut c_void`(0.58)로 다르다. `h.hwnd.get() as _` 는 두 경우 모두 컴파일된다.
+
+#### 10.5.3 첫 화면 깜빡임 방지
+
+Wails §10.3 과 같은 목적입니다. 프런트가 테마를 적용하기 전 흰 창이 잠깐 보이지 않도록, 창을 **기본 테마 배경색 + 어두운 테마**로 띄웁니다(§10.5.4 의 `theme`·`backgroundColor`). 이후 §10.1 의 `useEffect` 가 저장된 실제 테마로 바꿉니다.
+
+#### 10.5.4 창 설정 (`src-tauri/tauri.conf.json`)
+
+```json
+{
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Product Name",
+        "width": 1280,
+        "height": 900,
+        "minWidth": 380,
+        "theme": "Dark",
+        "backgroundColor": "#060607",
+        "titleBarStyle": "Transparent"
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob: asset: http://asset.localhost",
+        "font-src": "'self' data:",
+        "connect-src": "'self' ipc: http://ipc.localhost"
+      }
+    }
+  }
+}
+```
+- `withGlobalTauri: true`: §10.0 브리지가 별도 패키지 없이 `window.__TAURI__.core.invoke` 를 쓰게 한다.
+- `theme: "Dark"` + `backgroundColor`(= 기본 테마 `ink-950`): 첫 화면 깜빡임 방지. 사용자가 라이트 테마를 저장해 뒀다면 시작 직후 잠깐 어두웠다가 바뀐다(Wails 와 같은 단순화).
+- `titleBarStyle: "Transparent"`: macOS 전용, 다른 OS 에서는 무시된다.
+- **CSP 가 이 디자인에서 요구하는 것**
+  - `style-src 'unsafe-inline'`: 커서 포인터 효과가 `<style>` 요소를 넣어 기본 커서를 숨기고(§8), 개발 모드의 Vite 도 `<style>` 을 주입한다. React 의 `style={{…}}` 와 JS 의 `el.style.x = …` 는 CSSOM 이라 CSP 에 막히지 않는다.
+  - `img-src data:`: 히어로 카드의 그레인 질감이 CSS 안의 `data:image/svg+xml` 이다(§6).
+  - `font-src 'self'`: 글꼴은 전부 npm 패키지(`pretendard`, `@fontsource/*`)로 번들되므로 외부 글꼴 도메인을 열 필요가 없다. **CDN 글꼴(`fonts.googleapis.com` 등)로 바꾸지 말 것** — 오프라인·CSP 양쪽에서 깨진다.
+  - `connect-src`: 앱이 부르는 외부 API 출처를 여기에 추가한다.
+
+#### 10.5.5 (선택) 직접 그린 제목 표시줄
+
+창 틀까지 완전히 테마로 그리고 싶다면 `"decorations": false` 로 기본 창 틀을 없애고 헤더를 제목 표시줄로 씁니다.
+- 헤더 바탕 요소에 `data-tauri-drag-region` 속성 → 끌어서 창 이동, 더블클릭으로 최대화.
+- 최소화/최대화/닫기 버튼을 `btn-icon` 으로 만들고 `getCurrentWindow().minimize() / toggleMaximize() / close()` 호출. 권한: `core:window:allow-minimize`, `core:window:allow-toggle-maximize`, `core:window:allow-close`, `core:window:allow-start-dragging`.
+- macOS 는 `"titleBarStyle": "Overlay"` + `"hiddenTitle": true` 로 신호등 버튼만 남기고 헤더가 그 자리까지 올라가게 할 수 있다 → 헤더 왼쪽에 약 **80px** 여백을 둔다(신호등 버튼 자리).
+- 단점: Windows 11 의 최대화 버튼 위 **스냅 레이아웃 팝업**과 창 가장자리 그림자·크기 조절 감각이 기본 창보다 떨어진다. 그래서 이 문서는 **기본 창 틀 + 색 맞추기(§10.5.2)** 를 기본안으로 한다.
+
+#### 10.5.6 앱 아이콘
+
+```bash
+npm run tauri icon ./app-icon-1024.png   # src-tauri/icons/ 에 png·ico·icns 를 모두 생성
+```
+- 입력은 §10.4 의 **배지 전체 1024px PNG**(모서리 바깥 투명).
+- 생성기는 모든 크기를 같은 이미지에서 줄이므로 작은 크기에 글자가 뭉개진다 → 생성 후 `src-tauri/icons/icon.ico` 를 §10.4 의 **9개 크기 ICO**(16–48 핵심 도형 / 64–256 배지 전체)로 덮어쓰고, `32x32.png` 도 핵심 도형 버전으로 바꾼다. macOS `icon.icns` 는 큰 크기 위주라 그대로 둬도 된다.
+- `tauri.conf.json` 의 `bundle.icon` 목록이 위 파일들을 가리키는지 확인한다(기본 템플릿 그대로면 맞다).
+
+### 10.6 웹뷰 호환성 (WebView2 · macOS WebKit · Linux WebKitGTK)
+
+Wails·Tauri 모두 macOS·Linux 에서는 **WebKit** 으로 그립니다. 이 디자인이 쓰는 최신 기능과, 지원하지 않을 때의 동작입니다. **표의 대체 동작은 모두 코드에 이미 반영돼 있어, 별도 작업 없이 "덜 화려하게" 보일 뿐 깨지지 않습니다.**
+
+| 기능 | 쓰는 곳 | WebView2 (Chromium) | macOS WebKit | Linux WebKitGTK | 지원 안 될 때 |
+|------|---------|---------------------|--------------|-----------------|----------------|
+| `@property` (각도 애니메이션) | 탭 보더 빔 회전 | 지원 | Safari 16.4+ | 2.40+ 권장 | 기본값 `--beam-angle: 0deg` 를 둬서 **회전 없는 정지된 빛**으로 보임. 기본값이 없으면 반 주기마다 깜빡이므로 반드시 둘 것 |
+| `mask` + `mask-composite: exclude` | 보더 빔 테두리만 남기기 | 지원 | `-webkit-mask-composite: xor` 로 지원 (둘 다 선언) | 같음 | — |
+| `conic-gradient` | 보더 빔 | 지원 | 12.1+ | 지원 | — |
+| `backdrop-filter` | 알약·헤더 흐림 | 지원 | `-webkit-backdrop-filter` 필요 (둘 다 선언) | 지원하나 소프트웨어 렌더링이면 느릴 수 있음 | 흐림 없이 반투명 바탕. 느리면 `--pill-blur: none` 으로 끈다 |
+| `color-mix()` | 링 게이지 발광, 커서 링 채움 등 **장식만** | 지원 | 16.2+ | 2.40+ | 해당 선언만 무시돼 발광·채움이 빠짐 |
+| `scrollbar-width` | 스크롤바 숨김 | 지원 | 미지원 | 미지원 | `::-webkit-scrollbar { display: none }` 도 함께 선언 |
+| `position: sticky` | 헤더, 스택 카드 | 지원 | 지원 | 지원 | — |
+| Canvas 2D, Pointer Events, `matchMedia` | 커서 효과, 움직임 줄이기 감지 | 지원 | 지원 | 지원 | — |
+| SVG `url(#id)` 그라데이션 | 브랜드 마크 | 지원 | `:` 가 든 id 를 못 읽는 버전이 있음 | 같음 | React `useId()` 결과에서 `:` 를 빼서 사용 (`brand-${useId().replace(/:/g,'')}`) |
+
+Linux 추가 메모:
+- 일부 GPU 드라이버(특히 NVIDIA)에서 WebKitGTK 창이 비어 보이면 실행 환경 변수 `WEBKIT_DISABLE_DMABUF_RENDERER=1` 을 준다(Tauri 문서의 알려진 문제).
+- 흐림·커서 트레일이 버벅이면 모양 설정에서 효과를 끄면 된다. 효과는 기본값이 모두 꺼짐이라 기본 상태에서는 부담이 없다.
+
 
 ---
 
@@ -5493,7 +5750,9 @@ const yDomain = useMemo<[number, number] | [number, 'auto']>(() => {
 | `src/components/CountUp.tsx` | 숫자 카운트 업 | §7.7 |
 | (선택) 토스트 컴포넌트 | 토스트 스택 패턴 | §6.14 |
 | (선택) 차트 컴포넌트 | Recharts 규칙 | §11 |
-| (선택) `titlebar_windows.go`, `titlebar_other.go`, `main.go` 발췌 | 데스크톱 제목 표시줄 | §10 |
+| `src/platform/desktop.ts` | 데스크톱 브리지 (웹·Wails·Tauri 감지 후 네이티브 호출) | §10.0 |
+| (Wails 선택) `titlebar_windows.go`, `titlebar_other.go`, `main.go` 발췌 | 데스크톱 제목 표시줄 (Go) | §10.2–10.3 |
+| (Tauri 선택) `src-tauri/src/titlebar.rs`, `lib.rs` 등록, `Cargo.toml`, `tauri.conf.json` | 데스크톱 제목 표시줄·창·CSP (Rust) | §10.5 |
 
 ### 13.2 기본 테마 변수 값 (CSS 폴백용)
 
