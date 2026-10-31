@@ -4750,7 +4750,7 @@ export default function CursorPresetGallery() {
 
 ### 9.5 영속성: `{ settings, vars, attrs }`
 
-- `localStorage` 키 **하나** (원본 `sm-appearance`; 이식 시 앱 고유 이름으로, 문서 코드에서는 `app-appearance`). 값은 JSON:
+- `localStorage` 키 **하나** (이식 시 앱 고유 이름으로 정한다. 문서 코드에서는 `app-appearance`). 값은 JSON:
   ```json
   { "settings": { …AppearanceSettings }, "vars": { "--c-white": "255 255 255", … }, "attrs": { "data-card": "glass", "data-theme-mode": "dark", "data-theme": "default" } }
   ```
@@ -5296,12 +5296,13 @@ err := wails.Run(&options.App{
 
 ### 10.4 앱 아이콘 · 파비콘 가이드
 
-- **원본 이미지**: 정사각 PNG 1024px 이상, 투명 배경 또는 `ink-950` 배경. 마크는 §4.5 의 그라데이션(`mint-500 → sky-300`) 마크.
-- **배지 크롭(둥근 사각 배지형 로고)**: 큰 아이콘(≥128px)은 마크를 배지 안에 두고 가장자리 여백을 남긴다. 배지 배경이 이미지에 포함돼 있으면 **모서리 바깥 투명 영역을 크롭**해서 불필요한 여백이 작은 크기에서 마크를 작아 보이게 만들지 않게 한다.
-- **작은 크기(≤48px)는 "차트만" 마크**: 워드마크·태그라인·장식(발광, 작은 점)은 16~48px 에서 뭉개진다. 막대 + 상승선 같은 **핵심 도형만 남긴 단순 버전**을 따로 만들어 16/24/32/48 에 쓴다. 선 두께는 크기에 비례하되 최소 1.5~2px.
-- **멀티사이즈 ICO(Windows)**: 16, 24, 32, 48, 64, 128, 256 을 한 ICO 에 담는다. **256 은 PNG 압축 엔트리**(Vista+ 표준), 작은 크기도 PNG 엔트리로 넣어도 되며(각 엔트리 = ICONDIRENTRY + PNG 바이트) 큰 용량을 피할 수 있다. 작은 크기는 위의 "차트만" 마크에서 직접 리샘플한 이미지를 사용.
-- **데스크톱 셸 아이콘 자리**: Wails 는 `build/appicon.png`(원본 PNG)에서 빌드 시 ICO 를 만든다. 직접 만든 ICO 가 필요하면 `build/windows/icon.ico` 로 대체.
-- **웹 파비콘**: `frontend/public/favicon.png`(예: 64~256px PNG, "차트만" 마크 권장) + `index.html`:
+실제로 적용해 검증한 절차다 (원본: 2048px 정사각 PNG, 어두운 여백 위에 흰 테두리의 둥근 사각 배지 + 마크 + 워드마크 + 태그라인).
+
+- **배지 크롭**: 원본에서 배지의 흰 테두리 바깥 경계를 픽셀 스캔으로 찾는다(가운데 행·열에서 밝은 픽셀(R,G,B > 200)이 처음/마지막으로 나오는 좌표, 모서리 반경은 윗변 바로 아래 줄에서 테두리가 처음 나오는 x − 왼쪽 경계). 경계에서 4px 바깥까지 잘라 정사각 캔버스 가운데에 **97% 크기**로 놓고, 같은 반경의 `roundRect` 로 clip 해서 **모서리 바깥을 투명**하게 만든다. 원본 여백에 있던 워터마크·장식도 이때 함께 빠진다.
+- **작은 크기(≤48px)는 핵심 도형만**: 워드마크·태그라인은 48px 이하에서 읽히지 않고 마크만 작아진다. 배지 안쪽에서 **마크(도형)만 포함하는 정사각 영역**을 잘라(글자 윗변보다 위에서 끝나게) 꽉 차게 그리고, 둥근 모서리 clip + **얇은 흰 테두리**(`rgba(255,255,255,0.55)`, 두께 `max(1, size/32)`)를 그려 작은 크기에서도 윤곽이 보이게 한다.
+- **멀티사이즈 ICO(Windows)**: 9개 크기를 PNG 엔트리로 담는다 — **16·20·24·32·40·48 = 핵심 도형 버전**, **64·128·256 = 배지 전체**. ICO 형식: 헤더 6바이트(reserved 0, type 1, count) + 엔트리당 16바이트(width/height 는 256 이면 0, planes 1, bpp 32, 데이터 크기, 오프셋) + PNG 바이트들. Windows Vista 이후는 모든 크기의 PNG 엔트리를 지원한다.
+- **배치(Wails)**: `build/appicon.png` = 배지 전체 1024px(저장소에 커밋). `build/windows/icon.ico` = 위의 멀티사이즈 ICO. 이 폴더는 보통 git 에서 제외되고, ICO 가 없으면 Wails 가 `appicon.png` 를 그대로 줄여 ICO 를 만든다(작은 크기에도 글자가 들어감) → 직접 만든 ICO 를 두는 편이 낫다. 빌드한 exe 에서 아이콘을 꺼내(`System.Drawing.Icon.ExtractAssociatedIcon`) 적용 여부를 확인할 수 있다.
+- **웹 파비콘**: `frontend/public/favicon.png`(배지 전체 256px) + `index.html`:
   ```html
   <link rel="icon" type="image/png" href="/favicon.png" />
   ```
