@@ -181,43 +181,24 @@ function App() {
       <div
         key={account.id}
         onClick={() => setSelectedAccountDetail(account)}
-        className={`surface surface-interactive p-4 sm:p-6 ${
+        className={`surface surface-interactive flex h-full flex-col p-5 ${
           restricted ? 'border-l-2 !border-l-amber-300/60' : ''
         }`}
       >
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
-            <div className={`w-28 h-10 sm:w-36 sm:h-12 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden shrink-0 ${
+        {/* 윗줄: 증권사 로고 · 수정/삭제 */}
+        <div className="flex items-start justify-between gap-3">
+          <div
+            className={`flex h-11 w-36 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 ${
               logo ? 'bg-paper' : 'surface-inset text-zinc-400'
-            }`}>
-              {logo ? (
-                <img
-                  src={logo}
-                  alt={account.broker}
-                  className="w-full h-full object-contain p-1"
-                />
-              ) : (
-                <Wallet className="w-6 h-6" />
-              )}
-            </div>
-            <div>
-              <h3 className="text-lg font-medium tracking-tight text-white">{account.name}</h3>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                <span className="chip">
-                  {account.market_type === 'Domestic' ? '국내' : '해외'}
-                </span>
-                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${typeMeta.badgeClass}`}>
-                  {restricted && <Lock className="w-3 h-3" />}
-                  {typeMeta.short}
-                </span>
-                <span className="chip">{account.currency}</span>
-              </div>
-              {account.broker && (
-                <p className="label-mono mt-1.5">{account.broker}</p>
-              )}
-            </div>
+            }`}
+          >
+            {logo ? (
+              <img src={logo} alt={account.broker} className="h-full w-full object-contain px-2 py-1.5" />
+            ) : (
+              <Wallet className="h-5 w-5" />
+            )}
           </div>
-          <div className="flex items-center gap-2 shrink-0 ml-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               onClick={(e) => { e.stopPropagation(); handleEditAccount(account); }}
               className="btn-icon"
@@ -234,11 +215,27 @@ function App() {
             </button>
           </div>
         </div>
-        {account.description && (
-          <p className="text-zinc-400 text-sm mb-4">{account.description}</p>
-        )}
-        <div className="label-mono">
-          생성일: {new Date(account.created_at).toLocaleDateString('ko-KR')}
+
+        {/* 계좌 이름 · 증권사 · 속성 */}
+        <div className="mb-4 mt-4 min-w-0">
+          <h3 className="truncate text-lg font-medium tracking-tight text-white" title={account.name}>
+            {account.name}
+          </h3>
+          {account.broker && <p className="label-mono mt-1 truncate">{account.broker}</p>}
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="chip">{account.market_type === 'Domestic' ? '국내' : '해외'}</span>
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${typeMeta.badgeClass}`}>
+              {restricted && <Lock className="h-3 w-3" />}
+              {typeMeta.short}
+            </span>
+            <span className="chip">{account.currency}</span>
+          </div>
+          {account.description && <p className="mt-3 line-clamp-2 text-sm text-zinc-400">{account.description}</p>}
+        </div>
+
+        {/* 아래줄: 생성일 (카드 높이가 달라도 바닥에 맞춘다) */}
+        <div className="label-mono mt-auto border-t border-white/[0.06] pt-3">
+          생성일 {new Date(account.created_at).toLocaleDateString('ko-KR')}
         </div>
       </div>
     );
