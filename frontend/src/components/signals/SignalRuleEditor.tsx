@@ -18,7 +18,8 @@ type NumKey =
   | 'below_ma_pct'
   | 'above_ma_pct'
   | 'dividend_cut_pct'
-  | 'crash_pct';
+  | 'crash_pct'
+  | 'min_sell_qty';
 
 type EnableKey =
   | 'from_high_enabled'
@@ -26,6 +27,7 @@ type EnableKey =
   | 'above_ma_enabled'
   | 'dividend_cut_enabled'
   | 'crash_enabled'
+  | 'min_sell_qty_enabled'
   | 'tax_harvest_enabled'
   | 'fx_historical'
   | 'take_profit_enabled'
@@ -78,6 +80,16 @@ const SELL_RULES: RuleDef[] = [
   { enabled: 'dividend_cut_enabled', label: '배당 삭감', desc: '주당배당금이 직전 12개월 대비 기준(%) 이상 줄면 매도를 검토합니다.', fields: [{ key: 'dividend_cut_pct', label: '감소율', suffix: '%' }] },
 ];
 
+// 매도 제외 조건: 충족되면 위 매도 조건이 맞아도 매도 검토에서 뺀다
+const SELL_EXCLUDE_RULES: RuleDef[] = [
+  {
+    enabled: 'min_sell_qty_enabled',
+    label: '소량 보유 매도 제외',
+    desc: '보유 수량(모든 계좌 합계)이 기준 이하이면 매도 조건을 충족해도 매도 검토에서 제외합니다. 소수점 수량도 포함됩니다.',
+    fields: [{ key: 'min_sell_qty', label: '기준', suffix: '주 이하' }],
+  },
+];
+
 const BUY_RULES: RuleDef[] = [
   { enabled: 'buy_dip_enabled', label: '평단 대비 하락', desc: '현재가가 평단보다 기준 이상 낮으면 추가 매수를 검토합니다.', fields: [{ key: 'buy_dip_pct', label: '기준', suffix: '%' }] },
   { enabled: 'high_yield_enabled', label: '배당수익률 상승', desc: '현재가 기준 배당수익률이 기준 이상이면 매수를 검토합니다.', fields: [{ key: 'high_yield_pct', label: '기준', suffix: '%' }] },
@@ -88,20 +100,20 @@ const BUY_RULES: RuleDef[] = [
 const NUM_KEYS: NumKey[] = [
   'take_profit_pct', 'stop_loss_pct', 'target_weight_pct', 'weight_band_pct', 'dividend_payback_pct',
   'dividend_payback_min_return_pct', 'low_yield_pct', 'buy_dip_pct', 'high_yield_pct',
-  'from_high_pct', 'below_ma_pct', 'above_ma_pct', 'dividend_cut_pct', 'crash_pct',
+  'from_high_pct', 'below_ma_pct', 'above_ma_pct', 'dividend_cut_pct', 'crash_pct', 'min_sell_qty',
 ];
 const ENABLE_KEYS: EnableKey[] = [
   'take_profit_enabled', 'stop_loss_enabled', 'weight_enabled', 'dividend_payback_enabled',
   'low_yield_enabled', 'buy_dip_enabled', 'high_yield_enabled',
   'from_high_enabled', 'below_ma_enabled', 'above_ma_enabled', 'dividend_cut_enabled', 'crash_enabled',
-  'tax_harvest_enabled', 'fx_historical',
+  'tax_harvest_enabled', 'fx_historical', 'min_sell_qty_enabled',
 ];
 
 // 2단계 필드 기본값 (구 백엔드가 내려주지 않을 때 균형 값으로 채움)
-const NEW_NUM_DEFAULTS: Partial<Record<NumKey, number>> = { from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40 };
+const NEW_NUM_DEFAULTS: Partial<Record<NumKey, number>> = { from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, min_sell_qty: 1 };
 const NEW_FLAG_DEFAULTS: Partial<Record<EnableKey, boolean>> = {
   from_high_enabled: false, below_ma_enabled: false, above_ma_enabled: false, dividend_cut_enabled: false, crash_enabled: false,
-  tax_harvest_enabled: true, fx_historical: true,
+  tax_harvest_enabled: true, fx_historical: true, min_sell_qty_enabled: true,
 };
 const DEFAULT_HARVEST_MONTH = 11;
 
@@ -143,7 +155,7 @@ function validate(d: Draft): Partial<Record<NumKey, string>> {
       return;
     }
     if ((k === 'stop_loss_pct' || k === 'buy_dip_pct' || k === 'from_high_pct' || k === 'below_ma_pct' || k === 'crash_pct') && n > 0) errs[k] = '0 이하로 입력하세요';
-    else if ((k === 'above_ma_pct' || k === 'dividend_cut_pct' || k === 'weight_band_pct') && n < 0) errs[k] = '0 이상으로 입력하세요';
+    else if ((k === 'above_ma_pct' || k === 'dividend_cut_pct' || k === 'weight_band_pct' || k === 'min_sell_qty') && n < 0) errs[k] = '0 이상으로 입력하세요';
     else if (k === 'target_weight_pct' && (n < 0 || n > 100)) errs[k] = '0~100 사이로 입력하세요';
   });
   return errs;
@@ -293,6 +305,8 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
           <ModeToggle value={draft.sell_mode} onChange={(m) => !readOnly && setDraft((d) => ({ ...d, sell_mode: m }))} label="매도 조건 충족 방식" />
         </div>
         {SELL_RULES.map(renderRule)}
+        <p className="label-mono !mt-4">매도 제외</p>
+        {SELL_EXCLUDE_RULES.map(renderRule)}
       </section>
 
       <section className="space-y-2.5">

@@ -59,6 +59,7 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 		"above_ma_pct":                    r.AboveMAPct,
 		"dividend_cut_pct":                r.DividendCutPct,
 		"crash_pct":                       r.CrashPct,
+		"min_sell_qty":                    r.MinSellQty,
 	}
 	for k, v := range fin {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -91,6 +92,9 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	}
 	if r.DividendCutPct < 0 {
 		return &ErrInvalidSignalRule{"dividend_cut_pct must be >= 0"}
+	}
+	if r.MinSellQty < 0 {
+		return &ErrInvalidSignalRule{"min_sell_qty must be >= 0"}
 	}
 	if r.TaxHarvestFromMonth == 0 {
 		r.TaxHarvestFromMonth = defaultTaxHarvestMonth

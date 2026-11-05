@@ -46,6 +46,10 @@ type SignalRuleConfig struct {
 	TaxHarvestFromMonth int  `json:"tax_harvest_from_month"` // 1~12
 	FxHistorical        bool `json:"fx_historical"`
 
+	// 4단계: 보유 수량이 MinSellQty 주 이하이면 매도 조건이 충족돼도 매도 검토에서 제외한다
+	MinSellQtyEnabled bool    `json:"min_sell_qty_enabled"`
+	MinSellQty        float64 `json:"min_sell_qty"` // >= 0
+
 	SellMode string `gorm:"size:10" json:"sell_mode"`
 	BuyMode  string `gorm:"size:10" json:"buy_mode"`
 }
@@ -67,7 +71,7 @@ type SignalRule struct {
 }
 
 // SignalRuleVersion 은 현재 규칙 스키마 버전이다.
-const SignalRuleVersion = 3
+const SignalRuleVersion = 4
 
 // DefaultSignalRuleConfig 는 "균형" 기본 규칙 설정(저장 전)을 반환한다.
 func DefaultSignalRuleConfig() SignalRuleConfig {
@@ -97,6 +101,8 @@ func DefaultSignalRuleConfig() SignalRuleConfig {
 		TaxHarvestEnabled:           true,
 		TaxHarvestFromMonth:         11,
 		FxHistorical:                true,
+		MinSellQtyEnabled:           true,
+		MinSellQty:                  1,
 		SellMode:                    "any",
 		BuyMode:                     "any",
 	}

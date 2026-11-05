@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck, LayoutGrid, Layers } from 'lucide-react';
+import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck, MinusCircle, LayoutGrid, Layers } from 'lucide-react';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import SignalHistory from '../components/alerts/SignalHistory';
 import { apiClient } from '../api/client';
@@ -249,13 +249,22 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
         </div>
       </header>
 
-      {(item.profile_name || item.sell_disabled) && (
+      {(item.profile_name || item.sell_disabled || item.sell_excluded_small_qty) && (
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {item.profile_name && <ProfileChip name={item.profile_name} kind={item.profile_kind} />}
           {item.sell_disabled && (
             <span className="badge border border-sky-400/25 bg-sky-400/10 text-sky-200">
               <ShieldCheck className="h-3 w-3" />
               매도 신호 없음 · 장기보유
+            </span>
+          )}
+          {item.sell_excluded_small_qty && (
+            <span
+              className="badge border border-white/10 bg-white/[0.04] text-zinc-300"
+              title="전략의 '소량 보유 매도 제외' 설정에 따라 매도 조건을 충족해도 매도 검토에서 제외했습니다"
+            >
+              <MinusCircle className="h-3 w-3" />
+              {fmtNum(item.min_sell_qty ?? 1, 2)}주 이하 · 매도 검토 제외
             </span>
           )}
         </div>

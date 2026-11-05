@@ -52,6 +52,9 @@ type SignalItem struct {
 	ProfileName  string `json:"profile_name"`
 	ProfileKind  string `json:"profile_kind"`
 	SellDisabled bool   `json:"sell_disabled"` // 적용된 규칙에 켜진 매도 체크가 없음
+	// 보유 수량이 규칙의 기준(주) 이하라 매도 검토에서 제외됨 (매도 조건 표시는 그대로 둔다)
+	SellExcludedSmallQty bool    `json:"sell_excluded_small_qty,omitempty"`
+	MinSellQty           float64 `json:"min_sell_qty,omitempty"`
 
 	RestrictedOnly bool `json:"restricted_only"`
 
@@ -561,6 +564,12 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	it.SellDisabled = len(sell) == 0
 
 	sellHit := checksHit(sell, r.SellMode)
+	// 소량 보유(기준 주 이하)는 매도 검토에서 제외한다. 부동소수 오차를 감안해 아주 작은 여유를 둔다.
+	if r.MinSellQtyEnabled && r.MinSellQty > 0 && len(sell) > 0 && it.Quantity <= r.MinSellQty+1e-9 {
+		it.SellExcludedSmallQty = true
+		it.MinSellQty = r.MinSellQty
+		sellHit = false
+	}
 	buyHit := checksHit(buy, r.BuyMode)
 	switch {
 	case sellHit && buyHit:

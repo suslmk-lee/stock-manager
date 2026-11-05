@@ -13,11 +13,13 @@ import (
 const (
 	defaultTaxHarvestMonth = 11
 	defaultCrashPct        = -40
+	defaultMinSellQty      = 1
 )
 
 // migrateRuleConfig 는 이전 단계 규칙의 0 값 필드를 새 기본값으로 한 번만 보정한다. 보정했으면 true.
 //   - v1 -> v2: 시세 추세 / 배당 삭감 / 양도세 / 환율 기본값
 //   - v2 -> v3: 큰 폭락 경고(crash_pct=-40, 꺼짐)
+//   - v3 -> v4: 소량 보유 매도 제외(1주 이하, 켜짐)
 func migrateRuleConfig(c *models.SignalRuleConfig, version *int) bool {
 	if *version >= models.SignalRuleVersion {
 		return false
@@ -47,6 +49,12 @@ func migrateRuleConfig(c *models.SignalRuleConfig, version *int) bool {
 			c.CrashPct = defaultCrashPct
 		}
 		c.CrashEnabled = false
+	}
+	if *version < 4 {
+		if c.MinSellQty == 0 {
+			c.MinSellQty = defaultMinSellQty
+		}
+		c.MinSellQtyEnabled = true
 	}
 	*version = models.SignalRuleVersion
 	return true

@@ -115,7 +115,7 @@ func TestSignalRuleMigrationV1(t *testing.T) {
 	}
 	check := func(r models.SignalRule) {
 		t.Helper()
-		if r.RuleVersion != 3 || r.FromHighPct != -20 || r.BelowMAPct != -5 || r.AboveMAPct != 25 || r.DividendCutPct != 10 ||
+		if r.RuleVersion != models.SignalRuleVersion || !r.MinSellQtyEnabled || r.MinSellQty != 1 || r.FromHighPct != -20 || r.BelowMAPct != -5 || r.AboveMAPct != 25 || r.DividendCutPct != 10 ||
 			r.TaxHarvestFromMonth != 11 || !r.FxHistorical || !r.TaxHarvestEnabled ||
 			r.FromHighEnabled || r.BelowMAEnabled || r.AboveMAEnabled || r.DividendCutEnabled {
 			t.Errorf("migrated rule %+v", r)
@@ -140,7 +140,7 @@ func TestSignalRuleMigrationV1(t *testing.T) {
 	}
 	rules, _ = svc.GetSignalRules()
 	d := rules.Default
-	if d.RuleVersion != 3 || d.FromHighPct != 0 || d.FxHistorical || d.TaxHarvestEnabled || d.TaxHarvestFromMonth != 11 {
+	if d.RuleVersion != models.SignalRuleVersion || d.MinSellQtyEnabled || d.FromHighPct != 0 || d.FxHistorical || d.TaxHarvestEnabled || d.TaxHarvestFromMonth != 11 {
 		t.Errorf("must not re-migrate: %+v", d)
 	}
 }
@@ -168,7 +168,7 @@ func TestValidateSignalRuleStage2(t *testing.T) {
 	}
 	def := models.DefaultSignalRule()
 	if err := ValidateSignalRule(&def); err != nil || def.FromHighEnabled || def.BelowMAEnabled || def.AboveMAEnabled || def.DividendCutEnabled ||
-		!def.TaxHarvestEnabled || !def.FxHistorical || def.RuleVersion != 3 {
+		!def.TaxHarvestEnabled || !def.FxHistorical || def.RuleVersion != models.SignalRuleVersion || !def.MinSellQtyEnabled || def.MinSellQty != 1 {
 		t.Errorf("default %v %+v", err, def)
 	}
 }

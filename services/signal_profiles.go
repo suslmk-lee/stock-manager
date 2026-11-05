@@ -95,6 +95,18 @@ func (s *SignalService) ensureSeeded() error {
 	if err != nil {
 		return err
 	}
+	// 이전 스키마 버전으로 저장된 프로필 규칙을 한 번 보정한다 (예: v4 소량 보유 매도 제외 기본값)
+	var stale []models.SignalProfile
+	if err := s.db.Where("rule_version < ?", models.SignalRuleVersion).Find(&stale).Error; err != nil {
+		return err
+	}
+	for i := range stale {
+		if migrateRuleConfig(&stale[i].Rule, &stale[i].RuleVersion) {
+			if err := s.db.Save(&stale[i]).Error; err != nil {
+				return err
+			}
+		}
+	}
 	s.seeded = true
 	return nil
 }

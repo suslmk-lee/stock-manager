@@ -103,7 +103,7 @@ func TestSignalProfileRoutes(t *testing.T) {
 	// 레거시 default 규칙 엔드포인트
 	code, res = call(r, "GET", "/api/signal-rules", nil)
 	def, _ := res["default"].(map[string]interface{})
-	if code != 200 || def["asset_id"] != float64(0) || def["rule_version"] != float64(3) || def["crash_pct"] != float64(-40) {
+	if code != 200 || def["asset_id"] != float64(0) || def["rule_version"] != float64(models.SignalRuleVersion) || def["crash_pct"] != float64(-40) {
 		t.Fatalf("%d %v", code, res)
 	}
 	def["take_profit_pct"] = 61

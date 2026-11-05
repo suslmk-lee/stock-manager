@@ -191,6 +191,8 @@ export interface SignalRule {
   fx_historical?: boolean;
   crash_enabled?: boolean;
   crash_pct?: number; // <= 0 (큰 폭락 경고)
+  min_sell_qty_enabled?: boolean; // 보유 수량이 기준 이하이면 매도 검토 제외
+  min_sell_qty?: number; // >= 0 (주)
   sell_mode: SignalMode;
   buy_mode: SignalMode;
   created_at?: string;
@@ -294,6 +296,8 @@ export interface SignalItem {
   profile_name?: string;
   profile_kind?: ProfileKind;
   sell_disabled?: boolean;
+  sell_excluded_small_qty?: boolean; // 보유 수량이 기준 이하라 매도 검토에서 제외됨
+  min_sell_qty?: number;
   restricted_only: boolean;
   quantity: number;
   avg_price: number;

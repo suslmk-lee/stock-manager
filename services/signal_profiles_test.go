@@ -110,7 +110,7 @@ func TestDefaultProfileCopiesLegacyRuleAndKeepsRow(t *testing.T) {
 		t.Errorf("default profile %+v", d.Rule)
 	}
 	var stored models.SignalRule
-	if err := db.Where("asset_id = 0").First(&stored).Error; err != nil || stored.TakeProfitPct != 77 || stored.RuleVersion != 3 {
+	if err := db.Where("asset_id = 0").First(&stored).Error; err != nil || stored.TakeProfitPct != 77 || stored.RuleVersion != models.SignalRuleVersion {
 		t.Fatalf("legacy row must be kept (migrated): %+v %v", stored, err)
 	}
 }
@@ -118,7 +118,7 @@ func TestDefaultProfileCopiesLegacyRuleAndKeepsRow(t *testing.T) {
 func TestMigrateV2ToV3(t *testing.T) {
 	r := models.SignalRule{SignalRuleConfig: models.DefaultSignalRuleConfig(), RuleVersion: 2}
 	r.CrashPct, r.CrashEnabled = 0, true
-	if !migrateSignalRule(&r) || r.CrashPct != -40 || r.CrashEnabled || r.RuleVersion != 3 {
+	if !migrateSignalRule(&r) || r.CrashPct != -40 || r.CrashEnabled || r.RuleVersion != models.SignalRuleVersion || !r.MinSellQtyEnabled || r.MinSellQty != 1 {
 		t.Errorf("%+v", r)
 	}
 	r2 := models.SignalRule{SignalRuleConfig: models.DefaultSignalRuleConfig(), RuleVersion: 2}
@@ -339,7 +339,7 @@ func TestAssignmentMovesAndDefaultClears(t *testing.T) {
 func TestLegacyDefaultRuleRoundTrip(t *testing.T) {
 	svc, db := newProfileSvc(t)
 	rules, err := svc.GetSignalRules()
-	if err != nil || rules.Default.AssetID != 0 || rules.Default.RuleVersion != 3 || rules.Default.CrashPct != -40 {
+	if err != nil || rules.Default.AssetID != 0 || rules.Default.RuleVersion != models.SignalRuleVersion || rules.Default.CrashPct != -40 {
 		t.Fatalf("%+v %v", rules, err)
 	}
 	in := rules.Default
