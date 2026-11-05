@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck, MinusCircle, Scissors, LayoutGrid, Layers } from 'lucide-react';
+import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck, MinusCircle, Scissors, ShoppingCart, LayoutGrid, Layers } from 'lucide-react';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import SignalHistory from '../components/alerts/SignalHistory';
 import { apiClient } from '../api/client';
@@ -53,7 +53,12 @@ const CHECK_OPS: Record<string, string> = {
   yield_compression: '≤',
   vol_overheat: '≥',
   vol_oversold: '≤',
+  vol_stop: '≤',
+  last_buy_dip: '≤',
 };
+
+// 수익 실현 묶음에 속하는 매도 체크 (나머지 매도 체크는 위험 관리 묶음)
+const SELL_PROFIT_CODES = new Set(['take_profit', 'trailing_stop', 'annualized_return', 'weight_drift', 'yield_compression', 'vol_overheat']);
 
 const fmtKrw = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
 const fmtSignedKrw = (v: number) => `${v < 0 ? '-' : '+'}₩${Math.abs(Math.round(v)).toLocaleString('ko-KR')}`;
@@ -198,7 +203,19 @@ function ModeHint({ mode, count, total }: { mode?: SignalMode; count?: number; t
   return <span className="ml-1.5 text-zinc-600">({text})</span>;
 }
 
-function CheckGroup({ title, checks, tone, mode, count }: { title: string; checks: SignalCheck[]; tone: 'sell' | 'buy'; mode?: SignalMode; count?: number }) {
+// 묶음 방식 매도: 수익 실현 / 위험 관리 묶음별 필요 개수 (묶음에 켜진 조건이 없으면 생략)
+function GroupModeHint({ checks, profitCount, riskCount }: { checks: SignalCheck[]; profitCount?: number; riskCount?: number }) {
+  const profitTotal = checks.filter((c) => SELL_PROFIT_CODES.has(c.code)).length;
+  const riskTotal = checks.length - profitTotal;
+  const clamp = (n: number | undefined, total: number) => Math.min(Math.max(n ?? 1, 1), total);
+  const parts: string[] = [];
+  if (profitTotal > 0) parts.push(`수익 ${clamp(profitCount, profitTotal)}개`);
+  if (riskTotal > 0) parts.push(`위험 ${clamp(riskCount, riskTotal)}개`);
+  if (parts.length === 0) return null;
+  return <span className="ml-1.5 text-zinc-600">({parts.join(' · ')} 이상)</span>;
+}
+
+function CheckGroup({ title, checks, tone, mode, count, profitCount, riskCount }: { title: string; checks: SignalCheck[]; tone: 'sell' | 'buy'; mode?: SignalMode; count?: number; profitCount?: number; riskCount?: number }) {
   if (checks.length === 0) return null;
   const metClass =
     tone === 'sell' ? '!border-rose-400/30 !bg-rose-500/10 !text-rose-200' : '!border-mint-400/30 !bg-mint-400/10 !text-mint-300';
@@ -206,7 +223,7 @@ function CheckGroup({ title, checks, tone, mode, count }: { title: string; check
     <div>
       <div className="label-mono mb-1.5">
         {title}
-        <ModeHint mode={mode} count={count} total={checks.length} />
+        {mode === 'group' ? <GroupModeHint checks={checks} profitCount={profitCount} riskCount={riskCount} /> : <ModeHint mode={mode} count={count} total={checks.length} />}
       </div>
       <div className="flex flex-wrap gap-1.5">
         {checks.map((c) =>
@@ -253,6 +270,7 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
         </>,
       );
     }
+    if (item.last_buy_date) flowParts.push(<>마지막 매수 <span className="text-zinc-200">{item.last_buy_date}</span>{item.from_last_buy_pct !== undefined && <> · <span className={signTone(item.from_last_buy_pct)}>{fmtSignedPct(item.from_last_buy_pct)}</span></>}</>);
     if (item.volatility_pct) flowParts.push(<>변동성 연 <span className="text-zinc-200">{fmtPct(item.volatility_pct)}</span></>);
     if (item.ma200_sigma) flowParts.push(<>200일선 <span className={signTone(item.ma200_sigma)}>{item.ma200_sigma > 0 ? '+' : ''}{fmtNum(item.ma200_sigma, 2)}σ</span></>);
     if (item.cost_weight_pct) flowParts.push(<>원금 비중 <span className="text-zinc-200">{fmtPct(item.cost_weight_pct)}</span> → 현재 <span className="text-zinc-200">{fmtPct(item.weight_pct)}</span></>);
@@ -302,7 +320,22 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
         </div>
       )}
 
-      {(item.profile_name || item.sell_disabled || item.sell_excluded_small_qty) && (
+      {item.action === 'BUY' && !!item.suggested_buy_qty && item.suggested_buy_qty > 0 && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          <span className="badge border border-mint-400/40 bg-mint-400/15 !text-[12px] font-semibold text-mint-300">
+            <ShoppingCart className="h-3.5 w-3.5" />
+            추가 매수 검토 · {fmtNum(item.suggested_buy_qty, 2)}주
+            {!!item.suggested_buy_krw && ` · ${fmtKrw(item.suggested_buy_krw)}`}
+          </span>
+          {item.suggested_buy_kind && (
+            <span className="text-[11px] text-zinc-500">
+              {item.suggested_buy_kind === 'target_weight' ? '목표 비중까지' : item.suggested_buy_kind === 'lower_avg' ? `평단 −${fmtNum(rule?.buy_qty_lower_avg_pct ?? 5, 1)}%` : '정액'}
+            </span>
+          )}
+        </div>
+      )}
+
+      {(item.profile_name || item.sell_disabled || item.sell_excluded_small_qty || item.buy_excluded_reason) && (
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {item.profile_name && <ProfileChip name={item.profile_name} kind={item.profile_kind} />}
           {item.sell_disabled && (
@@ -318,6 +351,17 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
             >
               <MinusCircle className="h-3 w-3" />
               {fmtNum(item.min_sell_qty ?? 1, 2)}주 이하 · 매도 검토 제외
+            </span>
+          )}
+          {item.buy_excluded_reason && (
+            <span
+              className="badge border border-white/10 bg-white/[0.04] text-zinc-300"
+              title="전략의 '매수 제외' 설정에 따라 매수 조건을 충족해도 매수 검토에서 제외했습니다"
+            >
+              <MinusCircle className="h-3 w-3" />
+              {item.buy_excluded_reason === 'cooldown'
+                ? `최근 ${item.days_since_last_buy ?? item.buy_cooldown_days ?? 0}일 전 매수 · 매수 검토 제외`
+                : `비중 ${fmtNum(item.weight_pct, 1)}% ≥ ${fmtNum(item.buy_max_weight_pct ?? 0, 1)}% · 매수 검토 제외`}
             </span>
           )}
         </div>
@@ -460,7 +504,7 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
 
       {(item.sell_checks.length > 0 || item.buy_checks.length > 0) && (
         <div className="mt-4 space-y-3 border-t border-white/[0.06] pt-4">
-          <CheckGroup title="매도 조건" checks={item.sell_checks} tone="sell" mode={rule?.sell_mode} count={rule?.sell_min_count} />
+          <CheckGroup title="매도 조건" checks={item.sell_checks} tone="sell" mode={rule?.sell_mode} count={rule?.sell_min_count} profitCount={rule?.sell_profit_min_count} riskCount={rule?.sell_risk_min_count} />
           <CheckGroup title="매수 조건" checks={item.buy_checks} tone="buy" mode={rule?.buy_mode} count={rule?.buy_min_count} />
         </div>
       )}

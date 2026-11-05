@@ -156,7 +156,9 @@ export interface RealizedPnL {
 // 매매 신호
 // ==========================================
 // any: 1개 이상, all: 모두, count: sell_min_count / buy_min_count 개 이상
-export type SignalMode = 'any' | 'all' | 'count';
+// group: (매도 전용) 수익 실현 / 위험 관리 묶음별로 sell_profit_min_count / sell_risk_min_count 를 판정
+export type SignalMode = 'any' | 'all' | 'count' | 'group';
+export type BuyQtyMode = 'amount' | 'target_weight' | 'lower_avg';
 export type SignalAction = 'SELL' | 'BUY' | 'HOLD' | 'CONFLICT' | 'NO_PRICE';
 
 export interface SignalRule {
@@ -213,10 +215,25 @@ export interface SignalRule {
   drift_pct?: number; // > 0 (원금 비중 대비 %p)
   partial_enabled?: boolean;
   partial_pct?: number; // 1~100 (보유 수량의 %)
+  // 매수 규칙 · 변동성 손절 (구 백엔드에서는 없을 수 있음)
+  last_buy_dip_enabled?: boolean; // 기본 false
+  last_buy_dip_pct?: number; // < 0 (마지막 매수가 대비)
+  buy_cooldown_enabled?: boolean; // 기본 true
+  buy_cooldown_days?: number; // 정수 1~365
+  buy_max_weight_enabled?: boolean; // 기본 true
+  buy_max_weight_pct?: number; // (0,100]
+  buy_qty_enabled?: boolean; // 기본 true
+  buy_qty_mode?: BuyQtyMode;
+  buy_qty_amount_krw?: number; // > 0
+  buy_qty_lower_avg_pct?: number; // (0,50]
+  vol_stop_enabled?: boolean; // 기본 false
+  vol_stop_k?: number; // (0,5]
   sell_mode: SignalMode;
   buy_mode: SignalMode;
   sell_min_count?: number;
   buy_min_count?: number;
+  sell_profit_min_count?: number; // sell_mode === 'group' 일 때 수익 실현 묶음 기준 개수
+  sell_risk_min_count?: number; // sell_mode === 'group' 일 때 위험 관리 묶음 기준 개수
   created_at?: string;
   updated_at?: string;
 }
@@ -339,6 +356,17 @@ export interface SignalItem {
   suggested_sell_qty?: number;
   suggested_sell_krw?: number;
   suggested_sell_kind?: 'partial' | 'rebalance';
+  // 마지막 매수 · 매수 제외 · 매수 수량 제안
+  last_buy_date?: string; // YYYY-MM-DD
+  last_buy_price?: number;
+  from_last_buy_pct?: number;
+  days_since_last_buy?: number;
+  buy_excluded_reason?: 'cooldown' | 'max_weight';
+  buy_max_weight_pct?: number;
+  buy_cooldown_days?: number;
+  suggested_buy_qty?: number;
+  suggested_buy_krw?: number;
+  suggested_buy_kind?: BuyQtyMode;
   restricted_only: boolean;
   quantity: number;
   avg_price: number;
