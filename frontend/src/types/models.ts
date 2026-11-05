@@ -193,6 +193,13 @@ export interface SignalRule {
   crash_pct?: number; // <= 0 (큰 폭락 경고)
   min_sell_qty_enabled?: boolean; // 보유 수량이 기준 이하이면 매도 검토 제외
   min_sell_qty?: number; // >= 0 (주)
+  // 배당수익률 압축 · 변동성 대비 과열/과매도 (구 백엔드에서는 없을 수 있음)
+  yield_compression_enabled?: boolean;
+  yield_compression_pct?: number; // > 0 (24개월 평균 대비 낮아진 비율)
+  vol_overheat_enabled?: boolean;
+  vol_overheat_sigma?: number; // > 0 (+σ 이상이면 과열)
+  vol_oversold_enabled?: boolean;
+  vol_oversold_sigma?: number; // > 0 (양수로 입력, −σ 이하로 적용)
   // 수익 실현 (구 백엔드에서는 없을 수 있음)
   trailing_enabled?: boolean;
   trailing_activate_pct?: number; // >= 0 (추적 익절 활성 수익률)
@@ -310,6 +317,13 @@ export interface SignalItem {
   sell_disabled?: boolean;
   sell_excluded_small_qty?: boolean; // 보유 수량이 기준 이하라 매도 검토에서 제외됨
   min_sell_qty?: number;
+  // 변동성 · 배당수익률 압축
+  volatility_pct?: number; // 연환산 변동성 %
+  ma200_sigma?: number; // 200일선 괴리 (연 변동성 단위)
+  dividend_yield_avg_pct?: number; // 최근 24개월 평균 배당수익률 %
+  dividend_yield_vs_avg_pct?: number; // 현재 배당수익률의 평균 대비 %
+  dividend_yield_points?: number; // 계산에 쓴 개월 수
+  dividend_yield_source?: 'market' | 'records';
   // 수익 흐름 (매수 이후 최고가 · 보유 기간 · 연환산 · 원금 비중)
   peak_price?: number;
   peak_date?: string; // YYYY-MM-DD
