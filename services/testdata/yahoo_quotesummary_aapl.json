@@ -1,0 +1,45 @@
+{
+ "quoteSummary": {
+  "result": [
+   {
+    "summaryDetail": {
+     "trailingPE": {
+      "raw": 38.326283,
+      "fmt": "38.33"
+     },
+     "forwardPE": {
+      "raw": 32.321957,
+      "fmt": "32.32"
+     },
+     "beta": {
+      "raw": 1.089,
+      "fmt": "1.09"
+     }
+    },
+    "defaultKeyStatistics": {
+     "forwardPE": {
+      "raw": 32.321957,
+      "fmt": "32.32"
+     },
+     "bookValue": {
+      "raw": 7.713,
+      "fmt": "7.71"
+     },
+     "priceToBook": {
+      "raw": 44.62207,
+      "fmt": "44.62"
+     },
+     "trailingEps": {
+      "raw": 8.98,
+      "fmt": "8.98"
+     },
+     "forwardEps": {
+      "raw": 10.64818,
+      "fmt": "10.65"
+     }
+    }
+   }
+  ],
+  "error": null
+ }
+}

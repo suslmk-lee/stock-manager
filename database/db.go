@@ -238,6 +238,7 @@ func runMigrations() error {
 		&models.AssetSignalProfile{},
 		&models.ProfileSuggestion{},
 		&models.NotificationSetting{},
+		&models.FundamentalSnapshot{},
 	); err != nil {
 		return err
 	}

@@ -28,6 +28,12 @@ func NewServices() *Services {
 	ticker := services.NewTickerService()
 	exchange := services.NewExchangeRateService()
 
+	signal := services.NewSignalService(database.GetDB(), ticker, exchange)
+	dailySnap := services.NewDailySnapshotService(database.GetDB(), ticker)
+	fundamentals := services.NewFundamentalsService(nil)
+	signal.SetFundamentals(fundamentals)
+	dailySnap.SetFundamentals(fundamentals)
+
 	return &Services{
 		Account:      services.NewAccountService(),
 		Asset:        services.NewAssetService(),
@@ -38,7 +44,7 @@ func NewServices() *Services {
 		ExchangeRate: exchange,
 		Snapshot:     services.NewPortfolioSnapshotService(database.GetDB(), ticker),
 		RealizedPnL:  services.NewRealizedPnLService(),
-		Signal:       services.NewSignalService(database.GetDB(), ticker, exchange),
-		DailySnap:    services.NewDailySnapshotService(database.GetDB(), ticker),
+		Signal:       signal,
+		DailySnap:    dailySnap,
 	}
 }

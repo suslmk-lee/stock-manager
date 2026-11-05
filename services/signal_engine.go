@@ -129,6 +129,21 @@ type SignalItem struct {
 	ShortChangePct      float64 `json:"short_change_pct,omitempty"`
 	ShortChangeDays     int     `json:"short_change_days,omitempty"`
 
+	// RSI / MFI: 이력의 마지막 종가 기준(오늘 실시간 가격 제외), 계산 가능하면 규칙과 무관하게 채운다. *Min 은 rule.osc_lookback_days 구간 최솟값.
+	RSI    float64 `json:"rsi,omitempty"`
+	RSIMin float64 `json:"rsi_min,omitempty"`
+	MFI    float64 `json:"mfi,omitempty"`
+	MFIMin float64 `json:"mfi_min,omitempty"`
+
+	// 펀더멘털 (0 = 없음). 소스는 "yahoo" | "naver", AsOf 는 조회 일자(YYYY-MM-DD, KST)
+	PER                float64 `json:"per,omitempty"`
+	ForwardPER         float64 `json:"forward_per,omitempty"`
+	PBR                float64 `json:"pbr,omitempty"`
+	EPS                float64 `json:"eps,omitempty"`
+	BPS                float64 `json:"bps,omitempty"`
+	FundamentalsSource string  `json:"fundamentals_source,omitempty"`
+	FundamentalsAsOf   string  `json:"fundamentals_as_of,omitempty"`
+
 	trend TrendMetrics // 하회 후 반등 판단 지표 (JSON 제외)
 
 	hasLastBuy bool // 마지막 매수 거래 존재 여부 (DaysSinceLastBuy 0 과 구분)
@@ -233,6 +248,7 @@ type SignalAssetInput struct {
 	PnLs          []SignalPnLInput
 	Dividends     []SignalDividendInput
 	Txns          []SignalTxnInput
+	Fundamentals  *Fundamentals   // PER/PBR 등. nil 이면 없음
 	History       []PricePoint    // 일봉 종가 (종목 통화). 비어 있으면 추세 지표 없음
 	DivEvents     []DividendEvent // 시장(Yahoo) 주당배당 이벤트. 비어 있으면 사용자 배당 기록으로 대체
 	Rule          models.SignalRuleConfig
@@ -505,6 +521,8 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time, ct
 
 	computeShortTermMetrics(&item, in, now)
 	computeTrendMetrics(&item, in, now)
+	computeOscMetrics(&item, in, now)
+	applyFundamentals(&item, in.Fundamentals)
 	computeYieldMetrics(&item, in, QuantityAtFunc(currentQty, acctTxns), now)
 	computeVolMetrics(&item, in, now)
 
@@ -655,6 +673,18 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 		met := it.ShortChangeDays > 0 && it.ShortChangePct <= r.ShortDropPct
 		sell = append(sell, SignalCheck{"short_drop", "단기 급락", met, it.ShortChangePct, r.ShortDropPct, "%"})
 	}
+	if r.RsiSellEnabled {
+		sell = append(sell, SignalCheck{"rsi_overbought", "RSI 과열", it.RSI > 0 && it.RSI >= r.RsiSellLevel, it.RSI, r.RsiSellLevel, ""})
+	}
+	if r.MfiSellEnabled {
+		sell = append(sell, SignalCheck{"mfi_overbought", "MFI 과열", it.MFI > 0 && it.MFI >= r.MfiSellLevel, it.MFI, r.MfiSellLevel, ""})
+	}
+	if r.PerSellEnabled {
+		sell = append(sell, SignalCheck{"per_high", "PER 고평가", it.PER > 0 && it.PER >= r.PerSellMin, it.PER, r.PerSellMin, "배"})
+	}
+	if r.PbrSellEnabled {
+		sell = append(sell, SignalCheck{"pbr_high", "PBR 고평가", it.PBR > 0 && it.PBR >= r.PbrSellMin, it.PBR, r.PbrSellMin, "배"})
+	}
 	if r.DividendCutEnabled {
 		met := it.DividendTrendOK && it.DividendChangePct <= -r.DividendCutPct
 		sell = append(sell, SignalCheck{"dividend_cut", "배당 삭감", met, it.DividendChangePct, -r.DividendCutPct, "%"})
@@ -702,6 +732,19 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	if r.VolOversoldEnabled {
 		met := it.VolatilityPct > 0 && it.MA200 > 0 && it.MA200Sigma <= -r.VolOversoldSigma
 		buy = append(buy, SignalCheck{"vol_oversold", "변동성 대비 과매도", met, it.MA200Sigma, -r.VolOversoldSigma, "σ"})
+	}
+
+	if r.RsiBuyEnabled {
+		buy = append(buy, SignalCheck{"rsi_rebound", "RSI 과매도 반등", oscReboundMet(it.RSI, it.RSIMin, r.RsiBuyLevel), it.RSI, r.RsiBuyLevel, ""})
+	}
+	if r.MfiBuyEnabled {
+		buy = append(buy, SignalCheck{"mfi_rebound", "MFI 과매도 반등", oscReboundMet(it.MFI, it.MFIMin, r.MfiBuyLevel), it.MFI, r.MfiBuyLevel, ""})
+	}
+	if r.PerBuyEnabled {
+		buy = append(buy, SignalCheck{"per_low", "PER 저평가", it.PER > 0 && it.PER <= r.PerBuyMax, it.PER, r.PerBuyMax, "배"})
+	}
+	if r.PbrBuyEnabled {
+		buy = append(buy, SignalCheck{"pbr_low", "PBR 저평가", it.PBR > 0 && it.PBR <= r.PbrBuyMax, it.PBR, r.PbrBuyMax, "배"})
 	}
 
 	it.SellChecks = sell

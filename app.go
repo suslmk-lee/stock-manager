@@ -42,6 +42,9 @@ func NewApp() *App {
 	a.realizedPnLService = services.NewRealizedPnLService()
 	a.signalService = services.NewSignalService(database.GetDB(), a.tickerService, a.exchangeRateService)
 	a.dailySnapService = services.NewDailySnapshotService(database.GetDB(), a.tickerService)
+	fundamentals := services.NewFundamentalsService(nil)
+	a.signalService.SetFundamentals(fundamentals)
+	a.dailySnapService.SetFundamentals(fundamentals)
 	return a
 }
 

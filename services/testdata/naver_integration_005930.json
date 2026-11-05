@@ -1,0 +1,103 @@
+{
+ "stockEndType": "stock",
+ "itemCode": "005930",
+ "stockName": "삼성전자",
+ "totalInfos": [
+  {
+   "code": "lastClosePrice",
+   "key": "전일",
+   "value": "201,500"
+  },
+  {
+   "code": "openPrice",
+   "key": "시가",
+   "value": "-"
+  },
+  {
+   "code": "highPrice",
+   "key": "고가",
+   "value": "-"
+  },
+  {
+   "code": "lowPrice",
+   "key": "저가",
+   "value": "-"
+  },
+  {
+   "code": "accumulatedTradingVolume",
+   "key": "거래량",
+   "value": "-"
+  },
+  {
+   "code": "accumulatedTradingValue",
+   "key": "대금",
+   "value": "-"
+  },
+  {
+   "code": "marketValue",
+   "key": "시총",
+   "value": "1,178조 251억"
+  },
+  {
+   "code": "foreignRate",
+   "key": "외인소진율",
+   "value": "46.06%"
+  },
+  {
+   "code": "highPriceOf52Weeks",
+   "key": "52주 최고",
+   "value": "380,000"
+  },
+  {
+   "code": "lowPriceOf52Weeks",
+   "key": "52주 최저",
+   "value": "93,500"
+  },
+  {
+   "code": "per",
+   "key": "PER",
+   "value": "9.04배",
+   "valueDesc": "2026.06."
+  },
+  {
+   "code": "eps",
+   "key": "EPS",
+   "value": "22,292원",
+   "valueDesc": "2026.06."
+  },
+  {
+   "code": "cnsPer",
+   "key": "추정PER",
+   "value": "4.41배"
+  },
+  {
+   "code": "cnsEps",
+   "key": "추정EPS",
+   "value": "45,655원"
+  },
+  {
+   "code": "pbr",
+   "key": "PBR",
+   "value": "2.34배",
+   "valueDesc": "2026.06."
+  },
+  {
+   "code": "bps",
+   "key": "BPS",
+   "value": "86,052원",
+   "valueDesc": "2026.06."
+  },
+  {
+   "code": "dividendYieldRatio",
+   "key": "배당수익률",
+   "value": "0.83%",
+   "valueDesc": "2025.12."
+  },
+  {
+   "code": "dividend",
+   "key": "주당배당금",
+   "value": "1,668원",
+   "valueDesc": "2025.12."
+  }
+ ]
+}

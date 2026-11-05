@@ -160,6 +160,7 @@ var profitSellCodes = map[string]bool{
 	"take_profit": true, "trailing_stop": true, "annualized_return": true,
 	"weight_drift": true, "above_ma": true, "dividend_payback": true,
 	"yield_compression": true, "vol_overheat": true,
+	"rsi_overbought": true, "mfi_overbought": true, "per_high": true, "pbr_high": true,
 }
 
 // applySellSuggestion 은 SELL 판정된 종목에 분할 매도/리밸런싱 수량을 채운다.

@@ -294,8 +294,11 @@ func (s *TickerService) fetchPrice(ticker string) (*CurrentPrice, error) {
 }
 
 type PricePoint struct {
-	Time  int64   `json:"time"` // unix seconds
-	Close float64 `json:"close"`
+	Time   int64   `json:"time"` // unix seconds
+	Close  float64 `json:"close"`
+	High   float64 `json:"high,omitempty"`   // 0 = 없음 (RSI/MFI 계산용 고가)
+	Low    float64 `json:"low,omitempty"`    // 0 = 없음
+	Volume float64 `json:"volume,omitempty"` // 0 = 없음
 }
 
 type PriceHistory struct {
@@ -348,7 +351,12 @@ func (s *TickerService) GetPriceHistory(ticker, rangeStr, interval string) (*Pri
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
+	return parsePriceHistory(body, ticker, rangeStr, interval)
+}
 
+// parsePriceHistory 는 Yahoo chart 응답에서 종가/고가/저가/거래량을 뽑는다.
+// 종가가 null(0)인 봉은 건너뛰고, 고가/저가/거래량이 null 이면 0(없음)으로 둔다.
+func parsePriceHistory(body []byte, ticker, rangeStr, interval string) (*PriceHistory, error) {
 	var result struct {
 		Chart struct {
 			Result []struct {
@@ -360,7 +368,10 @@ func (s *TickerService) GetPriceHistory(ticker, rangeStr, interval string) (*Pri
 				Timestamp  []int64 `json:"timestamp"`
 				Indicators struct {
 					Quote []struct {
-						Close []float64 `json:"close"`
+						Close  []float64 `json:"close"`
+						High   []float64 `json:"high"`
+						Low    []float64 `json:"low"`
+						Volume []float64 `json:"volume"`
 					} `json:"quote"`
 				} `json:"indicators"`
 			} `json:"result"`
@@ -378,10 +389,16 @@ func (s *TickerService) GetPriceHistory(ticker, rangeStr, interval string) (*Pri
 	r := result.Chart.Result[0]
 	points := make([]PricePoint, 0, len(r.Timestamp))
 	if len(r.Indicators.Quote) > 0 {
-		closes := r.Indicators.Quote[0].Close
+		q := r.Indicators.Quote[0]
+		at := func(a []float64, i int) float64 {
+			if i < len(a) && a[i] > 0 {
+				return a[i]
+			}
+			return 0
+		}
 		for i, ts := range r.Timestamp {
-			if i < len(closes) && closes[i] > 0 {
-				points = append(points, PricePoint{Time: ts, Close: closes[i]})
+			if c := at(q.Close, i); c > 0 {
+				points = append(points, PricePoint{Time: ts, Close: c, High: at(q.High, i), Low: at(q.Low, i), Volume: at(q.Volume, i)})
 			}
 		}
 	}

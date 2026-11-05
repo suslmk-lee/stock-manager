@@ -45,6 +45,7 @@ type DailySeries struct {
 type DailySnapshotService struct {
 	db     *gorm.DB
 	ticker *TickerService
+	fund   *FundamentalsService // 일별 펀더멘털 저장 (nil 이면 건너뜀)
 
 	// 외부 의존성 (테스트에서 교체)
 	now           func() time.Time
@@ -240,6 +241,7 @@ func (s *DailySnapshotService) CaptureToday(source string) (*models.DailyAssetSn
 		return nil, fmt.Errorf("일별 스냅샷 저장 실패: %w", err)
 	}
 	log.Printf("[DailySnapshot] %s 캡처 완료 (%s): 총 %.0f원, 포지션 %d개", date, source, row.TotalKRW, len(posRows))
+	s.captureFundamentals(date, holdings) // 실패해도 캡처는 성공으로 본다
 	return &row, nil
 }
 

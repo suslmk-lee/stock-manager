@@ -26,6 +26,9 @@ type SignalService struct {
 	db       *gorm.DB
 	ticker   *TickerService
 	exchange *ExchangeRateService
+	fund     *FundamentalsService // PER/PBR (nil 이면 없음)
+
+	fundPersist sync.WaitGroup // 비동기 펀더멘털 저장 (테스트에서 대기용)
 
 	alertMu         sync.Mutex // 신호 상태/이벤트 기록 직렬화
 	seedMu          sync.Mutex // 기본 프로필 시딩 직렬화
@@ -304,6 +307,9 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	if r.FromHighStillBelowPct > 0 {
 		return &ErrInvalidSignalRule{"from_high_still_below_pct must be <= 0"}
 	}
+	if err := validateOscFundamentalRules(r); err != nil {
+		return err
+	}
 	if r.TaxHarvestFromMonth == 0 {
 		r.TaxHarvestFromMonth = defaultTaxHarvestMonth
 	}
@@ -468,6 +474,7 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 		prices    = map[string]*CurrentPrice{}
 		divEvents = map[string][]DividendEvent{}
 		histories = map[string]*PriceHistory{}
+		funds     = map[string]*Fundamentals{}
 		fxHist    *PriceHistory
 	)
 	if len(tickers) > 0 {
@@ -475,6 +482,10 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 		go func() { defer wg.Done(); divEvents = s.ticker.GetDividendEventsCachedMany(tickers) }()
 		go func() { defer wg.Done(); prices = s.ticker.GetCurrentPrices(tickers) }()
 		go func() { defer wg.Done(); histories = s.ticker.GetDailyHistoriesRangeCached(tickers, "2y") }() // 트레일링 고점은 1년보다 오래된 구간도 필요
+	}
+	if len(tickers) > 0 && s.fund != nil {
+		wg.Add(1)
+		go func() { defer wg.Done(); funds = s.fund.GetMany(tickers) }() // 실패한 종목은 빠지고, 리포트는 계속된다
 	}
 	wg.Add(1)
 	go func() {
@@ -552,6 +563,15 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 			in.History = h.Points
 		}
 		in.DivEvents = divEvents[strings.ToUpper(in.Ticker)]
+		in.Fundamentals = funds[strings.ToUpper(in.Ticker)]
+	}
+	if len(funds) > 0 {
+		saveTickers := make(map[uint]string, len(order))
+		for _, id := range order {
+			saveTickers[id] = inputs[id].Ticker
+		}
+		s.fundPersist.Add(1)
+		go s.persistFundamentals(kstDateString(now), saveTickers, funds)
 	}
 
 	ctx := SignalContext{FxAt: NewFxLookup(fxHist, usdKRW), FxOK: fxHist != nil && len(fxHist.Points) > 0}

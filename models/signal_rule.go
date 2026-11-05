@@ -119,6 +119,27 @@ type SignalRuleConfig struct {
 	ShortDropDays    int     `json:"short_drop_days"`    // 5~120 거래일
 	ShortDropPct     float64 `json:"short_drop_pct"`     // < 0
 
+	// 10단계: RSI / MFI 과매도 반등·과열, PER / PBR 저평가·고평가
+	RsiPeriod       int     `json:"rsi_period"`        // 2~50
+	MfiPeriod       int     `json:"mfi_period"`        // 2~50
+	OscLookbackDays int     `json:"osc_lookback_days"` // 1~60, RSI/MFI 과매도 반등 판정 구간
+	RsiBuyEnabled   bool    `json:"rsi_buy_enabled"`
+	RsiBuyLevel     float64 `json:"rsi_buy_level"` // 1~99
+	RsiSellEnabled  bool    `json:"rsi_sell_enabled"`
+	RsiSellLevel    float64 `json:"rsi_sell_level"` // 1~99, 매수 기준보다 커야 함
+	MfiBuyEnabled   bool    `json:"mfi_buy_enabled"`
+	MfiBuyLevel     float64 `json:"mfi_buy_level"`
+	MfiSellEnabled  bool    `json:"mfi_sell_enabled"`
+	MfiSellLevel    float64 `json:"mfi_sell_level"`
+	PerBuyEnabled   bool    `json:"per_buy_enabled"`
+	PerBuyMax       float64 `json:"per_buy_max"` // > 0
+	PerSellEnabled  bool    `json:"per_sell_enabled"`
+	PerSellMin      float64 `json:"per_sell_min"` // > 0
+	PbrBuyEnabled   bool    `json:"pbr_buy_enabled"`
+	PbrBuyMax       float64 `json:"pbr_buy_max"` // > 0
+	PbrSellEnabled  bool    `json:"pbr_sell_enabled"`
+	PbrSellMin      float64 `json:"pbr_sell_min"` // > 0
+
 	// 충족 방식: "any"(1개 이상) | "all"(모두) | "count"(MinCount 개 이상) | "group"(매도만: 익절/위험 그룹별 N개)
 	SellMode     string `gorm:"size:10" json:"sell_mode"`
 	BuyMode      string `gorm:"size:10" json:"buy_mode"`
@@ -147,7 +168,7 @@ type SignalRule struct {
 }
 
 // SignalRuleVersion 은 현재 규칙 스키마 버전이다.
-const SignalRuleVersion = 9
+const SignalRuleVersion = 10
 
 // DefaultSignalRuleConfig 는 "균형" 기본 규칙 설정(저장 전)을 반환한다.
 func DefaultSignalRuleConfig() SignalRuleConfig {
@@ -216,6 +237,17 @@ func DefaultSignalRuleConfig() SignalRuleConfig {
 		TimeStopDays:                365,
 		ShortDropDays:               20,
 		ShortDropPct:                -15,
+		RsiPeriod:                   14,
+		MfiPeriod:                   14,
+		OscLookbackDays:             10,
+		RsiBuyLevel:                 30,
+		RsiSellLevel:                70,
+		MfiBuyLevel:                 20,
+		MfiSellLevel:                80,
+		PerBuyMax:                   10,
+		PerSellMin:                  40,
+		PbrBuyMax:                   1,
+		PbrSellMin:                  5,
 		SellMode:                    "group",
 		BuyMode:                     "any",
 		SellProfitMinCount:          1,

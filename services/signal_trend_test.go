@@ -149,7 +149,7 @@ func TestTrendOfInsufficientHistory(t *testing.T) {
 func TestMigrateV8ToV9(t *testing.T) {
 	c := models.SignalRuleConfig{BelowMAEnabled: true, BelowMAPct: -7, FromHighEnabled: true, FromHighPct: -25, SellMode: "group", BuyMode: "any", SellProfitMinCount: 1, SellRiskMinCount: 1}
 	v := 8
-	if !migrateRuleConfig(&c, &v) || v != 9 || models.SignalRuleVersion != 9 {
+	if !migrateRuleConfig(&c, &v) || v != models.SignalRuleVersion {
 		t.Fatalf("not migrated v=%d", v)
 	}
 	if c.BelowMAMode != "rebound" || c.BelowMALookbackDays != 60 || c.BelowMAMaxAbovePct != 3 || c.BelowMAReclaimDays != 10 ||
