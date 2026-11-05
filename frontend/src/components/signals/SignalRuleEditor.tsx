@@ -26,7 +26,10 @@ type NumKey =
   | 'annualized_min_days'
   | 'annualized_min_return_pct'
   | 'drift_pct'
-  | 'partial_pct';
+  | 'partial_pct'
+  | 'yield_compression_pct'
+  | 'vol_overheat_sigma'
+  | 'vol_oversold_sigma';
 
 type EnableKey =
   | 'from_high_enabled'
@@ -47,7 +50,10 @@ type EnableKey =
   | 'dividend_payback_enabled'
   | 'low_yield_enabled'
   | 'buy_dip_enabled'
-  | 'high_yield_enabled';
+  | 'high_yield_enabled'
+  | 'yield_compression_enabled'
+  | 'vol_overheat_enabled'
+  | 'vol_oversold_enabled';
 
 interface FieldDef {
   key: NumKey;
@@ -90,6 +96,18 @@ const SELL_PROFIT_RULES: RuleDef[] = [
     label: '비중 쏠림',
     desc: '시세 상승으로 현재 비중이 투자 원금 비중보다 기준 이상 커지면 일부 매도(리밸런싱)를 검토합니다.',
     fields: [{ key: 'drift_pct', label: '원금 비중 대비', suffix: '%p' }],
+  },
+  {
+    enabled: 'yield_compression_enabled',
+    label: '배당수익률 압축',
+    desc: '현재 배당수익률이 이 종목의 최근 24개월 평균보다 기준 이상 낮으면, 배당보다 주가가 앞서 오른 것으로 보고 매도(일부 익절)를 검토합니다. 배당 이력이 6개월 이상 있어야 계산합니다.',
+    fields: [{ key: 'yield_compression_pct', label: '평균 대비', suffix: '% 낮음' }],
+  },
+  {
+    enabled: 'vol_overheat_enabled',
+    label: '변동성 대비 과열',
+    desc: '200일 이동평균선과의 괴리를 종목 자신의 연 변동성으로 나눠 판단합니다. 변동성이 큰 기술주와 잔잔한 ETF를 같은 잣대(σ)로 비교할 수 있어, 고정 %를 쓰는 장기 이평 과열 조건을 대신해 쓸 수 있습니다.',
+    fields: [{ key: 'vol_overheat_sigma', label: '200일선 대비', suffix: 'σ 이상' }],
   },
 ];
 
@@ -146,6 +164,12 @@ const BUY_RULES: RuleDef[] = [
   { enabled: 'high_yield_enabled', label: '배당수익률 상승', desc: '현재가 기준 배당수익률이 기준 이상이면 매수를 검토합니다.', fields: [{ key: 'high_yield_pct', label: '기준', suffix: '%' }] },
   { enabled: 'from_high_enabled', label: '52주 고점 대비 하락', desc: '현재가가 52주 최고가보다 기준 이상 낮으면 매수를 검토합니다.', fields: [{ key: 'from_high_pct', label: '기준', suffix: '%' }] },
   { enabled: 'below_ma_enabled', label: '장기 이평 하회', desc: '현재가가 200일 이동평균선보다 기준 이상 낮으면 매수를 검토합니다.', fields: [{ key: 'below_ma_pct', label: '기준', suffix: '%' }] },
+  {
+    enabled: 'vol_oversold_enabled',
+    label: '변동성 대비 과매도',
+    desc: '200일 이동평균선과의 괴리를 종목 자신의 연 변동성으로 나눠 판단합니다. 양수로 입력하며 −σ 이하(예: 1.5 → −1.5σ)일 때 매수를 검토합니다. 고정 %를 쓰는 장기 이평 하회 조건을 대신해 쓸 수 있습니다.',
+    fields: [{ key: 'vol_oversold_sigma', label: '200일선 대비', suffix: 'σ 이하' }],
+  },
 ];
 
 const NUM_KEYS: NumKey[] = [
@@ -153,6 +177,7 @@ const NUM_KEYS: NumKey[] = [
   'dividend_payback_min_return_pct', 'low_yield_pct', 'buy_dip_pct', 'high_yield_pct',
   'from_high_pct', 'below_ma_pct', 'above_ma_pct', 'dividend_cut_pct', 'crash_pct', 'min_sell_qty',
   'trailing_activate_pct', 'trailing_drop_pct', 'annualized_pct', 'annualized_min_days', 'annualized_min_return_pct', 'drift_pct', 'partial_pct',
+  'yield_compression_pct', 'vol_overheat_sigma', 'vol_oversold_sigma',
 ];
 const ENABLE_KEYS: EnableKey[] = [
   'take_profit_enabled', 'stop_loss_enabled', 'weight_enabled', 'dividend_payback_enabled',
@@ -160,23 +185,26 @@ const ENABLE_KEYS: EnableKey[] = [
   'from_high_enabled', 'below_ma_enabled', 'above_ma_enabled', 'dividend_cut_enabled', 'crash_enabled',
   'tax_harvest_enabled', 'fx_historical', 'min_sell_qty_enabled',
   'trailing_enabled', 'annualized_enabled', 'drift_enabled', 'partial_enabled',
+  'yield_compression_enabled', 'vol_overheat_enabled', 'vol_oversold_enabled',
 ];
 
 // 2단계 필드 기본값 (구 백엔드가 내려주지 않을 때 균형 값으로 채움)
 const NEW_NUM_DEFAULTS: Partial<Record<NumKey, number>> = { from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, min_sell_qty: 1,
   trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33,
+  yield_compression_pct: 20, vol_overheat_sigma: 1.5, vol_oversold_sigma: 1.5,
 };
 const NEW_FLAG_DEFAULTS: Partial<Record<EnableKey, boolean>> = {
   from_high_enabled: false, below_ma_enabled: false, above_ma_enabled: false, dividend_cut_enabled: false, crash_enabled: false,
   tax_harvest_enabled: true, fx_historical: true, min_sell_qty_enabled: true,
   trailing_enabled: true, annualized_enabled: false, drift_enabled: false, partial_enabled: true,
+  yield_compression_enabled: false, vol_overheat_enabled: false, vol_oversold_enabled: false,
 };
 const DEFAULT_HARVEST_MONTH = 11;
 
 const PRESETS: { id: string; label: string; values: Partial<Record<NumKey, number>> }[] = [
-  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5, crash_pct: -30, trailing_activate_pct: 15, trailing_drop_pct: -7, annualized_pct: 20, annualized_min_days: 60, annualized_min_return_pct: 10, drift_pct: 5, partial_pct: 50 } },
-  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33 } },
-  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20, crash_pct: -50, trailing_activate_pct: 30, trailing_drop_pct: -15, annualized_pct: 35, annualized_min_days: 120, annualized_min_return_pct: 25, drift_pct: 10, partial_pct: 25 } },
+  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5, crash_pct: -30, trailing_activate_pct: 15, trailing_drop_pct: -7, annualized_pct: 20, annualized_min_days: 60, annualized_min_return_pct: 10, drift_pct: 5, partial_pct: 50, yield_compression_pct: 15, vol_overheat_sigma: 1.2, vol_oversold_sigma: 1.2 } },
+  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33, yield_compression_pct: 20, vol_overheat_sigma: 1.5, vol_oversold_sigma: 1.5 } },
+  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20, crash_pct: -50, trailing_activate_pct: 30, trailing_drop_pct: -15, annualized_pct: 35, annualized_min_days: 120, annualized_min_return_pct: 25, drift_pct: 10, partial_pct: 25, yield_compression_pct: 30, vol_overheat_sigma: 2, vol_oversold_sigma: 2 } },
 ];
 
 interface Draft {
@@ -213,6 +241,7 @@ function validate(d: Draft): Partial<Record<NumKey, string>> {
     if ((k === 'stop_loss_pct' || k === 'buy_dip_pct' || k === 'from_high_pct' || k === 'below_ma_pct' || k === 'crash_pct') && n > 0) errs[k] = '0 이하로 입력하세요';
     else if (k === 'trailing_drop_pct' && n >= 0) errs[k] = '0보다 작게 입력하세요 (예: -10)';
     else if (k === 'drift_pct' && n <= 0) errs[k] = '0보다 크게 입력하세요';
+    else if ((k === 'yield_compression_pct' || k === 'vol_overheat_sigma' || k === 'vol_oversold_sigma') && (n <= 0 || n > (k === 'yield_compression_pct' ? 100 : 10))) errs[k] = k === 'yield_compression_pct' ? '0보다 크고 100 이하로 입력하세요' : '0보다 크고 10 이하로 입력하세요';
     else if (k === 'partial_pct' && (n < 1 || n > 100)) errs[k] = '1~100 사이로 입력하세요';
     else if (k === 'annualized_min_days' && (!Number.isInteger(n) || n < 1 || n > 3650)) errs[k] = '1~3650 사이 정수로 입력하세요';
     else if ((k === 'above_ma_pct' || k === 'dividend_cut_pct' || k === 'weight_band_pct' || k === 'min_sell_qty' || k === 'trailing_activate_pct' || k === 'annualized_pct' || k === 'annualized_min_return_pct') && n < 0) errs[k] = '0 이상으로 입력하세요';

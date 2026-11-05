@@ -50,6 +50,9 @@ const CHECK_OPS: Record<string, string> = {
   trailing_stop: '≤',
   annualized_return: '≥',
   weight_drift: '≥',
+  yield_compression: '≤',
+  vol_overheat: '≥',
+  vol_oversold: '≤',
 };
 
 const fmtKrw = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
@@ -66,7 +69,9 @@ function formatPrice(v: number, currency: string) {
 function checkText(c: SignalCheck) {
   const op = CHECK_OPS[c.code] ?? '→';
   const unit = c.unit || '%';
-  return `${c.label} ${fmtNum(c.value)}${unit} ${op} ${fmtNum(c.threshold)}${unit}`;
+  // σ 단위는 소수 2자리까지 표시
+  const d = unit === 'σ' ? 2 : 1;
+  return `${c.label} ${fmtNum(c.value, d)}${unit} ${op} ${fmtNum(c.threshold, d)}${unit}`;
 }
 
 // 분할 익절 비율 표기 (33 -> 1/3)
@@ -246,14 +251,24 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
         </>,
       );
     }
+    if (item.volatility_pct) flowParts.push(<>변동성 연 <span className="text-zinc-200">{fmtPct(item.volatility_pct)}</span></>);
+    if (item.ma200_sigma) flowParts.push(<>200일선 <span className={signTone(item.ma200_sigma)}>{item.ma200_sigma > 0 ? '+' : ''}{fmtNum(item.ma200_sigma, 2)}σ</span></>);
     if (item.cost_weight_pct) flowParts.push(<>원금 비중 <span className="text-zinc-200">{fmtPct(item.cost_weight_pct)}</span> → 현재 <span className="text-zinc-200">{fmtPct(item.weight_pct)}</span></>);
   }
+  const hasYieldAvg = !noPrice && (item.dividend_yield_avg_pct ?? 0) > 0;
   const divMetrics = (
     <>
       <Metric label="누적 배당" sub={`회수율 ${fmtPct(item.dividend_payback_pct)}`}>
         {fmtKrw(item.dividends_krw)}
       </Metric>
-      <Metric label="배당수익률" sub="현재 / 원금 기준">
+      <Metric
+        label="배당수익률"
+        sub={
+          hasYieldAvg
+            ? `24개월 평균 ${fmtPct(item.dividend_yield_avg_pct!, 2)} · 평균 대비 ${fmtSignedPct(item.dividend_yield_vs_avg_pct ?? 0)}${item.dividend_yield_source === 'records' ? ' (내 배당 기록 기준)' : ''}`
+            : '현재 / 원금 기준'
+        }
+      >
         {fmtPct(item.current_yield_pct, 2)} <span className="text-zinc-500">/ {fmtPct(item.yield_on_cost_pct, 2)}</span>
       </Metric>
     </>
