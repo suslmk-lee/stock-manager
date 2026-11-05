@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X, Plus, Loader2, RotateCcw, Trash2, Layers, Coins, Lock } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { ProfileAssignment, ProfileKind, SignalItem, SignalProfile } from '../../types/models';
+import ProfileAssignmentTable, { AssignFilter } from './ProfileAssignmentTable';
 import { DEFAULT_SECTION, ProfileRuleEditor, SectionId } from './SignalRuleEditor';
 import ProfileChip, { kindLabel } from './ProfileChip';
 
@@ -125,7 +126,8 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
   const [ruleNonce, setRuleNonce] = useState(0);
   // 프로필을 바꿔도 보고 있던 규칙 섹션을 유지한다
   const [ruleSection, setRuleSection] = useState<SectionId>(DEFAULT_SECTION);
-  const [addAssetId, setAddAssetId] = useState('');
+  const [mode, setMode] = useState<'edit' | 'assign'>('edit');
+  const [assignFilter, setAssignFilter] = useState<AssignFilter>('all');
   // 이름/설명/유형 편집 (사용자 정의 프로필)
   const [meta, setMeta] = useState({ name: '', description: '', kind: 'standard' as ProfileKind });
   const detailRef = useRef<HTMLElement>(null);
@@ -169,7 +171,6 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
     if (selected) setMeta({ name: selected.name, description: selected.description ?? '', kind: selected.kind });
     setConfirm(null);
     setActionError(null);
-    setAddAssetId('');
   }, [selected?.id, selected?.updated_at]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const profileIdOf = useCallback(
@@ -177,9 +178,7 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
     [assignments, defaultProfile?.id],
   );
 
-  const members = useMemo(() => (selected ? items.filter((i) => profileIdOf(i.asset_id) === selected.id) : []), [items, selected, profileIdOf]);
-  const addable = useMemo(() => (selected ? items.filter((i) => profileIdOf(i.asset_id) !== selected.id) : []), [items, selected, profileIdOf]);
-  const profileName = (id: number) => profiles.find((p) => p.id === id)?.name ?? '기본';
+  const memberCount = useMemo(() => (selected ? items.filter((i) => profileIdOf(i.asset_id) === selected.id).length : 0), [items, selected, profileIdOf]);
 
   const run = async (fn: () => Promise<void>, fallback: string) => {
     try {
@@ -194,12 +193,24 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
     }
   };
 
-  const assign = (profileId: number, assetId: number) =>
-    run(async () => {
-      const r = await apiClient.AssignSignalProfile(profileId, [assetId]);
-      if (r?.assignments) setAssignments(r.assignments);
-      await load();
-    }, '종목을 옮기지 못했습니다.');
+  // 종목 배정 표에서 호출: 낙관적으로 반영하고 실패하면 해당 종목만 이전 값으로 되돌린다
+  const assignAssets = useCallback(
+    async (profileId: number, assetIds: number[]) => {
+      const idSet = new Set(assetIds);
+      const prev = assignments.filter((a) => idSet.has(a.asset_id));
+      setAssignments((cur) => [...cur.filter((a) => !idSet.has(a.asset_id)), ...assetIds.map((asset_id) => ({ asset_id, profile_id: profileId }))]);
+      try {
+        const r = await apiClient.AssignSignalProfile(profileId, assetIds);
+        if (r?.assignments) setAssignments(r.assignments);
+        setChanged(true);
+        await load(); // 프로필별 종목 수 갱신
+      } catch (err) {
+        setAssignments((cur) => [...cur.filter((a) => !idSet.has(a.asset_id)), ...prev]);
+        throw err;
+      }
+    },
+    [assignments, load],
+  );
 
   const saveMeta = () =>
     run(async () => {
@@ -310,7 +321,18 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
 
             {/* 상세 */}
             <section ref={detailRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-              {creating ? (
+              {!creating && (
+                <div className="glass-pill mb-5 inline-flex p-0.5" role="group" aria-label="보기 전환">
+                  {([['edit', '전략 편집'], ['assign', '종목 배정']] as const).map(([m, label]) => (
+                    <button key={m} type="button" onClick={() => setMode(m)} aria-pressed={mode === m} className={`pill-item !px-4 !py-1.5 !text-sm ${mode === m ? 'pill-item-active' : ''}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!creating && mode === 'assign' ? (
+                <ProfileAssignmentTable items={items} profiles={profiles} profileIdOf={profileIdOf} initialFilter={assignFilter} onAssign={assignAssets} />
+              ) : creating ? (
                 <NewProfileForm
                   profiles={profiles}
                   onCancel={() => setCreating(false)}
@@ -400,65 +422,19 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
                     {actionError && <div className="mt-3 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">{actionError}</div>}
                   </div>
 
-                  <section aria-label="소속 종목">
-                    <div className="mb-2.5 flex items-center justify-between gap-2">
-                      <h3 className="label-mono">소속 종목 <span className="num text-zinc-400">{members.length}</span></h3>
-                    </div>
-                    {members.length === 0 ? (
-                      <p className="surface-inset px-4 py-5 text-center text-sm text-zinc-500">이 프로필에 속한 종목이 없습니다.</p>
-                    ) : (
-                      <ul className="flex flex-wrap gap-2">
-                        {members.map((m) => (
-                          <li key={m.asset_id} className="surface-inset flex items-center gap-2 py-1.5 pl-3 pr-1.5">
-                            <span className="text-sm text-zinc-100">{m.name}</span>
-                            <span className="label-mono">{m.ticker}</span>
-                            {selected.key !== 'default' && defaultProfile && (
-                              <button
-                                type="button"
-                                className="btn-icon !h-6 !w-6"
-                                disabled={busy}
-                                title="기본 프로필로 되돌리기"
-                                aria-label={`${m.name} 기본 프로필로 되돌리기`}
-                                onClick={() => assign(defaultProfile.id, m.asset_id)}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {selected.key !== 'default' && <p className="mt-2 text-[11px] text-zinc-600">× 를 누르면 종목이 '기본' 프로필로 돌아갑니다.</p>}
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <select
-                        aria-label="추가할 종목"
-                        className="input-field !w-auto min-w-0 flex-1 sm:max-w-sm"
-                        value={addAssetId}
-                        onChange={(e) => setAddAssetId(e.target.value)}
-                        disabled={addable.length === 0}
-                      >
-                        <option value="">{addable.length === 0 ? '추가할 종목이 없습니다' : '종목 선택…'}</option>
-                        {addable.map((i) => (
-                          <option key={i.asset_id} value={i.asset_id}>
-                            {i.name} ({i.ticker}) · 현재 {profileName(profileIdOf(i.asset_id))}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        className="btn-ghost"
-                        disabled={!addAssetId || busy}
-                        onClick={async () => {
-                          await assign(selected.id, Number(addAssetId));
-                          setAddAssetId('');
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                        종목 추가
-                      </button>
-                    </div>
-                  </section>
+                  <p className="-mt-3 flex flex-wrap items-center gap-x-2 text-sm text-zinc-400">
+                    소속 종목 <span className="num text-zinc-200">{memberCount}</span>개 ·
+                    <button
+                      type="button"
+                      className="text-mint-300 transition-colors hover:text-mint-200"
+                      onClick={() => {
+                        setAssignFilter(selected.id);
+                        setMode('assign');
+                      }}
+                    >
+                      종목 배정에서 관리 →
+                    </button>
+                  </p>
 
                   <section aria-label="전략 규칙">
                     <h3 className="label-mono mb-2.5">전략 규칙</h3>
