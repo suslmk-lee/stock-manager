@@ -98,6 +98,24 @@ type SignalItem struct {
 	SuggestedSellKRW  float64 `json:"suggested_sell_krw,omitempty"`
 	SuggestedSellKind string  `json:"suggested_sell_kind,omitempty"` // "partial" | "rebalance"
 
+	// 마지막 매수 (전 계좌 중 가장 최근 매수 거래, 종목 통화). 규칙이 꺼져 있어도 매수 이력이 있으면 채운다.
+	LastBuyDate      string  `json:"last_buy_date,omitempty"`
+	LastBuyPrice     float64 `json:"last_buy_price,omitempty"`
+	FromLastBuyPct   float64 `json:"from_last_buy_pct,omitempty"`
+	DaysSinceLastBuy int     `json:"days_since_last_buy,omitempty"`
+
+	// 매수 제외 (쿨다운 / 최대 비중): 매수 조건이 충족돼도 매수 검토에서 뺀다
+	BuyExcludedReason string  `json:"buy_excluded_reason,omitempty"` // "cooldown" | "max_weight"
+	BuyMaxWeightPct   float64 `json:"buy_max_weight_pct,omitempty"`
+	BuyCooldownDays   int     `json:"buy_cooldown_days,omitempty"`
+
+	// 매수 신호 시 추가 매수 수량 제안
+	SuggestedBuyQty  float64 `json:"suggested_buy_qty,omitempty"`
+	SuggestedBuyKRW  float64 `json:"suggested_buy_krw,omitempty"`
+	SuggestedBuyKind string  `json:"suggested_buy_kind,omitempty"` // "amount" | "target_weight" | "lower_avg"
+
+	hasLastBuy bool // 마지막 매수 거래 존재 여부 (DaysSinceLastBuy 0 과 구분)
+
 	// 주당 배당 추세 (세전, 종목 통화)
 	DPS12m            float64 `json:"dps_12m"`
 	DPSPrev12m        float64 `json:"dps_prev_12m"`
@@ -288,6 +306,7 @@ func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time,
 		it.CostWeightPct = safeDiv(it.CostKRW, totalCost) * 100
 		it.Action = evaluateSignalRule(it, rules[it.AssetID])
 		applySellSuggestion(it, rules[it.AssetID], totalMV)
+		applyBuySuggestion(it, rules[it.AssetID], totalMV)
 		switch it.Action {
 		case SignalSell:
 			report.Summary.Sell++
@@ -404,6 +423,8 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time, ct
 			item.DividendChangePct = tr.ChangePct
 		}
 	}
+
+	applyLastBuy(&item, in.Txns, in.Price, now)
 
 	if in.Price <= 0 {
 		item.Action = SignalNoPrice
@@ -563,6 +584,10 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	if r.StopLossEnabled {
 		sell = append(sell, SignalCheck{"stop_loss", "손절선", ret <= r.StopLossPct, ret, r.StopLossPct, "%"})
 	}
+	if r.VolStopEnabled {
+		th := -r.VolStopK * it.VolatilityPct
+		sell = append(sell, SignalCheck{"vol_stop", "변동성 기준 손절", it.VolatilityPct > 0 && ret <= th, ret, th, "%"})
+	}
 	if r.CrashEnabled {
 		sell = append(sell, SignalCheck{"crash", "큰 폭락 경고", ret <= r.CrashPct, ret, r.CrashPct, "%"})
 	}
@@ -611,6 +636,10 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	if r.BuyDipEnabled {
 		buy = append(buy, SignalCheck{"buy_dip", "평단 대비 하락", it.FromAvgPct <= r.BuyDipPct, it.FromAvgPct, r.BuyDipPct, "%"})
 	}
+	if r.LastBuyDipEnabled {
+		met := it.hasLastBuy && it.FromLastBuyPct <= r.LastBuyDipPct
+		buy = append(buy, SignalCheck{"last_buy_dip", "마지막 매수가 대비 하락", met, it.FromLastBuyPct, r.LastBuyDipPct, "%"})
+	}
 	if r.WeightEnabled && r.TargetWeightPct > 0 {
 		th := r.TargetWeightPct - r.WeightBandPct
 		buy = append(buy, SignalCheck{"weight_under", "비중 미달", it.WeightPct <= th, it.WeightPct, th, "%"})
@@ -636,7 +665,12 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	it.BuyChecks = buy
 	it.SellDisabled = len(sell) == 0
 
-	sellHit := checksHit(sell, r.SellMode, r.SellMinCount)
+	var sellHit bool
+	if r.SellMode == "group" {
+		sellHit = groupSellHit(sell, r.SellProfitMinCount, r.SellRiskMinCount)
+	} else {
+		sellHit = checksHit(sell, r.SellMode, r.SellMinCount)
+	}
 	// 소량 보유(기준 주 이하)는 매도 검토에서 제외한다. 부동소수 오차를 감안해 아주 작은 여유를 둔다.
 	if r.MinSellQtyEnabled && r.MinSellQty > 0 && len(sell) > 0 && it.Quantity <= r.MinSellQty+1e-9 {
 		it.SellExcludedSmallQty = true
@@ -644,6 +678,23 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 		sellHit = false
 	}
 	buyHit := checksHit(buy, r.BuyMode, r.BuyMinCount)
+	it.BuyExcludedReason, it.BuyMaxWeightPct, it.BuyCooldownDays = "", 0, 0
+	if buyHit {
+		// 재매수 쿨다운 / 최대 비중: 매수 조건이 충족돼도 매수 검토에서 제외한다 (사유는 쿨다운 우선, 상세는 둘 다 채움)
+		if r.BuyCooldownEnabled && r.BuyCooldownDays > 0 && it.hasLastBuy && it.DaysSinceLastBuy < r.BuyCooldownDays {
+			it.BuyExcludedReason = "cooldown"
+			it.BuyCooldownDays = r.BuyCooldownDays
+		}
+		if r.BuyMaxWeightEnabled && r.BuyMaxWeightPct > 0 && it.WeightPct >= r.BuyMaxWeightPct {
+			if it.BuyExcludedReason == "" {
+				it.BuyExcludedReason = "max_weight"
+			}
+			it.BuyMaxWeightPct = r.BuyMaxWeightPct
+		}
+		if it.BuyExcludedReason != "" {
+			buyHit = false
+		}
+	}
 	switch {
 	case sellHit && buyHit:
 		return SignalConflict

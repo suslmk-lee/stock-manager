@@ -74,11 +74,33 @@ type SignalRuleConfig struct {
 	VolOversoldEnabled      bool    `json:"vol_oversold_enabled"`
 	VolOversoldSigma        float64 `json:"vol_oversold_sigma"` // >= 0 (양수로 저장, -sigma 로 적용)
 
-	// 충족 방식: "any"(1개 이상) | "all"(모두) | "count"(MinCount 개 이상)
+	// 7단계: 매수 규칙(마지막 매수가 대비 하락 / 재매수 쿨다운 / 최대 비중 / 매수 수량 제안), 변동성 손절
+	LastBuyDipEnabled bool    `json:"last_buy_dip_enabled"`
+	LastBuyDipPct     float64 `json:"last_buy_dip_pct"` // <= 0, 마지막 매수가 대비
+
+	BuyCooldownEnabled bool `json:"buy_cooldown_enabled"` // 마지막 매수 후 N일 이내는 매수 검토 제외
+	BuyCooldownDays    int  `json:"buy_cooldown_days"`    // 1~365
+
+	BuyMaxWeightEnabled bool    `json:"buy_max_weight_enabled"` // 비중이 이 값 이상이면 매수 검토 제외
+	BuyMaxWeightPct     float64 `json:"buy_max_weight_pct"`     // (0, 100]
+
+	BuyQtyEnabled     bool    `json:"buy_qty_enabled"`
+	BuyQtyMode        string  `gorm:"size:20" json:"buy_qty_mode"` // amount | target_weight | lower_avg
+	BuyQtyAmountKRW   float64 `json:"buy_qty_amount_krw"`          // > 0
+	BuyQtyLowerAvgPct float64 `json:"buy_qty_lower_avg_pct"`       // (0, 50]
+
+	VolStopEnabled bool    `json:"vol_stop_enabled"`
+	VolStopK       float64 `json:"vol_stop_k"` // (0, 5], 손절선 = -K × 연변동성(%)
+
+	// 충족 방식: "any"(1개 이상) | "all"(모두) | "count"(MinCount 개 이상) | "group"(매도만: 익절/위험 그룹별 N개)
 	SellMode     string `gorm:"size:10" json:"sell_mode"`
 	BuyMode      string `gorm:"size:10" json:"buy_mode"`
 	SellMinCount int    `json:"sell_min_count"` // SellMode == "count" 일 때만 사용
 	BuyMinCount  int    `json:"buy_min_count"`  // BuyMode == "count" 일 때만 사용
+
+	// SellMode == "group" 일 때 그룹별 필요 충족 개수 (1~99, 켜진 조건 수를 넘으면 전부로 본다)
+	SellProfitMinCount int `json:"sell_profit_min_count"`
+	SellRiskMinCount   int `json:"sell_risk_min_count"`
 }
 
 // SignalRule 은 매매 신호 규칙이다. AssetID == 0 이면 (레거시) 전역 기본 규칙, 아니면 종목별 오버라이드.
@@ -98,7 +120,7 @@ type SignalRule struct {
 }
 
 // SignalRuleVersion 은 현재 규칙 스키마 버전이다.
-const SignalRuleVersion = 6
+const SignalRuleVersion = 7
 
 // DefaultSignalRuleConfig 는 "균형" 기본 규칙 설정(저장 전)을 반환한다.
 func DefaultSignalRuleConfig() SignalRuleConfig {
@@ -142,8 +164,20 @@ func DefaultSignalRuleConfig() SignalRuleConfig {
 		YieldCompressionPct:         20,
 		VolOverheatSigma:            1.5,
 		VolOversoldSigma:            1.5,
-		SellMode:                    "any",
+		LastBuyDipPct:               -10,
+		BuyCooldownEnabled:          true,
+		BuyCooldownDays:             14,
+		BuyMaxWeightEnabled:         true,
+		BuyMaxWeightPct:             20,
+		BuyQtyEnabled:               true,
+		BuyQtyMode:                  "amount",
+		BuyQtyAmountKRW:             1000000,
+		BuyQtyLowerAvgPct:           5,
+		VolStopK:                    1,
+		SellMode:                    "group",
 		BuyMode:                     "any",
+		SellProfitMinCount:          1,
+		SellRiskMinCount:            1,
 	}
 }
 

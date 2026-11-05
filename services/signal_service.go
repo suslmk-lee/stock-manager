@@ -69,6 +69,11 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 		"yield_compression_pct":           r.YieldCompressionPct,
 		"vol_overheat_sigma":              r.VolOverheatSigma,
 		"vol_oversold_sigma":              r.VolOversoldSigma,
+		"last_buy_dip_pct":                r.LastBuyDipPct,
+		"buy_max_weight_pct":              r.BuyMaxWeightPct,
+		"buy_qty_amount_krw":              r.BuyQtyAmountKRW,
+		"buy_qty_lower_avg_pct":           r.BuyQtyLowerAvgPct,
+		"vol_stop_k":                      r.VolStopK,
 	}
 	for k, v := range fin {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -156,6 +161,52 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	if r.VolOversoldEnabled && r.VolOversoldSigma == 0 {
 		return &ErrInvalidSignalRule{"vol_oversold_sigma must be > 0 when vol oversold is enabled"}
 	}
+	if r.LastBuyDipPct > 0 {
+		return &ErrInvalidSignalRule{"last_buy_dip_pct must be <= 0"}
+	}
+	if r.LastBuyDipEnabled && r.LastBuyDipPct == 0 {
+		return &ErrInvalidSignalRule{"last_buy_dip_pct must be < 0 when last buy dip is enabled"}
+	}
+	if r.BuyCooldownDays == 0 {
+		r.BuyCooldownDays = defaultBuyCooldownDays
+	}
+	if r.BuyCooldownDays < 1 || r.BuyCooldownDays > 365 {
+		return &ErrInvalidSignalRule{"buy_cooldown_days must be 1..365"}
+	}
+	if r.BuyMaxWeightPct == 0 {
+		r.BuyMaxWeightPct = defaultBuyMaxWeightPct
+	}
+	if r.BuyMaxWeightPct < 0 || r.BuyMaxWeightPct > 100 {
+		return &ErrInvalidSignalRule{"buy_max_weight_pct must be in (0, 100]"}
+	}
+	switch strings.ToLower(strings.TrimSpace(r.BuyQtyMode)) {
+	case "", "amount":
+		r.BuyQtyMode = "amount"
+	case "target_weight":
+		r.BuyQtyMode = "target_weight"
+	case "lower_avg":
+		r.BuyQtyMode = "lower_avg"
+	default:
+		return &ErrInvalidSignalRule{"buy_qty_mode must be 'amount', 'target_weight' or 'lower_avg'"}
+	}
+	if r.BuyQtyAmountKRW == 0 {
+		r.BuyQtyAmountKRW = defaultBuyQtyAmountKRW
+	}
+	if r.BuyQtyAmountKRW < 0 {
+		return &ErrInvalidSignalRule{"buy_qty_amount_krw must be > 0"}
+	}
+	if r.BuyQtyLowerAvgPct == 0 {
+		r.BuyQtyLowerAvgPct = defaultBuyQtyLowerAvgPct
+	}
+	if r.BuyQtyLowerAvgPct < 0 || r.BuyQtyLowerAvgPct > 50 {
+		return &ErrInvalidSignalRule{"buy_qty_lower_avg_pct must be in (0, 50]"}
+	}
+	if r.VolStopK < 0 || r.VolStopK > 5 {
+		return &ErrInvalidSignalRule{"vol_stop_k must be in [0, 5]"}
+	}
+	if r.VolStopEnabled && r.VolStopK == 0 {
+		return &ErrInvalidSignalRule{"vol_stop_k must be > 0 when vol stop is enabled"}
+	}
 	if r.TaxHarvestFromMonth == 0 {
 		r.TaxHarvestFromMonth = defaultTaxHarvestMonth
 	}
@@ -174,6 +225,21 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	}
 	if err := normalizeMinCount("buy_min_count", r.BuyMode, &r.BuyMinCount); err != nil {
 		return err
+	}
+	// 그룹별 개수는 "group" 방식에서만 검증한다. 다른 방식이면 값을 보존하되 비어 있으면 1 로 채운다.
+	for _, g := range []struct {
+		name string
+		n    *int
+	}{{"sell_profit_min_count", &r.SellProfitMinCount}, {"sell_risk_min_count", &r.SellRiskMinCount}} {
+		if r.SellMode != "group" {
+			if *g.n < 1 {
+				*g.n = 1
+			}
+			continue
+		}
+		if *g.n < 1 || *g.n > 99 {
+			return &ErrInvalidSignalRule{g.name + " must be 1..99 when sell_mode is 'group'"}
+		}
 	}
 	return nil
 }
@@ -198,8 +264,12 @@ func normalizeSignalMode(name, v string) (string, error) {
 		return "all", nil
 	case "count":
 		return "count", nil
+	case "group":
+		if name == "sell_mode" { // 그룹 방식은 매도 전용
+			return "group", nil
+		}
 	}
-	return "", &ErrInvalidSignalRule{name + " must be 'any', 'all' or 'count'"}
+	return "", &ErrInvalidSignalRule{name + " must be 'any', 'all', 'count' or 'group' (group is sell only)"}
 }
 
 // GetSignals 는 신호 리포트를 만들고, 신호 변화를 이력에 기록한다 (기록 실패는 로그만 남김).

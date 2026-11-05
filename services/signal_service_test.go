@@ -32,7 +32,7 @@ func TestSignalRuleCRUD(t *testing.T) {
 	}
 	def := models.DefaultSignalRule()
 	if rules.Default.ID == 0 || rules.Default.AssetID != 0 || rules.Default.TakeProfitPct != def.TakeProfitPct ||
-		!rules.Default.BuyDipEnabled || rules.Default.SellMode != "any" || len(rules.Overrides) != 0 {
+		!rules.Default.BuyDipEnabled || rules.Default.SellMode != "group" || len(rules.Overrides) != 0 {
 		t.Fatalf("default %+v", rules)
 	}
 	defID := rules.Default.ID

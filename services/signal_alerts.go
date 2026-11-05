@@ -122,7 +122,7 @@ func DiffSignals(items []SignalItem, prev map[uint]models.SignalState, baseline 
 			if ls := metLabels(it, nil); len(ls) > 0 {
 				msg += " · " + strings.Join(ls, ", ")
 			}
-			msg += sellSuggestionSuffix(it)
+			msg += sellSuggestionSuffix(it) + buySuggestionSuffix(it)
 			evCodes = codes
 		case it.Action == p.Action && isAlertAction(it.Action):
 			old := splitKey(p.MetKey)
@@ -136,7 +136,7 @@ func DiffSignals(items []SignalItem, prev map[uint]models.SignalState, baseline 
 			if len(evCodes) == 0 {
 				continue
 			}
-			msg = "새 조건 충족 · " + strings.Join(metLabels(it, newSet), ", ") + sellSuggestionSuffix(it)
+			msg = "새 조건 충족 · " + strings.Join(metLabels(it, newSet), ", ") + sellSuggestionSuffix(it) + buySuggestionSuffix(it)
 		case it.Action == SignalHold && isAlertAction(p.Action):
 			msg = "신호 해제 · 관망"
 		default:

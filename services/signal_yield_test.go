@@ -351,7 +351,7 @@ func TestMigrateV5ToV6(t *testing.T) {
 	std.VolOverheatEnabled, std.VolOverheatSigma = true, 0
 	std.VolOversoldEnabled, std.VolOversoldSigma = true, 0
 	r := models.SignalRule{SignalRuleConfig: std, RuleVersion: 5}
-	if !migrateSignalRule(&r) || r.RuleVersion != models.SignalRuleVersion || models.SignalRuleVersion != 6 {
+	if !migrateSignalRule(&r) || r.RuleVersion != models.SignalRuleVersion || models.SignalRuleVersion < 6 {
 		t.Fatalf("not migrated %+v", r)
 	}
 	c := r.SignalRuleConfig

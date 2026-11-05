@@ -16,12 +16,18 @@ const (
 	defaultMinSellQty        = 1
 	defaultAnnualizedMinDays = 90
 	defaultPartialPct        = 33
+
+	defaultBuyCooldownDays   = 14
+	defaultBuyMaxWeightPct   = 20
+	defaultBuyQtyAmountKRW   = 1000000
+	defaultBuyQtyLowerAvgPct = 5
 )
 
 // migrateRuleConfig 는 이전 단계 규칙의 0 값 필드를 새 기본값으로 한 번만 보정한다. 보정했으면 true.
 //   - v1 -> v2: 시세 추세 / 배당 삭감 / 양도세 / 환율 기본값
 //   - v2 -> v3: 큰 폭락 경고(crash_pct=-40, 꺼짐)
 //   - v3 -> v4: 소량 보유 매도 제외(1주 이하, 켜짐)
+//   - v6 -> v7: 매수 규칙(쿨다운/최대 비중/수량 제안 켜짐, 마지막 매수가 대비 꺼짐), 변동성 손절(꺼짐), 매도 충족 방식을 그룹 방식으로 환산
 //   - v5 -> v6: 배당수익률 압축(익절/손절이 모두 꺼진 배당형 규칙만 켜짐), 변동성 과열/과매도(꺼짐)
 //   - v4 -> v5: 익절 규칙(트레일링은 익절/손절 규칙이 있을 때만 켜짐, 연환산/쏠림은 꺼짐), 분할 매도(켜짐)
 func migrateRuleConfig(c *models.SignalRuleConfig, version *int) bool {
@@ -102,6 +108,50 @@ func migrateRuleConfig(c *models.SignalRuleConfig, version *int) bool {
 		c.YieldCompressionEnabled = !(c.TakeProfitEnabled || c.StopLossEnabled) // 배당형 규칙만 켬
 		c.VolOverheatEnabled = false
 		c.VolOversoldEnabled = false
+	}
+	if *version < 7 {
+		def := models.DefaultSignalRuleConfig()
+		if c.LastBuyDipPct == 0 {
+			c.LastBuyDipPct = def.LastBuyDipPct
+		}
+		if c.BuyCooldownDays == 0 {
+			c.BuyCooldownDays = def.BuyCooldownDays
+		}
+		if c.BuyMaxWeightPct == 0 {
+			c.BuyMaxWeightPct = def.BuyMaxWeightPct
+		}
+		if c.BuyQtyMode == "" {
+			c.BuyQtyMode = def.BuyQtyMode
+		}
+		if c.BuyQtyAmountKRW == 0 {
+			c.BuyQtyAmountKRW = def.BuyQtyAmountKRW
+		}
+		if c.BuyQtyLowerAvgPct == 0 {
+			c.BuyQtyLowerAvgPct = def.BuyQtyLowerAvgPct
+		}
+		if c.VolStopK == 0 {
+			c.VolStopK = def.VolStopK
+		}
+		c.LastBuyDipEnabled = false
+		c.BuyCooldownEnabled = true
+		c.BuyMaxWeightEnabled = true
+		c.BuyQtyEnabled = true
+		c.VolStopEnabled = false
+		// 매도 충족 방식을 그룹 방식으로 환산: any -> (1,1), count N -> (N,1), all -> (99,99)
+		switch c.SellMode {
+		case "all":
+			c.SellProfitMinCount, c.SellRiskMinCount = 99, 99
+		case "count":
+			n := c.SellMinCount
+			if n < 1 {
+				n = 1
+			}
+			c.SellProfitMinCount, c.SellRiskMinCount = n, 1
+		default:
+			c.SellProfitMinCount, c.SellRiskMinCount = 1, 1
+		}
+		c.SellMode = "group"
+		c.SellMinCount = 0
 	}
 	*version = models.SignalRuleVersion
 	return true
