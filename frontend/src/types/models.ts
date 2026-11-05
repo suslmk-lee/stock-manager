@@ -158,6 +158,8 @@ export interface RealizedPnL {
 // any: 1개 이상, all: 모두, count: sell_min_count / buy_min_count 개 이상
 // group: (매도 전용) 수익 실현 / 위험 관리 묶음별로 sell_profit_min_count / sell_risk_min_count 를 판정
 export type SignalMode = 'any' | 'all' | 'count' | 'group';
+export type BelowMaMode = 'below' | 'rebound' | 'reclaim';
+export type FromHighMode = 'below' | 'rebound';
 export type BuyQtyMode = 'amount' | 'target_weight' | 'lower_avg';
 export type SignalAction = 'SELL' | 'BUY' | 'HOLD' | 'CONFLICT' | 'NO_PRICE';
 
@@ -244,6 +246,15 @@ export interface SignalRule {
   short_drop_enabled?: boolean; // 기본 false
   short_drop_days?: number; // 정수 5~120 (거래일), 기본 20
   short_drop_pct?: number; // < 0, 기본 -15
+  // 장기 이평 하회 / 52주 고점 대비 하락의 반등 방식 (구 백엔드에서는 없을 수 있음)
+  below_ma_mode?: BelowMaMode; // 기본 'rebound'
+  below_ma_lookback_days?: number; // 정수 10~250 (거래일), 기본 60
+  below_ma_max_above_pct?: number; // 0~50, 기본 3
+  below_ma_reclaim_days?: number; // 정수 1~60, 기본 10
+  from_high_mode?: FromHighMode; // 기본 'rebound'
+  from_high_lookback_days?: number; // 정수 10~250, 기본 60
+  from_high_rebound_pct?: number; // (0,100], 기본 5
+  from_high_still_below_pct?: number; // <= 0, 기본 -10
   sell_mode: SignalMode;
   buy_mode: SignalMode;
   sell_min_count?: number;
@@ -414,6 +425,12 @@ export interface SignalItem {
   from_high_pct?: number;
   from_low_pct?: number;
   vs_ma200_pct?: number;
+  // 반등 방식 매수 신호 보조 지표
+  ma200_min_dev_pct?: number;
+  ma20_rising?: boolean;
+  ma200_reclaim_days_ago?: number;
+  from_high_deepest_pct?: number;
+  from_low_rebound_pct?: number;
   price_history_ok?: boolean;
   // 배당 추세
   dps_12m?: number;

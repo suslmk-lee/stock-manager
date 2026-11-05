@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, Info } from 'lucide-react';
 import { apiClient } from '../../api/client';
-import { BuyQtyMode, SignalMode, SignalProfile, SignalRule } from '../../types/models';
+import { BelowMaMode, BuyQtyMode, FromHighMode, SignalMode, SignalProfile, SignalRule } from '../../types/models';
 
 type NumKey =
   | 'take_profit_pct'
@@ -42,7 +42,13 @@ type NumKey =
   | 'time_stop_days'
   | 'time_stop_max_return_pct'
   | 'short_drop_days'
-  | 'short_drop_pct';
+  | 'short_drop_pct'
+  | 'below_ma_lookback_days'
+  | 'below_ma_max_above_pct'
+  | 'below_ma_reclaim_days'
+  | 'from_high_lookback_days'
+  | 'from_high_rebound_pct'
+  | 'from_high_still_below_pct';
 
 type EnableKey =
   | 'from_high_enabled'
@@ -237,8 +243,8 @@ const BUY_RULES: RuleDef[] = [
     desc: '현재 배당수익률이 이 종목의 최근 24개월 평균보다 기준 이상 높으면, 배당 대비 주가가 싸진 것으로 보고 매수를 검토합니다. 배당 이력이 6개월 이상 있어야 계산합니다.',
     fields: [{ key: 'yield_expansion_pct', label: '평균 대비', suffix: '% 높음' }],
   },
-  { enabled: 'from_high_enabled', label: '52주 고점 대비 하락', desc: '현재가가 52주 최고가보다 기준 이상 낮으면 매수를 검토합니다.', fields: [{ key: 'from_high_pct', label: '기준', suffix: '%' }] },
-  { enabled: 'below_ma_enabled', label: '장기 이평 하회', desc: '현재가가 200일 이동평균선보다 기준 이상 낮으면 매수를 검토합니다.', fields: [{ key: 'below_ma_pct', label: '기준', suffix: '%' }] },
+  { enabled: 'from_high_enabled', label: '52주 고점 대비 하락', desc: '52주 최고가 대비 하락 후 반등을 확인하면 매수를 검토합니다.', fields: [{ key: 'from_high_pct', label: '기준', suffix: '%' }] },
+  { enabled: 'below_ma_enabled', label: '장기 이평 하회', desc: '200일 이동평균선 아래로 크게 내려갔다가 되돌아오는 시점에 매수를 검토합니다.', fields: [{ key: 'below_ma_pct', label: '기준', suffix: '%' }] },
   {
     enabled: 'vol_oversold_enabled',
     label: '변동성 대비 과매도',
@@ -255,6 +261,7 @@ const NUM_KEYS: NumKey[] = [
   'yield_compression_pct', 'vol_overheat_sigma', 'vol_oversold_sigma',
   'last_buy_dip_pct', 'buy_cooldown_days', 'buy_max_weight_pct', 'buy_qty_amount_krw', 'buy_qty_lower_avg_pct', 'vol_stop_k',
   'rebound_from_low_pct', 'rebound_lookback_days', 'yield_expansion_pct', 'time_stop_days', 'time_stop_max_return_pct', 'short_drop_days', 'short_drop_pct',
+  'below_ma_lookback_days', 'below_ma_max_above_pct', 'below_ma_reclaim_days', 'from_high_lookback_days', 'from_high_rebound_pct', 'from_high_still_below_pct',
 ];
 const ENABLE_KEYS: EnableKey[] = [
   'take_profit_enabled', 'stop_loss_enabled', 'weight_enabled', 'dividend_payback_enabled',
@@ -273,6 +280,7 @@ const NEW_NUM_DEFAULTS: Partial<Record<NumKey, number>> = { from_high_pct: -20, 
   yield_compression_pct: 20, vol_overheat_sigma: 1.5, vol_oversold_sigma: 1.5,
   last_buy_dip_pct: -10, buy_cooldown_days: 14, buy_max_weight_pct: 20, buy_qty_amount_krw: 1000000, buy_qty_lower_avg_pct: 5, vol_stop_k: 1,
   rebound_from_low_pct: 5, rebound_lookback_days: 20, yield_expansion_pct: 20, time_stop_days: 365, time_stop_max_return_pct: 0, short_drop_days: 20, short_drop_pct: -15,
+  below_ma_lookback_days: 60, below_ma_max_above_pct: 3, below_ma_reclaim_days: 10, from_high_lookback_days: 60, from_high_rebound_pct: 5, from_high_still_below_pct: -10,
 };
 const NEW_FLAG_DEFAULTS: Partial<Record<EnableKey, boolean>> = {
   from_high_enabled: false, below_ma_enabled: false, above_ma_enabled: false, dividend_cut_enabled: false, crash_enabled: false,
@@ -285,9 +293,9 @@ const NEW_FLAG_DEFAULTS: Partial<Record<EnableKey, boolean>> = {
 const DEFAULT_HARVEST_MONTH = 11;
 
 const PRESETS: { id: string; label: string; values: Partial<Record<NumKey, number>> }[] = [
-  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5, crash_pct: -30, trailing_activate_pct: 15, trailing_drop_pct: -7, annualized_pct: 20, annualized_min_days: 60, annualized_min_return_pct: 10, drift_pct: 5, partial_pct: 50, yield_compression_pct: 15, vol_overheat_sigma: 1.2, vol_oversold_sigma: 1.2, last_buy_dip_pct: -15, buy_cooldown_days: 30, buy_max_weight_pct: 15, vol_stop_k: 0.8, rebound_from_low_pct: 7, rebound_lookback_days: 20, yield_expansion_pct: 15, time_stop_days: 270, time_stop_max_return_pct: 5, short_drop_days: 20, short_drop_pct: -10 } },
-  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33, yield_compression_pct: 20, vol_overheat_sigma: 1.5, vol_oversold_sigma: 1.5, last_buy_dip_pct: -10, buy_cooldown_days: 14, buy_max_weight_pct: 20, vol_stop_k: 1, rebound_from_low_pct: 5, rebound_lookback_days: 20, yield_expansion_pct: 20, time_stop_days: 365, time_stop_max_return_pct: 0, short_drop_days: 20, short_drop_pct: -15 } },
-  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20, crash_pct: -50, trailing_activate_pct: 30, trailing_drop_pct: -15, annualized_pct: 35, annualized_min_days: 120, annualized_min_return_pct: 25, drift_pct: 10, partial_pct: 25, yield_compression_pct: 30, vol_overheat_sigma: 2, vol_oversold_sigma: 2, last_buy_dip_pct: -7, buy_cooldown_days: 7, buy_max_weight_pct: 30, vol_stop_k: 1.5, rebound_from_low_pct: 3, rebound_lookback_days: 10, yield_expansion_pct: 30, time_stop_days: 540, time_stop_max_return_pct: -5, short_drop_days: 20, short_drop_pct: -20 } },
+  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5, crash_pct: -30, trailing_activate_pct: 15, trailing_drop_pct: -7, annualized_pct: 20, annualized_min_days: 60, annualized_min_return_pct: 10, drift_pct: 5, partial_pct: 50, yield_compression_pct: 15, vol_overheat_sigma: 1.2, vol_oversold_sigma: 1.2, last_buy_dip_pct: -15, buy_cooldown_days: 30, buy_max_weight_pct: 15, vol_stop_k: 0.8, rebound_from_low_pct: 7, rebound_lookback_days: 20, yield_expansion_pct: 15, time_stop_days: 270, time_stop_max_return_pct: 5, short_drop_days: 20, short_drop_pct: -10, below_ma_lookback_days: 90, below_ma_max_above_pct: 2, below_ma_reclaim_days: 5, from_high_lookback_days: 90, from_high_rebound_pct: 7, from_high_still_below_pct: -15 } },
+  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33, yield_compression_pct: 20, vol_overheat_sigma: 1.5, vol_oversold_sigma: 1.5, last_buy_dip_pct: -10, buy_cooldown_days: 14, buy_max_weight_pct: 20, vol_stop_k: 1, rebound_from_low_pct: 5, rebound_lookback_days: 20, yield_expansion_pct: 20, time_stop_days: 365, time_stop_max_return_pct: 0, short_drop_days: 20, short_drop_pct: -15, below_ma_lookback_days: 60, below_ma_max_above_pct: 3, below_ma_reclaim_days: 10, from_high_lookback_days: 60, from_high_rebound_pct: 5, from_high_still_below_pct: -10 } },
+  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20, crash_pct: -50, trailing_activate_pct: 30, trailing_drop_pct: -15, annualized_pct: 35, annualized_min_days: 120, annualized_min_return_pct: 25, drift_pct: 10, partial_pct: 25, yield_compression_pct: 30, vol_overheat_sigma: 2, vol_oversold_sigma: 2, last_buy_dip_pct: -7, buy_cooldown_days: 7, buy_max_weight_pct: 30, vol_stop_k: 1.5, rebound_from_low_pct: 3, rebound_lookback_days: 10, yield_expansion_pct: 30, time_stop_days: 540, time_stop_max_return_pct: -5, short_drop_days: 20, short_drop_pct: -20, below_ma_lookback_days: 40, below_ma_max_above_pct: 5, below_ma_reclaim_days: 15, from_high_lookback_days: 40, from_high_rebound_pct: 3, from_high_still_below_pct: -5 } },
 ];
 
 interface Draft {
@@ -302,6 +310,8 @@ interface Draft {
   sell_profit_count: number;
   sell_risk_count: number;
   buy_qty_mode: BuyQtyMode;
+  below_ma_mode: BelowMaMode;
+  from_high_mode: FromHighMode;
 }
 
 const ALL_COUNT = 99;
@@ -331,6 +341,8 @@ function toDraft(rule: SignalRule): Draft {
     sell_profit_count: groupCounts(rule).profit,
     sell_risk_count: groupCounts(rule).risk,
     buy_qty_mode: rule.buy_qty_mode || 'amount',
+    below_ma_mode: rule.below_ma_mode || 'rebound',
+    from_high_mode: rule.from_high_mode || 'rebound',
   };
 }
 
@@ -362,6 +374,11 @@ function validate(d: Draft): Partial<Record<NumKey, string>> {
     else if (k === 'yield_expansion_pct' && n <= 0) errs[k] = '0보다 크게 입력하세요';
     else if (k === 'time_stop_days' && (!Number.isInteger(n) || n < 30 || n > 3650)) errs[k] = '30~3650 사이 정수로 입력하세요';
     else if (k === 'short_drop_pct' && n >= 0) errs[k] = '0보다 작게 입력하세요 (예: -15)';
+    else if ((k === 'below_ma_lookback_days' || k === 'from_high_lookback_days') && (!Number.isInteger(n) || n < 10 || n > 250)) errs[k] = '10~250 사이 정수로 입력하세요';
+    else if (k === 'below_ma_max_above_pct' && (n < 0 || n > 50)) errs[k] = '0~50 사이로 입력하세요';
+    else if (k === 'below_ma_reclaim_days' && (!Number.isInteger(n) || n < 1 || n > 60)) errs[k] = '1~60 사이 정수로 입력하세요';
+    else if (k === 'from_high_rebound_pct' && (n <= 0 || n > 100)) errs[k] = '0보다 크고 100 이하로 입력하세요';
+    else if (k === 'from_high_still_below_pct' && n > 0) errs[k] = '0 이하로 입력하세요 (예: -10)';
   });
   return errs;
 }
@@ -487,6 +504,8 @@ function buildRule(base: SignalRule, d: Draft): SignalRule {
   NUM_KEYS.forEach((k) => (rule[k] = Number(d.nums[k])));
   ENABLE_KEYS.forEach((k) => (rule[k] = d.flags[k]));
   rule.buy_qty_mode = d.buy_qty_mode;
+  rule.below_ma_mode = d.below_ma_mode;
+  rule.from_high_mode = d.from_high_mode;
   const month = Math.round(Number(d.month));
   rule.tax_harvest_from_month = month >= 1 && month <= 12 ? month : DEFAULT_HARVEST_MONTH;
   return rule;
@@ -542,6 +561,7 @@ const SECTION_OF_NUM: Partial<Record<NumKey, SectionId>> = (() => {
   add(BUY_EXCLUDE_RULES, 'confirm');
   m.rebound_lookback_days = 'confirm';
   m.rebound_from_low_pct = 'confirm';
+  (['below_ma_lookback_days', 'below_ma_max_above_pct', 'below_ma_reclaim_days', 'from_high_lookback_days', 'from_high_rebound_pct', 'from_high_still_below_pct'] as NumKey[]).forEach((k) => (m[k] = 'buy'));
   m.buy_qty_amount_krw = 'buyqty';
   m.buy_qty_lower_avg_pct = 'buyqty';
   return m;
@@ -726,6 +746,95 @@ function SectionBody({ rd, readOnly, touched, showNote, id }: { rd: RuleDraft; r
     );
   };
 
+  const modePills = <T extends string>(label: string, options: { value: T; label: string }[], mode: T, onPick: (v: T) => void) => (
+    <div className="glass-pill inline-flex p-0.5" role="group" aria-label={label}>
+      {options.map((m) => (
+        <button
+          key={m.value}
+          type="button"
+          disabled={readOnly}
+          aria-pressed={mode === m.value}
+          onClick={() => onPick(m.value)}
+          className={`pill-item !px-3 !py-1 !text-xs ${mode === m.value ? 'pill-item-active' : ''}`}
+        >
+          {m.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderBelowMa = () => {
+    const on = draft.flags.below_ma_enabled;
+    const mode = draft.below_ma_mode;
+    const x = fmtNum(draft.nums.below_ma_pct).replace('-', '');
+    const n = fmtNum(draft.nums.below_ma_lookback_days);
+    const desc =
+      mode === 'below'
+        ? `현재가가 200일선보다 ${x}% 이상 아래에 있으면 매수를 검토합니다. 하락이 계속되는 중에도 신호가 날 수 있습니다.`
+        : mode === 'reclaim'
+          ? `최근 ${n}거래일 안에 200일선보다 ${x}% 이상 아래에 있었고, 최근 ${fmtNum(draft.nums.below_ma_reclaim_days)}거래일 안에 200일선을 다시 넘어 지금도 그 위에 있으면 매수를 검토합니다.`
+          : `최근 ${n}거래일 안에 200일선보다 ${x}% 이상 아래에 있었고, 지금은 20일 이평선 위에서 20일선이 오르는 중일 때 매수를 검토합니다. 이미 200일선보다 ${fmtNum(draft.nums.below_ma_max_above_pct)}% 넘게 오른 뒤에는 신호를 내지 않습니다.`;
+    return rowShell(
+      'below_ma',
+      on,
+      <Switch checked={on} onChange={(v) => setFlag('below_ma_enabled', v)} label="장기 이평 하회" disabled={readOnly} />,
+      '장기 이평 하회',
+      desc,
+      <>
+        {modePills<BelowMaMode>(
+          '장기 이평 방식',
+          [
+            { value: 'rebound', label: '하회 후 반등' },
+            { value: 'reclaim', label: '200일선 회복' },
+            { value: 'below', label: '단순 하회' },
+          ],
+          mode,
+          (v) => setDraft((d) => ({ ...d, below_ma_mode: v })),
+        )}
+        {numInput('below_ma_pct', '200일선 대비', '% 이하까지 하락')}
+        {mode !== 'below' && numInput('below_ma_lookback_days', '최근', '거래일 안')}
+        {mode === 'rebound' && numInput('below_ma_max_above_pct', '200일선 위', '% 이내')}
+        {mode === 'reclaim' && numInput('below_ma_reclaim_days', '회복', '거래일 이내')}
+      </>,
+    );
+  };
+
+  const renderFromHigh = () => {
+    const on = draft.flags.from_high_enabled;
+    const mode = draft.from_high_mode;
+    const x = fmtNum(draft.nums.from_high_pct).replace('-', '');
+    const desc =
+      mode === 'below'
+        ? `현재가가 52주 최고가보다 ${x}% 이상 낮으면 매수를 검토합니다. 하락이 계속되는 중에도 신호가 날 수 있습니다.`
+        : `최근 ${fmtNum(draft.nums.from_high_lookback_days)}거래일 안에 52주 고점 대비 ${x}% 이상 떨어졌고, 그 기간 최저 종가에서 ${fmtNum(draft.nums.from_high_rebound_pct)}% 이상 반등했으며, 아직 고점보다 ${fmtNum(draft.nums.from_high_still_below_pct).replace('-', '')}% 이상 아래일 때 매수를 검토합니다.`;
+    return rowShell(
+      'from_high',
+      on,
+      <Switch checked={on} onChange={(v) => setFlag('from_high_enabled', v)} label="52주 고점 대비 하락" disabled={readOnly} />,
+      '52주 고점 대비 하락',
+      desc,
+      <>
+        {modePills<FromHighMode>(
+          '52주 고점 방식',
+          [
+            { value: 'rebound', label: '하락 후 반등' },
+            { value: 'below', label: '단순 하락' },
+          ],
+          mode,
+          (v) => setDraft((d) => ({ ...d, from_high_mode: v })),
+        )}
+        {numInput('from_high_pct', '고점 대비', '%까지 하락')}
+        {mode === 'rebound' && (
+          <>
+            {numInput('from_high_lookback_days', '최근', '거래일 안')}
+            {numInput('from_high_rebound_pct', '저점에서', '% 이상 반등')}
+            {numInput('from_high_still_below_pct', '고점보다', '% 이상 아래')}
+          </>
+        )}
+      </>,
+    );
+  };
+
   const renderBuyQty = () => {
     const on = draft.flags.buy_qty_enabled;
     const mode = draft.buy_qty_mode;
@@ -785,7 +894,13 @@ function SectionBody({ rd, readOnly, touched, showNote, id }: { rd: RuleDraft; r
         </>
       );
     case 'buy':
-      return <>{BUY_RULES.map(renderRule)}</>;
+      return (
+        <>
+          {BUY_RULES.map((def) =>
+            def.enabled === 'below_ma_enabled' ? renderBelowMa() : def.enabled === 'from_high_enabled' ? renderFromHigh() : renderRule(def),
+          )}
+        </>
+      );
     case 'confirm':
       return (
         <>

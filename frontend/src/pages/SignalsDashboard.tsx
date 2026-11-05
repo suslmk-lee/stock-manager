@@ -79,6 +79,11 @@ function checkText(c: SignalCheck) {
   const unit = c.unit || '%';
   // σ 단위는 소수 2자리까지 표시
   const d = unit === 'σ' ? 2 : 1;
+  // 반등 방식은 현재값이 기준과 직접 비교되지 않으므로 현재값과 하락 깊이 기준을 따로 보여 준다
+  if ((c.code === 'below_ma' || c.code === 'from_high') && /반등|회복/.test(c.label)) {
+    const depth = c.threshold !== 0 ? ` (하락 기준 ${fmtNum(c.threshold, d)}${unit})` : '';
+    return `${c.label} · 현재 ${fmtNum(c.value, d)}${unit}${depth}`;
+  }
   return `${c.label} ${fmtNum(c.value, d)}${unit} ${op} ${fmtNum(c.threshold, d)}${unit}`;
 }
 
@@ -463,6 +468,15 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
                 {!!item.ma200 && (
                   <span>
                     200일선 대비 <span className={signTone(item.vs_ma200_pct ?? 0)}>{fmtSignedPct(item.vs_ma200_pct ?? 0)}</span>
+                    {item.ma200_min_dev_pct !== undefined && <> (최저 {fmtSignedPct(item.ma200_min_dev_pct)})</>}
+                  </span>
+                )}
+                {item.ma20_rising !== undefined && <span>20일선 {item.ma20_rising ? '상승' : '하락'}</span>}
+                {(item.ma200_reclaim_days_ago ?? 0) > 0 && <span>200일선 회복 {item.ma200_reclaim_days_ago}일 전</span>}
+                {item.from_high_deepest_pct !== undefined && (
+                  <span>
+                    고점 대비 최저 {fmtSignedPct(item.from_high_deepest_pct)}
+                    {item.from_low_rebound_pct !== undefined && <> · 저점 대비 {fmtSignedPct(item.from_low_rebound_pct)}</>}
                   </span>
                 )}
               </div>
