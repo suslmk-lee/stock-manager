@@ -246,6 +246,27 @@ export interface SignalRule {
   short_drop_enabled?: boolean; // 기본 false
   short_drop_days?: number; // 정수 5~120 (거래일), 기본 20
   short_drop_pct?: number; // < 0, 기본 -15
+  // 기술 지표 (RSI · MFI) — 구 백엔드에서는 없을 수 있음
+  rsi_period?: number; // 정수 2~50, 기본 14
+  mfi_period?: number; // 정수 2~50, 기본 14
+  osc_lookback_days?: number; // 정수 1~60, 기본 10 (과매도 반등 확인 기간)
+  rsi_buy_enabled?: boolean; // 기본 false
+  rsi_buy_level?: number; // 1~99, 기본 30
+  rsi_sell_enabled?: boolean; // 기본 false
+  rsi_sell_level?: number; // 1~99, 기본 70 (둘 다 켜면 매수 기준보다 커야 함)
+  mfi_buy_enabled?: boolean; // 기본 false
+  mfi_buy_level?: number; // 기본 20
+  mfi_sell_enabled?: boolean; // 기본 false
+  mfi_sell_level?: number; // 기본 80
+  // 펀더멘털 (PER · PBR)
+  per_buy_enabled?: boolean; // 기본 false
+  per_buy_max?: number; // > 0, 기본 10
+  per_sell_enabled?: boolean; // 기본 false
+  per_sell_min?: number; // > 0, 기본 40
+  pbr_buy_enabled?: boolean; // 기본 false
+  pbr_buy_max?: number; // > 0, 기본 1
+  pbr_sell_enabled?: boolean; // 기본 false
+  pbr_sell_min?: number; // > 0, 기본 5
   // 장기 이평 하회 / 52주 고점 대비 하락의 반등 방식 (구 백엔드에서는 없을 수 있음)
   below_ma_mode?: BelowMaMode; // 기본 'rebound'
   below_ma_lookback_days?: number; // 정수 10~250 (거래일), 기본 60
@@ -399,6 +420,18 @@ export interface SignalItem {
   short_change_days?: number;
   buy_max_weight_pct?: number;
   buy_cooldown_days?: number;
+  // 기술 지표 · 펀더멘털 (없으면 계산 불가)
+  rsi?: number;
+  rsi_min?: number; // 확인 기간 중 최저 RSI
+  mfi?: number;
+  mfi_min?: number;
+  per?: number;
+  forward_per?: number;
+  pbr?: number;
+  eps?: number;
+  bps?: number;
+  fundamentals_source?: 'yahoo' | 'naver';
+  fundamentals_as_of?: string; // YYYY-MM-DD
   suggested_buy_qty?: number;
   suggested_buy_krw?: number;
   suggested_buy_kind?: BuyQtyMode;
