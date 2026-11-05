@@ -58,10 +58,21 @@ const CHECK_OPS: Record<string, string> = {
   yield_expansion: '≥',
   time_stop: '≤',
   short_drop: '≤',
+  rsi_rebound: '→',
+  mfi_rebound: '→',
+  rsi_overbought: '≥',
+  mfi_overbought: '≥',
+  per_low: '≤',
+  pbr_low: '≤',
+  per_high: '≥',
+  pbr_high: '≥',
 };
 
+// 단위가 "배"인 펀더멘털 체크
+const MULTIPLE_CODES = new Set(['per_low', 'pbr_low', 'per_high', 'pbr_high']);
+
 // 수익 실현 묶음에 속하는 매도 체크 (나머지 매도 체크는 위험 관리 묶음)
-const SELL_PROFIT_CODES = new Set(['take_profit', 'trailing_stop', 'annualized_return', 'weight_drift', 'yield_compression', 'vol_overheat']);
+const SELL_PROFIT_CODES = new Set(['take_profit', 'trailing_stop', 'annualized_return', 'weight_drift', 'yield_compression', 'vol_overheat', 'rsi_overbought', 'mfi_overbought', 'per_high', 'pbr_high']);
 
 const fmtKrw = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
 const fmtSignedKrw = (v: number) => `${v < 0 ? '-' : '+'}₩${Math.abs(Math.round(v)).toLocaleString('ko-KR')}`;
@@ -74,8 +85,20 @@ function formatPrice(v: number, currency: string) {
   return currency === 'USD' ? `$${fmtNum(v, 2)}` : `₩${Math.round(v).toLocaleString('ko-KR')}`;
 }
 
-function checkText(c: SignalCheck) {
+function checkText(c: SignalCheck, oscMins?: { rsi?: number; mfi?: number }) {
   const op = CHECK_OPS[c.code] ?? '→';
+  // RSI/MFI 과매도 반등: 최근 최저값은 카드 지표 행에 있으므로 여기서는 현재값과 기준만 보여 준다
+  if (c.code === 'rsi_rebound' || c.code === 'mfi_rebound') {
+    const name = c.code === 'rsi_rebound' ? 'RSI' : 'MFI';
+    const lo = c.code === 'rsi_rebound' ? oscMins?.rsi : oscMins?.mfi;
+    return `${name} ${fmtNum(c.value, 0)} (${lo ? `최근 ${fmtNum(lo, 0)} → ` : ""}반등, 기준 ${fmtNum(c.threshold, 0)})`;
+  }
+  if (c.code.startsWith('rsi_') || c.code.startsWith('mfi_')) {
+    return `${c.label} ${fmtNum(c.value, 1)} ${op} ${fmtNum(c.threshold, 0)}`;
+  }
+  if (MULTIPLE_CODES.has(c.code)) {
+    return `${c.label} ${fmtNum(c.value, 2)}배 ${op} ${fmtNum(c.threshold, 2)}배`;
+  }
   const unit = c.unit || '%';
   // σ 단위는 소수 2자리까지 표시
   const d = unit === 'σ' ? 2 : 1;
@@ -223,7 +246,7 @@ function GroupModeHint({ checks, profitCount, riskCount }: { checks: SignalCheck
   return <span className="ml-1.5 text-zinc-600">({parts.join(' · ')} 이상)</span>;
 }
 
-function CheckGroup({ title, checks, tone, mode, count, profitCount, riskCount }: { title: string; checks: SignalCheck[]; tone: 'sell' | 'buy'; mode?: SignalMode; count?: number; profitCount?: number; riskCount?: number }) {
+function CheckGroup({ title, checks, tone, mode, count, profitCount, riskCount, oscMins }: { oscMins?: { rsi?: number; mfi?: number }; title: string; checks: SignalCheck[]; tone: 'sell' | 'buy'; mode?: SignalMode; count?: number; profitCount?: number; riskCount?: number }) {
   if (checks.length === 0) return null;
   const metClass =
     tone === 'sell' ? '!border-rose-400/30 !bg-rose-500/10 !text-rose-200' : '!border-mint-400/30 !bg-mint-400/10 !text-mint-300';
@@ -237,12 +260,12 @@ function CheckGroup({ title, checks, tone, mode, count, profitCount, riskCount }
         {checks.map((c) =>
           c.met ? (
             <Chip key={c.code} check className={`${metClass} ${tone === 'sell' ? '[&_svg]:!text-rose-300' : ''}`}>
-              {checkText(c)}
+              {checkText(c, oscMins)}
             </Chip>
           ) : (
             <Chip key={c.code} className="!text-zinc-500">
               <span className="text-zinc-600">·</span>
-              {checkText(c)}
+              {checkText(c, oscMins)}
             </Chip>
           ),
         )}
@@ -285,7 +308,19 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
     if (item.ma200_sigma) flowParts.push(<>200일선 <span className={signTone(item.ma200_sigma)}>{item.ma200_sigma > 0 ? '+' : ''}{fmtNum(item.ma200_sigma, 2)}σ</span></>);
     if (item.cost_weight_pct) flowParts.push(<>원금 비중 <span className="text-zinc-200">{fmtPct(item.cost_weight_pct)}</span> → 현재 <span className="text-zinc-200">{fmtPct(item.weight_pct)}</span></>);
   }
-  const hasYieldAvg = !noPrice && (item.dividend_yield_avg_pct ?? 0) > 0;
+  // 지표: RSI/MFI/PER/PBR (값이 있는 항목만)
+  const oscTone = (v: number, hot: number, cold: number) => (v >= hot ? 'text-rose-300' : v <= cold ? 'text-mint-300' : 'text-zinc-200');
+  const indParts: React.ReactNode[] = [];
+  if (!noPrice) {
+    if (item.rsi) indParts.push(<>RSI <span className={oscTone(item.rsi, 70, 30)}>{fmtNum(item.rsi, 1)}</span>{item.rsi_min ? <span className="text-zinc-500"> (최근 최저 {fmtNum(item.rsi_min, 1)})</span> : null}</>);
+    if (item.mfi) indParts.push(<>MFI <span className={oscTone(item.mfi, 80, 20)}>{fmtNum(item.mfi, 1)}</span>{item.mfi_min ? <span className="text-zinc-500"> (최근 최저 {fmtNum(item.mfi_min, 1)})</span> : null}</>);
+    if (item.per) indParts.push(<>PER <span className="text-zinc-200">{fmtNum(item.per, 1)}배</span>{item.forward_per ? <span className="text-zinc-500"> (예상 {fmtNum(item.forward_per, 1)}배)</span> : null}</>);
+    if (item.pbr) indParts.push(<>PBR <span className="text-zinc-200">{fmtNum(item.pbr, 2)}배</span></>);
+  }
+  const hasFundamentals = !!item.per || !!item.pbr;
+  const fundSource = item.fundamentals_source === 'naver' ? '네이버' : item.fundamentals_source === 'yahoo' ? 'Yahoo' : '';
+  const fundHint = hasFundamentals && (fundSource || item.fundamentals_as_of) ? [fundSource, item.fundamentals_as_of].filter(Boolean).join(' · ') : '';
+  const hasYieldAvg =!noPrice && (item.dividend_yield_avg_pct ?? 0) > 0;
   const divMetrics = (
     <>
       <Metric label="누적 배당" sub={`회수율 ${fmtPct(item.dividend_payback_pct)}`}>
@@ -456,6 +491,18 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
         </div>
       )}
 
+      {indParts.length > 0 && (
+        <div className="surface-inset mt-4 min-w-0 px-3 py-2.5">
+          <div className="label-mono">지표</div>
+          <div className="num mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-zinc-400">
+            {indParts.map((part, i) => (
+              <span key={i}>{part}</span>
+            ))}
+            {fundHint && <span className="text-[10px] text-zinc-500">{fundHint}</span>}
+          </div>
+        </div>
+      )}
+
       {(showTrend || showDiv) && (
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {showTrend && (
@@ -527,7 +574,7 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
       {(item.sell_checks.length > 0 || item.buy_checks.length > 0) && (
         <div className="mt-4 space-y-3 border-t border-white/[0.06] pt-4">
           <CheckGroup title="매도 조건" checks={item.sell_checks} tone="sell" mode={rule?.sell_mode} count={rule?.sell_min_count} profitCount={rule?.sell_profit_min_count} riskCount={rule?.sell_risk_min_count} />
-          <CheckGroup title="매수 조건" checks={item.buy_checks} tone="buy" mode={rule?.buy_mode} count={rule?.buy_min_count} />
+          <CheckGroup title="매수 조건" oscMins={{ rsi: item.rsi_min, mfi: item.mfi_min }} checks={item.buy_checks} tone="buy" mode={rule?.buy_mode} count={rule?.buy_min_count} />
         </div>
       )}
 
