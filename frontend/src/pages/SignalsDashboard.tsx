@@ -3,7 +3,7 @@ import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import SignalHistory from '../components/alerts/SignalHistory';
 import { apiClient } from '../api/client';
-import { SignalAction, SignalCheck, SignalItem, SignalProfile, SignalReport, SignalRule, SignalRulesResponse, SignalTaxSummary } from '../types/models';
+import { SignalAction, SignalCheck, SignalItem, SignalMode, SignalProfile, SignalReport, SignalRule, SignalRulesResponse, SignalTaxSummary } from '../types/models';
 import IconTile from '../components/ui/IconTile';
 import RingGauge from '../components/ui/RingGauge';
 import Chip from '../components/ui/Chip';
@@ -191,12 +191,14 @@ function RangeBar({ low, high, price, ma }: { low: number; high: number; price: 
   );
 }
 
-function ModeHint({ mode }: { mode?: 'any' | 'all' }) {
+function ModeHint({ mode, count, total }: { mode?: SignalMode; count?: number; total: number }) {
   if (!mode) return null;
-  return <span className="ml-1.5 text-zinc-600">({mode === 'all' ? '모두 충족' : '하나 이상'})</span>;
+  const need = mode === 'all' ? total : mode === 'count' ? Math.min(Math.max(count ?? 1, 1), total) : 1;
+  const text = need >= total && total > 1 ? '모두 충족' : need <= 1 ? '하나 이상' : `${need}개 이상`;
+  return <span className="ml-1.5 text-zinc-600">({text})</span>;
 }
 
-function CheckGroup({ title, checks, tone, mode }: { title: string; checks: SignalCheck[]; tone: 'sell' | 'buy'; mode?: 'any' | 'all' }) {
+function CheckGroup({ title, checks, tone, mode, count }: { title: string; checks: SignalCheck[]; tone: 'sell' | 'buy'; mode?: SignalMode; count?: number }) {
   if (checks.length === 0) return null;
   const metClass =
     tone === 'sell' ? '!border-rose-400/30 !bg-rose-500/10 !text-rose-200' : '!border-mint-400/30 !bg-mint-400/10 !text-mint-300';
@@ -204,7 +206,7 @@ function CheckGroup({ title, checks, tone, mode }: { title: string; checks: Sign
     <div>
       <div className="label-mono mb-1.5">
         {title}
-        <ModeHint mode={mode} />
+        <ModeHint mode={mode} count={count} total={checks.length} />
       </div>
       <div className="flex flex-wrap gap-1.5">
         {checks.map((c) =>
@@ -458,8 +460,8 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
 
       {(item.sell_checks.length > 0 || item.buy_checks.length > 0) && (
         <div className="mt-4 space-y-3 border-t border-white/[0.06] pt-4">
-          <CheckGroup title="매도 조건" checks={item.sell_checks} tone="sell" mode={rule?.sell_mode} />
-          <CheckGroup title="매수 조건" checks={item.buy_checks} tone="buy" mode={rule?.buy_mode} />
+          <CheckGroup title="매도 조건" checks={item.sell_checks} tone="sell" mode={rule?.sell_mode} count={rule?.sell_min_count} />
+          <CheckGroup title="매수 조건" checks={item.buy_checks} tone="buy" mode={rule?.buy_mode} count={rule?.buy_min_count} />
         </div>
       )}
 

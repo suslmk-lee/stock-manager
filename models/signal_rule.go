@@ -74,8 +74,11 @@ type SignalRuleConfig struct {
 	VolOversoldEnabled      bool    `json:"vol_oversold_enabled"`
 	VolOversoldSigma        float64 `json:"vol_oversold_sigma"` // >= 0 (양수로 저장, -sigma 로 적용)
 
-	SellMode string `gorm:"size:10" json:"sell_mode"`
-	BuyMode  string `gorm:"size:10" json:"buy_mode"`
+	// 충족 방식: "any"(1개 이상) | "all"(모두) | "count"(MinCount 개 이상)
+	SellMode     string `gorm:"size:10" json:"sell_mode"`
+	BuyMode      string `gorm:"size:10" json:"buy_mode"`
+	SellMinCount int    `json:"sell_min_count"` // SellMode == "count" 일 때만 사용
+	BuyMinCount  int    `json:"buy_min_count"`  // BuyMode == "count" 일 때만 사용
 }
 
 // SignalRule 은 매매 신호 규칙이다. AssetID == 0 이면 (레거시) 전역 기본 규칙, 아니면 종목별 오버라이드.

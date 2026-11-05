@@ -169,6 +169,24 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	if r.BuyMode, err = normalizeSignalMode("buy_mode", r.BuyMode); err != nil {
 		return err
 	}
+	if err := normalizeMinCount("sell_min_count", r.SellMode, &r.SellMinCount); err != nil {
+		return err
+	}
+	if err := normalizeMinCount("buy_min_count", r.BuyMode, &r.BuyMinCount); err != nil {
+		return err
+	}
+	return nil
+}
+
+// normalizeMinCount 는 "count" 방식일 때 최소 개수를 검증한다. 다른 방식이면 0 으로 비운다.
+func normalizeMinCount(name, mode string, n *int) error {
+	if mode != "count" {
+		*n = 0
+		return nil
+	}
+	if *n < 1 || *n > 50 {
+		return &ErrInvalidSignalRule{name + " must be 1..50 when mode is 'count'"}
+	}
 	return nil
 }
 
@@ -178,8 +196,10 @@ func normalizeSignalMode(name, v string) (string, error) {
 		return "any", nil
 	case "all":
 		return "all", nil
+	case "count":
+		return "count", nil
 	}
-	return "", &ErrInvalidSignalRule{name + " must be 'any' or 'all'"}
+	return "", &ErrInvalidSignalRule{name + " must be 'any', 'all' or 'count'"}
 }
 
 // GetSignals 는 신호 리포트를 만들고, 신호 변화를 이력에 기록한다 (기록 실패는 로그만 남김).

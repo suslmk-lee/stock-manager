@@ -198,7 +198,7 @@ type SignalAssetInput struct {
 	PnLs          []SignalPnLInput
 	Dividends     []SignalDividendInput
 	Txns          []SignalTxnInput
-	History       []PricePoint // 일봉 종가 (종목 통화). 비어 있으면 추세 지표 없음
+	History       []PricePoint    // 일봉 종가 (종목 통화). 비어 있으면 추세 지표 없음
 	DivEvents     []DividendEvent // 시장(Yahoo) 주당배당 이벤트. 비어 있으면 사용자 배당 기록으로 대체
 	Rule          models.SignalRuleConfig
 	RuleSource    string // "asset" | "profile" | "default"
@@ -636,14 +636,14 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	it.BuyChecks = buy
 	it.SellDisabled = len(sell) == 0
 
-	sellHit := checksHit(sell, r.SellMode)
+	sellHit := checksHit(sell, r.SellMode, r.SellMinCount)
 	// 소량 보유(기준 주 이하)는 매도 검토에서 제외한다. 부동소수 오차를 감안해 아주 작은 여유를 둔다.
 	if r.MinSellQtyEnabled && r.MinSellQty > 0 && len(sell) > 0 && it.Quantity <= r.MinSellQty+1e-9 {
 		it.SellExcludedSmallQty = true
 		it.MinSellQty = r.MinSellQty
 		sellHit = false
 	}
-	buyHit := checksHit(buy, r.BuyMode)
+	buyHit := checksHit(buy, r.BuyMode, r.BuyMinCount)
 	switch {
 	case sellHit && buyHit:
 		return SignalConflict
@@ -655,24 +655,32 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	return SignalHold
 }
 
-func checksHit(checks []SignalCheck, mode string) bool {
+// checksHit 는 켜진 조건 중 충족된 개수로 판정한다.
+//   - any: 1개 이상, all: 전부, count: minCount 개 이상 (켜진 조건 수보다 크면 전부로 본다)
+func checksHit(checks []SignalCheck, mode string, minCount int) bool {
 	if len(checks) == 0 {
 		return false
 	}
-	if mode == "all" {
-		for _, c := range checks {
-			if !c.Met {
-				return false
-			}
+	need := 1
+	switch mode {
+	case "all":
+		need = len(checks)
+	case "count":
+		need = minCount
+		if need < 1 {
+			need = 1
 		}
-		return true
+		if need > len(checks) {
+			need = len(checks)
+		}
 	}
+	met := 0
 	for _, c := range checks {
 		if c.Met {
-			return true
+			met++
 		}
 	}
-	return false
+	return met >= need
 }
 
 // sanitizeSignalReport 는 NaN/±Inf 를 0 으로 바꾼다. encoding/json 은 이런 값을

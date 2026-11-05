@@ -213,6 +213,8 @@ interface Draft {
   month: string;
   sell_mode: SignalMode;
   buy_mode: SignalMode;
+  sell_min_count: number;
+  buy_min_count: number;
 }
 
 function toDraft(rule: SignalRule): Draft {
@@ -226,6 +228,8 @@ function toDraft(rule: SignalRule): Draft {
     month: String(rule.tax_harvest_from_month || DEFAULT_HARVEST_MONTH),
     sell_mode: rule.sell_mode || 'any',
     buy_mode: rule.buy_mode || 'any',
+    sell_min_count: rule.sell_min_count || 2,
+    buy_min_count: rule.buy_min_count || 2,
   };
 }
 
@@ -250,19 +254,50 @@ function validate(d: Draft): Partial<Record<NumKey, string>> {
   return errs;
 }
 
-export function ModeToggle({ value, onChange, label }: { value: SignalMode; onChange: (m: SignalMode) => void; label: string }) {
+// 충족 방식(any/all/count) ↔ 필요한 개수. 켜진 조건 수(enabled)를 넘지 않게 맞춘다.
+function requiredCount(mode: SignalMode, count: number, enabled: number): number {
+  if (enabled <= 0) return 0;
+  if (mode === 'all') return enabled;
+  if (mode === 'count') return Math.min(Math.max(count, 1), enabled);
+  return 1;
+}
+function modeForCount(k: number, enabled: number): { mode: SignalMode; count: number } {
+  if (k <= 1) return { mode: 'any', count: 2 };
+  if (k >= enabled) return { mode: 'all', count: 2 };
+  return { mode: 'count', count: k };
+}
+
+// 몇 개 이상 충족해야 신호를 낼지 고른다. 선택지는 켜진 조건 수까지만 보여 준다.
+export function CountSelect({ mode, count, enabled, onChange, label, disabled }: {
+  mode: SignalMode;
+  count: number;
+  enabled: number;
+  onChange: (mode: SignalMode, count: number) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  const current = requiredCount(mode, count, enabled);
+  const options = Array.from({ length: Math.max(enabled, 0) }, (_, i) => i + 1);
   return (
-    <div className="glass-pill flex p-0.5" role="group" aria-label={label}>
-      {([['any', '하나 이상 충족'], ['all', '모두 충족']] as [SignalMode, string][]).map(([v, text]) => (
-        <button
-          key={v}
-          type="button"
-          onClick={() => onChange(v)}
-          className={`pill-item !px-3 !py-1 !text-xs ${value === v ? 'pill-item-active' : ''}`}
-        >
-          {text}
-        </button>
-      ))}
+    <div className="flex items-center gap-2">
+      <span className="label-mono !text-zinc-500">켜진 {enabled}개 중</span>
+      <select
+        aria-label={label}
+        value={current}
+        disabled={disabled || enabled === 0}
+        onChange={(e) => {
+          const next = modeForCount(Number(e.target.value), enabled);
+          onChange(next.mode, next.count);
+        }}
+        className="input-field !w-auto !py-1.5 !pr-8 !text-xs"
+      >
+        {enabled === 0 && <option value={0}>켜진 조건 없음</option>}
+        {options.map((k) => (
+          <option key={k} value={k}>
+            {k === enabled && k > 1 ? `모두 충족 (${k}개)` : k === 1 ? '1개 이상 충족 (하나라도)' : `${k}개 이상 충족`}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -307,8 +342,28 @@ function useRuleDraft(initial: SignalRule) {
 }
 type RuleDraft = ReturnType<typeof useRuleDraft>;
 
+// 실제 신호 판정에 쓰이는 켜진 조건 수 (목표 비중은 목표가 0보다 클 때만 매도·매수 양쪽 조건이 된다)
+function weightActive(d: Draft): boolean {
+  return d.flags.weight_enabled && Number(d.nums.target_weight_pct) > 0;
+}
+function enabledSellCount(d: Draft): number {
+  return [...SELL_PROFIT_RULES, ...SELL_RISK_RULES].filter((r) => (r.enabled === 'weight_enabled' ? weightActive(d) : d.flags[r.enabled])).length;
+}
+function enabledBuyCount(d: Draft): number {
+  return BUY_RULES.filter((r) => d.flags[r.enabled]).length + (weightActive(d) ? 1 : 0);
+}
+
 function buildRule(base: SignalRule, d: Draft): SignalRule {
   const rule: SignalRule = { ...base, sell_mode: d.sell_mode, buy_mode: d.buy_mode };
+  // 켜진 조건 수에 맞춰 충족 방식을 정리한다 (예: 3개 이상인데 켜진 게 3개 → 모두)
+  const sellOn = enabledSellCount(d);
+  const buyOn = enabledBuyCount(d);
+  const sell = modeForCount(requiredCount(d.sell_mode, d.sell_min_count, sellOn), sellOn);
+  const buy = modeForCount(requiredCount(d.buy_mode, d.buy_min_count, buyOn), buyOn);
+  rule.sell_mode = sellOn > 0 ? sell.mode : d.sell_mode === 'count' ? 'any' : d.sell_mode;
+  rule.sell_min_count = sellOn > 0 && sell.mode === 'count' ? sell.count : 0;
+  rule.buy_mode = buyOn > 0 ? buy.mode : d.buy_mode === 'count' ? 'any' : d.buy_mode;
+  rule.buy_min_count = buyOn > 0 && buy.mode === 'count' ? buy.count : 0;
   NUM_KEYS.forEach((k) => (rule[k] = Number(d.nums[k])));
   ENABLE_KEYS.forEach((k) => (rule[k] = d.flags[k]));
   const month = Math.round(Number(d.month));
@@ -391,7 +446,14 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
       <section className="space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="label-mono !text-rose-300">매도 조건</h3>
-          <ModeToggle value={draft.sell_mode} onChange={(m) => !readOnly && setDraft((d) => ({ ...d, sell_mode: m }))} label="매도 조건 충족 방식" />
+          <CountSelect
+            mode={draft.sell_mode}
+            count={draft.sell_min_count}
+            enabled={enabledSellCount(draft)}
+            disabled={readOnly}
+            onChange={(m, c) => setDraft((d) => ({ ...d, sell_mode: m, sell_min_count: c }))}
+            label="매도 조건 충족 개수"
+          />
         </div>
         <p className="label-mono !text-mint-300">수익 실현</p>
         {SELL_PROFIT_RULES.map(renderRule)}
@@ -406,7 +468,14 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
       <section className="space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="label-mono !text-mint-300">매수 조건</h3>
-          <ModeToggle value={draft.buy_mode} onChange={(m) => !readOnly && setDraft((d) => ({ ...d, buy_mode: m }))} label="매수 조건 충족 방식" />
+          <CountSelect
+            mode={draft.buy_mode}
+            count={draft.buy_min_count}
+            enabled={enabledBuyCount(draft)}
+            disabled={readOnly}
+            onChange={(m, c) => setDraft((d) => ({ ...d, buy_mode: m, buy_min_count: c }))}
+            label="매수 조건 충족 개수"
+          />
         </div>
         {BUY_RULES.map(renderRule)}
       </section>

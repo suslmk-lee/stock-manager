@@ -155,7 +155,8 @@ export interface RealizedPnL {
 // ==========================================
 // 매매 신호
 // ==========================================
-export type SignalMode = 'any' | 'all';
+// any: 1개 이상, all: 모두, count: sell_min_count / buy_min_count 개 이상
+export type SignalMode = 'any' | 'all' | 'count';
 export type SignalAction = 'SELL' | 'BUY' | 'HOLD' | 'CONFLICT' | 'NO_PRICE';
 
 export interface SignalRule {
@@ -214,6 +215,8 @@ export interface SignalRule {
   partial_pct?: number; // 1~100 (보유 수량의 %)
   sell_mode: SignalMode;
   buy_mode: SignalMode;
+  sell_min_count?: number;
+  buy_min_count?: number;
   created_at?: string;
   updated_at?: string;
 }
