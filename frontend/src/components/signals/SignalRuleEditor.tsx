@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2 } from 'lucide-react';
 import { apiClient } from '../../api/client';
-import { SignalMode, SignalProfile, SignalRule } from '../../types/models';
+import { BuyQtyMode, SignalMode, SignalProfile, SignalRule } from '../../types/models';
 
 type NumKey =
   | 'take_profit_pct'
@@ -29,7 +29,13 @@ type NumKey =
   | 'partial_pct'
   | 'yield_compression_pct'
   | 'vol_overheat_sigma'
-  | 'vol_oversold_sigma';
+  | 'vol_oversold_sigma'
+  | 'last_buy_dip_pct'
+  | 'buy_cooldown_days'
+  | 'buy_max_weight_pct'
+  | 'buy_qty_amount_krw'
+  | 'buy_qty_lower_avg_pct'
+  | 'vol_stop_k';
 
 type EnableKey =
   | 'from_high_enabled'
@@ -53,7 +59,12 @@ type EnableKey =
   | 'high_yield_enabled'
   | 'yield_compression_enabled'
   | 'vol_overheat_enabled'
-  | 'vol_oversold_enabled';
+  | 'vol_oversold_enabled'
+  | 'last_buy_dip_enabled'
+  | 'buy_cooldown_enabled'
+  | 'buy_max_weight_enabled'
+  | 'buy_qty_enabled'
+  | 'vol_stop_enabled';
 
 interface FieldDef {
   key: NumKey;
@@ -114,6 +125,12 @@ const SELL_PROFIT_RULES: RuleDef[] = [
 // 위험 관리 조건
 const SELL_RISK_RULES: RuleDef[] = [
   { enabled: 'stop_loss_enabled', label: '손절 기준', desc: '실질 수익률이 기준 이하로 내려가면 손절을 검토합니다.', fields: [{ key: 'stop_loss_pct', label: '기준', suffix: '%' }] },
+  {
+    enabled: 'vol_stop_enabled',
+    label: '변동성 기준 손절',
+    desc: '실질 수익률이 종목 연 변동성의 k배만큼 손실이면 손절을 검토합니다. 변동성 연 40%인 종목은 1배일 때 −40%, 연 12%면 −12%가 기준이 됩니다. 고정 % 손절 대신 쓸 수 있습니다.',
+    fields: [{ key: 'vol_stop_k', label: '변동성의', suffix: '배' }],
+  },
   { enabled: 'crash_enabled', label: '큰 폭락 경고', desc: '실질 수익률이 기준 이하로 폭락하면 경고합니다. 손절 대신 쓰는 장기보유용 안전장치입니다.', fields: [{ key: 'crash_pct', label: '기준', suffix: '%' }] },
   {
     enabled: 'weight_enabled',
@@ -159,7 +176,29 @@ const SELL_QTY_RULES: RuleDef[] = [
   },
 ];
 
+// 매수 제외 조건 (신호 개수에 세지 않는다): 해당하면 매수 신호를 버린다
+const BUY_EXCLUDE_RULES: RuleDef[] = [
+  {
+    enabled: 'buy_cooldown_enabled',
+    label: '매수 쿨다운',
+    desc: '최근 매수한 지 기준 일수 이내이면 매수 조건을 충족해도 매수 검토에서 제외합니다. 개수 조건에는 포함되지 않습니다.',
+    fields: [{ key: 'buy_cooldown_days', label: '최근 매수', suffix: '일 이내 매수 시' }],
+  },
+  {
+    enabled: 'buy_max_weight_enabled',
+    label: '비중 상한',
+    desc: '종목 비중이 상한 이상이면 매수 조건을 충족해도 매수 검토에서 제외합니다. 개수 조건에는 포함되지 않습니다.',
+    fields: [{ key: 'buy_max_weight_pct', label: '비중', suffix: '% 이상이면' }],
+  },
+];
+
 const BUY_RULES: RuleDef[] = [
+  {
+    enabled: 'last_buy_dip_enabled',
+    label: '마지막 매수가 대비 하락',
+    desc: '가장 최근 매수가보다 기준 이상 떨어지면 다음 매수를 검토합니다. 한 번 사면 기준점이 그 가격으로 내려가 같은 신호가 반복되지 않고 자연스럽게 나눠 사게 됩니다.',
+    fields: [{ key: 'last_buy_dip_pct', label: '마지막 매수가 대비', suffix: '%' }],
+  },
   { enabled: 'buy_dip_enabled', label: '평단 대비 하락', desc: '현재가가 평단보다 기준 이상 낮으면 추가 매수를 검토합니다.', fields: [{ key: 'buy_dip_pct', label: '기준', suffix: '%' }] },
   { enabled: 'high_yield_enabled', label: '배당수익률 상승', desc: '현재가 기준 배당수익률이 기준 이상이면 매수를 검토합니다.', fields: [{ key: 'high_yield_pct', label: '기준', suffix: '%' }] },
   { enabled: 'from_high_enabled', label: '52주 고점 대비 하락', desc: '현재가가 52주 최고가보다 기준 이상 낮으면 매수를 검토합니다.', fields: [{ key: 'from_high_pct', label: '기준', suffix: '%' }] },
@@ -178,6 +217,7 @@ const NUM_KEYS: NumKey[] = [
   'from_high_pct', 'below_ma_pct', 'above_ma_pct', 'dividend_cut_pct', 'crash_pct', 'min_sell_qty',
   'trailing_activate_pct', 'trailing_drop_pct', 'annualized_pct', 'annualized_min_days', 'annualized_min_return_pct', 'drift_pct', 'partial_pct',
   'yield_compression_pct', 'vol_overheat_sigma', 'vol_oversold_sigma',
+  'last_buy_dip_pct', 'buy_cooldown_days', 'buy_max_weight_pct', 'buy_qty_amount_krw', 'buy_qty_lower_avg_pct', 'vol_stop_k',
 ];
 const ENABLE_KEYS: EnableKey[] = [
   'take_profit_enabled', 'stop_loss_enabled', 'weight_enabled', 'dividend_payback_enabled',
@@ -186,25 +226,28 @@ const ENABLE_KEYS: EnableKey[] = [
   'tax_harvest_enabled', 'fx_historical', 'min_sell_qty_enabled',
   'trailing_enabled', 'annualized_enabled', 'drift_enabled', 'partial_enabled',
   'yield_compression_enabled', 'vol_overheat_enabled', 'vol_oversold_enabled',
+  'last_buy_dip_enabled', 'buy_cooldown_enabled', 'buy_max_weight_enabled', 'buy_qty_enabled', 'vol_stop_enabled',
 ];
 
 // 2단계 필드 기본값 (구 백엔드가 내려주지 않을 때 균형 값으로 채움)
 const NEW_NUM_DEFAULTS: Partial<Record<NumKey, number>> = { from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, min_sell_qty: 1,
   trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33,
   yield_compression_pct: 20, vol_overheat_sigma: 1.5, vol_oversold_sigma: 1.5,
+  last_buy_dip_pct: -10, buy_cooldown_days: 14, buy_max_weight_pct: 20, buy_qty_amount_krw: 1000000, buy_qty_lower_avg_pct: 5, vol_stop_k: 1,
 };
 const NEW_FLAG_DEFAULTS: Partial<Record<EnableKey, boolean>> = {
   from_high_enabled: false, below_ma_enabled: false, above_ma_enabled: false, dividend_cut_enabled: false, crash_enabled: false,
   tax_harvest_enabled: true, fx_historical: true, min_sell_qty_enabled: true,
   trailing_enabled: true, annualized_enabled: false, drift_enabled: false, partial_enabled: true,
   yield_compression_enabled: false, vol_overheat_enabled: false, vol_oversold_enabled: false,
+  last_buy_dip_enabled: false, buy_cooldown_enabled: true, buy_max_weight_enabled: true, buy_qty_enabled: true, vol_stop_enabled: false,
 };
 const DEFAULT_HARVEST_MONTH = 11;
 
 const PRESETS: { id: string; label: string; values: Partial<Record<NumKey, number>> }[] = [
-  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5, crash_pct: -30, trailing_activate_pct: 15, trailing_drop_pct: -7, annualized_pct: 20, annualized_min_days: 60, annualized_min_return_pct: 10, drift_pct: 5, partial_pct: 50, yield_compression_pct: 15, vol_overheat_sigma: 1.2, vol_oversold_sigma: 1.2 } },
-  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33, yield_compression_pct: 20, vol_overheat_sigma: 1.5, vol_oversold_sigma: 1.5 } },
-  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20, crash_pct: -50, trailing_activate_pct: 30, trailing_drop_pct: -15, annualized_pct: 35, annualized_min_days: 120, annualized_min_return_pct: 25, drift_pct: 10, partial_pct: 25, yield_compression_pct: 30, vol_overheat_sigma: 2, vol_oversold_sigma: 2 } },
+  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5, crash_pct: -30, trailing_activate_pct: 15, trailing_drop_pct: -7, annualized_pct: 20, annualized_min_days: 60, annualized_min_return_pct: 10, drift_pct: 5, partial_pct: 50, yield_compression_pct: 15, vol_overheat_sigma: 1.2, vol_oversold_sigma: 1.2, last_buy_dip_pct: -15, buy_cooldown_days: 30, buy_max_weight_pct: 15, vol_stop_k: 0.8 } },
+  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33, yield_compression_pct: 20, vol_overheat_sigma: 1.5, vol_oversold_sigma: 1.5, last_buy_dip_pct: -10, buy_cooldown_days: 14, buy_max_weight_pct: 20, vol_stop_k: 1 } },
+  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20, crash_pct: -50, trailing_activate_pct: 30, trailing_drop_pct: -15, annualized_pct: 35, annualized_min_days: 120, annualized_min_return_pct: 25, drift_pct: 10, partial_pct: 25, yield_compression_pct: 30, vol_overheat_sigma: 2, vol_oversold_sigma: 2, last_buy_dip_pct: -7, buy_cooldown_days: 7, buy_max_weight_pct: 30, vol_stop_k: 1.5 } },
 ];
 
 interface Draft {
@@ -215,6 +258,21 @@ interface Draft {
   buy_mode: SignalMode;
   sell_min_count: number;
   buy_min_count: number;
+  // 매도 묶음별 기준 개수 (99 = 모두). 저장할 때 켜진 개수로 맞춘다
+  sell_profit_count: number;
+  sell_risk_count: number;
+  buy_qty_mode: BuyQtyMode;
+}
+
+const ALL_COUNT = 99;
+
+// 저장된 규칙에서 매도 묶음 기준 개수를 복원한다 (구 any/count/all 방식은 묶음 기준으로 변환)
+function groupCounts(rule: SignalRule): { profit: number; risk: number } {
+  const mode = rule.sell_mode || 'any';
+  if (mode === 'group') return { profit: Math.max(rule.sell_profit_min_count || 1, 1), risk: Math.max(rule.sell_risk_min_count || 1, 1) };
+  if (mode === 'all') return { profit: ALL_COUNT, risk: ALL_COUNT };
+  if (mode === 'count') return { profit: Math.max(rule.sell_min_count || 2, 1), risk: 1 };
+  return { profit: 1, risk: 1 };
 }
 
 function toDraft(rule: SignalRule): Draft {
@@ -226,10 +284,13 @@ function toDraft(rule: SignalRule): Draft {
     nums,
     flags,
     month: String(rule.tax_harvest_from_month || DEFAULT_HARVEST_MONTH),
-    sell_mode: rule.sell_mode || 'any',
+    sell_mode: 'group',
     buy_mode: rule.buy_mode || 'any',
     sell_min_count: rule.sell_min_count || 2,
     buy_min_count: rule.buy_min_count || 2,
+    sell_profit_count: groupCounts(rule).profit,
+    sell_risk_count: groupCounts(rule).risk,
+    buy_qty_mode: rule.buy_qty_mode || 'amount',
   };
 }
 
@@ -250,6 +311,12 @@ function validate(d: Draft): Partial<Record<NumKey, string>> {
     else if (k === 'annualized_min_days' && (!Number.isInteger(n) || n < 1 || n > 3650)) errs[k] = '1~3650 사이 정수로 입력하세요';
     else if ((k === 'above_ma_pct' || k === 'dividend_cut_pct' || k === 'weight_band_pct' || k === 'min_sell_qty' || k === 'trailing_activate_pct' || k === 'annualized_pct' || k === 'annualized_min_return_pct') && n < 0) errs[k] = '0 이상으로 입력하세요';
     else if (k === 'target_weight_pct' && (n < 0 || n > 100)) errs[k] = '0~100 사이로 입력하세요';
+    else if (k === 'last_buy_dip_pct' && n >= 0) errs[k] = '0보다 작게 입력하세요 (예: -10)';
+    else if (k === 'buy_cooldown_days' && (!Number.isInteger(n) || n < 1 || n > 365)) errs[k] = '1~365 사이 정수로 입력하세요';
+    else if (k === 'buy_max_weight_pct' && (n <= 0 || n > 100)) errs[k] = '0보다 크고 100 이하로 입력하세요';
+    else if (k === 'buy_qty_amount_krw' && n <= 0) errs[k] = '0보다 크게 입력하세요';
+    else if (k === 'buy_qty_lower_avg_pct' && (n <= 0 || n > 50)) errs[k] = '0보다 크고 50 이하로 입력하세요';
+    else if (k === 'vol_stop_k' && (n <= 0 || n > 5)) errs[k] = '0보다 크고 5 이하로 입력하세요';
   });
   return errs;
 }
@@ -346,26 +413,35 @@ type RuleDraft = ReturnType<typeof useRuleDraft>;
 function weightActive(d: Draft): boolean {
   return d.flags.weight_enabled && Number(d.nums.target_weight_pct) > 0;
 }
-function enabledSellCount(d: Draft): number {
-  return [...SELL_PROFIT_RULES, ...SELL_RISK_RULES].filter((r) => (r.enabled === 'weight_enabled' ? weightActive(d) : d.flags[r.enabled])).length;
+function enabledOf(d: Draft, rules: RuleDef[]): number {
+  return rules.filter((r) => (r.enabled === 'weight_enabled' ? weightActive(d) : d.flags[r.enabled])).length;
+}
+function enabledProfitCount(d: Draft): number {
+  return enabledOf(d, SELL_PROFIT_RULES);
+}
+function enabledRiskCount(d: Draft): number {
+  return enabledOf(d, SELL_RISK_RULES);
 }
 function enabledBuyCount(d: Draft): number {
   return BUY_RULES.filter((r) => d.flags[r.enabled]).length + (weightActive(d) ? 1 : 0);
 }
 
 function buildRule(base: SignalRule, d: Draft): SignalRule {
-  const rule: SignalRule = { ...base, sell_mode: d.sell_mode, buy_mode: d.buy_mode };
+  const rule: SignalRule = { ...base, sell_mode: 'group', buy_mode: d.buy_mode };
   // 켜진 조건 수에 맞춰 충족 방식을 정리한다 (예: 3개 이상인데 켜진 게 3개 → 모두)
-  const sellOn = enabledSellCount(d);
+  const profitOn = enabledProfitCount(d);
+  const riskOn = enabledRiskCount(d);
   const buyOn = enabledBuyCount(d);
-  const sell = modeForCount(requiredCount(d.sell_mode, d.sell_min_count, sellOn), sellOn);
   const buy = modeForCount(requiredCount(d.buy_mode, d.buy_min_count, buyOn), buyOn);
-  rule.sell_mode = sellOn > 0 ? sell.mode : d.sell_mode === 'count' ? 'any' : d.sell_mode;
-  rule.sell_min_count = sellOn > 0 && sell.mode === 'count' ? sell.count : 0;
+  // 매도는 항상 묶음 방식. 기준 개수는 1~켜진 개수로 맞춘다 (모두 = 켜진 개수)
+  rule.sell_profit_min_count = Math.min(Math.max(d.sell_profit_count, 1), Math.max(profitOn, 1));
+  rule.sell_risk_min_count = Math.min(Math.max(d.sell_risk_count, 1), Math.max(riskOn, 1));
+  rule.sell_min_count = 0;
   rule.buy_mode = buyOn > 0 ? buy.mode : d.buy_mode === 'count' ? 'any' : d.buy_mode;
   rule.buy_min_count = buyOn > 0 && buy.mode === 'count' ? buy.count : 0;
   NUM_KEYS.forEach((k) => (rule[k] = Number(d.nums[k])));
   ENABLE_KEYS.forEach((k) => (rule[k] = d.flags[k]));
+  rule.buy_qty_mode = d.buy_qty_mode;
   const month = Math.round(Number(d.month));
   rule.tax_harvest_from_month = month >= 1 && month <= 12 ? month : DEFAULT_HARVEST_MONTH;
   return rule;
@@ -373,6 +449,11 @@ function buildRule(base: SignalRule, d: Draft): SignalRule {
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : typeof err === 'string' && err ? err : fallback;
+}
+
+// CountSelect 의 (mode,count) 선택을 묶음 기준 개수로 바꾼다 (모두 = ALL_COUNT)
+function groupValue(mode: SignalMode, count: number): number {
+  return mode === 'all' ? ALL_COUNT : mode === 'count' ? count : 1;
 }
 
 // 규칙 입력 폼 본문 (프로필 편집 / 종목 편집 공용)
@@ -425,6 +506,80 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
     );
   };
 
+  const BUY_QTY_MODES: { value: BuyQtyMode; label: string }[] = [
+    { value: 'amount', label: '정액' },
+    { value: 'target_weight', label: '목표 비중까지' },
+    { value: 'lower_avg', label: '평단 낮추기' },
+  ];
+  const renderNumInput = (key: NumKey, label: string, suffix: string) => {
+    const err = (touched || draft.nums[key] !== '') && errors[key];
+    return (
+      <div>
+        <label className="field-label !mb-1" htmlFor={`rule-${key}`}>{label}</label>
+        <div className="flex items-center gap-1.5">
+          <input
+            id={`rule-${key}`}
+            type="number"
+            step="any"
+            inputMode="decimal"
+            value={draft.nums[key]}
+            disabled={readOnly}
+            onChange={(e) => setNum(key, e.target.value)}
+            className={`input-field num ${key === 'buy_qty_amount_krw' ? '!w-36' : '!w-24'} !py-1.5 text-right ${err ? '!border-rose-400/60' : ''}`}
+          />
+          <span className="label-mono !text-zinc-400">{suffix}</span>
+        </div>
+        {err && <p className="mt-1 text-[11px] text-rose-300">{err}</p>}
+      </div>
+    );
+  };
+  const renderBuyQty = () => {
+    const on = draft.flags.buy_qty_enabled;
+    const mode = draft.buy_qty_mode;
+    const amount = Number(draft.nums.buy_qty_amount_krw);
+    return (
+      <div className="surface-inset p-3.5">
+        <div className="flex items-start gap-3">
+          <div className="pt-0.5">
+            <Switch checked={on} onChange={(v) => setFlag('buy_qty_enabled', v)} label="매수 수량 제안" disabled={readOnly} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className={`text-sm font-medium ${on ? 'text-white' : 'text-zinc-400'}`}>매수 수량 제안</span>
+            <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">매수 신호일 때 살 수량을 제안합니다. 비중 상한을 넘지 않는 범위에서 계산합니다.</p>
+            <div className={`mt-2.5 space-y-2.5 transition-opacity ${on ? '' : 'opacity-50'}`}>
+              <div className="glass-pill inline-flex p-0.5" role="group" aria-label="매수 수량 계산 방식">
+                {BUY_QTY_MODES.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    disabled={readOnly}
+                    aria-pressed={mode === m.value}
+                    onClick={() => setDraft((d) => ({ ...d, buy_qty_mode: m.value }))}
+                    className={`pill-item !px-3 !py-1 !text-xs ${mode === m.value ? 'pill-item-active' : ''}`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              {mode === 'amount' && (
+                <div>
+                  {renderNumInput('buy_qty_amount_krw', '1회 매수 금액', '원')}
+                  {Number.isFinite(amount) && amount > 0 && <p className="mt-1 text-[11px] text-zinc-500">₩{Math.round(amount).toLocaleString('ko-KR')}</p>}
+                </div>
+              )}
+              {mode === 'lower_avg' && renderNumInput('buy_qty_lower_avg_pct', '평단을', '% 낮추기')}
+              {mode === 'target_weight' && (
+                <p className="text-[11px] leading-relaxed text-zinc-500">
+                  '목표 비중 이탈'의 목표 비중 값까지 채우는 수량을 제안합니다. 목표 비중이 0이면 정액 방식으로 계산합니다.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-5">
       {!readOnly && (
@@ -444,20 +599,31 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
       {readOnly && readOnlyHint && <p className="text-xs text-zinc-500">{readOnlyHint}</p>}
 
       <section className="space-y-2.5">
+        <h3 className="label-mono !text-rose-300">매도 조건</h3>
+        <p className="text-xs text-zinc-500">수익 실현 또는 위험 관리 중 한 묶음이라도 기준 개수를 채우면 매도 검토</p>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="label-mono !text-rose-300">매도 조건</h3>
+          <p className="label-mono !text-mint-300">수익 실현</p>
           <CountSelect
-            mode={draft.sell_mode}
-            count={draft.sell_min_count}
-            enabled={enabledSellCount(draft)}
+            mode="count"
+            count={draft.sell_profit_count}
+            enabled={enabledProfitCount(draft)}
             disabled={readOnly}
-            onChange={(m, c) => setDraft((d) => ({ ...d, sell_mode: m, sell_min_count: c }))}
-            label="매도 조건 충족 개수"
+            onChange={(m, c) => setDraft((d) => ({ ...d, sell_profit_count: groupValue(m, c) }))}
+            label="수익 실현 충족 개수"
           />
         </div>
-        <p className="label-mono !text-mint-300">수익 실현</p>
         {SELL_PROFIT_RULES.map(renderRule)}
-        <p className="label-mono !mt-4 !text-rose-300">위험 관리</p>
+        <div className="!mt-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="label-mono !text-rose-300">위험 관리</p>
+          <CountSelect
+            mode="count"
+            count={draft.sell_risk_count}
+            enabled={enabledRiskCount(draft)}
+            disabled={readOnly}
+            onChange={(m, c) => setDraft((d) => ({ ...d, sell_risk_count: groupValue(m, c) }))}
+            label="위험 관리 충족 개수"
+          />
+        </div>
         {SELL_RISK_RULES.map(renderRule)}
         <p className="label-mono !mt-4">매도 제외</p>
         {SELL_EXCLUDE_RULES.map(renderRule)}
@@ -477,7 +643,13 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
             label="매수 조건 충족 개수"
           />
         </div>
+        <p className="label-mono !text-mint-300">추가 매수 신호</p>
         {BUY_RULES.map(renderRule)}
+        <p className="label-mono !mt-4">매수 제외</p>
+        <p className="text-xs text-zinc-500">매수 제외 조건은 충족 개수에 세지 않고, 해당하면 매수 신호를 버립니다.</p>
+        {BUY_EXCLUDE_RULES.map(renderRule)}
+        <p className="label-mono !mt-4">매수 수량</p>
+        {renderBuyQty()}
       </section>
 
       <section className="space-y-2.5">
