@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X, Plus, Loader2, RotateCcw, Trash2, Layers, Coins, Lock } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { ProfileAssignment, ProfileKind, SignalItem, SignalProfile } from '../../types/models';
-import { ProfileRuleEditor } from './SignalRuleEditor';
+import { DEFAULT_SECTION, ProfileRuleEditor, SectionId } from './SignalRuleEditor';
 import ProfileChip, { kindLabel } from './ProfileChip';
 
 interface ProfileManagerProps {
@@ -123,6 +123,8 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<'reset' | 'delete' | null>(null);
   const [ruleNonce, setRuleNonce] = useState(0);
+  // 프로필을 바꿔도 보고 있던 규칙 섹션을 유지한다
+  const [ruleSection, setRuleSection] = useState<SectionId>(DEFAULT_SECTION);
   const [addAssetId, setAddAssetId] = useState('');
   // 이름/설명/유형 편집 (사용자 정의 프로필)
   const [meta, setMeta] = useState({ name: '', description: '', kind: 'standard' as ProfileKind });
@@ -463,6 +465,8 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
                     <ProfileRuleEditor
                       key={`${selected.id}-${ruleNonce}`}
                       profile={selected}
+                      section={ruleSection}
+                      onSectionChange={setRuleSection}
                       onSaved={() => {
                         setChanged(true);
                         load();

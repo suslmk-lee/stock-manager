@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Info } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { BuyQtyMode, SignalMode, SignalProfile, SignalRule } from '../../types/models';
 
@@ -501,76 +501,176 @@ function groupValue(mode: SignalMode, count: number): number {
   return mode === 'all' ? ALL_COUNT : mode === 'count' ? count : 1;
 }
 
-// 규칙 입력 폼 본문 (프로필 편집 / 종목 편집 공용)
-function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: RuleDraft; readOnly: boolean; touched: boolean; showNote: boolean; readOnlyHint?: string }) {
-  const { draft, errors, setDraft, setNum, setFlag, applyPreset } = rd;
+// ===== 섹션 탐색형 편집기 =====
 
-  const renderRule = (def: RuleDef) => {
-    const on = draft.flags[def.enabled];
-    return (
-      <div key={def.enabled} className="surface-inset p-3.5">
-        <div className="flex items-start gap-3">
-          <div className="pt-0.5">
-            <Switch checked={on} onChange={(v) => setFlag(def.enabled, v)} label={def.label} disabled={readOnly} />
-          </div>
-          <div className={`min-w-0 flex-1 ${def.fields.length > 2 ? '' : 'sm:flex sm:items-start sm:justify-between sm:gap-4'}`}>
-            <div className="min-w-0 sm:flex-1">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span className={`text-sm font-medium ${on ? 'text-white' : 'text-zinc-400'}`}>{def.label}</span>
-                {def.note && showNote && <span className="badge border border-amber-400/25 bg-amber-400/10 text-amber-200">{def.note}</span>}
-              </div>
-              <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">{def.desc}</p>
-            </div>
-            <div className={`mt-2.5 flex flex-wrap gap-x-4 gap-y-2 transition-opacity ${def.fields.length > 2 ? '' : 'sm:mt-0 sm:shrink-0'} ${on ? '' : 'opacity-50'}`}>
-              {def.fields.map((f) => {
-                const err = (touched || draft.nums[f.key] !== '') && errors[f.key];
-                return (
-                  <div key={f.key}>
-                    <label className="field-label !mb-1" htmlFor={`rule-${f.key}`}>{f.label}</label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        id={`rule-${f.key}`}
-                        type="number"
-                        step="any"
-                        inputMode="decimal"
-                        value={draft.nums[f.key]}
-                        disabled={readOnly}
-                        onChange={(e) => setNum(f.key, e.target.value)}
-                        className={`input-field num !w-24 !py-1.5 text-right ${err ? '!border-rose-400/60' : ''}`}
-                      />
-                      <span className="label-mono !text-zinc-400">{f.suffix}</span>
-                    </div>
-                    {err && <p className="mt-1 text-[11px] text-rose-300">{err}</p>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
+export type SectionId = 'profit' | 'risk' | 'exclude' | 'buy' | 'confirm' | 'buyqty' | 'misc';
+export const DEFAULT_SECTION: SectionId = 'profit';
+
+const BUY_QTY_MODES: { value: BuyQtyMode; label: string }[] = [
+  { value: 'amount', label: '정액' },
+  { value: 'target_weight', label: '목표 비중까지' },
+  { value: 'lower_avg', label: '평단 낮추기' },
+];
+
+interface SectionMeta {
+  id: SectionId;
+  group: '매도' | '매수' | '공통';
+  title: string;
+  purpose: string;
+  dot: string; // 상태 점 색
+}
+
+const SECTIONS: SectionMeta[] = [
+  { id: 'profit', group: '매도', title: '수익 실현', purpose: '기준 개수만큼 충족하면 이익 실현을 검토하는 조건', dot: 'bg-mint-400' },
+  { id: 'risk', group: '매도', title: '위험 관리', purpose: '기준 개수만큼 충족하면 바로 알려야 하는 조건', dot: 'bg-rose-400' },
+  { id: 'exclude', group: '매도', title: '제외 · 수량', purpose: '조건을 충족해도 매도에서 빼는 예외와 제안할 매도 수량', dot: 'bg-amber-400' },
+  { id: 'buy', group: '매수', title: '매수 신호', purpose: '기준 개수만큼 충족하면 추가 매수를 검토하는 신호', dot: 'bg-mint-400' },
+  { id: 'confirm', group: '매수', title: '확인 · 제외', purpose: '개수에 세지 않고, 매수 신호가 났을 때 한 번 더 걸러내는 조건', dot: 'bg-amber-400' },
+  { id: 'buyqty', group: '매수', title: '매수 수량', purpose: '매수 신호일 때 살 수량을 제안하는 방식', dot: 'bg-sky-400' },
+  { id: 'misc', group: '공통', title: '기타', purpose: '수익률 계산 기준과 연말 절세 힌트', dot: 'bg-zinc-500' },
+];
+
+// 입력 항목이 속한 섹션 (검증 오류 표시용)
+const SECTION_OF_NUM: Partial<Record<NumKey, SectionId>> = (() => {
+  const m: Partial<Record<NumKey, SectionId>> = {};
+  const add = (rules: RuleDef[], s: SectionId) => rules.forEach((r) => r.fields.forEach((f) => (m[f.key] = s)));
+  add(SELL_PROFIT_RULES, 'profit');
+  add(SELL_RISK_RULES, 'risk');
+  add(SELL_EXCLUDE_RULES, 'exclude');
+  add(SELL_QTY_RULES, 'exclude');
+  add(BUY_RULES, 'buy');
+  add(BUY_EXCLUDE_RULES, 'confirm');
+  m.rebound_lookback_days = 'confirm';
+  m.rebound_from_low_pct = 'confirm';
+  m.buy_qty_amount_krw = 'buyqty';
+  m.buy_qty_lower_avg_pct = 'buyqty';
+  return m;
+})();
+
+function errorCountBySection(errors: Partial<Record<NumKey, string>>): Partial<Record<SectionId, number>> {
+  const out: Partial<Record<SectionId, number>> = {};
+  (Object.keys(errors) as NumKey[]).forEach((k) => {
+    const s = SECTION_OF_NUM[k];
+    if (s) out[s] = (out[s] ?? 0) + 1;
+  });
+  return out;
+}
+
+// 저장 시도 때 오류가 있는 첫 섹션 (없으면 null)
+function firstErrorSection(errors: Partial<Record<NumKey, string>>): SectionId | null {
+  const counts = errorCountBySection(errors);
+  return SECTIONS.find((s) => counts[s.id])?.id ?? null;
+}
+
+function fmtNum(raw: string): string {
+  const n = Number(raw);
+  return raw.trim() !== '' && Number.isFinite(n) ? String(n) : '?';
+}
+function fmtMoney(raw: string): string {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return '?원';
+  if (n >= 10000 && n % 10000 === 0) return `${(n / 10000).toLocaleString('ko-KR')}만 원`;
+  return `${Math.round(n).toLocaleString('ko-KR')}원`;
+}
+function countText(req: number, on: number): string {
+  return on > 1 && req >= on ? '모두' : `${req}개 이상`;
+}
+
+// 현재 편집 중인 값으로 전략을 두 문장으로 요약한다
+function summarize(d: Draft): { sell: string; buy: string } {
+  const profitOn = enabledProfitCount(d);
+  const riskOn = enabledRiskCount(d);
+  const sellParts: string[] = [];
+  const groups: string[] = [];
+  if (profitOn > 0) groups.push(`수익 실현 조건 ${countText(Math.min(Math.max(d.sell_profit_count, 1), profitOn), profitOn)}`);
+  if (riskOn > 0) groups.push(`위험 조건 ${countText(Math.min(Math.max(d.sell_risk_count, 1), riskOn), riskOn)}`);
+  sellParts.push(groups.length > 0 ? `${groups.join(' 또는 ')} 충족 시` : '켜진 수익 실현·위험 조건 없음');
+  if (d.flags.min_sell_qty_enabled) sellParts.push(`${fmtNum(d.nums.min_sell_qty)}주 이하 보유는 제외`);
+  if (d.flags.partial_enabled) sellParts.push(`분할 익절 ${fmtNum(d.nums.partial_pct)}%`);
+
+  const buyOn = enabledBuyCount(d);
+  const buyParts: string[] = [];
+  buyParts.push(buyOn > 0 ? `매수 조건 ${countText(requiredCount(d.buy_mode, d.buy_min_count, buyOn), buyOn)} 충족 시` : '켜진 매수 조건 없음');
+  if (d.flags.rebound_confirm_enabled) buyParts.push('반등 확인');
+  const ex: string[] = [];
+  if (d.flags.buy_cooldown_enabled) ex.push(`최근 ${fmtNum(d.nums.buy_cooldown_days)}일 매수`);
+  if (d.flags.buy_max_weight_enabled) ex.push(`비중 ${fmtNum(d.nums.buy_max_weight_pct)}% 이상`);
+  if (ex.length > 0) buyParts.push(`${ex.join('·')}은 제외`);
+  if (d.flags.buy_qty_enabled) {
+    buyParts.push(
+      d.buy_qty_mode === 'amount'
+        ? `정액 ${fmtMoney(d.nums.buy_qty_amount_krw)} 제안`
+        : d.buy_qty_mode === 'lower_avg'
+          ? `평단 ${fmtNum(d.nums.buy_qty_lower_avg_pct)}% 낮추기 제안`
+          : '목표 비중까지 제안',
     );
-  };
+  }
+  return { sell: sellParts.join(' · '), buy: buyParts.join(' · ') };
+}
 
-  const BUY_QTY_MODES: { value: BuyQtyMode; label: string }[] = [
-    { value: 'amount', label: '정액' },
-    { value: 'target_weight', label: '목표 비중까지' },
-    { value: 'lower_avg', label: '평단 낮추기' },
-  ];
-  const renderNumInput = (key: NumKey, label: string, suffix: string) => {
+// 섹션별 요약 상태 (nav 오른쪽 짧은 텍스트)
+function sectionStatus(d: Draft, id: SectionId): string {
+  const flagCount = (rules: RuleDef[]) => rules.filter((r) => d.flags[r.enabled]).length;
+  switch (id) {
+    case 'profit':
+      return `${flagCount(SELL_PROFIT_RULES)}/${SELL_PROFIT_RULES.length}`;
+    case 'risk':
+      return `${flagCount(SELL_RISK_RULES)}/${SELL_RISK_RULES.length}`;
+    case 'exclude':
+      return String(flagCount(SELL_EXCLUDE_RULES) + flagCount(SELL_QTY_RULES));
+    case 'buy':
+      return `${flagCount(BUY_RULES)}/${BUY_RULES.length}`;
+    case 'confirm':
+      return `${flagCount(BUY_EXCLUDE_RULES) + (d.flags.rebound_confirm_enabled ? 1 : 0)}/${BUY_EXCLUDE_RULES.length + 1}`;
+    case 'buyqty':
+      return !d.flags.buy_qty_enabled ? '꺼짐' : d.buy_qty_mode === 'amount' ? '정액' : d.buy_qty_mode === 'target_weight' ? '목표 비중' : '평단';
+    case 'misc':
+      return `${Number(d.flags.fx_historical) + Number(d.flags.tax_harvest_enabled)}/2`;
+  }
+}
+
+// 설명을 담은 ⓘ 아이콘 (hover/focus 때 말풍선, title 은 보조)
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex shrink-0">
+      <button type="button" title={text} aria-label={`설명: ${text}`} className="rounded-full text-zinc-500 transition-colors hover:text-zinc-200 focus:text-zinc-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-mint-400/60">
+        <Info className="h-3.5 w-3.5" />
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none invisible absolute left-0 top-full z-30 mt-1.5 w-64 max-w-[70vw] rounded-xl border border-white/15 bg-zinc-900 px-3 py-2 text-xs font-normal leading-relaxed text-zinc-200 opacity-0 shadow-xl transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
+// 규칙 내용 영역 (규칙 행들)
+function SectionBody({ rd, readOnly, touched, showNote, id }: { rd: RuleDraft; readOnly: boolean; touched: boolean; showNote: boolean; id: SectionId }) {
+  const { draft, errors, setDraft, setNum, setFlag } = rd;
+
+  // 입력 + 단위 (한 줄용)
+  const numInput = (key: NumKey, label: string, suffix: string, wide?: boolean) => {
     const err = (touched || draft.nums[key] !== '') && errors[key];
     return (
-      <div>
-        <label className="field-label !mb-1" htmlFor={`rule-${key}`}>{label}</label>
+      <div className="flex flex-col items-end">
         <div className="flex items-center gap-1.5">
+          {label !== '기준' && (
+            <label className="text-[11px] text-zinc-500" htmlFor={`rule-${key}`}>
+              {label}
+            </label>
+          )}
           <input
             id={`rule-${key}`}
             type="number"
             step="any"
             inputMode="decimal"
+            aria-label={label}
             value={draft.nums[key]}
             disabled={readOnly}
             onChange={(e) => setNum(key, e.target.value)}
-            className={`input-field num ${key === 'buy_qty_amount_krw' ? '!w-36' : '!w-24'} !py-1.5 text-right ${err ? '!border-rose-400/60' : ''}`}
+            className={`input-field num ${wide ? '!w-32' : '!w-20'} !py-1 text-right !text-sm ${err ? '!border-rose-400/60' : ''}`}
           />
           <span className="label-mono !text-zinc-400">{suffix}</span>
         </div>
@@ -578,82 +678,223 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
       </div>
     );
   };
-  const renderBuyQty = () => {
-    const on = draft.flags.buy_qty_enabled;
-    const mode = draft.buy_qty_mode;
-    const amount = Number(draft.nums.buy_qty_amount_krw);
-    return (
-      <div className="surface-inset p-3.5">
-        <div className="flex items-start gap-3">
-          <div className="pt-0.5">
-            <Switch checked={on} onChange={(v) => setFlag('buy_qty_enabled', v)} label="매수 수량 제안" disabled={readOnly} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <span className={`text-sm font-medium ${on ? 'text-white' : 'text-zinc-400'}`}>매수 수량 제안</span>
-            <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">매수 신호일 때 살 수량을 제안합니다. 비중 상한을 넘지 않는 범위에서 계산합니다.</p>
-            <div className={`mt-2.5 space-y-2.5 transition-opacity ${on ? '' : 'opacity-50'}`}>
-              <div className="glass-pill inline-flex p-0.5" role="group" aria-label="매수 수량 계산 방식">
-                {BUY_QTY_MODES.map((m) => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    disabled={readOnly}
-                    aria-pressed={mode === m.value}
-                    onClick={() => setDraft((d) => ({ ...d, buy_qty_mode: m.value }))}
-                    className={`pill-item !px-3 !py-1 !text-xs ${mode === m.value ? 'pill-item-active' : ''}`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              {mode === 'amount' && (
-                <div>
-                  {renderNumInput('buy_qty_amount_krw', '1회 매수 금액', '원')}
-                  {Number.isFinite(amount) && amount > 0 && <p className="mt-1 text-[11px] text-zinc-500">₩{Math.round(amount).toLocaleString('ko-KR')}</p>}
-                </div>
-              )}
-              {mode === 'lower_avg' && renderNumInput('buy_qty_lower_avg_pct', '평단을', '% 낮추기')}
-              {mode === 'target_weight' && (
-                <p className="text-[11px] leading-relaxed text-zinc-500">
-                  '목표 비중 이탈'의 목표 비중 값까지 채우는 수량을 제안합니다. 목표 비중이 0이면 정액 방식으로 계산합니다.
-                </p>
-              )}
-            </div>
-          </div>
+
+  const rowShell = (key: string, on: boolean, sw: React.ReactNode, title: React.ReactNode, desc: string, body: React.ReactNode) => (
+    <div key={key} className="surface-inset px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {sw}
+        <div className={`flex min-w-[9rem] flex-1 items-center gap-1.5 ${on ? '' : 'opacity-60'}`}>
+          <span className={`text-sm font-medium ${on ? 'text-white' : 'text-zinc-400'}`}>{title}</span>
+          <InfoTip text={desc} />
         </div>
+        <div className={`ml-auto flex flex-wrap items-start justify-end gap-x-3 gap-y-1.5 transition-opacity ${on ? '' : 'opacity-50'}`}>{body}</div>
       </div>
+    </div>
+  );
+
+  const renderRule = (def: RuleDef) => {
+    const on = draft.flags[def.enabled];
+    return rowShell(
+      def.enabled,
+      on,
+      <Switch checked={on} onChange={(v) => setFlag(def.enabled, v)} label={def.label} disabled={readOnly} />,
+      <>
+        {def.label}
+        {def.note && showNote && <span className="badge ml-2 border border-amber-400/25 bg-amber-400/10 align-middle text-amber-200">{def.note}</span>}
+      </>,
+      def.desc,
+      def.fields.map((f) => <div key={f.key}>{numInput(f.key, f.label, f.suffix)}</div>),
     );
   };
 
   const renderRebound = () => {
     const on = draft.flags.rebound_confirm_enabled;
+    return rowShell(
+      'rebound',
+      on,
+      <Switch checked={on} onChange={(v) => setFlag('rebound_confirm_enabled', v)} label="반등 확인" disabled={readOnly} />,
+      '반등 확인',
+      '떨어지는 중에 사지 않도록, 매수 신호가 떠도 최근 저점에서 반등했거나 20일 이평선 위로 올라왔을 때만 매수 검토로 인정합니다.',
+      <>
+        {numInput('rebound_lookback_days', '최근', '거래일')}
+        {numInput('rebound_from_low_pct', '저점 대비', '% 이상 반등')}
+        <label className="flex items-center gap-2 py-1 text-xs text-zinc-400">
+          <Switch checked={draft.flags.rebound_ma_enabled} onChange={(v) => setFlag('rebound_ma_enabled', v)} label="또는 20일 이평선 위" disabled={readOnly} />
+          <span>또는 20일 이평선 위</span>
+        </label>
+      </>,
+    );
+  };
+
+  const renderBuyQty = () => {
+    const on = draft.flags.buy_qty_enabled;
+    const mode = draft.buy_qty_mode;
+    const amount = Number(draft.nums.buy_qty_amount_krw);
     return (
-      <div className="surface-inset p-3.5">
-        <div className="flex items-start gap-3">
-          <div className="pt-0.5">
-            <Switch checked={on} onChange={(v) => setFlag('rebound_confirm_enabled', v)} label="반등 확인" disabled={readOnly} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <span className={`text-sm font-medium ${on ? 'text-white' : 'text-zinc-400'}`}>반등 확인</span>
-            <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">떨어지는 중에 사지 않도록, 매수 신호가 떠도 최근 저점에서 반등했거나 20일 이평선 위로 올라왔을 때만 매수 검토로 인정합니다.</p>
-            <div className={`mt-2.5 space-y-2.5 transition-opacity ${on ? '' : 'opacity-50'}`}>
-              <div className="flex flex-wrap gap-x-4 gap-y-2">
-                {renderNumInput('rebound_lookback_days', '최근', '거래일')}
-                {renderNumInput('rebound_from_low_pct', '저점 대비', '% 이상 반등')}
-              </div>
-              <div className="flex items-center gap-2 text-xs text-zinc-400">
-                <Switch checked={draft.flags.rebound_ma_enabled} onChange={(v) => setFlag('rebound_ma_enabled', v)} label="또는 20일 이평선 위" disabled={readOnly} />
-                <span>또는 20일 이평선 위</span>
-              </div>
+      <>
+        {rowShell(
+          'buyqty',
+          on,
+          <Switch checked={on} onChange={(v) => setFlag('buy_qty_enabled', v)} label="매수 수량 제안" disabled={readOnly} />,
+          '매수 수량 제안',
+          '매수 신호일 때 살 수량을 제안합니다. 비중 상한을 넘지 않는 범위에서 계산합니다.',
+          <>
+            <div className="glass-pill inline-flex p-0.5" role="group" aria-label="매수 수량 계산 방식">
+              {BUY_QTY_MODES.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  disabled={readOnly}
+                  aria-pressed={mode === m.value}
+                  onClick={() => setDraft((d) => ({ ...d, buy_qty_mode: m.value }))}
+                  className={`pill-item !px-3 !py-1 !text-xs ${mode === m.value ? 'pill-item-active' : ''}`}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
-          </div>
-        </div>
-      </div>
+            {mode === 'amount' && numInput('buy_qty_amount_krw', '1회', '원', true)}
+            {mode === 'lower_avg' && numInput('buy_qty_lower_avg_pct', '평단을', '% 낮추기')}
+          </>,
+        )}
+        {mode === 'amount' && Number.isFinite(amount) && amount > 0 && <p className="px-1 text-[11px] text-zinc-500">1회 ₩{Math.round(amount).toLocaleString('ko-KR')}</p>}
+        {mode === 'target_weight' && (
+          <p className="px-1 text-[11px] leading-relaxed text-zinc-500">'목표 비중 이탈'의 목표 비중 값까지 채우는 수량을 제안합니다. 목표 비중이 0이면 정액 방식으로 계산합니다.</p>
+        )}
+      </>
+    );
+  };
+
+  const simpleRow = (key: string, on: boolean, label: string, desc: string, flag: EnableKey, extra?: React.ReactNode) =>
+    rowShell(key, on, <Switch checked={on} onChange={(v) => setFlag(flag, v)} label={label} disabled={readOnly} />, label, desc, extra);
+
+  const sub = (text: string) => <p className="label-mono !mt-3">{text}</p>;
+
+  switch (id) {
+    case 'profit':
+      return <>{SELL_PROFIT_RULES.map(renderRule)}</>;
+    case 'risk':
+      return <>{SELL_RISK_RULES.map(renderRule)}</>;
+    case 'exclude':
+      return (
+        <>
+          {sub('매도 제외')}
+          {SELL_EXCLUDE_RULES.map(renderRule)}
+          {sub('매도 수량')}
+          {SELL_QTY_RULES.map(renderRule)}
+        </>
+      );
+    case 'buy':
+      return <>{BUY_RULES.map(renderRule)}</>;
+    case 'confirm':
+      return (
+        <>
+          {sub('확인 조건')}
+          {renderRebound()}
+          {sub('매수 제외')}
+          {BUY_EXCLUDE_RULES.map(renderRule)}
+        </>
+      );
+    case 'buyqty':
+      return renderBuyQty();
+    case 'misc':
+      return (
+        <>
+          {simpleRow('fx', draft.flags.fx_historical, '매수 시점 환율로 수익률 계산', '해외 종목의 원화 수익률을 매수 당시 환율 기준으로 계산합니다. 거래 기록이 없는 수량은 현재 환율을 사용합니다.', 'fx_historical')}
+          {simpleRow(
+            'tax',
+            draft.flags.tax_harvest_enabled,
+            '연말 절세 힌트',
+            '해외주식 양도세 기본공제 활용을 위한 이익 실현 / 손실 상계 힌트를 표시합니다.',
+            'tax_harvest_enabled',
+            <div className="flex items-center gap-1.5">
+              <select
+                aria-label="절세 힌트 시작 월"
+                value={draft.month}
+                disabled={readOnly}
+                onChange={(e) => setDraft((d) => ({ ...d, month: e.target.value }))}
+                className="input-field num !w-20 !py-1 !text-sm"
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={m}>{m}월</option>
+                ))}
+              </select>
+              <span className="label-mono !text-zinc-400">부터</span>
+            </div>,
+          )}
+        </>
+      );
+  }
+}
+
+// 규칙 입력 폼 본문 (프로필 편집 / 종목 편집 공용)
+// navLayout: 'side' 는 lg 이상에서 왼쪽 세로 목록, 'pills' 는 항상 위쪽 가로 스크롤 목록 (좁은 모달용)
+function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint, section, onSection, navLayout }: {
+  rd: RuleDraft;
+  readOnly: boolean;
+  touched: boolean;
+  showNote: boolean;
+  readOnlyHint?: string;
+  section: SectionId;
+  onSection: (s: SectionId) => void;
+  navLayout: 'side' | 'pills';
+}) {
+  const { draft, errors, setDraft, applyPreset } = rd;
+  const errCounts = errorCountBySection(errors);
+  const summary = summarize(draft);
+  const side = navLayout === 'side';
+  const meta = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0];
+
+  // 섹션 우측의 충족 개수 선택
+  const headerAction = (() => {
+    switch (section) {
+      case 'profit':
+        return (
+          <CountSelect mode="count" count={draft.sell_profit_count} enabled={enabledProfitCount(draft)} disabled={readOnly}
+            onChange={(m, c) => setDraft((d) => ({ ...d, sell_profit_count: groupValue(m, c) }))} label="수익 실현 충족 개수" />
+        );
+      case 'risk':
+        return (
+          <CountSelect mode="count" count={draft.sell_risk_count} enabled={enabledRiskCount(draft)} disabled={readOnly}
+            onChange={(m, c) => setDraft((d) => ({ ...d, sell_risk_count: groupValue(m, c) }))} label="위험 관리 충족 개수" />
+        );
+      case 'buy':
+        return (
+          <CountSelect mode={draft.buy_mode} count={draft.buy_min_count} enabled={enabledBuyCount(draft)} disabled={readOnly}
+            onChange={(m, c) => setDraft((d) => ({ ...d, buy_mode: m, buy_min_count: c }))} label="매수 조건 충족 개수" />
+        );
+      default:
+        return null;
+    }
+  })();
+
+  const navItem = (s: SectionMeta) => {
+    const active = s.id === section;
+    const ec = errCounts[s.id] ?? 0;
+    return (
+      <button
+        key={s.id}
+        type="button"
+        aria-current={active ? 'page' : undefined}
+        onClick={() => onSection(s.id)}
+        className={`flex shrink-0 items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-sm transition-colors ${side ? 'lg:w-full' : ''} ${
+          active ? 'bg-white/[0.09] text-white' : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200'
+        }`}
+      >
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${s.dot}`} />
+        <span className="whitespace-nowrap">{s.title}</span>
+        {ec > 0 && (
+          <span className="num rounded-full bg-rose-500/20 px-1.5 text-[10px] leading-4 text-rose-300" aria-label={`오류 ${ec}개`}>
+            {ec}
+          </span>
+        )}
+        {side && <span className="num ml-auto hidden whitespace-nowrap pl-1 text-[11px] text-zinc-500 lg:inline">{sectionStatus(draft, s.id)}</span>}
+      </button>
     );
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3.5">
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-3">
           <span className="label-mono">프리셋</span>
@@ -670,104 +911,40 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
 
       {readOnly && readOnlyHint && <p className="text-xs text-zinc-500">{readOnlyHint}</p>}
 
-      <section className="space-y-2.5">
-        <h3 className="label-mono !text-rose-300">매도 조건</h3>
-        <p className="text-xs text-zinc-500">수익 실현 또는 위험 관리 중 한 묶음이라도 기준 개수를 채우면 매도 검토</p>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="label-mono !text-mint-300">수익 실현</p>
-          <CountSelect
-            mode="count"
-            count={draft.sell_profit_count}
-            enabled={enabledProfitCount(draft)}
-            disabled={readOnly}
-            onChange={(m, c) => setDraft((d) => ({ ...d, sell_profit_count: groupValue(m, c) }))}
-            label="수익 실현 충족 개수"
-          />
-        </div>
-        {SELL_PROFIT_RULES.map(renderRule)}
-        <div className="!mt-4 flex flex-wrap items-center justify-between gap-2">
-          <p className="label-mono !text-rose-300">위험 관리</p>
-          <CountSelect
-            mode="count"
-            count={draft.sell_risk_count}
-            enabled={enabledRiskCount(draft)}
-            disabled={readOnly}
-            onChange={(m, c) => setDraft((d) => ({ ...d, sell_risk_count: groupValue(m, c) }))}
-            label="위험 관리 충족 개수"
-          />
-        </div>
-        {SELL_RISK_RULES.map(renderRule)}
-        <p className="label-mono !mt-4">매도 제외</p>
-        {SELL_EXCLUDE_RULES.map(renderRule)}
-        <p className="label-mono !mt-4">매도 수량</p>
-        {SELL_QTY_RULES.map(renderRule)}
-      </section>
+      {/* 전략 요약 */}
+      <div className="space-y-1 rounded-2xl border border-mint-400/20 bg-mint-400/[0.06] px-4 py-3 text-xs leading-relaxed text-zinc-300" aria-label="전략 요약">
+        <p><span className="mr-1.5 font-semibold text-rose-300">매도 검토</span>— {summary.sell}</p>
+        <p><span className="mr-1.5 font-semibold text-mint-300">매수 검토</span>— {summary.buy}</p>
+      </div>
 
-      <section className="space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="label-mono !text-mint-300">매수 조건</h3>
-          <CountSelect
-            mode={draft.buy_mode}
-            count={draft.buy_min_count}
-            enabled={enabledBuyCount(draft)}
-            disabled={readOnly}
-            onChange={(m, c) => setDraft((d) => ({ ...d, buy_mode: m, buy_min_count: c }))}
-            label="매수 조건 충족 개수"
-          />
-        </div>
-        <p className="label-mono !text-mint-300">추가 매수 신호</p>
-        {BUY_RULES.map(renderRule)}
-        <p className="label-mono !mt-4">확인 조건</p>
-        <p className="text-xs text-zinc-500">확인 조건은 개수에 포함되지 않고, 매수 신호가 났을 때 한 번 더 확인합니다.</p>
-        {renderRebound()}
-        <p className="label-mono !mt-4">매수 제외</p>
-        <p className="text-xs text-zinc-500">매수 제외 조건은 충족 개수에 세지 않고, 해당하면 매수 신호를 버립니다.</p>
-        {BUY_EXCLUDE_RULES.map(renderRule)}
-        <p className="label-mono !mt-4">매수 수량</p>
-        {renderBuyQty()}
-      </section>
+      {/* 섹션 목록 + 내용 (높이 고정: 섹션을 바꿔도 흔들리지 않는다) */}
+      <div className={`flex h-[34rem] max-h-[70vh] flex-col gap-3 ${side ? 'lg:flex-row lg:gap-4' : ''}`}>
+        <nav aria-label="전략 섹션" className={`shrink-0 ${side ? 'lg:w-48 lg:overflow-y-auto' : ''}`}>
+          <div className={`flex gap-1 overflow-x-auto pb-1 ${side ? 'lg:flex-col lg:gap-0.5 lg:overflow-x-visible lg:pb-0' : ''}`}>
+            {SECTIONS.map((s, i) => (
+              <div key={s.id} className={`flex shrink-0 items-center gap-1 ${side ? 'lg:flex-col lg:items-stretch lg:gap-0.5' : ''}`}>
+                {SECTIONS[i - 1]?.group !== s.group && (
+                  <span className={`label-mono ${side ? 'lg:px-2.5 lg:pb-0.5 lg:pt-2' : 'pl-1.5'} !text-[10px]`}>{s.group}</span>
+                )}
+                {navItem(s)}
+              </div>
+            ))}
+          </div>
+        </nav>
 
-      <section className="space-y-2.5">
-        <h3 className="label-mono">기타</h3>
-        <div className="surface-inset p-3.5">
-          <div className="flex items-start gap-3">
-            <div className="pt-0.5">
-              <Switch checked={draft.flags.fx_historical} onChange={(v) => setFlag('fx_historical', v)} label="매수 시점 환율로 수익률 계산" disabled={readOnly} />
+        <section aria-label={meta.title} className={`flex min-h-0 min-w-0 flex-1 flex-col ${side ? 'lg:border-l lg:border-white/[0.07] lg:pl-4' : ''}`}>
+          <div className="mb-2.5 flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-white">{meta.title}</h3>
+              <p className="text-xs text-zinc-500">{meta.purpose}</p>
             </div>
-            <div className="min-w-0 flex-1">
-              <span className={`text-sm font-medium ${draft.flags.fx_historical ? 'text-white' : 'text-zinc-400'}`}>매수 시점 환율로 수익률 계산</span>
-              <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">해외 종목의 원화 수익률을 매수 당시 환율 기준으로 계산합니다. 거래 기록이 없는 수량은 현재 환율을 사용합니다.</p>
-            </div>
+            {headerAction}
           </div>
-        </div>
-        <div className="surface-inset p-3.5">
-          <div className="flex items-start gap-3">
-            <div className="pt-0.5">
-              <Switch checked={draft.flags.tax_harvest_enabled} onChange={(v) => setFlag('tax_harvest_enabled', v)} label="연말 절세 힌트" disabled={readOnly} />
-            </div>
-            <div className="min-w-0 flex-1 sm:flex sm:items-start sm:justify-between sm:gap-4">
-              <div className="min-w-0 sm:flex-1">
-                <span className={`text-sm font-medium ${draft.flags.tax_harvest_enabled ? 'text-white' : 'text-zinc-400'}`}>연말 절세 힌트</span>
-                <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">해외주식 양도세 기본공제 활용을 위한 이익 실현 / 손실 상계 힌트를 표시합니다.</p>
-              </div>
-              <div className={`mt-2.5 flex items-center gap-1.5 transition-opacity sm:mt-0 sm:shrink-0 ${draft.flags.tax_harvest_enabled ? '' : 'opacity-50'}`}>
-                <select
-                  aria-label="절세 힌트 시작 월"
-                  value={draft.month}
-                  disabled={readOnly}
-                  onChange={(e) => setDraft((d) => ({ ...d, month: e.target.value }))}
-                  className="input-field num !w-20 !py-1.5"
-                >
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                    <option key={m} value={m}>{m}월</option>
-                  ))}
-                </select>
-                <span className="label-mono !text-zinc-400">부터</span>
-              </div>
-            </div>
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pb-16 pr-1">
+            <SectionBody rd={rd} readOnly={readOnly} touched={touched} showNote={showNote} id={section} />
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
@@ -775,11 +952,20 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
 interface ProfileRuleEditorProps {
   profile: SignalProfile;
   onSaved: (p: SignalProfile) => void;
+  // 선택한 섹션을 부모가 들고 있으면 프로필을 바꿔도 유지된다
+  section?: SectionId;
+  onSectionChange?: (s: SectionId) => void;
 }
 
 // 프로필의 규칙을 편집하는 인라인 편집기 (ProfileManager 오른쪽 패널에 들어간다). profile 이 바뀌면 key 로 다시 마운트할 것.
-export function ProfileRuleEditor({ profile, onSaved }: ProfileRuleEditorProps) {
+export function ProfileRuleEditor({ profile, onSaved, section: sectionProp, onSectionChange }: ProfileRuleEditorProps) {
   const rd = useRuleDraft(profile.rule);
+  const [localSection, setLocalSection] = useState<SectionId>(DEFAULT_SECTION);
+  const section = sectionProp ?? localSection;
+  const setSection = (s: SectionId) => {
+    setLocalSection(s);
+    onSectionChange?.(s);
+  };
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
@@ -794,7 +980,11 @@ export function ProfileRuleEditor({ profile, onSaved }: ProfileRuleEditorProps) 
   const handleSave = async () => {
     setTouched(true);
     setSubmitError(null);
-    if (rd.hasErrors) return;
+    if (rd.hasErrors) {
+      const first = firstErrorSection(rd.errors);
+      if (first) setSection(first);
+      return;
+    }
     try {
       setSaving(true);
       const saved = await apiClient.UpdateSignalProfile(profile.id, { rule: buildRule(profile.rule, rd.draft) });
@@ -809,7 +999,7 @@ export function ProfileRuleEditor({ profile, onSaved }: ProfileRuleEditorProps) 
 
   return (
     <div>
-      <RuleFields rd={rd} readOnly={false} touched={touched} showNote />
+      <RuleFields rd={rd} readOnly={false} touched={touched} showNote section={section} onSection={setSection} navLayout="side" />
       {submitError && <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{submitError}</div>}
       <div className="mt-5 flex items-center justify-end gap-3">
         {touched && rd.hasErrors && <span className="mr-auto text-xs text-rose-300">입력값을 확인하세요</span>}
@@ -844,6 +1034,7 @@ export default function SignalRuleEditor({ assetId, assetName, profiles, current
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
+  const [section, setSection] = useState<SectionId>(DEFAULT_SECTION);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -868,7 +1059,11 @@ export default function SignalRuleEditor({ assetId, assetName, profiles, current
   const handleSave = async () => {
     setTouched(true);
     setSubmitError(null);
-    if (!readOnly && rd.hasErrors) return;
+    if (!readOnly && rd.hasErrors) {
+      const first = firstErrorSection(rd.errors);
+      if (first) setSection(first);
+      return;
+    }
     try {
       setSaving(true);
       if (choice === 'profile') {
@@ -958,6 +1153,9 @@ export default function SignalRuleEditor({ assetId, assetName, profiles, current
             readOnly={readOnly}
             touched={touched}
             showNote={false}
+            section={section}
+            onSection={setSection}
+            navLayout="pills"
             readOnlyHint={`선택한 프로필(${selected?.name ?? ''})의 규칙입니다. 값을 바꾸려면 프로필 관리에서 수정하거나 '이 종목만 개별 전략'을 선택하세요.`}
           />
 
