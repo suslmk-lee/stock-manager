@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck, MinusCircle, LayoutGrid, Layers } from 'lucide-react';
+import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck, MinusCircle, Scissors, LayoutGrid, Layers } from 'lucide-react';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import SignalHistory from '../components/alerts/SignalHistory';
 import { apiClient } from '../api/client';
@@ -47,6 +47,9 @@ const CHECK_OPS: Record<string, string> = {
   dividend_cut: '≤',
   from_high: '≤',
   below_ma: '≤',
+  trailing_stop: '≤',
+  annualized_return: '≥',
+  weight_drift: '≥',
 };
 
 const fmtKrw = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
@@ -64,6 +67,14 @@ function checkText(c: SignalCheck) {
   const op = CHECK_OPS[c.code] ?? '→';
   const unit = c.unit || '%';
   return `${c.label} ${fmtNum(c.value)}${unit} ${op} ${fmtNum(c.threshold)}${unit}`;
+}
+
+// 분할 익절 비율 표기 (33 -> 1/3)
+function fractionText(pct: number) {
+  if (pct === 33 || pct === 33.3) return '1/3';
+  if (pct === 50) return '1/2';
+  if (pct === 25) return '1/4';
+  return `${fmtNum(pct, 1)}%`;
 }
 
 function ringInfo(item: SignalItem): { value: number; text: string } | null {
@@ -222,6 +233,21 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
   const showTrend = !noPrice && !!item.price_history_ok && !!item.high_52w && !!item.low_52w;
   const showDiv = !noPrice && !!item.dividend_trend_ok;
   const hint = !noPrice ? item.tax_hint : null;
+  // 수익 흐름: 값이 있는 항목만 표시
+  const flowParts: React.ReactNode[] = [];
+  if (!noPrice) {
+    if (item.holding_days) flowParts.push(<>보유 <span className="text-zinc-200">{item.holding_days.toLocaleString('ko-KR')}일</span></>);
+    if (item.annualized_return_pct) flowParts.push(<>연환산 <span className={signTone(item.annualized_return_pct)}>{fmtSignedPct(item.annualized_return_pct)}</span></>);
+    if (item.peak_price) {
+      flowParts.push(
+        <>
+          고점 대비 <span className={signTone(item.from_peak_pct ?? 0)}>{fmtSignedPct(item.from_peak_pct ?? 0)}</span>
+          {item.peak_date && <span className="text-zinc-500"> ({item.peak_date})</span>}
+        </>,
+      );
+    }
+    if (item.cost_weight_pct) flowParts.push(<>원금 비중 <span className="text-zinc-200">{fmtPct(item.cost_weight_pct)}</span> → 현재 <span className="text-zinc-200">{fmtPct(item.weight_pct)}</span></>);
+  }
   const divMetrics = (
     <>
       <Metric label="누적 배당" sub={`회수율 ${fmtPct(item.dividend_payback_pct)}`}>
@@ -248,6 +274,16 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
           </span>
         </div>
       </header>
+
+      {item.action === 'SELL' && !!item.suggested_sell_qty && item.suggested_sell_qty > 0 && (
+        <div className="mt-2.5">
+          <span className="badge border border-rose-400/40 bg-rose-500/15 !text-[12px] font-semibold text-rose-100">
+            <Scissors className="h-3.5 w-3.5" />
+            {item.suggested_sell_kind === 'rebalance' ? '리밸런싱' : `${fractionText(rule?.partial_pct ?? 33)} 익절 검토`} · {fmtNum(item.suggested_sell_qty, 2)}주
+            {!!item.suggested_sell_krw && ` · ${fmtKrw(item.suggested_sell_krw)}`}
+          </span>
+        </div>
+      )}
 
       {(item.profile_name || item.sell_disabled || item.sell_excluded_small_qty) && (
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
@@ -334,6 +370,17 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
           )}
         </div>
       </div>
+
+      {flowParts.length > 0 && (
+        <div className="surface-inset mt-4 min-w-0 px-3 py-2.5">
+          <div className="label-mono">수익 흐름</div>
+          <div className="num mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-zinc-400">
+            {flowParts.map((part, i) => (
+              <span key={i}>{part}</span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {(showTrend || showDiv) && (
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
