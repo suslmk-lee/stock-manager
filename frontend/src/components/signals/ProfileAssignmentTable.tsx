@@ -172,11 +172,12 @@ export default function ProfileAssignmentTable({ items, profiles, profileIdOf, i
     await assignBulk(dividendProfile.id, recTargets, `추천 ${recTargets.length}개 종목을 '${dividendProfile.name}' 프로필로 지정했습니다.`);
   };
 
-  const SortHead = ({ k, label, className = '' }: { k: SortKey; label: string; className?: string }) => {
+  // 컴포넌트가 아닌 렌더 함수로 둔다 (렌더마다 새 컴포넌트가 되어 포커스를 잃지 않도록)
+  const sortHead = (k: SortKey, label: string, className = '') => {
     const active = sort.key === k;
     const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown;
     return (
-      <th className={`px-3 py-2 font-medium ${className}`} aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <th className={`whitespace-nowrap px-3 py-2 font-medium ${className}`} key={k} aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
         <button type="button" onClick={() => toggleSort(k)} className={`inline-flex items-center gap-1 transition-colors hover:text-white ${active ? 'text-white' : ''}`}>
           {label}
           <Icon className={`h-3 w-3 ${active ? '' : 'opacity-40'}`} />
@@ -276,17 +277,17 @@ export default function ProfileAssignmentTable({ items, profiles, profileIdOf, i
 
       {/* 표 */}
       <div className="surface-inset max-h-[56vh] min-h-[16rem] overflow-auto">
-        <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[560px] border-collapse text-left text-sm">
           <thead className="sticky top-0 z-10 bg-zinc-900/95 text-xs text-zinc-400 backdrop-blur">
             <tr>
               <th className="w-9 px-3 py-2">
                 <input type="checkbox" className="h-4 w-4 cursor-pointer accent-mint-400" checked={allChecked} onChange={toggleAll} aria-label="표시된 종목 전체 선택" disabled={rows.length === 0} />
               </th>
-              <SortHead k="name" label="종목" />
-              <th className="px-3 py-2 font-medium">현재 신호</th>
-              <SortHead k="yield" label="배당수익률" className="text-right [&>button]:flex-row-reverse" />
-              <th className="px-3 py-2 font-medium">추천</th>
-              <SortHead k="profile" label="프로필" />
+              {sortHead('name', '종목')}
+              <th className="whitespace-nowrap px-3 py-2 font-medium">현재 신호</th>
+              {sortHead('yield', '배당수익률', 'text-right [&>button]:flex-row-reverse')}
+              <th className="whitespace-nowrap px-3 py-2 font-medium">추천</th>
+              {sortHead('profile', '프로필')}
             </tr>
           </thead>
           <tbody>
@@ -306,9 +307,9 @@ export default function ProfileAssignmentTable({ items, profiles, profileIdOf, i
                       <input type="checkbox" className="h-4 w-4 cursor-pointer accent-mint-400" checked={checked.has(i.asset_id)} onChange={() => toggleOne(i.asset_id)} aria-label={`${i.name} 선택`} />
                     </td>
                     <td className="px-3 py-1.5">
-                      <div className="flex min-w-0 items-baseline gap-2">
+                      <div className="flex min-w-0 max-w-[12rem] items-baseline gap-2 2xl:max-w-[20rem]" title={`${i.name} (${i.ticker})`}>
                         <span className="truncate text-zinc-100">{i.name}</span>
-                        <span className="label-mono">{i.ticker}</span>
+                        <span className="label-mono shrink-0">{i.ticker}</span>
                       </div>
                     </td>
                     <td className="px-3 py-1.5">
@@ -325,7 +326,9 @@ export default function ProfileAssignmentTable({ items, profiles, profileIdOf, i
                       )}
                     </td>
                     <td className="px-3 py-1.5">
-                      <div className="flex items-center gap-2">
+                      {/* 좁은 폭에서 넘치지 않게 개별 전략 표시는 선택 목록 아래로 */}
+                      <div className="flex flex-col items-start gap-1">
+                        <div className="flex items-center gap-2">
                         <select
                           aria-label={`${i.name} 프로필`}
                           className="input-field !w-auto min-w-[7rem] !py-1 !text-xs"
@@ -338,9 +341,10 @@ export default function ProfileAssignmentTable({ items, profiles, profileIdOf, i
                           ))}
                         </select>
                         {saving && <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" />}
+                        </div>
                         {i.rule_source === 'asset' && (
                           <span
-                            className="badge border border-amber-400/25 bg-amber-400/10 text-amber-200"
+                            className="badge whitespace-nowrap border border-amber-400/25 bg-amber-400/10 !text-[10px] text-amber-200"
                             title="이 종목에는 종목별 개별 전략이 설정되어 있어, 프로필 규칙보다 개별 전략이 우선 적용됩니다."
                           >
                             개별 전략
