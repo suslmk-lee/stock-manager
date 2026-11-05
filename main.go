@@ -15,15 +15,20 @@ import (
 var assets embed.FS
 
 func main() {
-	if err := database.InitDB(); err != nil {
-		log.Fatal("Failed to initialize database:", err)
+	// 바인딩 생성(wails build / generate module) 중에는 실제 DB·API 서버를 건드리지 않는다
+	if !bindingsMode {
+		if err := database.InitDB(); err != nil {
+			log.Fatal("Failed to initialize database:", err)
+		}
+		defer database.CloseDB()
 	}
-	defer database.CloseDB()
 
 	app := NewApp()
 
 	// 백그라운드에서 API 서버 실행
-	go StartAPIServer(app)
+	if !bindingsMode {
+		go StartAPIServer(app)
+	}
 
 	err := wails.Run(&options.App{
 		Title:  "Stock Manager",
