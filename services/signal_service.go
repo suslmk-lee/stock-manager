@@ -74,6 +74,10 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 		"buy_qty_amount_krw":              r.BuyQtyAmountKRW,
 		"buy_qty_lower_avg_pct":           r.BuyQtyLowerAvgPct,
 		"vol_stop_k":                      r.VolStopK,
+		"rebound_from_low_pct":            r.ReboundFromLowPct,
+		"yield_expansion_pct":             r.YieldExpansionPct,
+		"time_stop_max_return_pct":        r.TimeStopMaxReturnPct,
+		"short_drop_pct":                  r.ShortDropPct,
 	}
 	for k, v := range fin {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -206,6 +210,42 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	}
 	if r.VolStopEnabled && r.VolStopK == 0 {
 		return &ErrInvalidSignalRule{"vol_stop_k must be > 0 when vol stop is enabled"}
+	}
+	if r.ReboundFromLowPct == 0 {
+		r.ReboundFromLowPct = defaultReboundFromLowPct
+	}
+	if r.ReboundFromLowPct < 0 || r.ReboundFromLowPct > 100 {
+		return &ErrInvalidSignalRule{"rebound_from_low_pct must be in (0, 100]"}
+	}
+	if r.ReboundLookbackDays == 0 {
+		r.ReboundLookbackDays = defaultReboundLookbackDays
+	}
+	if r.ReboundLookbackDays < 5 || r.ReboundLookbackDays > 120 {
+		return &ErrInvalidSignalRule{"rebound_lookback_days must be 5..120"}
+	}
+	if r.YieldExpansionPct < 0 {
+		return &ErrInvalidSignalRule{"yield_expansion_pct must be >= 0"}
+	}
+	if r.YieldExpansionPct == 0 {
+		r.YieldExpansionPct = defaultYieldExpansionPct
+	}
+	if r.TimeStopDays == 0 {
+		r.TimeStopDays = defaultTimeStopDays
+	}
+	if r.TimeStopDays < 30 || r.TimeStopDays > 3650 {
+		return &ErrInvalidSignalRule{"time_stop_days must be 30..3650"}
+	}
+	if r.ShortDropDays == 0 {
+		r.ShortDropDays = defaultShortDropDays
+	}
+	if r.ShortDropDays < 5 || r.ShortDropDays > 120 {
+		return &ErrInvalidSignalRule{"short_drop_days must be 5..120"}
+	}
+	if r.ShortDropPct > 0 {
+		return &ErrInvalidSignalRule{"short_drop_pct must be <= 0"}
+	}
+	if r.ShortDropPct == 0 {
+		r.ShortDropPct = defaultShortDropPct
 	}
 	if r.TaxHarvestFromMonth == 0 {
 		r.TaxHarvestFromMonth = defaultTaxHarvestMonth

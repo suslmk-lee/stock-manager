@@ -92,6 +92,23 @@ type SignalRuleConfig struct {
 	VolStopEnabled bool    `json:"vol_stop_enabled"`
 	VolStopK       float64 `json:"vol_stop_k"` // (0, 5], 손절선 = -K × 연변동성(%)
 
+	// 8단계: 매수 확인(반등), 배당수익률 확대, 시간 손절, 단기 급락
+	ReboundConfirmEnabled bool    `json:"rebound_confirm_enabled"` // 매수 조건 충족 후 반등 확인이 안 되면 매수 검토 제외
+	ReboundFromLowPct     float64 `json:"rebound_from_low_pct"`    // (0, 100], 최근 저점 대비 반등 폭
+	ReboundLookbackDays   int     `json:"rebound_lookback_days"`   // 5~120 거래일(종가 개수)
+	ReboundMAEnabled      bool    `json:"rebound_ma_enabled"`      // 현재가 >= 20일 이평이면 반등으로 인정
+
+	YieldExpansionEnabled bool    `json:"yield_expansion_enabled"` // 24개월 평균 대비 배당수익률 확대 (매수)
+	YieldExpansionPct     float64 `json:"yield_expansion_pct"`     // > 0
+
+	TimeStopEnabled      bool    `json:"time_stop_enabled"` // 보유 N일 이상인데 수익률이 기준 이하면 매도 (위험 그룹)
+	TimeStopDays         int     `json:"time_stop_days"`    // 30~3650
+	TimeStopMaxReturnPct float64 `json:"time_stop_max_return_pct"`
+
+	ShortDropEnabled bool    `json:"short_drop_enabled"` // 최근 N거래일 대비 급락 (위험 그룹)
+	ShortDropDays    int     `json:"short_drop_days"`    // 5~120 거래일
+	ShortDropPct     float64 `json:"short_drop_pct"`     // < 0
+
 	// 충족 방식: "any"(1개 이상) | "all"(모두) | "count"(MinCount 개 이상) | "group"(매도만: 익절/위험 그룹별 N개)
 	SellMode     string `gorm:"size:10" json:"sell_mode"`
 	BuyMode      string `gorm:"size:10" json:"buy_mode"`
@@ -120,7 +137,7 @@ type SignalRule struct {
 }
 
 // SignalRuleVersion 은 현재 규칙 스키마 버전이다.
-const SignalRuleVersion = 7
+const SignalRuleVersion = 8
 
 // DefaultSignalRuleConfig 는 "균형" 기본 규칙 설정(저장 전)을 반환한다.
 func DefaultSignalRuleConfig() SignalRuleConfig {
@@ -174,6 +191,13 @@ func DefaultSignalRuleConfig() SignalRuleConfig {
 		BuyQtyAmountKRW:             1000000,
 		BuyQtyLowerAvgPct:           5,
 		VolStopK:                    1,
+		ReboundFromLowPct:           5,
+		ReboundLookbackDays:         20,
+		ReboundMAEnabled:            true,
+		YieldExpansionPct:           20,
+		TimeStopDays:                365,
+		ShortDropDays:               20,
+		ShortDropPct:                -15,
 		SellMode:                    "group",
 		BuyMode:                     "any",
 		SellProfitMinCount:          1,
@@ -198,6 +222,7 @@ func DividendSignalRuleConfig() SignalRuleConfig {
 	c.FromHighEnabled = true
 	c.FromHighPct = -20
 	c.YieldCompressionEnabled = true
+	c.YieldExpansionEnabled = true
 	return c
 }
 

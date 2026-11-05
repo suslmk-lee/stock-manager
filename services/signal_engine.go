@@ -105,7 +105,7 @@ type SignalItem struct {
 	DaysSinceLastBuy int     `json:"days_since_last_buy,omitempty"`
 
 	// 매수 제외 (쿨다운 / 최대 비중): 매수 조건이 충족돼도 매수 검토에서 뺀다
-	BuyExcludedReason string  `json:"buy_excluded_reason,omitempty"` // "cooldown" | "max_weight"
+	BuyExcludedReason string  `json:"buy_excluded_reason,omitempty"` // "cooldown" | "max_weight" | "no_rebound"
 	BuyMaxWeightPct   float64 `json:"buy_max_weight_pct,omitempty"`
 	BuyCooldownDays   int     `json:"buy_cooldown_days,omitempty"`
 
@@ -113,6 +113,15 @@ type SignalItem struct {
 	SuggestedBuyQty  float64 `json:"suggested_buy_qty,omitempty"`
 	SuggestedBuyKRW  float64 `json:"suggested_buy_krw,omitempty"`
 	SuggestedBuyKind string  `json:"suggested_buy_kind,omitempty"` // "amount" | "target_weight" | "lower_avg"
+
+	// 단기 흐름: 최근 저점 대비 반등(매수 확인)과 최근 N거래일 변화율. 시세 이력이 있으면 규칙과 무관하게 채운다.
+	RecentLowPrice      float64 `json:"recent_low_price,omitempty"`
+	FromRecentLowPct    float64 `json:"from_recent_low_pct,omitempty"`
+	MA20                float64 `json:"ma20,omitempty"`
+	ReboundConfirmed    bool    `json:"rebound_confirmed,omitempty"`
+	ReboundLookbackDays int     `json:"rebound_lookback_days,omitempty"`
+	ShortChangePct      float64 `json:"short_change_pct,omitempty"`
+	ShortChangeDays     int     `json:"short_change_days,omitempty"`
 
 	hasLastBuy bool // 마지막 매수 거래 존재 여부 (DaysSinceLastBuy 0 과 구분)
 
@@ -486,6 +495,7 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time, ct
 		}
 	}
 
+	computeShortTermMetrics(&item, in, now)
 	computeYieldMetrics(&item, in, QuantityAtFunc(currentQty, acctTxns), now)
 	computeVolMetrics(&item, in, now)
 
@@ -628,6 +638,14 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 		met := it.VolatilityPct > 0 && it.MA200 > 0 && it.MA200Sigma >= r.VolOverheatSigma
 		sell = append(sell, SignalCheck{"vol_overheat", "변동성 대비 과열", met, it.MA200Sigma, r.VolOverheatSigma, "σ"})
 	}
+	if r.TimeStopEnabled {
+		met := it.HoldingDays > 0 && it.HoldingDays >= r.TimeStopDays && ret <= r.TimeStopMaxReturnPct
+		sell = append(sell, SignalCheck{"time_stop", "시간 손절", met, ret, r.TimeStopMaxReturnPct, "%"})
+	}
+	if r.ShortDropEnabled {
+		met := it.ShortChangeDays > 0 && it.ShortChangePct <= r.ShortDropPct
+		sell = append(sell, SignalCheck{"short_drop", "단기 급락", met, it.ShortChangePct, r.ShortDropPct, "%"})
+	}
 	if r.DividendCutEnabled {
 		met := it.DividendTrendOK && it.DividendChangePct <= -r.DividendCutPct
 		sell = append(sell, SignalCheck{"dividend_cut", "배당 삭감", met, it.DividendChangePct, -r.DividendCutPct, "%"})
@@ -656,6 +674,10 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 		buy = append(buy, SignalCheck{"below_ma", "장기 이평 하회", met, it.VsMA200Pct, r.BelowMAPct, "%"})
 	}
 
+	if r.YieldExpansionEnabled {
+		met := it.DividendYieldPoints >= yieldMinPoints && it.DividendYieldVsAvgPct >= r.YieldExpansionPct
+		buy = append(buy, SignalCheck{"yield_expansion", "배당수익률 확대", met, it.DividendYieldVsAvgPct, r.YieldExpansionPct, "%"})
+	}
 	if r.VolOversoldEnabled {
 		met := it.VolatilityPct > 0 && it.MA200 > 0 && it.MA200Sigma <= -r.VolOversoldSigma
 		buy = append(buy, SignalCheck{"vol_oversold", "변동성 대비 과매도", met, it.MA200Sigma, -r.VolOversoldSigma, "σ"})
@@ -690,6 +712,10 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 				it.BuyExcludedReason = "max_weight"
 			}
 			it.BuyMaxWeightPct = r.BuyMaxWeightPct
+		}
+		// 반등 확인: 시세 이력이 없으면(최근 저점 계산 불가) 막지 않는다. 사유 우선순위는 cooldown > max_weight > no_rebound.
+		if r.ReboundConfirmEnabled && it.RecentLowPrice > 0 && !it.ReboundConfirmed && it.BuyExcludedReason == "" {
+			it.BuyExcludedReason = "no_rebound"
 		}
 		if it.BuyExcludedReason != "" {
 			buyHit = false
