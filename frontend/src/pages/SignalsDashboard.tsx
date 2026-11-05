@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck, MinusCircle, Scissors, ShoppingCart, LayoutGrid, Layers } from 'lucide-react';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import SignalHistory from '../components/alerts/SignalHistory';
@@ -66,13 +66,17 @@ const CHECK_OPS: Record<string, string> = {
   pbr_low: '≤',
   per_high: '≥',
   pbr_high: '≥',
+  per_avg_low: '≤',
+  pbr_avg_low: '≤',
+  per_avg_high: '≥',
+  pbr_avg_high: '≥',
 };
 
 // 단위가 "배"인 펀더멘털 체크
 const MULTIPLE_CODES = new Set(['per_low', 'pbr_low', 'per_high', 'pbr_high']);
 
 // 수익 실현 묶음에 속하는 매도 체크 (나머지 매도 체크는 위험 관리 묶음)
-const SELL_PROFIT_CODES = new Set(['take_profit', 'trailing_stop', 'annualized_return', 'weight_drift', 'yield_compression', 'vol_overheat', 'rsi_overbought', 'mfi_overbought', 'per_high', 'pbr_high']);
+const SELL_PROFIT_CODES = new Set(['take_profit', 'trailing_stop', 'annualized_return', 'weight_drift', 'yield_compression', 'vol_overheat', 'rsi_overbought', 'mfi_overbought', 'per_high', 'pbr_high', 'per_avg_high', 'pbr_avg_high']);
 
 const fmtKrw = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
 const fmtSignedKrw = (v: number) => `${v < 0 ? '-' : '+'}₩${Math.abs(Math.round(v)).toLocaleString('ko-KR')}`;
@@ -95,6 +99,10 @@ function checkText(c: SignalCheck, oscMins?: { rsi?: number; mfi?: number }) {
   }
   if (c.code.startsWith('rsi_') || c.code.startsWith('mfi_')) {
     return `${c.label} ${fmtNum(c.value, 1)} ${op} ${fmtNum(c.threshold, 0)}`;
+  }
+  // PER/PBR 평균 대비: 부호 있는 % (현재 값이 평균보다 몇 % 높은지/낮은지)
+  if (c.code === 'per_avg_low' || c.code === 'pbr_avg_low' || c.code === 'per_avg_high' || c.code === 'pbr_avg_high') {
+    return `${c.label} ${fmtSignedPct(c.value)} ${op} ${fmtSignedPct(c.threshold)}`;
   }
   if (MULTIPLE_CODES.has(c.code)) {
     return `${c.label} ${fmtNum(c.value, 2)}배 ${op} ${fmtNum(c.threshold, 2)}배`;
@@ -314,12 +322,23 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
   if (!noPrice) {
     if (item.rsi) indParts.push(<>RSI <span className={oscTone(item.rsi, 70, 30)}>{fmtNum(item.rsi, 1)}</span>{item.rsi_min ? <span className="text-zinc-500"> (최근 최저 {fmtNum(item.rsi_min, 1)})</span> : null}</>);
     if (item.mfi) indParts.push(<>MFI <span className={oscTone(item.mfi, 80, 20)}>{fmtNum(item.mfi, 1)}</span>{item.mfi_min ? <span className="text-zinc-500"> (최근 최저 {fmtNum(item.mfi_min, 1)})</span> : null}</>);
-    if (item.per) indParts.push(<>PER <span className="text-zinc-200">{fmtNum(item.per, 1)}배</span>{item.forward_per ? <span className="text-zinc-500"> (예상 {fmtNum(item.forward_per, 1)}배)</span> : null}</>);
-    if (item.pbr) indParts.push(<>PBR <span className="text-zinc-200">{fmtNum(item.pbr, 2)}배</span></>);
+    const winMonths = item.valuation_window_months ?? rule?.valuation_window_months ?? 36;
+    // 평균 대비 %: 매도 기준 이상이면 rose, 매수 기준 이하이면 mint, 그 외 중립 (규칙을 모르면 ±20%)
+    const vsTone = (v: number, buyPct?: number, sellPct?: number) => (v >= (sellPct ?? 20) ? 'text-rose-300' : v <= -(buyPct ?? 20) ? 'text-mint-300' : 'text-zinc-300');
+    const avgText = (avg: number | undefined, vs: number | undefined, digits: number, buyPct?: number, sellPct?: number) =>
+      avg && vs !== undefined ? (
+        <>{winMonths}개월 평균 {fmtNum(avg, digits)}배, <span className={vsTone(vs, buyPct, sellPct)}>{fmtSignedPct(vs, 0)}</span></>
+      ) : null;
+    const perAvg = avgText(item.per_avg, item.per_vs_avg_pct, 1, rule?.per_avg_buy_pct, rule?.per_avg_sell_pct);
+    const pbrAvg = avgText(item.pbr_avg, item.pbr_vs_avg_pct, 2, rule?.pbr_avg_buy_pct, rule?.pbr_avg_sell_pct);
+    const perExtra = [item.forward_per ? <>예상 {fmtNum(item.forward_per, 1)}배</> : null, perAvg].filter(Boolean);
+    if (item.per) indParts.push(<>PER <span className="text-zinc-200">{fmtNum(item.per, 1)}배</span>{perExtra.length > 0 && <span className="text-zinc-500"> ({perExtra.map((e, i) => <Fragment key={i}>{i > 0 && ' · '}{e}</Fragment>)})</span>}</>);
+    if (item.pbr) indParts.push(<>PBR <span className="text-zinc-200">{fmtNum(item.pbr, 2)}배</span>{pbrAvg && <span className="text-zinc-500"> ({pbrAvg})</span>}</>);
   }
   const hasFundamentals = !!item.per || !!item.pbr;
   const fundSource = item.fundamentals_source === 'naver' ? '네이버' : item.fundamentals_source === 'yahoo' ? 'Yahoo' : '';
-  const fundHint = hasFundamentals && (fundSource || item.fundamentals_as_of) ? [fundSource, item.fundamentals_as_of].filter(Boolean).join(' · ') : '';
+  const avgSourceHint = (item.per_avg || item.pbr_avg) && item.valuation_source ? (item.valuation_source === 'computed' ? '평균: 실적 기반 계산' : '평균: 저장값') : '';
+  const fundHint = hasFundamentals ? [fundSource, item.fundamentals_as_of, avgSourceHint].filter(Boolean).join(' · ') : '';
   const hasYieldAvg =!noPrice && (item.dividend_yield_avg_pct ?? 0) > 0;
   const divMetrics = (
     <>

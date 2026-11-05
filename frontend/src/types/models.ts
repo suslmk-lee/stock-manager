@@ -267,6 +267,16 @@ export interface SignalRule {
   pbr_buy_max?: number; // > 0, 기본 1
   pbr_sell_enabled?: boolean; // 기본 false
   pbr_sell_min?: number; // > 0, 기본 5
+  // PER · PBR 을 종목 자신의 과거 평균과 비교 (구 백엔드에서는 없을 수 있음)
+  valuation_window_months?: number; // 정수 12~60, 기본 36
+  per_avg_buy_enabled?: boolean; // 기본 false
+  per_avg_buy_pct?: number; // (0, 90], 기본 20
+  per_avg_sell_enabled?: boolean; // 기본 false
+  per_avg_sell_pct?: number; // (0, 500], 기본 30
+  pbr_avg_buy_enabled?: boolean; // 기본 false
+  pbr_avg_buy_pct?: number; // (0, 90], 기본 20
+  pbr_avg_sell_enabled?: boolean; // 기본 false
+  pbr_avg_sell_pct?: number; // (0, 500], 기본 30
   // 장기 이평 하회 / 52주 고점 대비 하락의 반등 방식 (구 백엔드에서는 없을 수 있음)
   below_ma_mode?: BelowMaMode; // 기본 'rebound'
   below_ma_lookback_days?: number; // 정수 10~250 (거래일), 기본 60
@@ -432,6 +442,15 @@ export interface SignalItem {
   bps?: number;
   fundamentals_source?: 'yahoo' | 'naver';
   fundamentals_as_of?: string; // YYYY-MM-DD
+  // 종목 자신의 과거 평균 대비 (없으면 계산 불가)
+  per_avg?: number;
+  per_vs_avg_pct?: number; // 현재 PER 의 평균 대비 %
+  per_points?: number; // 평균에 쓴 월 수
+  pbr_avg?: number;
+  pbr_vs_avg_pct?: number;
+  pbr_points?: number;
+  valuation_source?: 'computed' | 'snapshots';
+  valuation_window_months?: number;
   suggested_buy_qty?: number;
   suggested_buy_krw?: number;
   suggested_buy_kind?: BuyQtyMode;
