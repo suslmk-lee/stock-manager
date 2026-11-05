@@ -193,6 +193,18 @@ export interface SignalRule {
   crash_pct?: number; // <= 0 (큰 폭락 경고)
   min_sell_qty_enabled?: boolean; // 보유 수량이 기준 이하이면 매도 검토 제외
   min_sell_qty?: number; // >= 0 (주)
+  // 수익 실현 (구 백엔드에서는 없을 수 있음)
+  trailing_enabled?: boolean;
+  trailing_activate_pct?: number; // >= 0 (추적 익절 활성 수익률)
+  trailing_drop_pct?: number; // < 0 (최고가 대비 되돌림)
+  annualized_enabled?: boolean;
+  annualized_pct?: number; // >= 0
+  annualized_min_days?: number; // 1~3650
+  annualized_min_return_pct?: number; // >= 0
+  drift_enabled?: boolean;
+  drift_pct?: number; // > 0 (원금 비중 대비 %p)
+  partial_enabled?: boolean;
+  partial_pct?: number; // 1~100 (보유 수량의 %)
   sell_mode: SignalMode;
   buy_mode: SignalMode;
   created_at?: string;
@@ -298,6 +310,18 @@ export interface SignalItem {
   sell_disabled?: boolean;
   sell_excluded_small_qty?: boolean; // 보유 수량이 기준 이하라 매도 검토에서 제외됨
   min_sell_qty?: number;
+  // 수익 흐름 (매수 이후 최고가 · 보유 기간 · 연환산 · 원금 비중)
+  peak_price?: number;
+  peak_date?: string; // YYYY-MM-DD
+  peak_gain_pct?: number;
+  from_peak_pct?: number;
+  holding_days?: number;
+  annualized_return_pct?: number;
+  cost_weight_pct?: number;
+  // 매도 수량 제안 (수익 실현 신호일 때만)
+  suggested_sell_qty?: number;
+  suggested_sell_krw?: number;
+  suggested_sell_kind?: 'partial' | 'rebalance';
   restricted_only: boolean;
   quantity: number;
   avg_price: number;

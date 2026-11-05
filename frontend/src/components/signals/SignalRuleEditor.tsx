@@ -19,7 +19,14 @@ type NumKey =
   | 'above_ma_pct'
   | 'dividend_cut_pct'
   | 'crash_pct'
-  | 'min_sell_qty';
+  | 'min_sell_qty'
+  | 'trailing_activate_pct'
+  | 'trailing_drop_pct'
+  | 'annualized_pct'
+  | 'annualized_min_days'
+  | 'annualized_min_return_pct'
+  | 'drift_pct'
+  | 'partial_pct';
 
 type EnableKey =
   | 'from_high_enabled'
@@ -28,6 +35,10 @@ type EnableKey =
   | 'dividend_cut_enabled'
   | 'crash_enabled'
   | 'min_sell_qty_enabled'
+  | 'trailing_enabled'
+  | 'annualized_enabled'
+  | 'drift_enabled'
+  | 'partial_enabled'
   | 'tax_harvest_enabled'
   | 'fx_historical'
   | 'take_profit_enabled'
@@ -52,8 +63,38 @@ interface RuleDef {
   note?: string;
 }
 
-const SELL_RULES: RuleDef[] = [
+// 수익 실현 조건
+const SELL_PROFIT_RULES: RuleDef[] = [
   { enabled: 'take_profit_enabled', label: '목표 수익률 도달', desc: '실질 수익률이 목표 이상이면 이익 실현을 검토합니다.', fields: [{ key: 'take_profit_pct', label: '목표', suffix: '%' }] },
+  {
+    enabled: 'trailing_enabled',
+    label: '고점 대비 되돌림 (추적 익절)',
+    desc: '수익률이 활성 기준을 넘은 뒤 매수 이후 최고가에서 기준만큼 떨어지면 매도를 검토합니다. 오르는 동안에는 신호를 내지 않습니다.',
+    fields: [
+      { key: 'trailing_activate_pct', label: '활성 수익률', suffix: '%' },
+      { key: 'trailing_drop_pct', label: '고점 대비', suffix: '%' },
+    ],
+  },
+  {
+    enabled: 'annualized_enabled',
+    label: '연환산 수익률',
+    desc: '보유 기간으로 환산한 연 수익률이 기준 이상이면 매도를 검토합니다. 짧은 기간의 일시적 급등을 거르기 위해 최소 보유 일수와 최소 수익률을 함께 봅니다.',
+    fields: [
+      { key: 'annualized_pct', label: '연 수익률', suffix: '%' },
+      { key: 'annualized_min_days', label: '최소 보유', suffix: '일' },
+      { key: 'annualized_min_return_pct', label: '최소 수익률', suffix: '%' },
+    ],
+  },
+  {
+    enabled: 'drift_enabled',
+    label: '비중 쏠림',
+    desc: '시세 상승으로 현재 비중이 투자 원금 비중보다 기준 이상 커지면 일부 매도(리밸런싱)를 검토합니다.',
+    fields: [{ key: 'drift_pct', label: '원금 비중 대비', suffix: '%p' }],
+  },
+];
+
+// 위험 관리 조건
+const SELL_RISK_RULES: RuleDef[] = [
   { enabled: 'stop_loss_enabled', label: '손절 기준', desc: '실질 수익률이 기준 이하로 내려가면 손절을 검토합니다.', fields: [{ key: 'stop_loss_pct', label: '기준', suffix: '%' }] },
   { enabled: 'crash_enabled', label: '큰 폭락 경고', desc: '실질 수익률이 기준 이하로 폭락하면 경고합니다. 손절 대신 쓰는 장기보유용 안전장치입니다.', fields: [{ key: 'crash_pct', label: '기준', suffix: '%' }] },
   {
@@ -90,6 +131,16 @@ const SELL_EXCLUDE_RULES: RuleDef[] = [
   },
 ];
 
+// 매도 수량 제안
+const SELL_QTY_RULES: RuleDef[] = [
+  {
+    enabled: 'partial_enabled',
+    label: '분할 익절',
+    desc: '수익 실현 신호일 때 전량 대신 일부 매도 수량을 제안합니다. 비중 쏠림이면 원금 비중으로 되돌리는 수량을 제안합니다. 손절·위험 신호는 전량 검토로 표시합니다.',
+    fields: [{ key: 'partial_pct', label: '보유 수량의', suffix: '%' }],
+  },
+];
+
 const BUY_RULES: RuleDef[] = [
   { enabled: 'buy_dip_enabled', label: '평단 대비 하락', desc: '현재가가 평단보다 기준 이상 낮으면 추가 매수를 검토합니다.', fields: [{ key: 'buy_dip_pct', label: '기준', suffix: '%' }] },
   { enabled: 'high_yield_enabled', label: '배당수익률 상승', desc: '현재가 기준 배당수익률이 기준 이상이면 매수를 검토합니다.', fields: [{ key: 'high_yield_pct', label: '기준', suffix: '%' }] },
@@ -101,26 +152,31 @@ const NUM_KEYS: NumKey[] = [
   'take_profit_pct', 'stop_loss_pct', 'target_weight_pct', 'weight_band_pct', 'dividend_payback_pct',
   'dividend_payback_min_return_pct', 'low_yield_pct', 'buy_dip_pct', 'high_yield_pct',
   'from_high_pct', 'below_ma_pct', 'above_ma_pct', 'dividend_cut_pct', 'crash_pct', 'min_sell_qty',
+  'trailing_activate_pct', 'trailing_drop_pct', 'annualized_pct', 'annualized_min_days', 'annualized_min_return_pct', 'drift_pct', 'partial_pct',
 ];
 const ENABLE_KEYS: EnableKey[] = [
   'take_profit_enabled', 'stop_loss_enabled', 'weight_enabled', 'dividend_payback_enabled',
   'low_yield_enabled', 'buy_dip_enabled', 'high_yield_enabled',
   'from_high_enabled', 'below_ma_enabled', 'above_ma_enabled', 'dividend_cut_enabled', 'crash_enabled',
   'tax_harvest_enabled', 'fx_historical', 'min_sell_qty_enabled',
+  'trailing_enabled', 'annualized_enabled', 'drift_enabled', 'partial_enabled',
 ];
 
 // 2단계 필드 기본값 (구 백엔드가 내려주지 않을 때 균형 값으로 채움)
-const NEW_NUM_DEFAULTS: Partial<Record<NumKey, number>> = { from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, min_sell_qty: 1 };
+const NEW_NUM_DEFAULTS: Partial<Record<NumKey, number>> = { from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, min_sell_qty: 1,
+  trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33,
+};
 const NEW_FLAG_DEFAULTS: Partial<Record<EnableKey, boolean>> = {
   from_high_enabled: false, below_ma_enabled: false, above_ma_enabled: false, dividend_cut_enabled: false, crash_enabled: false,
   tax_harvest_enabled: true, fx_historical: true, min_sell_qty_enabled: true,
+  trailing_enabled: true, annualized_enabled: false, drift_enabled: false, partial_enabled: true,
 };
 const DEFAULT_HARVEST_MONTH = 11;
 
 const PRESETS: { id: string; label: string; values: Partial<Record<NumKey, number>> }[] = [
-  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5, crash_pct: -30 } },
-  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40 } },
-  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20, crash_pct: -50 } },
+  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5, crash_pct: -30, trailing_activate_pct: 15, trailing_drop_pct: -7, annualized_pct: 20, annualized_min_days: 60, annualized_min_return_pct: 10, drift_pct: 5, partial_pct: 50 } },
+  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33 } },
+  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20, crash_pct: -50, trailing_activate_pct: 30, trailing_drop_pct: -15, annualized_pct: 35, annualized_min_days: 120, annualized_min_return_pct: 25, drift_pct: 10, partial_pct: 25 } },
 ];
 
 interface Draft {
@@ -155,7 +211,11 @@ function validate(d: Draft): Partial<Record<NumKey, string>> {
       return;
     }
     if ((k === 'stop_loss_pct' || k === 'buy_dip_pct' || k === 'from_high_pct' || k === 'below_ma_pct' || k === 'crash_pct') && n > 0) errs[k] = '0 이하로 입력하세요';
-    else if ((k === 'above_ma_pct' || k === 'dividend_cut_pct' || k === 'weight_band_pct' || k === 'min_sell_qty') && n < 0) errs[k] = '0 이상으로 입력하세요';
+    else if (k === 'trailing_drop_pct' && n >= 0) errs[k] = '0보다 작게 입력하세요 (예: -10)';
+    else if (k === 'drift_pct' && n <= 0) errs[k] = '0보다 크게 입력하세요';
+    else if (k === 'partial_pct' && (n < 1 || n > 100)) errs[k] = '1~100 사이로 입력하세요';
+    else if (k === 'annualized_min_days' && (!Number.isInteger(n) || n < 1 || n > 3650)) errs[k] = '1~3650 사이 정수로 입력하세요';
+    else if ((k === 'above_ma_pct' || k === 'dividend_cut_pct' || k === 'weight_band_pct' || k === 'min_sell_qty' || k === 'trailing_activate_pct' || k === 'annualized_pct' || k === 'annualized_min_return_pct') && n < 0) errs[k] = '0 이상으로 입력하세요';
     else if (k === 'target_weight_pct' && (n < 0 || n > 100)) errs[k] = '0~100 사이로 입력하세요';
   });
   return errs;
@@ -243,7 +303,7 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
           <div className="pt-0.5">
             <Switch checked={on} onChange={(v) => setFlag(def.enabled, v)} label={def.label} disabled={readOnly} />
           </div>
-          <div className="min-w-0 flex-1 sm:flex sm:items-start sm:justify-between sm:gap-4">
+          <div className={`min-w-0 flex-1 ${def.fields.length > 2 ? '' : 'sm:flex sm:items-start sm:justify-between sm:gap-4'}`}>
             <div className="min-w-0 sm:flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <span className={`text-sm font-medium ${on ? 'text-white' : 'text-zinc-400'}`}>{def.label}</span>
@@ -251,7 +311,7 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
               </div>
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">{def.desc}</p>
             </div>
-            <div className={`mt-2.5 flex flex-wrap gap-x-4 gap-y-2 transition-opacity sm:mt-0 sm:shrink-0 ${on ? '' : 'opacity-50'}`}>
+            <div className={`mt-2.5 flex flex-wrap gap-x-4 gap-y-2 transition-opacity ${def.fields.length > 2 ? '' : 'sm:mt-0 sm:shrink-0'} ${on ? '' : 'opacity-50'}`}>
               {def.fields.map((f) => {
                 const err = (touched || draft.nums[f.key] !== '') && errors[f.key];
                 return (
@@ -304,9 +364,14 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint }: { rd: Rul
           <h3 className="label-mono !text-rose-300">매도 조건</h3>
           <ModeToggle value={draft.sell_mode} onChange={(m) => !readOnly && setDraft((d) => ({ ...d, sell_mode: m }))} label="매도 조건 충족 방식" />
         </div>
-        {SELL_RULES.map(renderRule)}
+        <p className="label-mono !text-mint-300">수익 실현</p>
+        {SELL_PROFIT_RULES.map(renderRule)}
+        <p className="label-mono !mt-4 !text-rose-300">위험 관리</p>
+        {SELL_RISK_RULES.map(renderRule)}
         <p className="label-mono !mt-4">매도 제외</p>
         {SELL_EXCLUDE_RULES.map(renderRule)}
+        <p className="label-mono !mt-4">매도 수량</p>
+        {SELL_QTY_RULES.map(renderRule)}
       </section>
 
       <section className="space-y-2.5">
