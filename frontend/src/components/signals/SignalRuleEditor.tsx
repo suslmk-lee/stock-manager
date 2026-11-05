@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, Info } from 'lucide-react';
 import { apiClient } from '../../api/client';
+import { RECOMMENDED_STRATEGIES, RecommendedStrategy, applyRecommended } from './recommendedStrategies';
 import { BelowMaMode, BuyQtyMode, FromHighMode, SignalMode, SignalProfile, SignalRule } from '../../types/models';
 
 type NumKey =
@@ -1084,6 +1085,17 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint, section, on
   navLayout: 'side' | 'pills';
 }) {
   const { draft, errors, setDraft, applyPreset } = rd;
+  // 추천 전략: 확인 대기 중인 전략과 적용 직후 안내
+  const [pendingRec, setPendingRec] = useState<RecommendedStrategy | null>(null);
+  const [recApplied, setRecApplied] = useState(false);
+  const confirmRecommended = () => {
+    if (!pendingRec) return;
+    const patch = pendingRec.patch;
+    // 현재 초안을 규칙으로 되돌린 뒤 조건만 교체하고 다시 초안으로 (운용 설정은 보존)
+    setDraft((d) => toDraft(applyRecommended(buildRule({} as SignalRule, d), patch)));
+    setPendingRec(null);
+    setRecApplied(true);
+  };
   const errCounts = errorCountBySection(errors);
   const summary = summarize(draft);
   const side = navLayout === 'side';
@@ -1150,6 +1162,44 @@ function RuleFields({ rd, readOnly, touched, showNote, readOnlyHint, section, on
             ))}
           </div>
           <span className="text-[11px] text-zinc-600">기준 값만 채우며 켜짐 상태는 유지됩니다</span>
+        </div>
+      )}
+
+      {!readOnly && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="label-mono">추천 전략</span>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="추천 전략">
+              {RECOMMENDED_STRATEGIES.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  title={r.summary}
+                  aria-pressed={pendingRec?.id === r.id}
+                  onClick={() => {
+                    setRecApplied(false);
+                    setPendingRec(r);
+                  }}
+                  className={`pill-item !px-3 !py-1 !text-xs whitespace-nowrap ${pendingRec?.id === r.id ? 'pill-item-active' : ''}`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            {recApplied && !pendingRec && <span className="text-[11px] text-mint-300">추천 설정을 채웠습니다 · 저장해야 적용됩니다</span>}
+          </div>
+          {pendingRec && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-2.5">
+              <p className="min-w-0 flex-1 text-xs leading-relaxed text-amber-100">
+                현재 편집 중인 조건을 '{pendingRec.label}' 추천 설정으로 바꿉니다. 저장해야 적용됩니다.
+                <span className="mt-0.5 block text-zinc-400">{pendingRec.summary}</span>
+              </p>
+              <div className="flex gap-2">
+                <button type="button" className="btn-ghost !px-3 !py-1 !text-xs" onClick={() => setPendingRec(null)}>취소</button>
+                <button type="button" className="btn-primary !px-3 !py-1 !text-xs" onClick={confirmRecommended}>적용</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

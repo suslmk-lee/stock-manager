@@ -13,7 +13,23 @@ const ACTION_BADGE: Record<SignalAction, { label: string; badge: string }> = {
 };
 
 // 필터: 전체 | 프로필 id | 개별 전략
-export type AssignFilter = 'all' | 'override' | number;
+export type AssignFilter = 'all' | 'override' | 'income' | number;
+
+// 커버드콜·인컴 ETF 후보 키워드 (소문자 비교). "CC"는 영문자에 붙지 않은 경우만 (아래 CC_WORD)
+const INCOME_KEYWORDS = [
+  '커버드콜', 'covered call', 'coveredcall', 'buywrite', 'buy-write', '인컴', 'income', '프리미엄', 'premium',
+  '월배당', '위클리', 'weekly', '타겟위클리', '데일리cc', 'option income', 'yieldmax',
+];
+const CC_WORD = /(^|[^a-z])cc(?![a-z])/;
+
+// 종목명/티커로 커버드콜·인컴 ETF 후보인지 판단한다.
+// 예) true : "TIGER 미국나스닥100커버드콜(합성)", "KODEX 미국배당프리미엄액티브", "ACE 미국30년국채액티브+데일리CC",
+//             "JEPI (JPMorgan Equity Premium Income)", "YieldMax TSLA Option Income", "QYLD Nasdaq 100 Covered Call"
+//     false: "KODEX 200", "TIGER 미국S&P500", "ACC Fund"
+export function isIncomeCandidate(name: string, ticker: string): boolean {
+  const text = `${name} ${ticker}`.toLowerCase();
+  return INCOME_KEYWORDS.some((k) => text.includes(k)) || CC_WORD.test(text);
+}
 
 type SortKey = 'name' | 'yield' | 'profile';
 
@@ -77,6 +93,7 @@ export default function ProfileAssignmentTable({ items, profiles, profileIdOf, i
     return m;
   }, [items, profileIdOf]);
   const overrideCount = useMemo(() => items.filter((i) => i.rule_source === 'asset').length, [items]);
+  const incomeCount = useMemo(() => items.filter((i) => isIncomeCandidate(i.name, i.ticker)).length, [items]);
 
   // 추천대로 일괄 적용 대상: 후보이면서 아직 배당 프로필이 아닌 보유 종목
   const heldIds = useMemo(() => new Set(items.map((i) => i.asset_id)), [items]);
@@ -91,6 +108,7 @@ export default function ProfileAssignmentTable({ items, profiles, profileIdOf, i
     const list = items.filter((i) => {
       if (q && !i.name.toLowerCase().includes(q) && !i.ticker.toLowerCase().includes(q)) return false;
       if (filter === 'override') return i.rule_source === 'asset';
+      if (filter === 'income') return isIncomeCandidate(i.name, i.ticker);
       if (filter !== 'all') return profileIdOf(i.asset_id) === filter;
       return true;
     });
@@ -244,6 +262,9 @@ export default function ProfileAssignmentTable({ items, profiles, profileIdOf, i
           ))}
           <button type="button" className={pill(filter === 'override')} onClick={() => setFilter('override')}>
             개별 전략 <span className="num">{overrideCount}</span>
+          </button>
+          <button type="button" className={pill(filter === 'income')} onClick={() => setFilter('income')} title="종목명·티커에 커버드콜, 인컴, 프리미엄, 월배당, 위클리, CC 등이 들어간 종목">
+            커버드콜·인컴 후보 <span className="num">{incomeCount}</span>
           </button>
         </div>
       </div>

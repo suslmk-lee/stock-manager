@@ -1,11 +1,24 @@
 import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X, Plus, Loader2, RotateCcw, Trash2, Layers, Coins, Lock } from 'lucide-react';
+import { X, Plus, Loader2, RotateCcw, Trash2, Layers, Coins, Lock, Sparkles } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { ProfileAssignment, ProfileKind, SignalItem, SignalProfile } from '../../types/models';
 import ProfileAssignmentTable, { AssignFilter } from './ProfileAssignmentTable';
 import { DEFAULT_SECTION, ProfileRuleEditor, SectionId } from './SignalRuleEditor';
 import ProfileChip, { kindLabel } from './ProfileChip';
+import { INCOME_PROFILE_DESC, INCOME_PROFILE_NAME, INCOME_STRATEGY, RECOMMENDED_STRATEGIES, applyRecommended, RecommendedStrategy } from './recommendedStrategies';
+
+const INCOME_DISMISS_KEY = 'stock-manager:income-profile-suggestion-dismissed';
+
+// 프로필을 만든 뒤 추천 전략의 조건을 적용한다 (복사 원본의 운용 설정은 유지)
+async function createWithStrategy(
+  req: { name: string; description?: string; kind: ProfileKind; copy_from_profile_id?: number },
+  strategy: RecommendedStrategy,
+): Promise<SignalProfile> {
+  const created = await apiClient.CreateSignalProfile(req);
+  const updated = await apiClient.UpdateSignalProfile(created.id, { rule: applyRecommended(created.rule, strategy.patch) });
+  return updated ?? created;
+}
 
 interface ProfileManagerProps {
   items: SignalItem[]; // 보유 종목 (신호 리포트)
@@ -41,6 +54,8 @@ function NewProfileForm({ profiles, onCreated, onCancel }: { profiles: SignalPro
   const [description, setDescription] = useState('');
   const [kind, setKind] = useState<ProfileKind>('standard');
   const [copyFrom, setCopyFrom] = useState<number>(defaultProfile?.id ?? 0);
+  // 시작 설정: 'copy' = 기존 프로필 복사, 그 외 = 추천 전략 id
+  const [start, setStart] = useState<string>('copy');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +66,12 @@ function NewProfileForm({ profiles, onCreated, onCancel }: { profiles: SignalPro
     if (target) setCopyFrom(target.id);
   };
 
+  const changeStart = (id: string) => {
+    setStart(id);
+    const strat = RECOMMENDED_STRATEGIES.find((r) => r.id === id);
+    if (strat) changeKind(strat.kind);
+  };
+
   const submit = async () => {
     if (!name.trim()) {
       setError('프로필 이름을 입력하세요');
@@ -59,12 +80,14 @@ function NewProfileForm({ profiles, onCreated, onCancel }: { profiles: SignalPro
     try {
       setSaving(true);
       setError(null);
-      const created = await apiClient.CreateSignalProfile({
+      const req = {
         name: name.trim(),
         description: description.trim() || undefined,
         kind,
         copy_from_profile_id: copyFrom || undefined,
-      });
+      };
+      const strat = RECOMMENDED_STRATEGIES.find((r) => r.id === start);
+      const created = strat ? await createWithStrategy(req, strat) : await apiClient.CreateSignalProfile(req);
       onCreated(created);
     } catch (err) {
       setError(errMsg(err, '프로필을 만들지 못했습니다.'));
@@ -93,7 +116,17 @@ function NewProfileForm({ profiles, onCreated, onCancel }: { profiles: SignalPro
         <p className="mt-1.5 text-xs text-zinc-500">{kind === 'dividend' ? '배당형: 카드에 배당 회수율을 우선 표시하고 장기보유 관점으로 보여 줍니다.' : '일반형: 수익률 중심의 일반 카드로 표시합니다.'}</p>
       </div>
       <div>
-        <label className="field-label" htmlFor="np-copy">규칙 복사 원본</label>
+        <label className="field-label" htmlFor="np-start">시작 설정</label>
+        <select id="np-start" className="input-field" value={start} onChange={(e) => changeStart(e.target.value)}>
+          <option value="copy">기존 프로필 복사</option>
+          {RECOMMENDED_STRATEGIES.map((r) => (
+            <option key={r.id} value={r.id}>추천: {r.label}</option>
+          ))}
+        </select>
+        {start !== 'copy' && <p className="mt-1.5 text-xs text-zinc-500">{RECOMMENDED_STRATEGIES.find((r) => r.id === start)?.summary} 수량·쿨다운 등 운용 설정은 아래 원본에서 가져옵니다.</p>}
+      </div>
+      <div>
+        <label className="field-label" htmlFor="np-copy">{start === 'copy' ? '규칙 복사 원본' : '운용 설정 복사 원본'}</label>
         <select id="np-copy" className="input-field" value={copyFrom} onChange={(e) => setCopyFrom(Number(e.target.value))}>
           {profiles.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
@@ -127,6 +160,15 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
   // 프로필을 바꿔도 보고 있던 규칙 섹션을 유지한다
   const [ruleSection, setRuleSection] = useState<SectionId>(DEFAULT_SECTION);
   const [mode, setMode] = useState<'edit' | 'assign'>('edit');
+  const [incomeDismissed, setIncomeDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(INCOME_DISMISS_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [incomeBusy, setIncomeBusy] = useState(false);
+  const [incomeError, setIncomeError] = useState<string | null>(null);
   const [assignFilter, setAssignFilter] = useState<AssignFilter>('all');
   // 이름/설명/유형 편집 (사용자 정의 프로필)
   const [meta, setMeta] = useState({ name: '', description: '', kind: 'standard' as ProfileKind });
@@ -166,6 +208,37 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
   const defaultProfile = profiles.find((p) => p.key === 'default');
+  const dividendBuiltIn = profiles.find((p) => p.key === 'dividend');
+  const hasIncomeProfile = profiles.some((p) => p.name === INCOME_PROFILE_NAME);
+
+  const dismissIncome = () => {
+    setIncomeDismissed(true);
+    try {
+      localStorage.setItem(INCOME_DISMISS_KEY, '1');
+    } catch {
+      /* 저장할 수 없으면 이번 세션에서만 숨긴다 */
+    }
+  };
+
+  const createIncomeProfile = async () => {
+    try {
+      setIncomeBusy(true);
+      setIncomeError(null);
+      const created = await createWithStrategy(
+        { name: INCOME_PROFILE_NAME, description: INCOME_PROFILE_DESC, kind: 'dividend', copy_from_profile_id: dividendBuiltIn?.id },
+        INCOME_STRATEGY,
+      );
+      setChanged(true);
+      setCreating(false);
+      setMode('edit');
+      await load();
+      setSelectedId(created.id);
+    } catch (err) {
+      setIncomeError(errMsg(err, '커버드콜·인컴 ETF 프로필을 만들지 못했습니다.'));
+    } finally {
+      setIncomeBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (selected) setMeta({ name: selected.name, description: selected.description ?? '', kind: selected.kind });
@@ -317,6 +390,22 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
                   </button>
                 </li>
               </ul>
+              {!hasIncomeProfile && !incomeDismissed && (
+                <div className="m-3 mt-0 rounded-2xl border border-sky-400/25 bg-sky-400/[0.06] p-3 text-xs leading-relaxed text-zinc-300">
+                  <p className="flex items-start gap-1.5">
+                    <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-300" />
+                    <span>'{INCOME_PROFILE_NAME}' 전용 프로필이 없습니다. 분배금 중심 ETF는 배당수익률 압축·확대 기준이 더 맞습니다.</span>
+                  </p>
+                  {incomeError && <p className="mt-1.5 text-rose-300">{incomeError}</p>}
+                  <div className="mt-2 flex gap-2">
+                    <button type="button" className="btn-primary !px-3 !py-1 !text-xs" disabled={incomeBusy || !dividendBuiltIn} onClick={createIncomeProfile}>
+                      {incomeBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      추천 설정으로 만들기
+                    </button>
+                    <button type="button" className="btn-ghost !px-3 !py-1 !text-xs" disabled={incomeBusy} onClick={dismissIncome}>닫기</button>
+                  </div>
+                </div>
+              )}
             </aside>
 
             {/* 상세 */}
