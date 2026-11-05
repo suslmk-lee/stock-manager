@@ -50,6 +50,22 @@ type SignalRuleConfig struct {
 	MinSellQtyEnabled bool    `json:"min_sell_qty_enabled"`
 	MinSellQty        float64 `json:"min_sell_qty"` // >= 0
 
+	// 5단계: 익절 규칙 (트레일링 / 연환산 / 비중 쏠림) 과 분할 매도 제안
+	TrailingEnabled     bool    `json:"trailing_enabled"`
+	TrailingActivatePct float64 `json:"trailing_activate_pct"` // >= 0, 고점 수익률이 이 값 이상이면 활성화
+	TrailingDropPct     float64 `json:"trailing_drop_pct"`     // <= 0, 고점 대비 되돌림
+
+	AnnualizedEnabled      bool    `json:"annualized_enabled"`
+	AnnualizedPct          float64 `json:"annualized_pct"`            // >= 0
+	AnnualizedMinDays      int     `json:"annualized_min_days"`       // 1~3650
+	AnnualizedMinReturnPct float64 `json:"annualized_min_return_pct"` // >= 0
+
+	DriftEnabled bool    `json:"drift_enabled"`
+	DriftPct     float64 `json:"drift_pct"` // 시가 비중 - 원가 비중 (%p)
+
+	PartialEnabled bool    `json:"partial_enabled"`
+	PartialPct     float64 `json:"partial_pct"` // 1~100
+
 	SellMode string `gorm:"size:10" json:"sell_mode"`
 	BuyMode  string `gorm:"size:10" json:"buy_mode"`
 }
@@ -71,7 +87,7 @@ type SignalRule struct {
 }
 
 // SignalRuleVersion 은 현재 규칙 스키마 버전이다.
-const SignalRuleVersion = 4
+const SignalRuleVersion = 5
 
 // DefaultSignalRuleConfig 는 "균형" 기본 규칙 설정(저장 전)을 반환한다.
 func DefaultSignalRuleConfig() SignalRuleConfig {
@@ -103,6 +119,15 @@ func DefaultSignalRuleConfig() SignalRuleConfig {
 		FxHistorical:                true,
 		MinSellQtyEnabled:           true,
 		MinSellQty:                  1,
+		TrailingEnabled:             true,
+		TrailingActivatePct:         20,
+		TrailingDropPct:             -10,
+		AnnualizedPct:               25,
+		AnnualizedMinDays:           90,
+		AnnualizedMinReturnPct:      15,
+		DriftPct:                    7,
+		PartialEnabled:              true,
+		PartialPct:                  33,
 		SellMode:                    "any",
 		BuyMode:                     "any",
 	}
@@ -114,6 +139,7 @@ func DividendSignalRuleConfig() SignalRuleConfig {
 	c := DefaultSignalRuleConfig()
 	c.TakeProfitEnabled = false
 	c.StopLossEnabled = false
+	c.TrailingEnabled = false
 	c.CrashEnabled = true
 	c.CrashPct = -40
 	c.DividendCutEnabled = true

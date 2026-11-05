@@ -11,15 +11,18 @@ import (
 )
 
 const (
-	defaultTaxHarvestMonth = 11
-	defaultCrashPct        = -40
-	defaultMinSellQty      = 1
+	defaultTaxHarvestMonth   = 11
+	defaultCrashPct          = -40
+	defaultMinSellQty        = 1
+	defaultAnnualizedMinDays = 90
+	defaultPartialPct        = 33
 )
 
 // migrateRuleConfig 는 이전 단계 규칙의 0 값 필드를 새 기본값으로 한 번만 보정한다. 보정했으면 true.
 //   - v1 -> v2: 시세 추세 / 배당 삭감 / 양도세 / 환율 기본값
 //   - v2 -> v3: 큰 폭락 경고(crash_pct=-40, 꺼짐)
 //   - v3 -> v4: 소량 보유 매도 제외(1주 이하, 켜짐)
+//   - v4 -> v5: 익절 규칙(트레일링은 익절/손절 규칙이 있을 때만 켜짐, 연환산/쏠림은 꺼짐), 분할 매도(켜짐)
 func migrateRuleConfig(c *models.SignalRuleConfig, version *int) bool {
 	if *version >= models.SignalRuleVersion {
 		return false
@@ -55,6 +58,34 @@ func migrateRuleConfig(c *models.SignalRuleConfig, version *int) bool {
 			c.MinSellQty = defaultMinSellQty
 		}
 		c.MinSellQtyEnabled = true
+	}
+	if *version < 5 {
+		def := models.DefaultSignalRuleConfig()
+		if c.TrailingActivatePct == 0 {
+			c.TrailingActivatePct = def.TrailingActivatePct
+		}
+		if c.TrailingDropPct == 0 {
+			c.TrailingDropPct = def.TrailingDropPct
+		}
+		if c.AnnualizedPct == 0 {
+			c.AnnualizedPct = def.AnnualizedPct
+		}
+		if c.AnnualizedMinDays == 0 {
+			c.AnnualizedMinDays = def.AnnualizedMinDays
+		}
+		if c.AnnualizedMinReturnPct == 0 {
+			c.AnnualizedMinReturnPct = def.AnnualizedMinReturnPct
+		}
+		if c.DriftPct == 0 {
+			c.DriftPct = def.DriftPct
+		}
+		if c.PartialPct == 0 {
+			c.PartialPct = def.PartialPct
+		}
+		c.TrailingEnabled = c.TakeProfitEnabled || c.StopLossEnabled
+		c.AnnualizedEnabled = false
+		c.DriftEnabled = false
+		c.PartialEnabled = true
 	}
 	*version = models.SignalRuleVersion
 	return true

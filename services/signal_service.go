@@ -60,6 +60,12 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 		"dividend_cut_pct":                r.DividendCutPct,
 		"crash_pct":                       r.CrashPct,
 		"min_sell_qty":                    r.MinSellQty,
+		"trailing_activate_pct":           r.TrailingActivatePct,
+		"trailing_drop_pct":               r.TrailingDropPct,
+		"annualized_pct":                  r.AnnualizedPct,
+		"annualized_min_return_pct":       r.AnnualizedMinReturnPct,
+		"drift_pct":                       r.DriftPct,
+		"partial_pct":                     r.PartialPct,
 	}
 	for k, v := range fin {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -95,6 +101,39 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	}
 	if r.MinSellQty < 0 {
 		return &ErrInvalidSignalRule{"min_sell_qty must be >= 0"}
+	}
+	if r.TrailingActivatePct < 0 {
+		return &ErrInvalidSignalRule{"trailing_activate_pct must be >= 0"}
+	}
+	if r.TrailingDropPct > 0 {
+		return &ErrInvalidSignalRule{"trailing_drop_pct must be <= 0"}
+	}
+	if r.TrailingEnabled && r.TrailingDropPct == 0 {
+		return &ErrInvalidSignalRule{"trailing_drop_pct must be < 0 when trailing is enabled"}
+	}
+	if r.AnnualizedPct < 0 {
+		return &ErrInvalidSignalRule{"annualized_pct must be >= 0"}
+	}
+	if r.AnnualizedMinReturnPct < 0 {
+		return &ErrInvalidSignalRule{"annualized_min_return_pct must be >= 0"}
+	}
+	if r.AnnualizedMinDays == 0 {
+		r.AnnualizedMinDays = defaultAnnualizedMinDays // 구버전 클라이언트가 필드를 보내지 않은 경우
+	}
+	if r.AnnualizedMinDays < 1 || r.AnnualizedMinDays > 3650 {
+		return &ErrInvalidSignalRule{"annualized_min_days must be 1..3650"}
+	}
+	if r.DriftPct < 0 {
+		return &ErrInvalidSignalRule{"drift_pct must be >= 0"}
+	}
+	if r.DriftEnabled && r.DriftPct == 0 {
+		return &ErrInvalidSignalRule{"drift_pct must be > 0 when drift is enabled"}
+	}
+	if r.PartialPct == 0 {
+		r.PartialPct = defaultPartialPct
+	}
+	if r.PartialPct < 1 || r.PartialPct > 100 {
+		return &ErrInvalidSignalRule{"partial_pct must be 1..100"}
 	}
 	if r.TaxHarvestFromMonth == 0 {
 		r.TaxHarvestFromMonth = defaultTaxHarvestMonth
@@ -225,7 +264,7 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 	if len(tickers) > 0 {
 		wg.Add(2)
 		go func() { defer wg.Done(); prices = s.ticker.GetCurrentPrices(tickers) }()
-		go func() { defer wg.Done(); histories = s.ticker.GetDailyHistoriesCached(tickers) }()
+		go func() { defer wg.Done(); histories = s.ticker.GetDailyHistoriesRangeCached(tickers, "2y") }() // 트레일링 고점은 1년보다 오래된 구간도 필요
 	}
 	wg.Add(1)
 	go func() {

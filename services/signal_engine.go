@@ -84,6 +84,20 @@ type SignalItem struct {
 	VsMA200Pct     float64 `json:"vs_ma200_pct"`
 	PriceHistoryOK bool    `json:"price_history_ok"`
 
+	// 익절 지표: 고점(보유 시작일 이후 일봉 종가 + 현재가), 평균 보유일, 연환산 수익률, 원가 비중
+	PeakPrice           float64 `json:"peak_price"`
+	PeakDate            string  `json:"peak_date,omitempty"`
+	PeakGainPct         float64 `json:"peak_gain_pct"`
+	FromPeakPct         float64 `json:"from_peak_pct"`
+	HoldingDays         int     `json:"holding_days"`
+	AnnualizedReturnPct float64 `json:"annualized_return_pct"`
+	CostWeightPct       float64 `json:"cost_weight_pct"`
+
+	// 매도 신호 시 일부 매도/리밸런싱 제안 (이익 실현 성격의 신호만 충족된 경우)
+	SuggestedSellQty  float64 `json:"suggested_sell_qty,omitempty"`
+	SuggestedSellKRW  float64 `json:"suggested_sell_krw,omitempty"`
+	SuggestedSellKind string  `json:"suggested_sell_kind,omitempty"` // "partial" | "rebalance"
+
 	// 주당 배당 추세 (세전, 종목 통화)
 	DPS12m            float64 `json:"dps_12m"`
 	DPSPrev12m        float64 `json:"dps_prev_12m"`
@@ -218,7 +232,7 @@ func safeDiv(a, b float64) float64 {
 func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time, ctx SignalContext) SignalReport {
 	items := make([]SignalItem, 0, len(inputs))
 	rules := make(map[uint]models.SignalRuleConfig, len(inputs))
-	var totalMV float64
+	var totalMV, totalCost float64
 	var candidates []DividendCandidate
 	priced := map[uint]bool{}
 	eligible := map[uint]bool{}
@@ -237,6 +251,7 @@ func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time,
 		eligible[in.AssetID] = item.RuleSource == "default"
 		if item.Action != SignalNoPrice {
 			totalMV += item.MarketValueKRW
+			totalCost += item.CostKRW
 		}
 		items = append(items, item)
 	}
@@ -261,7 +276,9 @@ func BuildSignalReport(inputs []SignalAssetInput, usdKRW float64, now time.Time,
 			continue
 		}
 		it.WeightPct = safeDiv(it.MarketValueKRW, totalMV) * 100
+		it.CostWeightPct = safeDiv(it.CostKRW, totalCost) * 100
 		it.Action = evaluateSignalRule(it, rules[it.AssetID])
+		applySellSuggestion(it, rules[it.AssetID], totalMV)
 		switch it.Action {
 		case SignalSell:
 			report.Summary.Sell++
@@ -405,6 +422,24 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time, ct
 	}
 	item.Action = SignalHold
 
+	// 평균 보유일 / 고점: 현재 보유 로트를 거래에서 FIFO 로 재구성한다.
+	lots := heldLotsFIFO(in.Txns, in.Holdings)
+	item.HoldingDays = int(math.Round(weightedHoldingDays(lots, now)))
+	if len(in.History) > 0 {
+		since, _ := firstBuyDate(lots) // 거래 정보가 없으면 zero -> 조회된 전체 구간
+		peak, peakDate := peakCloseSince(in.History, since, now)
+		if in.Price >= peak { // 오늘 현재가도 고점 후보
+			peak, peakDate = in.Price, now.In(time.FixedZone("KST", kstOffsetSec)).Format("2006-01-02")
+		}
+		if peak > 0 {
+			item.PeakPrice, item.PeakDate = peak, peakDate
+			item.FromPeakPct = (in.Price/peak - 1) * 100
+			if item.AvgPrice > 0 {
+				item.PeakGainPct = (peak/item.AvgPrice - 1) * 100
+			}
+		}
+	}
+
 	// 시세 추세
 	if len(in.History) > 0 {
 		st := ComputePriceStats(in.History, now)
@@ -530,6 +565,19 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	if r.LowYieldEnabled {
 		met := it.Dividends12mKRW > 0 && it.CurrentYieldPct <= r.LowYieldPct
 		sell = append(sell, SignalCheck{"low_yield", "배당수익률 하락", met, it.CurrentYieldPct, r.LowYieldPct, "%"})
+	}
+	if r.TrailingEnabled {
+		met := it.PriceHistoryOK && it.PeakPrice > 0 && it.PeakGainPct >= r.TrailingActivatePct && it.FromPeakPct <= r.TrailingDropPct
+		sell = append(sell, SignalCheck{"trailing_stop", "고점 대비 되돌림", met, it.FromPeakPct, r.TrailingDropPct, "%"})
+	}
+	it.AnnualizedReturnPct = annualizedReturnPct(ret, float64(it.HoldingDays))
+	if r.AnnualizedEnabled {
+		met := it.HoldingDays >= r.AnnualizedMinDays && ret >= r.AnnualizedMinReturnPct && it.AnnualizedReturnPct >= r.AnnualizedPct
+		sell = append(sell, SignalCheck{"annualized_return", "연환산 수익률", met, it.AnnualizedReturnPct, r.AnnualizedPct, "%"})
+	}
+	if r.DriftEnabled && r.DriftPct > 0 {
+		drift := it.WeightPct - it.CostWeightPct
+		sell = append(sell, SignalCheck{"weight_drift", "비중 쏠림", drift >= r.DriftPct, drift, r.DriftPct, "%p"})
 	}
 	if r.AboveMAEnabled {
 		met := it.PriceHistoryOK && it.MA200 > 0 && it.VsMA200Pct >= r.AboveMAPct
