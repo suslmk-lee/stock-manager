@@ -228,6 +228,22 @@ export interface SignalRule {
   buy_qty_lower_avg_pct?: number; // (0,50]
   vol_stop_enabled?: boolean; // 기본 false
   vol_stop_k?: number; // (0,5]
+  // 반등 확인 (매수 확인 조건, 개수에 포함되지 않음)
+  rebound_confirm_enabled?: boolean; // 기본 false
+  rebound_from_low_pct?: number; // (0,100], 기본 5
+  rebound_lookback_days?: number; // 정수 5~120 (거래일), 기본 20
+  rebound_ma_enabled?: boolean; // 20일 이평선 위면 인정, 기본 true
+  // 배당수익률 확대 (매수 신호)
+  yield_expansion_enabled?: boolean; // 기본 false
+  yield_expansion_pct?: number; // > 0, 기본 20
+  // 시간 손절 (위험 관리)
+  time_stop_enabled?: boolean; // 기본 false
+  time_stop_days?: number; // 정수 30~3650, 기본 365
+  time_stop_max_return_pct?: number; // 유한한 수, 기본 0
+  // 단기 급락 (위험 관리)
+  short_drop_enabled?: boolean; // 기본 false
+  short_drop_days?: number; // 정수 5~120 (거래일), 기본 20
+  short_drop_pct?: number; // < 0, 기본 -15
   sell_mode: SignalMode;
   buy_mode: SignalMode;
   sell_min_count?: number;
@@ -361,7 +377,15 @@ export interface SignalItem {
   last_buy_price?: number;
   from_last_buy_pct?: number;
   days_since_last_buy?: number;
-  buy_excluded_reason?: 'cooldown' | 'max_weight';
+  buy_excluded_reason?: 'cooldown' | 'max_weight' | 'no_rebound';
+  // 반등 확인 · 단기 흐름
+  recent_low_price?: number;
+  from_recent_low_pct?: number;
+  ma20?: number;
+  rebound_confirmed?: boolean;
+  rebound_lookback_days?: number;
+  short_change_pct?: number;
+  short_change_days?: number;
   buy_max_weight_pct?: number;
   buy_cooldown_days?: number;
   suggested_buy_qty?: number;

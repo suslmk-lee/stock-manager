@@ -55,6 +55,9 @@ const CHECK_OPS: Record<string, string> = {
   vol_oversold: '≤',
   vol_stop: '≤',
   last_buy_dip: '≤',
+  yield_expansion: '≥',
+  time_stop: '≤',
+  short_drop: '≤',
 };
 
 // 수익 실현 묶음에 속하는 매도 체크 (나머지 매도 체크는 위험 관리 묶음)
@@ -271,6 +274,8 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
       );
     }
     if (item.last_buy_date) flowParts.push(<>마지막 매수 <span className="text-zinc-200">{item.last_buy_date}</span>{item.from_last_buy_pct !== undefined && <> · <span className={signTone(item.from_last_buy_pct)}>{fmtSignedPct(item.from_last_buy_pct)}</span></>}</>);
+    if (item.short_change_days && item.short_change_pct !== undefined) flowParts.push(<>{item.short_change_days}거래일 <span className={signTone(item.short_change_pct)}>{fmtSignedPct(item.short_change_pct)}</span></>);
+    if (item.recent_low_price && item.from_recent_low_pct !== undefined) flowParts.push(<>저점 대비 <span className={signTone(item.from_recent_low_pct)}>{fmtSignedPct(item.from_recent_low_pct)}</span></>);
     if (item.volatility_pct) flowParts.push(<>변동성 연 <span className="text-zinc-200">{fmtPct(item.volatility_pct)}</span></>);
     if (item.ma200_sigma) flowParts.push(<>200일선 <span className={signTone(item.ma200_sigma)}>{item.ma200_sigma > 0 ? '+' : ''}{fmtNum(item.ma200_sigma, 2)}σ</span></>);
     if (item.cost_weight_pct) flowParts.push(<>원금 비중 <span className="text-zinc-200">{fmtPct(item.cost_weight_pct)}</span> → 현재 <span className="text-zinc-200">{fmtPct(item.weight_pct)}</span></>);
@@ -362,6 +367,8 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
               {item.buy_excluded_reason === 'cooldown'
                 ? // days_since_last_buy 는 0(오늘)이면 응답에서 빠진다
                   `${item.days_since_last_buy ? `최근 ${item.days_since_last_buy}일 전 매수` : '오늘 매수'} · ${item.buy_cooldown_days ?? 14}일 쿨다운 · 매수 검토 제외`
+                : item.buy_excluded_reason === 'no_rebound'
+                ? `반등 미확인 · ${item.rebound_lookback_days ?? 20}일 저점 대비 ${fmtNum(item.from_recent_low_pct ?? 0, 1)}% · 매수 보류`
                 : `비중 ${fmtNum(item.weight_pct, 1)}% ≥ ${fmtNum(item.buy_max_weight_pct ?? 0, 1)}% · 매수 검토 제외`}
             </span>
           )}
