@@ -236,7 +236,7 @@ func TestMigrateV9ToV10(t *testing.T) {
 	c.RsiBuyEnabled = true // 이전 스키마에는 없던 값이라 꺼진 상태로 보정
 	c.TakeProfitPct = 77
 	v := 9
-	if !migrateRuleConfig(&c, &v) || v != models.SignalRuleVersion || models.SignalRuleVersion != 10 {
+	if !migrateRuleConfig(&c, &v) || v != models.SignalRuleVersion {
 		t.Fatalf("v=%d", v)
 	}
 	if c.RsiPeriod != 14 || c.MfiPeriod != 14 || c.OscLookbackDays != 10 || c.RsiBuyLevel != 30 || c.RsiSellLevel != 70 ||

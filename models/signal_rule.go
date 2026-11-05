@@ -140,6 +140,17 @@ type SignalRuleConfig struct {
 	PbrSellEnabled  bool    `json:"pbr_sell_enabled"`
 	PbrSellMin      float64 `json:"pbr_sell_min"` // > 0
 
+	// 11단계: PER/PBR 을 자기 과거 평균(월말 기준)과 비교
+	ValuationWindowMonths int     `json:"valuation_window_months"` // 12~60, 평균을 구하는 월말 개수
+	PerAvgBuyEnabled      bool    `json:"per_avg_buy_enabled"`
+	PerAvgBuyPct          float64 `json:"per_avg_buy_pct"` // (0, 90], 평균 대비 이만큼 이상 낮으면 저평가
+	PerAvgSellEnabled     bool    `json:"per_avg_sell_enabled"`
+	PerAvgSellPct         float64 `json:"per_avg_sell_pct"` // (0, 500], 평균 대비 이만큼 이상 높으면 고평가
+	PbrAvgBuyEnabled      bool    `json:"pbr_avg_buy_enabled"`
+	PbrAvgBuyPct          float64 `json:"pbr_avg_buy_pct"`
+	PbrAvgSellEnabled     bool    `json:"pbr_avg_sell_enabled"`
+	PbrAvgSellPct         float64 `json:"pbr_avg_sell_pct"`
+
 	// 충족 방식: "any"(1개 이상) | "all"(모두) | "count"(MinCount 개 이상) | "group"(매도만: 익절/위험 그룹별 N개)
 	SellMode     string `gorm:"size:10" json:"sell_mode"`
 	BuyMode      string `gorm:"size:10" json:"buy_mode"`
@@ -168,7 +179,7 @@ type SignalRule struct {
 }
 
 // SignalRuleVersion 은 현재 규칙 스키마 버전이다.
-const SignalRuleVersion = 10
+const SignalRuleVersion = 11
 
 // DefaultSignalRuleConfig 는 "균형" 기본 규칙 설정(저장 전)을 반환한다.
 func DefaultSignalRuleConfig() SignalRuleConfig {
@@ -248,6 +259,11 @@ func DefaultSignalRuleConfig() SignalRuleConfig {
 		PerSellMin:                  40,
 		PbrBuyMax:                   1,
 		PbrSellMin:                  5,
+		ValuationWindowMonths:       36,
+		PerAvgBuyPct:                20,
+		PerAvgSellPct:               30,
+		PbrAvgBuyPct:                20,
+		PbrAvgSellPct:               30,
 		SellMode:                    "group",
 		BuyMode:                     "any",
 		SellProfitMinCount:          1,

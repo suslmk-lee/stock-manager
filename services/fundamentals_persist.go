@@ -35,6 +35,9 @@ func UpsertFundamentalSnapshots(db *gorm.DB, date string, tickers map[uint]strin
 	}).CreateInBatches(&rows, 100).Error
 }
 
+// SetValuation 은 월말 PER/PBR 이력 서비스를 주입한다 (nil 이면 평균 대비 지표 없음).
+func (s *SignalService) SetValuation(v *ValuationService) { s.valuation = v }
+
 // SetFundamentals 는 펀더멘털 서비스를 주입한다 (nil 이면 PER/PBR 지표 없음).
 func (s *SignalService) SetFundamentals(f *FundamentalsService) { s.fund = f }
 

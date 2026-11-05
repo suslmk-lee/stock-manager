@@ -27,6 +27,7 @@ type SignalService struct {
 	ticker   *TickerService
 	exchange *ExchangeRateService
 	fund     *FundamentalsService // PER/PBR (nil 이면 없음)
+	valuation *ValuationService    // 월말 PER/PBR 이력 (nil 이면 평균 대비 지표 없음)
 
 	fundPersist sync.WaitGroup // 비동기 펀더멘털 저장 (테스트에서 대기용)
 
@@ -310,6 +311,9 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	if err := validateOscFundamentalRules(r); err != nil {
 		return err
 	}
+	if err := validateValuationRules(r); err != nil {
+		return err
+	}
 	if r.TaxHarvestFromMonth == 0 {
 		r.TaxHarvestFromMonth = defaultTaxHarvestMonth
 	}
@@ -475,6 +479,7 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 		divEvents = map[string][]DividendEvent{}
 		histories = map[string]*PriceHistory{}
 		funds     = map[string]*Fundamentals{}
+		vals      = map[string]*ValuationSeries{}
 		fxHist    *PriceHistory
 	)
 	if len(tickers) > 0 {
@@ -486,6 +491,10 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 	if len(tickers) > 0 && s.fund != nil {
 		wg.Add(1)
 		go func() { defer wg.Done(); funds = s.fund.GetMany(tickers) }() // 실패한 종목은 빠지고, 리포트는 계속된다
+	}
+	if len(tickers) > 0 && s.valuation != nil {
+		wg.Add(1)
+		go func() { defer wg.Done(); vals = s.valuation.GetMany(tickers) }() // 실패한 종목은 빠지고, 리포트는 계속된다
 	}
 	wg.Add(1)
 	go func() {
@@ -564,6 +573,7 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 		}
 		in.DivEvents = divEvents[strings.ToUpper(in.Ticker)]
 		in.Fundamentals = funds[strings.ToUpper(in.Ticker)]
+		in.Valuation = vals[strings.ToUpper(in.Ticker)]
 	}
 	if len(funds) > 0 {
 		saveTickers := make(map[uint]string, len(order))

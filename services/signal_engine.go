@@ -144,6 +144,17 @@ type SignalItem struct {
 	FundamentalsSource string  `json:"fundamentals_source,omitempty"`
 	FundamentalsAsOf   string  `json:"fundamentals_as_of,omitempty"`
 
+	// PER/PBR 을 자기 과거 월말 평균과 비교 (규칙과 무관하게 계산 가능하면 채운다). vs_avg_pct = (현재/평균 − 1) × 100.
+	// *_points 는 이력이 있으면 항상, *_avg / *_vs_avg_pct 는 지점이 6개 이상일 때만 채운다 (avg > 0 이 "계산 가능").
+	PERAvg                float64 `json:"per_avg,omitempty"`
+	PERVsAvgPct           float64 `json:"per_vs_avg_pct,omitempty"`
+	PERPoints             int     `json:"per_points,omitempty"`
+	PBRAvg                float64 `json:"pbr_avg,omitempty"`
+	PBRVsAvgPct           float64 `json:"pbr_vs_avg_pct,omitempty"`
+	PBRPoints             int     `json:"pbr_points,omitempty"`
+	ValuationSource       string  `json:"valuation_source,omitempty"` // "computed" | "snapshots"
+	ValuationWindowMonths int     `json:"valuation_window_months,omitempty"`
+
 	trend TrendMetrics // 하회 후 반등 판단 지표 (JSON 제외)
 
 	hasLastBuy bool // 마지막 매수 거래 존재 여부 (DaysSinceLastBuy 0 과 구분)
@@ -249,6 +260,7 @@ type SignalAssetInput struct {
 	Dividends     []SignalDividendInput
 	Txns          []SignalTxnInput
 	Fundamentals  *Fundamentals   // PER/PBR 등. nil 이면 없음
+	Valuation     *ValuationSeries // 월말 PER/PBR 이력. nil 이면 평균 대비 지표 없음
 	History       []PricePoint    // 일봉 종가 (종목 통화). 비어 있으면 추세 지표 없음
 	DivEvents     []DividendEvent // 시장(Yahoo) 주당배당 이벤트. 비어 있으면 사용자 배당 기록으로 대체
 	Rule          models.SignalRuleConfig
@@ -523,6 +535,7 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time, ct
 	computeTrendMetrics(&item, in, now)
 	computeOscMetrics(&item, in, now)
 	applyFundamentals(&item, in.Fundamentals)
+	computeValuationMetrics(&item, in.Valuation, in.Rule.ValuationWindowMonths, now)
 	computeYieldMetrics(&item, in, QuantityAtFunc(currentQty, acctTxns), now)
 	computeVolMetrics(&item, in, now)
 
@@ -685,6 +698,12 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	if r.PbrSellEnabled {
 		sell = append(sell, SignalCheck{"pbr_high", "PBR 고평가", it.PBR > 0 && it.PBR >= r.PbrSellMin, it.PBR, r.PbrSellMin, "배"})
 	}
+	if r.PerAvgSellEnabled {
+		sell = append(sell, SignalCheck{"per_avg_high", "PER 평균 대비 고평가", it.PERAvg > 0 && it.PERVsAvgPct >= r.PerAvgSellPct, it.PERVsAvgPct, r.PerAvgSellPct, "%"})
+	}
+	if r.PbrAvgSellEnabled {
+		sell = append(sell, SignalCheck{"pbr_avg_high", "PBR 평균 대비 고평가", it.PBRAvg > 0 && it.PBRVsAvgPct >= r.PbrAvgSellPct, it.PBRVsAvgPct, r.PbrAvgSellPct, "%"})
+	}
 	if r.DividendCutEnabled {
 		met := it.DividendTrendOK && it.DividendChangePct <= -r.DividendCutPct
 		sell = append(sell, SignalCheck{"dividend_cut", "배당 삭감", met, it.DividendChangePct, -r.DividendCutPct, "%"})
@@ -745,6 +764,12 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	}
 	if r.PbrBuyEnabled {
 		buy = append(buy, SignalCheck{"pbr_low", "PBR 저평가", it.PBR > 0 && it.PBR <= r.PbrBuyMax, it.PBR, r.PbrBuyMax, "배"})
+	}
+	if r.PerAvgBuyEnabled {
+		buy = append(buy, SignalCheck{"per_avg_low", "PER 평균 대비 저평가", it.PERAvg > 0 && it.PERVsAvgPct <= -r.PerAvgBuyPct, it.PERVsAvgPct, -r.PerAvgBuyPct, "%"})
+	}
+	if r.PbrAvgBuyEnabled {
+		buy = append(buy, SignalCheck{"pbr_avg_low", "PBR 평균 대비 저평가", it.PBRAvg > 0 && it.PBRVsAvgPct <= -r.PbrAvgBuyPct, it.PBRVsAvgPct, -r.PbrAvgBuyPct, "%"})
 	}
 
 	it.SellChecks = sell

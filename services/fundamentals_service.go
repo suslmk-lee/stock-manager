@@ -64,6 +64,8 @@ type FundamentalsService struct {
 	yahooCookieURL  string
 	yahooCrumbURL   string
 	yahooSummaryURL string // 뒤에 /{ticker}?modules=...&crumb=... 가 붙는다
+	naverFinanceURL string // {code}, {annual|quarter} 를 %s 두 개로 받는 형식
+	yahooSeriesURL  string // 뒤에 /{ticker}?type=...&period1=...&period2=... 가 붙는다
 
 	// 테스트 훅 (운영에서는 nil)
 	fetch func(ticker string) (*Fundamentals, error)
@@ -88,6 +90,8 @@ func NewFundamentalsService(client *http.Client) *FundamentalsService {
 		yahooCookieURL:  "https://fc.yahoo.com",
 		yahooCrumbURL:   "https://query2.finance.yahoo.com/v1/test/getcrumb",
 		yahooSummaryURL: "https://query2.finance.yahoo.com/v10/finance/quoteSummary",
+		naverFinanceURL: "https://m.stock.naver.com/api/stock/%s/finance/%s",
+		yahooSeriesURL:  "https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries",
 	}
 }
 

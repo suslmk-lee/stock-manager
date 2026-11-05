@@ -44,6 +44,7 @@ func NewApp() *App {
 	a.dailySnapService = services.NewDailySnapshotService(database.GetDB(), a.tickerService)
 	fundamentals := services.NewFundamentalsService(nil)
 	a.signalService.SetFundamentals(fundamentals)
+	a.signalService.SetValuation(services.NewValuationService(database.GetDB(), a.tickerService, fundamentals))
 	a.dailySnapService.SetFundamentals(fundamentals)
 	return a
 }

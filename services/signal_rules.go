@@ -34,6 +34,7 @@ const (
 //   - v1 -> v2: 시세 추세 / 배당 삭감 / 양도세 / 환율 기본값
 //   - v2 -> v3: 큰 폭락 경고(crash_pct=-40, 꺼짐)
 //   - v3 -> v4: 소량 보유 매도 제외(1주 이하, 켜짐)
+//   - v10 -> v11: PER/PBR 평균 대비 규칙(모두 꺼짐, 기간/기준 기본값 채움)
 //   - v9 -> v10: RSI/MFI/PER/PBR 규칙(모두 꺼짐, 기간/기준 기본값 채움)
 //   - v8 -> v9: 장기 이평 하회/52주 고점 대비 하락을 하회 후 반등 모드로 전환 (켜짐 여부와 임계값은 유지)
 //   - v7 -> v8: 반등 확인/시간 손절/단기 급락(꺼짐, 반등 MA 옵션 켜짐), 배당수익률 확대(배당형 규칙만 켜짐)
@@ -203,6 +204,12 @@ func migrateRuleConfig(c *models.SignalRuleConfig, version *int) bool {
 		c.PerBuyMax, c.PerSellMin, c.PbrBuyMax, c.PbrSellMin = def.PerBuyMax, def.PerSellMin, def.PbrBuyMax, def.PbrSellMin
 		c.RsiBuyEnabled, c.RsiSellEnabled, c.MfiBuyEnabled, c.MfiSellEnabled = false, false, false, false
 		c.PerBuyEnabled, c.PerSellEnabled, c.PbrBuyEnabled, c.PbrSellEnabled = false, false, false, false
+	}
+	if *version < 11 {
+		def := models.DefaultSignalRuleConfig()
+		c.ValuationWindowMonths = def.ValuationWindowMonths
+		c.PerAvgBuyPct, c.PerAvgSellPct, c.PbrAvgBuyPct, c.PbrAvgSellPct = def.PerAvgBuyPct, def.PerAvgSellPct, def.PbrAvgBuyPct, def.PbrAvgSellPct
+		c.PerAvgBuyEnabled, c.PerAvgSellEnabled, c.PbrAvgBuyEnabled, c.PbrAvgSellEnabled = false, false, false, false
 	}
 	*version = models.SignalRuleVersion
 	return true
