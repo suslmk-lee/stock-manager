@@ -21,12 +21,15 @@ const INCOME_KEYWORDS = [
   '월배당', '위클리', 'weekly', '타겟위클리', '데일리cc', 'option income', 'yieldmax',
 ];
 const CC_WORD = /(^|[^a-z])cc(?![a-z])/;
+// 개별 기업명(예: "Realty Income Corporation")은 ETF 가 아니므로 제외한다
+const COMPANY_FORM = /\b(corporation|corp\.?|incorporated|inc\.?|company|co\.,?\s*ltd\.?|plc|n\.v\.|s\.a\.)(?![a-z])/;
 
 // 종목명/티커로 커버드콜·인컴 ETF 후보인지 판단한다.
 // 예) true : "TIGER 미국나스닥100커버드콜(합성)", "KODEX 미국배당프리미엄액티브", "ACE 미국30년국채액티브+데일리CC",
 //             "JEPI (JPMorgan Equity Premium Income)", "YieldMax TSLA Option Income", "QYLD Nasdaq 100 Covered Call"
-//     false: "KODEX 200", "TIGER 미국S&P500", "ACC Fund"
+//     false: "KODEX 200", "TIGER 미국S&P500", "ACC Fund", "Realty Income Corporation"
 export function isIncomeCandidate(name: string, ticker: string): boolean {
+  if (COMPANY_FORM.test(name.toLowerCase())) return false;
   const text = `${name} ${ticker}`.toLowerCase();
   return INCOME_KEYWORDS.some((k) => text.includes(k)) || CC_WORD.test(text);
 }
