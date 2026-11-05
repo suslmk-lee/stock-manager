@@ -22,6 +22,7 @@ const (
 //   - v1 -> v2: 시세 추세 / 배당 삭감 / 양도세 / 환율 기본값
 //   - v2 -> v3: 큰 폭락 경고(crash_pct=-40, 꺼짐)
 //   - v3 -> v4: 소량 보유 매도 제외(1주 이하, 켜짐)
+//   - v5 -> v6: 배당수익률 압축(익절/손절이 모두 꺼진 배당형 규칙만 켜짐), 변동성 과열/과매도(꺼짐)
 //   - v4 -> v5: 익절 규칙(트레일링은 익절/손절 규칙이 있을 때만 켜짐, 연환산/쏠림은 꺼짐), 분할 매도(켜짐)
 func migrateRuleConfig(c *models.SignalRuleConfig, version *int) bool {
 	if *version >= models.SignalRuleVersion {
@@ -86,6 +87,21 @@ func migrateRuleConfig(c *models.SignalRuleConfig, version *int) bool {
 		c.AnnualizedEnabled = false
 		c.DriftEnabled = false
 		c.PartialEnabled = true
+	}
+	if *version < 6 {
+		def := models.DefaultSignalRuleConfig()
+		if c.YieldCompressionPct == 0 {
+			c.YieldCompressionPct = def.YieldCompressionPct
+		}
+		if c.VolOverheatSigma == 0 {
+			c.VolOverheatSigma = def.VolOverheatSigma
+		}
+		if c.VolOversoldSigma == 0 {
+			c.VolOversoldSigma = def.VolOversoldSigma
+		}
+		c.YieldCompressionEnabled = !(c.TakeProfitEnabled || c.StopLossEnabled) // 배당형 규칙만 켬
+		c.VolOverheatEnabled = false
+		c.VolOversoldEnabled = false
 	}
 	*version = models.SignalRuleVersion
 	return true

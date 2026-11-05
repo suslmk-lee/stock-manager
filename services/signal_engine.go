@@ -104,6 +104,14 @@ type SignalItem struct {
 	DividendChangePct float64 `json:"dividend_change_pct"`
 	DividendTrendOK   bool    `json:"dividend_trend_ok"`
 
+	// 배당수익률 압축(최근 24개월 월말 평균 대비 현재)과 변동성 대비 200일 이평 괴리
+	DividendYieldAvgPct   float64 `json:"dividend_yield_avg_pct,omitempty"`
+	DividendYieldVsAvgPct float64 `json:"dividend_yield_vs_avg_pct,omitempty"`
+	DividendYieldPoints   int     `json:"dividend_yield_points,omitempty"`
+	DividendYieldSource   string  `json:"dividend_yield_source,omitempty"` // "market" | "records"
+	VolatilityPct         float64 `json:"volatility_pct,omitempty"`        // 연환산 %
+	MA200Sigma            float64 `json:"ma200_sigma,omitempty"`
+
 	// 매수 시점 환율 기준 수익
 	CostKRWFx        float64 `json:"cost_krw_fx"`
 	TotalReturnPctFx float64 `json:"total_return_pct_fx"`
@@ -191,6 +199,7 @@ type SignalAssetInput struct {
 	Dividends     []SignalDividendInput
 	Txns          []SignalTxnInput
 	History       []PricePoint // 일봉 종가 (종목 통화). 비어 있으면 추세 지표 없음
+	DivEvents     []DividendEvent // 시장(Yahoo) 주당배당 이벤트. 비어 있으면 사용자 배당 기록으로 대체
 	Rule          models.SignalRuleConfig
 	RuleSource    string // "asset" | "profile" | "default"
 	Sector        string
@@ -456,6 +465,9 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time, ct
 		}
 	}
 
+	computeYieldMetrics(&item, in, QuantityAtFunc(currentQty, acctTxns), now)
+	computeVolMetrics(&item, in, now)
+
 	computeFxMetrics(&item, in, priceCur, usdKRW, ctx)
 
 	// 양도세 힌트: 해외상장(USD) 종목의 일반계좌 평가손익 기준
@@ -583,6 +595,14 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 		met := it.PriceHistoryOK && it.MA200 > 0 && it.VsMA200Pct >= r.AboveMAPct
 		sell = append(sell, SignalCheck{"above_ma", "장기 이평 과열", met, it.VsMA200Pct, r.AboveMAPct, "%"})
 	}
+	if r.YieldCompressionEnabled {
+		met := it.DividendYieldPoints >= yieldMinPoints && it.DividendYieldVsAvgPct <= -r.YieldCompressionPct
+		sell = append(sell, SignalCheck{"yield_compression", "배당수익률 압축", met, it.DividendYieldVsAvgPct, -r.YieldCompressionPct, "%"})
+	}
+	if r.VolOverheatEnabled {
+		met := it.VolatilityPct > 0 && it.MA200 > 0 && it.MA200Sigma >= r.VolOverheatSigma
+		sell = append(sell, SignalCheck{"vol_overheat", "변동성 대비 과열", met, it.MA200Sigma, r.VolOverheatSigma, "σ"})
+	}
 	if r.DividendCutEnabled {
 		met := it.DividendTrendOK && it.DividendChangePct <= -r.DividendCutPct
 		sell = append(sell, SignalCheck{"dividend_cut", "배당 삭감", met, it.DividendChangePct, -r.DividendCutPct, "%"})
@@ -605,6 +625,11 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 	if r.BelowMAEnabled {
 		met := it.MA200 > 0 && it.VsMA200Pct <= r.BelowMAPct
 		buy = append(buy, SignalCheck{"below_ma", "장기 이평 하회", met, it.VsMA200Pct, r.BelowMAPct, "%"})
+	}
+
+	if r.VolOversoldEnabled {
+		met := it.VolatilityPct > 0 && it.MA200 > 0 && it.MA200Sigma <= -r.VolOversoldSigma
+		buy = append(buy, SignalCheck{"vol_oversold", "변동성 대비 과매도", met, it.MA200Sigma, -r.VolOversoldSigma, "σ"})
 	}
 
 	it.SellChecks = sell

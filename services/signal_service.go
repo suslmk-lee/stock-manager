@@ -66,6 +66,9 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 		"annualized_min_return_pct":       r.AnnualizedMinReturnPct,
 		"drift_pct":                       r.DriftPct,
 		"partial_pct":                     r.PartialPct,
+		"yield_compression_pct":           r.YieldCompressionPct,
+		"vol_overheat_sigma":              r.VolOverheatSigma,
+		"vol_oversold_sigma":              r.VolOversoldSigma,
 	}
 	for k, v := range fin {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -134,6 +137,24 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	}
 	if r.PartialPct < 1 || r.PartialPct > 100 {
 		return &ErrInvalidSignalRule{"partial_pct must be 1..100"}
+	}
+	if r.YieldCompressionPct < 0 {
+		return &ErrInvalidSignalRule{"yield_compression_pct must be >= 0"}
+	}
+	if r.YieldCompressionEnabled && r.YieldCompressionPct == 0 {
+		return &ErrInvalidSignalRule{"yield_compression_pct must be > 0 when yield compression is enabled"}
+	}
+	if r.VolOverheatSigma < 0 {
+		return &ErrInvalidSignalRule{"vol_overheat_sigma must be >= 0"}
+	}
+	if r.VolOverheatEnabled && r.VolOverheatSigma == 0 {
+		return &ErrInvalidSignalRule{"vol_overheat_sigma must be > 0 when vol overheat is enabled"}
+	}
+	if r.VolOversoldSigma < 0 {
+		return &ErrInvalidSignalRule{"vol_oversold_sigma must be >= 0"}
+	}
+	if r.VolOversoldEnabled && r.VolOversoldSigma == 0 {
+		return &ErrInvalidSignalRule{"vol_oversold_sigma must be > 0 when vol oversold is enabled"}
 	}
 	if r.TaxHarvestFromMonth == 0 {
 		r.TaxHarvestFromMonth = defaultTaxHarvestMonth
@@ -258,11 +279,13 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 	var (
 		wg        sync.WaitGroup
 		prices    = map[string]*CurrentPrice{}
+		divEvents = map[string][]DividendEvent{}
 		histories = map[string]*PriceHistory{}
 		fxHist    *PriceHistory
 	)
 	if len(tickers) > 0 {
-		wg.Add(2)
+		wg.Add(3)
+		go func() { defer wg.Done(); divEvents = s.ticker.GetDividendEventsCachedMany(tickers) }()
 		go func() { defer wg.Done(); prices = s.ticker.GetCurrentPrices(tickers) }()
 		go func() { defer wg.Done(); histories = s.ticker.GetDailyHistoriesRangeCached(tickers, "2y") }() // 트레일링 고점은 1년보다 오래된 구간도 필요
 	}
@@ -341,6 +364,7 @@ func (s *SignalService) buildSignalReport() (*SignalReport, error) {
 		if h := histories[strings.ToUpper(in.Ticker)]; h != nil {
 			in.History = h.Points
 		}
+		in.DivEvents = divEvents[strings.ToUpper(in.Ticker)]
 	}
 
 	ctx := SignalContext{FxAt: NewFxLookup(fxHist, usdKRW), FxOK: fxHist != nil && len(fxHist.Points) > 0}

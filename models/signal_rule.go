@@ -66,6 +66,14 @@ type SignalRuleConfig struct {
 	PartialEnabled bool    `json:"partial_enabled"`
 	PartialPct     float64 `json:"partial_pct"` // 1~100
 
+	// 6단계: 배당수익률 압축 / 변동성 대비 과열·과매도
+	YieldCompressionEnabled bool    `json:"yield_compression_enabled"`
+	YieldCompressionPct     float64 `json:"yield_compression_pct"` // >= 0, 24개월 평균 수익률 대비 압축 폭(%)
+	VolOverheatEnabled      bool    `json:"vol_overheat_enabled"`
+	VolOverheatSigma        float64 `json:"vol_overheat_sigma"` // >= 0, 200일 이평 괴리 / 연변동성
+	VolOversoldEnabled      bool    `json:"vol_oversold_enabled"`
+	VolOversoldSigma        float64 `json:"vol_oversold_sigma"` // >= 0 (양수로 저장, -sigma 로 적용)
+
 	SellMode string `gorm:"size:10" json:"sell_mode"`
 	BuyMode  string `gorm:"size:10" json:"buy_mode"`
 }
@@ -87,7 +95,7 @@ type SignalRule struct {
 }
 
 // SignalRuleVersion 은 현재 규칙 스키마 버전이다.
-const SignalRuleVersion = 5
+const SignalRuleVersion = 6
 
 // DefaultSignalRuleConfig 는 "균형" 기본 규칙 설정(저장 전)을 반환한다.
 func DefaultSignalRuleConfig() SignalRuleConfig {
@@ -128,6 +136,9 @@ func DefaultSignalRuleConfig() SignalRuleConfig {
 		DriftPct:                    7,
 		PartialEnabled:              true,
 		PartialPct:                  33,
+		YieldCompressionPct:         20,
+		VolOverheatSigma:            1.5,
+		VolOversoldSigma:            1.5,
 		SellMode:                    "any",
 		BuyMode:                     "any",
 	}
@@ -149,6 +160,7 @@ func DividendSignalRuleConfig() SignalRuleConfig {
 	c.HighYieldPct = 4
 	c.FromHighEnabled = true
 	c.FromHighPct = -20
+	c.YieldCompressionEnabled = true
 	return c
 }
 

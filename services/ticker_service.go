@@ -22,6 +22,7 @@ type TickerService struct {
 	cacheTTL   time.Duration
 
 	histCache2 dailyHistoryStore // see ticker_history_cache.go (zero value usable)
+	divEvCache dividendEventsStore // see ticker_dividends.go (zero value usable)
 }
 
 func NewTickerService() *TickerService {
