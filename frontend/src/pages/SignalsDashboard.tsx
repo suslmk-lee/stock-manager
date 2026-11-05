@@ -360,7 +360,8 @@ function SignalCard({ item, rule, onEdit, flash }: { item: SignalItem; rule?: Si
             >
               <MinusCircle className="h-3 w-3" />
               {item.buy_excluded_reason === 'cooldown'
-                ? `최근 ${item.days_since_last_buy ?? item.buy_cooldown_days ?? 0}일 전 매수 · 매수 검토 제외`
+                ? // days_since_last_buy 는 0(오늘)이면 응답에서 빠진다
+                  `${item.days_since_last_buy ? `최근 ${item.days_since_last_buy}일 전 매수` : '오늘 매수'} · ${item.buy_cooldown_days ?? 14}일 쿨다운 · 매수 검토 제외`
                 : `비중 ${fmtNum(item.weight_pct, 1)}% ≥ ${fmtNum(item.buy_max_weight_pct ?? 0, 1)}% · 매수 검토 제외`}
             </span>
           )}
