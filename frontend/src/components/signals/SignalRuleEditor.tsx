@@ -59,7 +59,12 @@ type NumKey =
   | 'per_buy_max'
   | 'per_sell_min'
   | 'pbr_buy_max'
-  | 'pbr_sell_min';
+  | 'pbr_sell_min'
+  | 'valuation_window_months'
+  | 'per_avg_buy_pct'
+  | 'per_avg_sell_pct'
+  | 'pbr_avg_buy_pct'
+  | 'pbr_avg_sell_pct';
 
 type EnableKey =
   | 'from_high_enabled'
@@ -101,7 +106,11 @@ type EnableKey =
   | 'per_buy_enabled'
   | 'per_sell_enabled'
   | 'pbr_buy_enabled'
-  | 'pbr_sell_enabled';
+  | 'pbr_sell_enabled'
+  | 'per_avg_buy_enabled'
+  | 'per_avg_sell_enabled'
+  | 'pbr_avg_buy_enabled'
+  | 'pbr_avg_sell_enabled';
 
 interface FieldDef {
   key: NumKey;
@@ -172,14 +181,26 @@ const SELL_PROFIT_RULES: RuleDef[] = [
   {
     enabled: 'per_sell_enabled',
     label: 'PER 고평가',
-    desc: '주가수익비율(PER)이 기준 이상이면 고평가로 보고 이익 실현을 검토합니다. ETF 등 PER 값이 없는 종목은 이 조건을 건너뜁니다. 데이터는 국내 종목은 네이버, 해외 종목은 Yahoo 기준입니다.',
+    desc: '주가수익비율(PER)이 기준 이상이면 고평가로 보고 이익 실현을 검토합니다. ETF 등 PER 값이 없는 종목은 건너뜁니다. 업종마다 적정 PER이 달라, 종목 간 비교에는 \'평균 대비\' 조건이 보통 더 적합합니다. 데이터는 국내 종목은 네이버, 해외 종목은 Yahoo 기준입니다.',
     fields: [{ key: 'per_sell_min', label: 'PER', suffix: '배 이상' }],
   },
   {
     enabled: 'pbr_sell_enabled',
     label: 'PBR 고평가',
-    desc: '주가순자산비율(PBR)이 기준 이상이면 고평가로 보고 이익 실현을 검토합니다. ETF 등 PBR 값이 없는 종목은 이 조건을 건너뜁니다. 데이터는 국내 종목은 네이버, 해외 종목은 Yahoo 기준입니다.',
+    desc: '주가순자산비율(PBR)이 기준 이상이면 고평가로 보고 이익 실현을 검토합니다. ETF 등 PBR 값이 없는 종목은 건너뜁니다. 업종마다 적정 PBR이 달라, 종목 간 비교에는 \'평균 대비\' 조건이 보통 더 적합합니다. 데이터는 국내 종목은 네이버, 해외 종목은 Yahoo 기준입니다.',
     fields: [{ key: 'pbr_sell_min', label: 'PBR', suffix: '배 이상' }],
+  },
+  {
+    enabled: 'per_avg_sell_enabled',
+    label: 'PER 평균 대비 고평가',
+    desc: '현재 PER이 이 종목의 최근 {N}개월 평균보다 기준 이상 높으면 고평가로 보고 이익 실현을 검토합니다. 과거 실적(EPS·BPS)과 월말 주가로 계산하며, 적자 구간과 ETF는 제외됩니다.',
+    fields: [{ key: 'per_avg_sell_pct', label: '평균보다', suffix: '% 이상 높음' }],
+  },
+  {
+    enabled: 'pbr_avg_sell_enabled',
+    label: 'PBR 평균 대비 고평가',
+    desc: '현재 PBR이 이 종목의 최근 {N}개월 평균보다 기준 이상 높으면 고평가로 보고 이익 실현을 검토합니다. 과거 실적(EPS·BPS)과 월말 주가로 계산하며, 적자 구간과 ETF는 제외됩니다.',
+    fields: [{ key: 'pbr_avg_sell_pct', label: '평균보다', suffix: '% 이상 높음' }],
   },
 ];
 
@@ -309,14 +330,26 @@ const BUY_RULES: RuleDef[] = [
   {
     enabled: 'per_buy_enabled',
     label: 'PER 저평가',
-    desc: '주가수익비율(PER)이 기준 이하이면 저평가로 보고 매수를 검토합니다. ETF 등 PER 값이 없는 종목은 이 조건을 건너뜁니다. 데이터는 국내 종목은 네이버, 해외 종목은 Yahoo 기준입니다.',
+    desc: '주가수익비율(PER)이 기준 이하이면 저평가로 보고 매수를 검토합니다. ETF 등 PER 값이 없는 종목은 건너뜁니다. 업종마다 적정 PER이 달라, 종목 간 비교에는 \'평균 대비\' 조건이 보통 더 적합합니다. 데이터는 국내 종목은 네이버, 해외 종목은 Yahoo 기준입니다.',
     fields: [{ key: 'per_buy_max', label: 'PER', suffix: '배 이하' }],
   },
   {
     enabled: 'pbr_buy_enabled',
     label: 'PBR 저평가',
-    desc: '주가순자산비율(PBR)이 기준 이하이면 저평가로 보고 매수를 검토합니다. ETF 등 PBR 값이 없는 종목은 이 조건을 건너뜁니다. 데이터는 국내 종목은 네이버, 해외 종목은 Yahoo 기준입니다.',
+    desc: '주가순자산비율(PBR)이 기준 이하이면 저평가로 보고 매수를 검토합니다. ETF 등 PBR 값이 없는 종목은 건너뜁니다. 업종마다 적정 PBR이 달라, 종목 간 비교에는 \'평균 대비\' 조건이 보통 더 적합합니다. 데이터는 국내 종목은 네이버, 해외 종목은 Yahoo 기준입니다.',
     fields: [{ key: 'pbr_buy_max', label: 'PBR', suffix: '배 이하' }],
+  },
+  {
+    enabled: 'per_avg_buy_enabled',
+    label: 'PER 평균 대비 저평가',
+    desc: '현재 PER이 이 종목의 최근 {N}개월 평균보다 기준 이상 낮으면 저평가로 보고 매수를 검토합니다. 과거 실적(EPS·BPS)과 월말 주가로 계산하며, 적자 구간과 ETF는 제외됩니다.',
+    fields: [{ key: 'per_avg_buy_pct', label: '평균보다', suffix: '% 이상 낮음' }],
+  },
+  {
+    enabled: 'pbr_avg_buy_enabled',
+    label: 'PBR 평균 대비 저평가',
+    desc: '현재 PBR이 이 종목의 최근 {N}개월 평균보다 기준 이상 낮으면 저평가로 보고 매수를 검토합니다. 과거 실적(EPS·BPS)과 월말 주가로 계산하며, 적자 구간과 ETF는 제외됩니다.',
+    fields: [{ key: 'pbr_avg_buy_pct', label: '평균보다', suffix: '% 이상 낮음' }],
   },
 ];
 
@@ -331,6 +364,7 @@ const NUM_KEYS: NumKey[] = [
   'below_ma_lookback_days', 'below_ma_max_above_pct', 'below_ma_reclaim_days', 'from_high_lookback_days', 'from_high_rebound_pct', 'from_high_still_below_pct',
   'rsi_period', 'mfi_period', 'osc_lookback_days', 'rsi_buy_level', 'rsi_sell_level', 'mfi_buy_level', 'mfi_sell_level',
   'per_buy_max', 'per_sell_min', 'pbr_buy_max', 'pbr_sell_min',
+  'valuation_window_months', 'per_avg_buy_pct', 'per_avg_sell_pct', 'pbr_avg_buy_pct', 'pbr_avg_sell_pct',
 ];
 const ENABLE_KEYS: EnableKey[] = [
   'take_profit_enabled', 'stop_loss_enabled', 'weight_enabled', 'dividend_payback_enabled',
@@ -342,6 +376,7 @@ const ENABLE_KEYS: EnableKey[] = [
   'last_buy_dip_enabled', 'buy_cooldown_enabled', 'buy_max_weight_enabled', 'buy_qty_enabled', 'vol_stop_enabled',
   'rebound_confirm_enabled', 'rebound_ma_enabled', 'yield_expansion_enabled', 'time_stop_enabled', 'short_drop_enabled',
   'rsi_buy_enabled', 'rsi_sell_enabled', 'mfi_buy_enabled', 'mfi_sell_enabled', 'per_buy_enabled', 'per_sell_enabled', 'pbr_buy_enabled', 'pbr_sell_enabled',
+  'per_avg_buy_enabled', 'per_avg_sell_enabled', 'pbr_avg_buy_enabled', 'pbr_avg_sell_enabled',
 ];
 
 // 2단계 필드 기본값 (구 백엔드가 내려주지 않을 때 균형 값으로 채움)
@@ -353,6 +388,7 @@ const NEW_NUM_DEFAULTS: Partial<Record<NumKey, number>> = { from_high_pct: -20, 
   below_ma_lookback_days: 60, below_ma_max_above_pct: 3, below_ma_reclaim_days: 10, from_high_lookback_days: 60, from_high_rebound_pct: 5, from_high_still_below_pct: -10,
   rsi_period: 14, mfi_period: 14, osc_lookback_days: 10, rsi_buy_level: 30, rsi_sell_level: 70, mfi_buy_level: 20, mfi_sell_level: 80,
   per_buy_max: 10, per_sell_min: 40, pbr_buy_max: 1, pbr_sell_min: 5,
+  valuation_window_months: 36, per_avg_buy_pct: 20, per_avg_sell_pct: 30, pbr_avg_buy_pct: 20, pbr_avg_sell_pct: 30,
 };
 const NEW_FLAG_DEFAULTS: Partial<Record<EnableKey, boolean>> = {
   from_high_enabled: false, below_ma_enabled: false, above_ma_enabled: false, dividend_cut_enabled: false, crash_enabled: false,
@@ -363,13 +399,14 @@ const NEW_FLAG_DEFAULTS: Partial<Record<EnableKey, boolean>> = {
   rebound_confirm_enabled: false, rebound_ma_enabled: true, yield_expansion_enabled: false, time_stop_enabled: false, short_drop_enabled: false,
   rsi_buy_enabled: false, rsi_sell_enabled: false, mfi_buy_enabled: false, mfi_sell_enabled: false,
   per_buy_enabled: false, per_sell_enabled: false, pbr_buy_enabled: false, pbr_sell_enabled: false,
+  per_avg_buy_enabled: false, per_avg_sell_enabled: false, pbr_avg_buy_enabled: false, pbr_avg_sell_enabled: false,
 };
 const DEFAULT_HARVEST_MONTH = 11;
 
 const PRESETS: { id: string; label: string; values: Partial<Record<NumKey, number>> }[] = [
-  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5, crash_pct: -30, trailing_activate_pct: 15, trailing_drop_pct: -7, annualized_pct: 20, annualized_min_days: 60, annualized_min_return_pct: 10, drift_pct: 5, partial_pct: 50, yield_compression_pct: 15, vol_overheat_sigma: 1.2, vol_oversold_sigma: 1.2, last_buy_dip_pct: -15, buy_cooldown_days: 30, buy_max_weight_pct: 15, vol_stop_k: 0.8, rebound_from_low_pct: 7, rebound_lookback_days: 20, yield_expansion_pct: 15, time_stop_days: 270, time_stop_max_return_pct: 5, short_drop_days: 20, short_drop_pct: -10, below_ma_lookback_days: 90, below_ma_max_above_pct: 2, below_ma_reclaim_days: 5, from_high_lookback_days: 90, from_high_rebound_pct: 7, from_high_still_below_pct: -15, rsi_buy_level: 25, rsi_sell_level: 75, mfi_buy_level: 15, mfi_sell_level: 85, per_buy_max: 8, per_sell_min: 50, pbr_buy_max: 0.8, pbr_sell_min: 6 } },
-  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33, yield_compression_pct: 20, vol_overheat_sigma: 1.5, vol_oversold_sigma: 1.5, last_buy_dip_pct: -10, buy_cooldown_days: 14, buy_max_weight_pct: 20, vol_stop_k: 1, rebound_from_low_pct: 5, rebound_lookback_days: 20, yield_expansion_pct: 20, time_stop_days: 365, time_stop_max_return_pct: 0, short_drop_days: 20, short_drop_pct: -15, below_ma_lookback_days: 60, below_ma_max_above_pct: 3, below_ma_reclaim_days: 10, from_high_lookback_days: 60, from_high_rebound_pct: 5, from_high_still_below_pct: -10, rsi_buy_level: 30, rsi_sell_level: 70, mfi_buy_level: 20, mfi_sell_level: 80, per_buy_max: 10, per_sell_min: 40, pbr_buy_max: 1, pbr_sell_min: 5 } },
-  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20, crash_pct: -50, trailing_activate_pct: 30, trailing_drop_pct: -15, annualized_pct: 35, annualized_min_days: 120, annualized_min_return_pct: 25, drift_pct: 10, partial_pct: 25, yield_compression_pct: 30, vol_overheat_sigma: 2, vol_oversold_sigma: 2, last_buy_dip_pct: -7, buy_cooldown_days: 7, buy_max_weight_pct: 30, vol_stop_k: 1.5, rebound_from_low_pct: 3, rebound_lookback_days: 10, yield_expansion_pct: 30, time_stop_days: 540, time_stop_max_return_pct: -5, short_drop_days: 20, short_drop_pct: -20, below_ma_lookback_days: 40, below_ma_max_above_pct: 5, below_ma_reclaim_days: 15, from_high_lookback_days: 40, from_high_rebound_pct: 3, from_high_still_below_pct: -5, rsi_buy_level: 35, rsi_sell_level: 65, mfi_buy_level: 25, mfi_sell_level: 75, per_buy_max: 15, per_sell_min: 30, pbr_buy_max: 1.5, pbr_sell_min: 4 } },
+  { id: 'conservative', label: '보수적', values: { take_profit_pct: 20, stop_loss_pct: -10, buy_dip_pct: -15, dividend_payback_pct: 30, dividend_payback_min_return_pct: 5, low_yield_pct: 3, high_yield_pct: 6, from_high_pct: -25, below_ma_pct: -8, above_ma_pct: 20, dividend_cut_pct: 5, crash_pct: -30, trailing_activate_pct: 15, trailing_drop_pct: -7, annualized_pct: 20, annualized_min_days: 60, annualized_min_return_pct: 10, drift_pct: 5, partial_pct: 50, yield_compression_pct: 15, vol_overheat_sigma: 1.2, vol_oversold_sigma: 1.2, last_buy_dip_pct: -15, buy_cooldown_days: 30, buy_max_weight_pct: 15, vol_stop_k: 0.8, rebound_from_low_pct: 7, rebound_lookback_days: 20, yield_expansion_pct: 15, time_stop_days: 270, time_stop_max_return_pct: 5, short_drop_days: 20, short_drop_pct: -10, below_ma_lookback_days: 90, below_ma_max_above_pct: 2, below_ma_reclaim_days: 5, from_high_lookback_days: 90, from_high_rebound_pct: 7, from_high_still_below_pct: -15, rsi_buy_level: 25, rsi_sell_level: 75, mfi_buy_level: 15, mfi_sell_level: 85, per_buy_max: 8, per_sell_min: 50, pbr_buy_max: 0.8, pbr_sell_min: 6, per_avg_buy_pct: 25, per_avg_sell_pct: 25, pbr_avg_buy_pct: 25, pbr_avg_sell_pct: 25 } },
+  { id: 'balanced', label: '균형', values: { take_profit_pct: 30, stop_loss_pct: -20, buy_dip_pct: -10, dividend_payback_pct: 50, dividend_payback_min_return_pct: 10, low_yield_pct: 2, high_yield_pct: 5, from_high_pct: -20, below_ma_pct: -5, above_ma_pct: 25, dividend_cut_pct: 10, crash_pct: -40, trailing_activate_pct: 20, trailing_drop_pct: -10, annualized_pct: 25, annualized_min_days: 90, annualized_min_return_pct: 15, drift_pct: 7, partial_pct: 33, yield_compression_pct: 20, vol_overheat_sigma: 1.5, vol_oversold_sigma: 1.5, last_buy_dip_pct: -10, buy_cooldown_days: 14, buy_max_weight_pct: 20, vol_stop_k: 1, rebound_from_low_pct: 5, rebound_lookback_days: 20, yield_expansion_pct: 20, time_stop_days: 365, time_stop_max_return_pct: 0, short_drop_days: 20, short_drop_pct: -15, below_ma_lookback_days: 60, below_ma_max_above_pct: 3, below_ma_reclaim_days: 10, from_high_lookback_days: 60, from_high_rebound_pct: 5, from_high_still_below_pct: -10, rsi_buy_level: 30, rsi_sell_level: 70, mfi_buy_level: 20, mfi_sell_level: 80, per_buy_max: 10, per_sell_min: 40, pbr_buy_max: 1, pbr_sell_min: 5, per_avg_buy_pct: 20, per_avg_sell_pct: 30, pbr_avg_buy_pct: 20, pbr_avg_sell_pct: 30 } },
+  { id: 'aggressive', label: '공격적', values: { take_profit_pct: 50, stop_loss_pct: -30, buy_dip_pct: -7, dividend_payback_pct: 80, dividend_payback_min_return_pct: 20, low_yield_pct: 1.5, high_yield_pct: 4, from_high_pct: -15, below_ma_pct: -3, above_ma_pct: 35, dividend_cut_pct: 20, crash_pct: -50, trailing_activate_pct: 30, trailing_drop_pct: -15, annualized_pct: 35, annualized_min_days: 120, annualized_min_return_pct: 25, drift_pct: 10, partial_pct: 25, yield_compression_pct: 30, vol_overheat_sigma: 2, vol_oversold_sigma: 2, last_buy_dip_pct: -7, buy_cooldown_days: 7, buy_max_weight_pct: 30, vol_stop_k: 1.5, rebound_from_low_pct: 3, rebound_lookback_days: 10, yield_expansion_pct: 30, time_stop_days: 540, time_stop_max_return_pct: -5, short_drop_days: 20, short_drop_pct: -20, below_ma_lookback_days: 40, below_ma_max_above_pct: 5, below_ma_reclaim_days: 15, from_high_lookback_days: 40, from_high_rebound_pct: 3, from_high_still_below_pct: -5, rsi_buy_level: 35, rsi_sell_level: 65, mfi_buy_level: 25, mfi_sell_level: 75, per_buy_max: 15, per_sell_min: 30, pbr_buy_max: 1.5, pbr_sell_min: 4, per_avg_buy_pct: 15, per_avg_sell_pct: 40, pbr_avg_buy_pct: 15, pbr_avg_sell_pct: 40 } },
 ];
 
 interface Draft {
@@ -457,6 +494,9 @@ function validate(d: Draft): Partial<Record<NumKey, string>> {
     else if (k === 'osc_lookback_days' && (!Number.isInteger(n) || n < 1 || n > 60)) errs[k] = '1~60 사이 정수로 입력하세요';
     else if ((k === 'rsi_buy_level' || k === 'rsi_sell_level' || k === 'mfi_buy_level' || k === 'mfi_sell_level') && (n < 1 || n > 99)) errs[k] = '1~99 사이로 입력하세요';
     else if ((k === 'per_buy_max' || k === 'per_sell_min' || k === 'pbr_buy_max' || k === 'pbr_sell_min') && n <= 0) errs[k] = '0보다 크게 입력하세요';
+    else if (k === 'valuation_window_months' && (!Number.isInteger(n) || n < 12 || n > 60)) errs[k] = '12~60 사이 정수로 입력하세요';
+    else if ((k === 'per_avg_buy_pct' || k === 'pbr_avg_buy_pct') && (n <= 0 || n > 90)) errs[k] = '0보다 크고 90 이하로 입력하세요';
+    else if ((k === 'per_avg_sell_pct' || k === 'pbr_avg_sell_pct') && (n <= 0 || n > 500)) errs[k] = '0보다 크고 500 이하로 입력하세요';
   });
   // 과열 기준은 과매도 기준보다 커야 한다 (둘 다 켰을 때)
   const f = d.flags;
@@ -644,7 +684,7 @@ const SECTION_OF_NUM: Partial<Record<NumKey, SectionId>> = (() => {
   m.rebound_lookback_days = 'confirm';
   m.rebound_from_low_pct = 'confirm';
   (['below_ma_lookback_days', 'below_ma_max_above_pct', 'below_ma_reclaim_days', 'from_high_lookback_days', 'from_high_rebound_pct', 'from_high_still_below_pct'] as NumKey[]).forEach((k) => (m[k] = 'buy'));
-  (['rsi_period', 'mfi_period', 'osc_lookback_days'] as NumKey[]).forEach((k) => (m[k] = 'misc'));
+  (['rsi_period', 'mfi_period', 'osc_lookback_days', 'valuation_window_months'] as NumKey[]).forEach((k) => (m[k] = 'misc'));
   m.buy_qty_amount_krw = 'buyqty';
   m.buy_qty_lower_avg_pct = 'buyqty';
   return m;
@@ -805,7 +845,7 @@ function SectionBody({ rd, readOnly, touched, showNote, id }: { rd: RuleDraft; r
         {def.label}
         {def.note && showNote && <span className="badge ml-2 border border-amber-400/25 bg-amber-400/10 align-middle text-amber-200">{def.note}</span>}
       </>,
-      def.desc,
+      def.desc.replace('{N}', String(Math.round(Number(draft.nums.valuation_window_months)) || 36)),
       def.fields.map((f) => <div key={f.key}>{numInput(f.key, f.label, f.suffix)}</div>),
     );
   };
@@ -1002,6 +1042,7 @@ function SectionBody({ rd, readOnly, touched, showNote, id }: { rd: RuleDraft; r
           {rowShell('rsi_period', true, null, 'RSI 기간', 'RSI(상대강도지수)를 계산할 거래일 수입니다. 기간이 짧을수록 민감하게 움직입니다. 항상 적용됩니다.', numInput('rsi_period', 'RSI 기간', '일'))}
           {rowShell('mfi_period', true, null, 'MFI 기간', 'MFI(자금흐름지수)를 계산할 거래일 수입니다. 항상 적용됩니다.', numInput('mfi_period', 'MFI 기간', '일'))}
           {rowShell('osc_lookback_days', true, null, '과매도 반등 확인 기간', 'RSI·MFI 과매도 반등 조건에서 기준 이하로 내려간 적이 있는지 되돌아볼 거래일 수입니다. 항상 적용됩니다.', numInput('osc_lookback_days', '확인 기간', '일'))}
+          {rowShell('valuation_window_months', true, null, 'PER·PBR 평균 기간', 'PER·PBR 평균 대비 조건에서 평균을 구할 최근 개월 수입니다(12~60). 항상 적용됩니다.', numInput('valuation_window_months', 'PER·PBR 평균 기간', '개월'))}
           {sub('기타')}
           {simpleRow('fx', draft.flags.fx_historical, '매수 시점 환율로 수익률 계산', '해외 종목의 원화 수익률을 매수 당시 환율 기준으로 계산합니다. 거래 기록이 없는 수량은 현재 환율을 사용합니다.', 'fx_historical')}
           {simpleRow(
