@@ -115,13 +115,21 @@ type SignalItem struct {
 	SuggestedBuyKind string  `json:"suggested_buy_kind,omitempty"` // "amount" | "target_weight" | "lower_avg"
 
 	// 단기 흐름: 최근 저점 대비 반등(매수 확인)과 최근 N거래일 변화율. 시세 이력이 있으면 규칙과 무관하게 채운다.
-	RecentLowPrice      float64 `json:"recent_low_price,omitempty"`
-	FromRecentLowPct    float64 `json:"from_recent_low_pct,omitempty"`
-	MA20                float64 `json:"ma20,omitempty"`
+	RecentLowPrice   float64 `json:"recent_low_price,omitempty"`
+	FromRecentLowPct float64 `json:"from_recent_low_pct,omitempty"`
+	MA20             float64 `json:"ma20,omitempty"`
+	// 하회 후 반등 지표: 200일선 괴리 최솟값 / 20일 이평 상승 / 200일선 상향 돌파 후 경과 / 52주 고점 대비 최대 낙폭 / 저점 대비 반등 폭
+	MA200MinDevPct      float64 `json:"ma200_min_dev_pct,omitempty"`
+	MA20Rising          bool    `json:"ma20_rising,omitempty"`
+	MA200ReclaimDaysAgo int     `json:"ma200_reclaim_days_ago,omitempty"`
+	FromHighDeepestPct  float64 `json:"from_high_deepest_pct,omitempty"`
+	FromLowReboundPct   float64 `json:"from_low_rebound_pct,omitempty"`
 	ReboundConfirmed    bool    `json:"rebound_confirmed,omitempty"`
 	ReboundLookbackDays int     `json:"rebound_lookback_days,omitempty"`
 	ShortChangePct      float64 `json:"short_change_pct,omitempty"`
 	ShortChangeDays     int     `json:"short_change_days,omitempty"`
+
+	trend TrendMetrics // 하회 후 반등 판단 지표 (JSON 제외)
 
 	hasLastBuy bool // 마지막 매수 거래 존재 여부 (DaysSinceLastBuy 0 과 구분)
 
@@ -496,6 +504,7 @@ func computeSignalMetrics(in SignalAssetInput, usdKRW float64, now time.Time, ct
 	}
 
 	computeShortTermMetrics(&item, in, now)
+	computeTrendMetrics(&item, in, now)
 	computeYieldMetrics(&item, in, QuantityAtFunc(currentQty, acctTxns), now)
 	computeVolMetrics(&item, in, now)
 
@@ -666,12 +675,24 @@ func evaluateSignalRule(it *SignalItem, r models.SignalRuleConfig) string {
 		buy = append(buy, SignalCheck{"high_yield", "배당수익률 상승", it.CurrentYieldPct >= r.HighYieldPct, it.CurrentYieldPct, r.HighYieldPct, "%"})
 	}
 	if r.FromHighEnabled {
-		met := it.PriceHistoryOK && it.FromHighPct <= r.FromHighPct
-		buy = append(buy, SignalCheck{"from_high", "52주 고점 대비 하락", met, it.FromHighPct, r.FromHighPct, "%"})
+		met, label := it.PriceHistoryOK && it.FromHighPct <= r.FromHighPct, "52주 고점 대비 하락"
+		if r.FromHighMode == trendModeRebound {
+			label = "52주 고점 대비 하락 후 반등"
+			met = it.PriceHistoryOK && FromHighReboundMet(it.trend, it.trend.Price, r.FromHighPct, it.FromHighPct, r.FromHighReboundPct, r.FromHighStillBelowPct)
+		}
+		buy = append(buy, SignalCheck{"from_high", label, met, it.FromHighPct, r.FromHighPct, "%"})
 	}
 	if r.BelowMAEnabled {
-		met := it.MA200 > 0 && it.VsMA200Pct <= r.BelowMAPct
-		buy = append(buy, SignalCheck{"below_ma", "장기 이평 하회", met, it.VsMA200Pct, r.BelowMAPct, "%"})
+		met, label, thr := it.MA200 > 0 && it.VsMA200Pct <= r.BelowMAPct, "장기 이평 하회", r.BelowMAPct
+		switch r.BelowMAMode {
+		case trendModeRebound:
+			label = "장기 이평 하회 후 반등"
+			met = it.MA200 > 0 && BelowMAMet(it.trend, r.BelowMAMode, it.trend.Price, it.VsMA200Pct, r.BelowMAPct, r.BelowMAMaxAbovePct, r.BelowMAReclaimDays)
+		case trendModeReclaim:
+			label, thr = "200일선 회복", 0
+			met = it.MA200 > 0 && BelowMAMet(it.trend, r.BelowMAMode, it.trend.Price, it.VsMA200Pct, r.BelowMAPct, r.BelowMAMaxAbovePct, r.BelowMAReclaimDays)
+		}
+		buy = append(buy, SignalCheck{"below_ma", label, met, it.VsMA200Pct, thr, "%"})
 	}
 
 	if r.YieldExpansionEnabled {

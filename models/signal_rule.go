@@ -39,6 +39,16 @@ type SignalRuleConfig struct {
 	AboveMAEnabled  bool    `json:"above_ma_enabled"`
 	AboveMAPct      float64 `json:"above_ma_pct"` // >= 0
 
+	// 9단계: 장기 이평 하회 / 52주 고점 대비 하락을 "하회 후 반등" 으로 전환
+	BelowMAMode           string  `gorm:"size:10" json:"below_ma_mode"`  // below | rebound | reclaim
+	BelowMALookbackDays   int     `json:"below_ma_lookback_days"`        // 10~250 거래일
+	BelowMAMaxAbovePct    float64 `json:"below_ma_max_above_pct"`        // 0~50, rebound 모드에서 200일선 위로 허용하는 최대 괴리
+	BelowMAReclaimDays    int     `json:"below_ma_reclaim_days"`         // 1~60, reclaim 모드: 최근 N 종가 내 상향 돌파
+	FromHighMode          string  `gorm:"size:10" json:"from_high_mode"` // below | rebound
+	FromHighLookbackDays  int     `json:"from_high_lookback_days"`       // 10~250 거래일
+	FromHighReboundPct    float64 `json:"from_high_rebound_pct"`         // (0, 100], 최근 저점 대비 반등 폭
+	FromHighStillBelowPct float64 `json:"from_high_still_below_pct"`     // <= 0, 현재도 52주 고점 대비 이 값 이하
+
 	DividendCutEnabled bool    `json:"dividend_cut_enabled"`
 	DividendCutPct     float64 `json:"dividend_cut_pct"` // >= 0
 
@@ -137,7 +147,7 @@ type SignalRule struct {
 }
 
 // SignalRuleVersion 은 현재 규칙 스키마 버전이다.
-const SignalRuleVersion = 8
+const SignalRuleVersion = 9
 
 // DefaultSignalRuleConfig 는 "균형" 기본 규칙 설정(저장 전)을 반환한다.
 func DefaultSignalRuleConfig() SignalRuleConfig {
@@ -162,6 +172,14 @@ func DefaultSignalRuleConfig() SignalRuleConfig {
 		HighYieldPct:                5,
 		FromHighPct:                 -20,
 		BelowMAPct:                  -5,
+		BelowMAMode:                 "rebound",
+		BelowMALookbackDays:         60,
+		BelowMAMaxAbovePct:          3,
+		BelowMAReclaimDays:          10,
+		FromHighMode:                "rebound",
+		FromHighLookbackDays:        60,
+		FromHighReboundPct:          5,
+		FromHighStillBelowPct:       -10,
 		AboveMAPct:                  25,
 		DividendCutPct:              10,
 		TaxHarvestEnabled:           true,

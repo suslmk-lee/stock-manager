@@ -34,6 +34,7 @@ const (
 //   - v1 -> v2: 시세 추세 / 배당 삭감 / 양도세 / 환율 기본값
 //   - v2 -> v3: 큰 폭락 경고(crash_pct=-40, 꺼짐)
 //   - v3 -> v4: 소량 보유 매도 제외(1주 이하, 켜짐)
+//   - v8 -> v9: 장기 이평 하회/52주 고점 대비 하락을 하회 후 반등 모드로 전환 (켜짐 여부와 임계값은 유지)
 //   - v7 -> v8: 반등 확인/시간 손절/단기 급락(꺼짐, 반등 MA 옵션 켜짐), 배당수익률 확대(배당형 규칙만 켜짐)
 //   - v6 -> v7: 매수 규칙(쿨다운/최대 비중/수량 제안 켜짐, 마지막 매수가 대비 꺼짐), 변동성 손절(꺼짐), 매도 충족 방식을 그룹 방식으로 환산
 //   - v5 -> v6: 배당수익률 압축(익절/손절이 모두 꺼진 배당형 규칙만 켜짐), 변동성 과열/과매도(꺼짐)
@@ -187,6 +188,12 @@ func migrateRuleConfig(c *models.SignalRuleConfig, version *int) bool {
 		c.YieldExpansionEnabled = !(c.TakeProfitEnabled || c.StopLossEnabled) // 배당형 규칙만 켬
 		c.TimeStopEnabled = false
 		c.ShortDropEnabled = false
+	}
+	if *version < 9 {
+		def := models.DefaultSignalRuleConfig()
+		c.BelowMAMode, c.FromHighMode = def.BelowMAMode, def.FromHighMode
+		c.BelowMALookbackDays, c.BelowMAMaxAbovePct, c.BelowMAReclaimDays = def.BelowMALookbackDays, def.BelowMAMaxAbovePct, def.BelowMAReclaimDays
+		c.FromHighLookbackDays, c.FromHighReboundPct, c.FromHighStillBelowPct = def.FromHighLookbackDays, def.FromHighReboundPct, def.FromHighStillBelowPct
 	}
 	*version = models.SignalRuleVersion
 	return true

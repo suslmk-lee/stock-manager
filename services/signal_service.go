@@ -247,6 +247,63 @@ func ValidateSignalRuleConfig(r *models.SignalRuleConfig) error {
 	if r.ShortDropPct == 0 {
 		r.ShortDropPct = defaultShortDropPct
 	}
+	for k, v := range map[string]float64{
+		"below_ma_max_above_pct":    r.BelowMAMaxAbovePct,
+		"from_high_rebound_pct":     r.FromHighReboundPct,
+		"from_high_still_below_pct": r.FromHighStillBelowPct,
+	} {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return &ErrInvalidSignalRule{fmt.Sprintf("%s must be a finite number", k)}
+		}
+	}
+	switch strings.ToLower(strings.TrimSpace(r.BelowMAMode)) {
+	case "", trendModeRebound:
+		r.BelowMAMode = trendModeRebound
+	case trendModeBelow:
+		r.BelowMAMode = trendModeBelow
+	case trendModeReclaim:
+		r.BelowMAMode = trendModeReclaim
+	default:
+		return &ErrInvalidSignalRule{"below_ma_mode must be 'below', 'rebound' or 'reclaim'"}
+	}
+	if r.BelowMALookbackDays == 0 {
+		r.BelowMALookbackDays = defaultBelowMALookbackDays
+	}
+	if r.BelowMALookbackDays < 10 || r.BelowMALookbackDays > 250 {
+		return &ErrInvalidSignalRule{"below_ma_lookback_days must be 10..250"}
+	}
+	if r.BelowMAMaxAbovePct < 0 || r.BelowMAMaxAbovePct > 50 {
+		return &ErrInvalidSignalRule{"below_ma_max_above_pct must be 0..50"}
+	}
+	if r.BelowMAReclaimDays == 0 {
+		r.BelowMAReclaimDays = defaultBelowMAReclaimDays
+	}
+	if r.BelowMAReclaimDays < 1 || r.BelowMAReclaimDays > 60 {
+		return &ErrInvalidSignalRule{"below_ma_reclaim_days must be 1..60"}
+	}
+	switch strings.ToLower(strings.TrimSpace(r.FromHighMode)) {
+	case "", trendModeRebound:
+		r.FromHighMode = trendModeRebound
+	case trendModeBelow:
+		r.FromHighMode = trendModeBelow
+	default:
+		return &ErrInvalidSignalRule{"from_high_mode must be 'below' or 'rebound'"}
+	}
+	if r.FromHighLookbackDays == 0 {
+		r.FromHighLookbackDays = defaultFromHighLookbackDays
+	}
+	if r.FromHighLookbackDays < 10 || r.FromHighLookbackDays > 250 {
+		return &ErrInvalidSignalRule{"from_high_lookback_days must be 10..250"}
+	}
+	if r.FromHighReboundPct == 0 {
+		r.FromHighReboundPct = defaultFromHighReboundPct
+	}
+	if r.FromHighReboundPct < 0 || r.FromHighReboundPct > 100 {
+		return &ErrInvalidSignalRule{"from_high_rebound_pct must be in (0, 100]"}
+	}
+	if r.FromHighStillBelowPct > 0 {
+		return &ErrInvalidSignalRule{"from_high_still_below_pct must be <= 0"}
+	}
 	if r.TaxHarvestFromMonth == 0 {
 		r.TaxHarvestFromMonth = defaultTaxHarvestMonth
 	}
