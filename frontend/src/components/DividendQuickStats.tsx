@@ -21,10 +21,14 @@ interface MonthlyStats {
 interface AssetDividendStats {
   assetName: string;
   ticker: string;
-  total: number;
+  total: number; // 이 계좌에서 받은 누적 배당금 (원화)
   count: number;
-  yield: number;
+  invested: number; // 투자금 = 지금 보유분의 매입 원가 (원화, 외화는 현재 환율). 0 = 보유 없음
+  yield: number; // 누적 배당금 ÷ 투자금 (%)
 }
+
+// 보유 단가의 통화: 국내 상장(.KS/.KQ)은 원화, 그 밖은 달러 (다른 화면과 같은 기준)
+const currencyOfTicker = (ticker: string): 'KRW' | 'USD' => (/\.(KS|KQ)$/i.test(ticker) ? 'KRW' : 'USD');
 
 export default function DividendQuickStats({ accountId, children, refreshTrigger = 0 }: DividendQuickStatsProps) {
   const tc = useThemeColors();
@@ -172,6 +176,21 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
         .sort((a, b) => b.total - a.total)
         .slice(0, 10);
 
+      // 종목별 투자금(보유 수량 × 평균 매입가)과 그 대비 누적 배당률 — 시세 없이 바로 계산된다
+      const topWithInvested: AssetDividendStats[] = sortedAssets.map(asset => {
+        const holding = holdings.find(h => h.asset?.ticker === asset.ticker);
+        const cost = (holding?.quantity || 0) * (holding?.average_price || 0);
+        const invested = currencyOfTicker(asset.ticker) === 'USD' ? cost * exchangeRateValue : cost;
+        return {
+          assetName: asset.name,
+          ticker: asset.ticker,
+          total: asset.total,
+          count: asset.count,
+          invested,
+          yield: invested > 0 ? (asset.total / invested) * 100 : 0,
+        };
+      });
+
       // 1) 시세 비의존 값 + 원가 기반 잠정 배당률을 먼저 표시 (패널 즉시 렌더)
       const fallbackBase = Math.max(investmentInKRW, buyInvestmentInKRW);
       const fallbackLabel = buyInvestmentInKRW >= investmentInKRW ? '누적매수(대체)' : '보유원가(대체)';
@@ -179,18 +198,10 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
       setTotalInvestment(fallbackBase);
       setAnnualYield(fallbackBase > 0 ? (yearlyTotal / fallbackBase) * 100 : 0);
       setExpectedAnnualYield(fallbackBase > 0 ? (annualizedDividend / fallbackBase) * 100 : 0);
-      setTopAssets(
-        sortedAssets.map(asset => ({
-          assetName: asset.name,
-          ticker: asset.ticker,
-          total: asset.total,
-          count: asset.count,
-          yield: 0,
-        }))
-      );
+      setTopAssets(topWithInvested);
       setLoading(false);
 
-      // 2) 시세는 비차단으로 받아 평가금액 기반 값(투자금/배당률/종목별 수익률)만 갱신
+      // 2) 시세는 비차단으로 받아 계좌 전체의 평가금액 기반 값(총 투자금/연배당률)만 갱신
       const tickers = Array.from(
         new Set(
           holdings
@@ -228,22 +239,6 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
             setAnnualYield((yearlyTotal / marketValueInKRW) * 100);
             setExpectedAnnualYield((annualizedDividend / marketValueInKRW) * 100);
           }
-
-          // 종목별 배당률 갱신
-          setTopAssets(
-            sortedAssets.map(asset => {
-              const holding = holdings.find(h => h.asset?.ticker === asset.ticker);
-              const qty = holding?.quantity || 0;
-              const marketValue = qty * (priceMap.get(asset.ticker) || 0);
-              return {
-                assetName: asset.name,
-                ticker: asset.ticker,
-                total: asset.total,
-                count: asset.count,
-                yield: marketValue > 0 ? (asset.total / marketValue) * 100 : 0,
-              };
-            })
-          );
         })
         .catch((err) => {
           console.error('Failed to load prices for dividend stats:', err);
@@ -415,8 +410,8 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
             <div className="space-y-2">
               {topAssets.map((asset, index) => (
                 <div key={asset.ticker} className="surface-inset p-4 hover:bg-white/[0.04] transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3 flex-1">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-sm ${
                         index === 0 ? 'bg-amber-400/15 text-amber-300' :
                         index === 1 ? 'bg-white/[0.1] text-zinc-200' :
@@ -438,11 +433,18 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="shrink-0 text-right">
                       <p className="num text-lg font-medium text-mint-300">{formatCurrency(asset.total)}</p>
-                      <div className="flex items-center gap-2 justify-end">
+                      {/* 받은 배당금이 얼마의 투자금에서 나왔는지: 보유분 매입 원가 */}
+                      <p
+                        className="num text-xs text-zinc-300"
+                        title="투자금 = 지금 보유한 수량 × 평균 매입가 (외화는 현재 환율로 원화 환산)"
+                      >
+                        {asset.invested > 0 ? `투자금 ${formatCurrency(asset.invested)}` : '보유 없음'}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-2 justify-end">
                         {asset.yield > 0 && (
-                          <span className="text-xs font-medium text-amber-300">
+                          <span className="text-xs font-medium text-amber-300" title="누적 배당금 ÷ 투자금">
                             배당률 {asset.yield.toFixed(2)}%
                           </span>
                         )}
