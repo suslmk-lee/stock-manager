@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download, ExternalLink, Loader2, X } from 'lucide-react';
 import Portal from '../ui/Portal';
+import ReleaseNotes from './ReleaseNotes';
 import { desktop, type UpdateInfo, type UpdateProgress } from '../../platform/desktop';
 
 const PHASE_LABEL: Record<UpdateProgress['phase'], string> = {
@@ -64,7 +65,9 @@ export default function UpdateDialog({ info, onClose }: { info: UpdateInfo; onCl
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             <div className="label-mono mb-2">바뀐 점</div>
-            <div className="surface-inset whitespace-pre-wrap px-3.5 py-3 text-sm leading-relaxed text-zinc-300">{info.notes?.trim() || '릴리스 노트가 없습니다.'}</div>
+            <div className="surface-inset px-3.5 py-3">
+              <ReleaseNotes notes={info.notes} current={info.current} />
+            </div>
             {!info.can_install && info.reason && <p className="mt-3 text-sm text-amber-200">{info.reason}</p>}
             {error && <p className="mt-3 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</p>}
           </div>

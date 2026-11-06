@@ -1,7 +1,10 @@
 # 버전 태그(v1.2.3)를 올리면 macOS 설치 파일(DMG)을 만들어 GitHub Release 에 올린다.
 # 설치된 앱은 켤 때와 3시간마다 이 Release 를 확인해 '업데이트' 버튼을 띄운다.
 #   git tag v1.2.3 && git push origin v1.2.3
-# Release 본문(바뀐 점)은 이전 태그 이후 커밋 메시지로 자동 생성된다.
+# Release 본문(앱 업데이트 창의 '바뀐 점')은 scripts/release-notes.sh 가 커밋 제목으로 만든다
+# (최근 5개 버전을 버전별 단락으로, 앱은 지금 버전보다 새 단락만 보여 준다).
+# 이미 올린 Release 의 본문만 다시 쓰려면 Actions → Release → Run workflow 에서 태그를 넣고
+# '본문만 다시 쓰기'를 켠다 (빌드 없이 1분 안에 끝난다).
 
 name: Release
 
@@ -14,6 +17,10 @@ on:
       tag:
         description: '다시 빌드할 태그 (예: v1.2.3)'
         required: true
+      notes_only:
+        description: '본문(바뀐 점)만 다시 쓰기 (DMG 빌드 생략)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -31,32 +38,54 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0
 
+      # 노트 스크립트는 워크플로를 실행한 커밋(수동 실행이면 master)의 것을 쓴다:
+      # 스크립트가 생기기 전의 옛 태그 본문도 다시 쓸 수 있게
+      - name: Write release notes
+        run: |
+          git show "${GITHUB_SHA}:scripts/release-notes.sh" > "$RUNNER_TEMP/release-notes.sh"
+          bash "$RUNNER_TEMP/release-notes.sh" "$TAG" 5 > "$RUNNER_TEMP/release-notes.md"
+          cat "$RUNNER_TEMP/release-notes.md"
+
       - uses: actions/setup-go@v5
+        if: ${{ !inputs.notes_only }}
         with:
           go-version-file: go.mod
 
       - uses: actions/setup-node@v4
+        if: ${{ !inputs.notes_only }}
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install Wails CLI
+        if: ${{ !inputs.notes_only }}
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
 
       - name: Set app version in wails.json (Info.plist 버전 표시용)
+        if: ${{ !inputs.notes_only }}
         run: |
           VER="${TAG#v}"
           sed -i '' "s/\"productVersion\": \"[^\"]*\"/\"productVersion\": \"${VER}\"/" wails.json
           grep productVersion wails.json
 
       - name: Build DMG (Apple Silicon + Intel)
+        if: ${{ !inputs.notes_only }}
         run: APP_VERSION="$TAG" scripts/build-dmg.sh --universal
 
       - name: Publish release
+        if: ${{ !inputs.notes_only }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
           name: Stock Manager ${{ env.TAG }}
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/release-notes.md
           files: build/bin/*.dmg
+
+      - name: Update release notes only
+        if: ${{ inputs.notes_only }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Stock Manager ${{ env.TAG }}
+          body_path: ${{ runner.temp }}/release-notes.md
