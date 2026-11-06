@@ -7,6 +7,7 @@ import (
 	"stock-manager/httpapi"
 	"stock-manager/models"
 	"stock-manager/services"
+	"stock-manager/updater"
 	"time"
 )
 
@@ -23,6 +24,7 @@ type App struct {
 	realizedPnLService  *services.RealizedPnLService
 	signalService       *services.SignalService
 	dailySnapService    *services.DailySnapshotService
+	updater             *updater.Updater
 }
 
 // NewApp 은 서비스 인스턴스를 모두 구성한 App 을 반환한다.
@@ -46,6 +48,7 @@ func NewApp() *App {
 	a.signalService.SetFundamentals(fundamentals)
 	a.signalService.SetValuation(services.NewValuationService(database.GetDB(), a.tickerService, fundamentals))
 	a.dailySnapService.SetFundamentals(fundamentals)
+	a.updater = updater.New(appVersion)
 	return a
 }
 

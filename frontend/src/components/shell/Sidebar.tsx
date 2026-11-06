@@ -1,5 +1,6 @@
-import { PanelLeftClose, PanelLeftOpen, Settings2, X } from 'lucide-react';
+import { Download, Loader2, PanelLeftClose, PanelLeftOpen, Settings2, X } from 'lucide-react';
 import Brand from '../ui/Brand';
+import { useUpdates } from '../update/UpdateProvider';
 import { NAV_GROUPS, type NavItem, type RouteId } from '../../navigation';
 import { APP_VERSION, versionLabel, versionShortLabel, versionTooltip } from '../../utils/appVersion';
 
@@ -29,6 +30,7 @@ export default function Sidebar({
   onOpenSettings,
 }: SidebarProps) {
   const rail = collapsed && !mobile;
+  const updates = useUpdates();
   const fx = usdKrw ? usdKrw.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) : '—';
 
   const navButton = (item: NavItem) => {
@@ -122,14 +124,41 @@ export default function Sidebar({
               {!rail && <span>메뉴 접기</span>}
             </button>
           )}
-          <div
-            className={`mt-1 flex items-center border-t border-white/[0.06] pt-2.5 font-mono text-[11px] text-zinc-500 ${
-              rail ? 'justify-center' : 'justify-between px-2.5'
+          {/* 새 버전이 있으면 업데이트 버튼 (데스크톱 앱만) */}
+          {updates.available && updates.info?.latest && (
+            <button
+              type="button"
+              onClick={updates.openDialog}
+              className={`btn-primary mt-1 w-full !py-1.5 !text-xs ${rail ? '!px-0' : ''}`}
+              title={`새 버전 ${updates.info.latest} 설치`}
+              aria-label={`앱 업데이트 ${updates.info.latest}`}
+            >
+              <Download className="h-3.5 w-3.5" />
+              {!rail && <span>업데이트 {updates.info.latest}</span>}
+            </button>
+          )}
+          {/* 현재 버전 — 데스크톱 앱에서는 누르면 새 버전을 확인한다 */}
+          <button
+            type="button"
+            onClick={updates.enabled ? () => updates.check(true) : undefined}
+            disabled={!updates.enabled || updates.checking}
+            className={`mt-1 flex w-full items-center border-t border-white/[0.06] pt-2.5 font-mono text-[11px] text-zinc-500 transition-colors enabled:hover:text-zinc-300 disabled:cursor-default ${
+              rail ? 'justify-center' : 'justify-between gap-2 px-2.5'
             }`}
-            title={versionTooltip()}
+            title={updates.enabled ? `${versionTooltip()}\n\n눌러서 새 버전 확인` : versionTooltip()}
+            aria-label={updates.enabled ? `앱 버전 ${versionLabel()}, 눌러서 새 버전 확인` : `앱 버전 ${versionLabel()}`}
           >
             {rail ? (
-              <span>{versionShortLabel()}</span>
+              updates.checking ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>{versionShortLabel()}</span>
+            ) : updates.checking ? (
+              <span className="flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                새 버전 확인 중…
+              </span>
+            ) : updates.notice ? (
+              <span className={`truncate ${updates.notice.kind === 'latest' ? 'text-mint-300' : updates.notice.kind === 'error' ? 'text-rose-300' : 'text-zinc-400'}`}>
+                {updates.notice.kind === 'latest' ? `✓ ${updates.notice.message}` : updates.notice.message}
+              </span>
             ) : (
               <>
                 <span className="whitespace-nowrap">
@@ -144,8 +173,7 @@ export default function Sidebar({
                 )}
               </>
             )}
-          </div>
-          <span className="sr-only">앱 버전 {versionLabel()}</span>
+          </button>
         </div>
       </aside>
     </>

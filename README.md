@@ -185,6 +185,22 @@ scripts/build-dmg.sh --skip-build # build/bin 의 .app 으로 DMG 만 다시 만
   처음 한 번은 앱을 Control-클릭 → 열기 하거나 `xattr -dr com.apple.quarantine "/Applications/Stock Manager.app"` 를 실행하세요.
   경고 없이 배포하려면 Apple Developer ID 서명과 공증(notarization)이 필요합니다.
 
+#### 릴리스와 앱 자동 업데이트
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+- 버전 태그(`v*.*.*`)를 올리면 GitHub Actions(`.github/workflows/release.yml`)가 Apple Silicon·Intel 겸용 DMG 를 만들어
+  GitHub Release 에 올립니다. 바뀐 점(Release 본문)은 이전 태그 이후 커밋으로 자동 작성됩니다.
+- 설치된 앱(macOS)은 켤 때와 3시간마다 최신 Release 를 확인하고, 새 버전이 있으면 사이드바에 **업데이트** 버튼을 띄웁니다.
+  사이드바 맨 아래 **버전을 누르면** 바로 확인합니다.
+- **지금 설치** 를 누르면 DMG 를 내려받아 서명을 확인한 뒤, 앱이 종료되면 지금 앱을 새 버전으로 바꾸고 다시 엽니다.
+  응용 프로그램 폴더 등 쓰기 권한이 있는 곳에 설치된 앱이어야 합니다.
+- 버전은 `scripts/build-dmg.sh` 가 `git describe`(또는 `APP_VERSION`)로 앱에 넣습니다. `wails dev`·`wails build` 로 직접 만든 빌드는
+  버전이 `dev` 라 업데이트를 확인하지 않습니다.
+- Windows 는 새 버전 알림만 하고, 설치는 릴리스 페이지에서 직접 받습니다.
+
 **작동 방식:**
 
 - Wails가 Go 백엔드와 React 프론트엔드를 하나의 데스크톱 앱으로 번들링

@@ -6,7 +6,10 @@
 # 사용법: scripts/build-dmg.sh [--universal] [--skip-build]
 #   --universal   Apple Silicon + Intel 겸용으로 빌드 (기본: 이 맥의 아키텍처)
 #   --skip-build  build/bin 에 이미 있는 .app 으로 DMG 만 다시 만든다
-# 결과: build/bin/StockManager-<git 버전>-<아키텍처>.dmg
+# 결과: build/bin/StockManager-<버전>-<아키텍처>.dmg
+#
+# 버전은 git describe (예: v1.2.0, 태그 뒤 개발 빌드면 v1.2.0-3-gabc1234). APP_VERSION 환경 변수로 바꿀 수 있다.
+# 이 버전이 앱(사이드바 표시·업데이트 확인)에 그대로 들어가므로, 업데이트 확인이 되는 빌드는 이 스크립트로 만든다.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -36,7 +39,8 @@ export PATH
 
 APP_NAME="Stock Manager"
 BUILT_APP="build/bin/stock-manager.app"
-VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
+VERSION="${APP_VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}"
+export APP_VERSION="$VERSION" # 프론트엔드 빌드(vite.config.ts)도 같은 버전을 쓴다
 ARCH="${PLATFORM#darwin/}"
 DMG="build/bin/StockManager-${VERSION}-${ARCH}.dmg"
 
@@ -45,7 +49,7 @@ if [[ $SKIP_BUILD -eq 0 ]]; then
     echo "wails CLI 가 없습니다: go install github.com/wailsapp/wails/v2/cmd/wails@latest" >&2
     exit 1
   fi
-  wails build -platform "$PLATFORM"
+  wails build -platform "$PLATFORM" -ldflags "-X main.appVersion=${VERSION}"
 fi
 
 if [[ ! -d "$BUILT_APP" ]]; then
