@@ -5,6 +5,8 @@ import type { ProfileKind, SignalRule } from '../../types/models';
 export interface RecommendedStrategy {
   id: string;
   label: string;
+  /** 프로필 이름 등에 붙이는 짧은 이름 */
+  short: string;
   kind: ProfileKind;
   summary: string;
   patch: Partial<SignalRule>;
@@ -32,6 +34,7 @@ export const RECOMMENDED_STRATEGIES: RecommendedStrategy[] = [
   {
     id: 'general',
     label: '일반 (개별 주식·일반 ETF)',
+    short: '일반',
     kind: 'standard',
     summary: '가격 신호와 지표 확인이 2개 이상 겹칠 때만 매수, 과열·고평가가 겹칠 때 분할 익절, 위험은 하나만 걸려도 알림',
     patch: {
@@ -55,6 +58,7 @@ export const RECOMMENDED_STRATEGIES: RecommendedStrategy[] = [
   {
     id: 'dividend-hold',
     label: '배당 장기보유',
+    short: '배당 장기보유',
     kind: 'dividend',
     summary: '배당수익률 확대·저점 반등·저PBR 중 하나만 보여도 매수를 검토하고, 수익률 압축이나 배당 삭감·대폭락 때만 매도를 알립니다.',
     patch: {
@@ -73,6 +77,7 @@ export const RECOMMENDED_STRATEGIES: RecommendedStrategy[] = [
   {
     id: 'growth-short',
     label: '성장주 단기',
+    short: '성장주 단기',
     kind: 'standard',
     summary: '과매도 지표와 이평선 회복·고점 대비 반등이 2개 이상 겹칠 때 매수, 과열 지표나 고점 하락 시 빠르게 익절·손절을 검토합니다.',
     patch: {
@@ -93,6 +98,7 @@ export const RECOMMENDED_STRATEGIES: RecommendedStrategy[] = [
   {
     id: 'covered-call-income',
     label: '커버드콜·인컴 ETF',
+    short: '커버드콜·인컴',
     kind: 'dividend',
     summary: '분배금 중심 ETF용: 분배율이 높아지면 매수, 낮아지면 익절을 검토하고 단기 급락이나 장기 정체(시간 손절)만 위험으로 봅니다.',
     patch: {
@@ -105,9 +111,26 @@ export const RECOMMENDED_STRATEGIES: RecommendedStrategy[] = [
       sell_risk_min_count: 1,
     },
   },
+  {
+    id: 'index-accumulate',
+    label: '지수 ETF 적립',
+    short: '지수 적립',
+    kind: 'standard',
+    summary: 'S&P 500·나스닥 100·코스피 200 같은 시장 지수 ETF용: 고점 대비 하락 후 반등·200일선 근처 반등·과매도·마지막 매수가 대비 하락 중 하나만 보여도 추가 매수를 검토하고, 매도는 큰 폭락만 알립니다.',
+    patch: {
+      from_high_enabled: true, from_high_mode: 'rebound', from_high_pct: -10,
+      below_ma_enabled: true, below_ma_mode: 'rebound', below_ma_pct: -5,
+      rsi_buy_enabled: true, rsi_buy_level: 30,
+      last_buy_dip_enabled: true, last_buy_dip_pct: -7,
+      buy_mode: 'any', buy_min_count: 0,
+      sell_profit_min_count: 1,
+      crash_enabled: true, crash_pct: -35,
+      sell_risk_min_count: 1,
+    },
+  },
 ];
 
-export const INCOME_STRATEGY = RECOMMENDED_STRATEGIES[3];
+export const INCOME_STRATEGY = RECOMMENDED_STRATEGIES.find((r) => r.id === 'covered-call-income')!;
 export const INCOME_PROFILE_NAME = '커버드콜·인컴 ETF';
 export const INCOME_PROFILE_DESC = '커버드콜·월배당 등 분배금 중심 ETF용 (배당수익률 압축·확대, 단기 급락, 시간 손절)';
 

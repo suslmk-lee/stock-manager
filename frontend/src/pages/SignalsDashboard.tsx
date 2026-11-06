@@ -240,6 +240,7 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
                     setTab('overview');
                     load(false);
                   }}
+                  onProfileSaved={() => load(false)}
                 />
               ) : (
                 <p className="py-16 text-center text-sm text-zinc-400">왼쪽 목록에서 종목을 고르세요.</p>

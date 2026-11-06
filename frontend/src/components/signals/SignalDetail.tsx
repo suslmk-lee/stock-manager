@@ -3,13 +3,15 @@ import SignalHistory from '../alerts/SignalHistory';
 import ProfileChip from './ProfileChip';
 import PriceChart from './PriceChart';
 import SignalRuleEditor from './SignalRuleEditor';
+import StrategyAdvisor from './StrategyAdvisor';
 import { ACTION_META, SignalCard, actionLabelOf } from './SignalCard';
 
-export type DetailTab = 'overview' | 'rule' | 'history';
+export type DetailTab = 'overview' | 'rule' | 'advice' | 'history';
 
 const TABS: { id: DetailTab; label: string }[] = [
   { id: 'overview', label: '개요' },
   { id: 'rule', label: '규칙' },
+  { id: 'advice', label: '전략 추천' },
   { id: 'history', label: '이력' },
 ];
 
@@ -22,10 +24,12 @@ interface SignalDetailProps {
   onTab: (t: DetailTab) => void;
   /** 규칙을 저장했을 때 (신호를 다시 계산해 불러온다) */
   onRuleSaved: () => void;
+  /** 추천 전략을 프로필로 저장했을 때 (탭은 그대로 두고 신호만 다시 불러온다) */
+  onProfileSaved: () => void;
 }
 
-/** 매매 신호 상세 패널: 개요(가격 차트 + 카드 본문) · 규칙(종목별 전략 편집) · 이력 */
-export default function SignalDetail({ item, rule, assetRule, profiles, tab, onTab, onRuleSaved }: SignalDetailProps) {
+/** 매매 신호 상세 패널: 개요(가격 차트 + 카드 본문) · 규칙(종목별 전략 편집) · 전략 추천 · 이력 */
+export default function SignalDetail({ item, rule, assetRule, profiles, tab, onTab, onRuleSaved, onProfileSaved }: SignalDetailProps) {
   const meta = ACTION_META[item.action];
   const accountCount = item.accounts.length;
 
@@ -90,6 +94,12 @@ export default function SignalDetail({ item, rule, assetRule, profiles, tab, onT
           ) : (
             <p className="py-10 text-center text-sm text-zinc-400">전략 프로필을 불러오지 못해 규칙을 편집할 수 없습니다.</p>
           )}
+        </div>
+      )}
+
+      {tab === 'advice' && (
+        <div role="tabpanel">
+          <StrategyAdvisor key={item.asset_id} item={item} profiles={profiles} assetRule={assetRule} onSaved={onProfileSaved} />
         </div>
       )}
 

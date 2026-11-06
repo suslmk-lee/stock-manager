@@ -720,6 +720,22 @@ function countText(req: number, on: number): string {
   return on > 1 && req >= on ? '모두' : `${req}개 이상`;
 }
 
+/** 저장된 규칙을 "매도 검토 / 매수 검토" 두 문장으로 요약한다 (전략 추천 미리보기용) */
+export function describeRule(rule: SignalRule): { sell: string; buy: string } {
+  return summarize(toDraft(rule));
+}
+
+/** 켜진 조건을 그룹별로 "이름 (기준 값)" 목록으로 (전략 추천 미리보기용) */
+export function listRuleConditions(rule: SignalRule): { profit: string[]; risk: string[]; buy: string[] } {
+  const d = toDraft(rule);
+  // 단위가 숫자에 바로 붙는 접미사 (% · σ · 일 · 배 · 주)
+  const tight = /^[%σ일배주]/;
+  const fmt = (def: RuleDef) =>
+    `${def.label} (${def.fields.map((f) => `${f.label} ${fmtNum(d.nums[f.key])}${tight.test(f.suffix) ? '' : ' '}${f.suffix}`).join(', ')})`;
+  const pick = (defs: RuleDef[]) => defs.filter((def) => d.flags[def.enabled]).map(fmt);
+  return { profit: pick(SELL_PROFIT_RULES), risk: pick(SELL_RISK_RULES), buy: pick(BUY_RULES) };
+}
+
 // 현재 편집 중인 값으로 전략을 두 문장으로 요약한다
 function summarize(d: Draft): { sell: string; buy: string } {
   const profitOn = enabledProfitCount(d);
