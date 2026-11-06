@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import { getAccountTypeMeta } from '../utils/accountType';
-import { ArrowLeft, Wallet, Lock, TrendingUp } from 'lucide-react';
+import { Wallet, Lock, TrendingUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import TotalReturnByAsset from './TotalReturnByAsset';
 import AssetDetailView from './AssetDetailView';
@@ -11,7 +11,8 @@ import { useThemeColors } from '../appearance/AppearanceContext';
 
 interface AccountDashboardProps {
   account: Account;
-  onBack: () => void;
+  /** 머리글 오른쪽 버튼 (수정·삭제 등) */
+  actions?: ReactNode;
 }
 
 const formatKRW = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
@@ -21,7 +22,8 @@ const compactKRW = (v: number) => {
   return `₩${Math.round(v).toLocaleString('ko-KR')}`;
 };
 
-export default function AccountDashboard({ account, onBack }: AccountDashboardProps) {
+// 계좌 상세 (계좌 관리의 오른쪽 패널): 평가금 추세 + 종목별 실질 손익
+export default function AccountDashboard({ account, actions }: AccountDashboardProps) {
   const tc = useThemeColors();
   const [trend, setTrend] = useState<{ label: string; value: number }[]>([]);
   const [trendLoading, setTrendLoading] = useState(true);
@@ -61,28 +63,29 @@ export default function AccountDashboard({ account, onBack }: AccountDashboardPr
   return (
     <div>
       {/* 헤더 */}
-      <div className="hero-grain p-4 sm:p-6 mb-6">
-        <button onClick={onBack} className="btn-ghost !px-3 !py-1.5 mb-4">
-          <ArrowLeft className="w-4 h-4" /> 계좌 목록
-        </button>
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <IconTile icon={Wallet} tone="mint" className="shrink-0" />
           <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl font-light tracking-tight text-white truncate">{account.name}</h2>
-            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+            <h2 className="truncate text-xl font-semibold tracking-tight text-white">{account.name}</h2>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="chip">{account.broker}</span>
               <span className="chip">{account.market_type === 'Domestic' ? '국내' : '해외'}</span>
               <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${getAccountTypeMeta(account).badgeClass}`}>
                 {getAccountTypeMeta(account).restricted && <Lock className="w-3 h-3" />}
                 {getAccountTypeMeta(account).short}
               </span>
+              <span className="chip">{account.currency}</span>
+              {account.account_number && <span className="label-mono">{account.account_number}</span>}
             </div>
           </div>
         </div>
-      </div>
+        {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
+      </header>
+      {account.description && <p className="-mt-2 mb-5 text-sm text-zinc-400">{account.description}</p>}
 
       {/* 평가금 추세 */}
-      <div className="surface p-4 sm:p-6 mb-6">
+      <div className="surface-inset p-4 sm:p-5 mb-5">
         <div className="flex items-center gap-3 mb-4">
           <IconTile icon={TrendingUp} tone="mint" size="sm" />
           <p className="section-title">평가금 추세</p>
