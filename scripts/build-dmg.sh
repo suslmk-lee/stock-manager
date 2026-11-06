@@ -45,14 +45,6 @@ if [[ $SKIP_BUILD -eq 0 ]]; then
     echo "wails CLI 가 없습니다: go install github.com/wailsapp/wails/v2/cmd/wails@latest" >&2
     exit 1
   fi
-  # Wails 는 build/darwin/Info.plist 가 있으면 다시 만들지 않는다.
-  # 예전 wails.json 설명의 '&' 때문에 깨진 채 남아 있으면 지워서 새로 만들게 한다.
-  for plist in build/darwin/Info.plist build/darwin/Info.dev.plist; do
-    if [[ -f "$plist" ]] && ! plutil -lint -s "$plist" >/dev/null 2>&1; then
-      echo "깨진 $plist 를 지우고 wails.json 기준으로 다시 만듭니다"
-      rm -f "$plist"
-    fi
-  done
   wails build -platform "$PLATFORM"
 fi
 
@@ -61,9 +53,10 @@ if [[ ! -d "$BUILT_APP" ]]; then
   exit 1
 fi
 
-# 앱 정보와 서명이 정상인지 확인 (Info.plist 가 깨지면 서명이 번들이 아닌 실행 파일에만 붙는다)
+# 앱 정보와 서명이 정상인지 확인 (Info.plist 가 깨지면 아이콘이 안 나오고 서명이 번들이 아닌 실행 파일에만 붙는다)
+# build/darwin/Info.plist 는 Wails 가 값을 채워 넣는 템플릿({{...}})이라 검사 대상이 아니다. 완성된 앱의 것을 본다.
 if ! plutil -lint -s "$BUILT_APP/Contents/Info.plist" >/dev/null; then
-  echo "$BUILT_APP/Contents/Info.plist 형식이 잘못됐습니다 (wails.json 의 info 값에 & 같은 문자가 있는지 확인)" >&2
+  echo "$BUILT_APP/Contents/Info.plist 형식이 잘못됐습니다 (wails.json 의 info 값에 & 같은 XML 특수문자가 있는지 확인)" >&2
   exit 1
 fi
 codesign --verify --deep --strict "$BUILT_APP"
