@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Menu } from 'lucide-react';
 import AppearanceSettings from './components/settings/AppearanceSettings';
 import App from './App';
@@ -37,7 +37,20 @@ export default function Dashboard() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [leadSlot, setLeadSlot] = useState<HTMLDivElement | null>(null);
   const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const { focusRequest } = useAlerts();
+
+  // 상단 바 높이를 CSS 변수로 알려 준다 (목록-상세 패널이 남은 창 높이를 채울 때 쓴다)
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const update = () => root.style.setProperty('--app-header-h', `${el.offsetHeight}px`);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // 768px 미만은 서랍 메뉴, 1280px 이하는 기본으로 아이콘 레일
   const mobile = useMediaQuery('(max-width: 767px)');
@@ -113,16 +126,17 @@ export default function Dashboard() {
 
         {/* 상단 바: 페이지 제목 + 페이지 도구(PageActions 포털) + 알림.
             모바일은 도구가 여러 줄로 늘어나므로 고정 바에는 제목만 두고 도구 줄은 아래로 내려 함께 스크롤되게 한다. */}
-        <header className="app-header sticky top-0 z-20 border-b border-white/[0.07] backdrop-blur-xl">
-          <div className="mx-auto flex min-h-14 max-w-screen-2xl items-center gap-x-3 px-4 py-2.5 sm:px-6">
+        <header ref={headerRef} className="app-header sticky top-0 z-20 border-b border-white/[0.07] backdrop-blur-xl">
+          {/* 데스크톱에서 도구가 한 줄에 다 안 들어가면 오른쪽 묶음이 다음 줄로 내려간다 (높이는 --app-header-h 로 전달) */}
+          <div className={`mx-auto flex min-h-14 max-w-screen-2xl items-center gap-x-3 px-4 py-2.5 sm:px-6 ${mobile ? '' : 'flex-wrap gap-y-2'}`}>
             {mobile && (
               <button type="button" className="btn-icon !h-9 !w-9 shrink-0" onClick={() => setMobileOpen(true)} aria-label="메뉴 열기">
                 <Menu className="h-4 w-4" />
               </button>
             )}
-            <h1 className="truncate text-lg font-semibold tracking-tight text-white">{current.title}</h1>
+            <h1 className={`text-lg font-semibold tracking-tight text-white ${mobile ? 'min-w-0 truncate' : 'shrink-0 whitespace-nowrap'}`}>{current.title}</h1>
             {!mobile && <div ref={setLeadSlot} className="flex min-w-0 flex-wrap items-center gap-2 empty:hidden" />}
-            <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className={`ml-auto flex items-center gap-2 ${mobile ? 'shrink-0' : 'flex-wrap justify-end'}`}>
               {!mobile && <div ref={setActionsSlot} className="flex flex-wrap items-center justify-end gap-2 empty:hidden" />}
               <AlertsBell />
             </div>
