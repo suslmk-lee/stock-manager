@@ -20,7 +20,8 @@ permissions:
 
 jobs:
   macos:
-    runs-on: macos-14
+    # 특정 버전(macos-14 등)은 GitHub 가 지원을 끝내면 작업이 바로 취소되므로 최신 이미지를 쓴다
+    runs-on: macos-latest
     timeout-minutes: 30
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
