@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { PageActions } from './shell/PageSlots';
 import { apiClient } from '../api/client';
 import { Asset, Account, TickerInfo, Holding } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
@@ -300,16 +301,15 @@ export default function AssetManager() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold tracking-tight text-white">주식/ETF 관리</h2>
+      <PageActions>
         <button
           onClick={() => setShowForm(!showForm)}
           className="btn-primary flex items-center gap-2 px-4 py-2"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
           자산 추가
         </button>
-      </div>
+      </PageActions>
 
       {/* 검색 바 */}
       <div className="mb-6">

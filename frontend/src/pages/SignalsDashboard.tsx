@@ -1,10 +1,10 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Radar, RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck, MinusCircle, Scissors, ShoppingCart, LayoutGrid, Layers } from 'lucide-react';
+import { PageActions } from '../components/shell/PageSlots';
+import { RefreshCw, SlidersHorizontal, Lock, ChevronDown, Settings2, Bell, Coins, ShieldCheck, MinusCircle, Scissors, ShoppingCart, LayoutGrid, Layers } from 'lucide-react';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import SignalHistory from '../components/alerts/SignalHistory';
 import { apiClient } from '../api/client';
 import { SignalAction, SignalCheck, SignalItem, SignalMode, SignalProfile, SignalReport, SignalRule, SignalRulesResponse, SignalTaxSummary } from '../types/models';
-import IconTile from '../components/ui/IconTile';
 import RingGauge from '../components/ui/RingGauge';
 import Chip from '../components/ui/Chip';
 import CountUp from '../components/CountUp';
@@ -790,32 +790,23 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
 
   return (
     <div>
-      <div className="mb-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-3">
-          <IconTile icon={Radar} tone="mint" />
-          <div>
-            <h1 className="text-2xl font-light tracking-tight text-white sm:text-3xl">매매 신호</h1>
-            <p className="label-mono mt-0.5">규칙 기반 · 매도 / 매수 검토 알림</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="btn-ghost" onClick={openSettings}>
-            <Bell className="h-4 w-4" />
-            알림 설정
-          </button>
-          <button type="button" className="btn-ghost" onClick={() => openCandidates()}>
-            <Coins className="h-4 w-4 text-sky-300" />
-            배당 종목 정리
-          </button>
-          <button type="button" className="btn-ghost" disabled={!profiles} onClick={() => setManagerOpen(true)}>
-            <SlidersHorizontal className="h-4 w-4" />
-            전략 프로필
-          </button>
-          <button type="button" className="btn-icon !h-9 !w-9" onClick={() => load(false)} disabled={refreshing} aria-label="새로고침" title="새로고침">
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
+      <PageActions lead={<span className="label-mono hidden sm:inline">규칙 기반 · 매도 / 매수 검토 알림</span>}>
+        <button type="button" className="btn-ghost" onClick={openSettings}>
+          <Bell className="h-4 w-4" />
+          알림 설정
+        </button>
+        <button type="button" className="btn-ghost" onClick={() => openCandidates()}>
+          <Coins className="h-4 w-4 text-sky-300" />
+          배당 종목 정리
+        </button>
+        <button type="button" className="btn-ghost" disabled={!profiles} onClick={() => setManagerOpen(true)}>
+          <SlidersHorizontal className="h-4 w-4" />
+          전략 프로필
+        </button>
+        <button type="button" className="btn-icon !h-9 !w-9" onClick={() => load(false)} disabled={refreshing} aria-label="새로고침" title="새로고침">
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
+      </PageActions>
 
       <p className="mb-6 text-xs leading-relaxed text-zinc-500">
         설정한 규칙에 따른 알림이며 투자 권유가 아닙니다.{' '}

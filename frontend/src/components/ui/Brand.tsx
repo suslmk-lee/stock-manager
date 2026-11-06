@@ -1,7 +1,15 @@
 import { useId } from 'react';
 
-// 상단 브랜드: 막대 + 상승선 마크와 두 굵기 워드마크 (테마 색을 따른다)
-export default function Brand() {
+// 브랜드: 막대 + 상승선 마크와 두 굵기 워드마크 (테마 색을 따른다)
+// wordmark: responsive = 좁은 화면(440px 미만)에서 숨김, show = 항상 표시, hide = 마크만
+// tagline: 워드마크 아래 "Portfolio · Dividend" 줄 (좁은 사이드바에서는 끈다)
+export default function Brand({
+  wordmark = 'responsive',
+  tagline = true,
+}: {
+  wordmark?: 'responsive' | 'show' | 'hide';
+  tagline?: boolean;
+}) {
   // useId 의 ':' 는 일부 WebKit 에서 url(#…) 참조를 깨뜨리므로 뺀다
   const gid = `brand-${useId().replace(/:/g, '')}`;
   return (
@@ -26,12 +34,14 @@ export default function Brand() {
         />
         <circle cx="28.5" cy="3.5" r="2.2" style={{ fill: 'rgb(var(--c-white))' }} />
       </svg>
-      <div className="hidden leading-none min-[440px]:block">
-        <div className="whitespace-nowrap text-[17px] tracking-tight text-white">
-          <span className="font-semibold">Stock</span> <span className="font-light text-zinc-400">Manager</span>
+      {wordmark !== 'hide' && (
+        <div className={`leading-none ${wordmark === 'responsive' ? 'hidden min-[440px]:block' : ''}`}>
+          <div className="whitespace-nowrap text-[17px] tracking-tight text-white">
+            <span className="font-semibold">Stock</span> <span className="font-light text-zinc-400">Manager</span>
+          </div>
+          {tagline && <div className="label-mono mt-1.5 !text-[10px] uppercase tracking-[0.2em]">Portfolio · Dividend</div>}
         </div>
-        <div className="label-mono mt-1.5 !text-[10px] uppercase tracking-[0.2em]">Portfolio · Dividend</div>
-      </div>
+      )}
     </div>
   );
 }

@@ -32,8 +32,9 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:  "Stock Manager",
-		Width:  1280,
-		Height: 1360,
+		// 기본 창: 사이드바 + 목록 + 상세 3단 배치를 기준으로 1440×900
+		Width:  1440,
+		Height: 900,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

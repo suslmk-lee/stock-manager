@@ -194,6 +194,39 @@ body {
     background: var(--header-bg, rgb(var(--c-ink-950) / 0.7));
   }
 
+  /* 왼쪽 사이드바 (components/shell/Sidebar.tsx) */
+  .app-sidebar {
+    background: var(--sidebar-bg, rgb(var(--c-ink-900) / 0.88));
+    border-right: 1px solid rgb(var(--c-white) / 0.07);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .nav-group-label {
+    @apply mb-1.5 mt-5 px-2.5 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-600;
+  }
+  .nav-item {
+    @apply relative flex h-9 w-full items-center gap-2.5 px-2.5 text-left text-sm text-zinc-400 transition-colors;
+    border-radius: var(--input-radius);
+    border: 1px solid transparent;
+  }
+  .nav-item:hover {
+    @apply text-zinc-100;
+    background: rgb(var(--c-white) / 0.04);
+  }
+  .nav-item:focus-visible {
+    outline: 2px solid rgb(var(--c-mint-400) / 0.6);
+    outline-offset: 1px;
+  }
+  .nav-item-active,
+  .nav-item-active:hover {
+    @apply text-white;
+    background: rgb(var(--c-mint-400) / 0.1);
+    border-color: rgb(var(--c-mint-400) / 0.28);
+  }
+  .nav-item-active .nav-item-icon {
+    @apply text-mint-400;
+  }
+
   /* 버튼: 주 행동 */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-all disabled:opacity-50;

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { PageActions } from './components/shell/PageSlots';
 import { apiClient } from './api/client';
 import { Account, AccountType } from './types/models';
 import { Plus, Trash2, Wallet, Pencil, Lock } from 'lucide-react';
@@ -243,22 +244,15 @@ function App() {
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3 min-w-0">
-          <IconTile icon={Wallet} tone="mint" />
-          <div className="min-w-0">
-            <h2 className="text-2xl font-light tracking-tight text-white">계좌 관리</h2>
-            <p className="label-mono">{accounts.length} accounts</p>
-          </div>
-        </div>
+      <PageActions lead={<span className="label-mono">{accounts.length}개 계좌</span>}>
         <button
           onClick={handleToggleCreateForm}
           className="btn-primary shrink-0"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
           계좌 추가
         </button>
-      </div>
+      </PageActions>
 
         {error && (
           <div className="rounded-2xl border border-rose-400/25 bg-rose-500/10 text-rose-200 text-sm px-4 py-3 mb-6">

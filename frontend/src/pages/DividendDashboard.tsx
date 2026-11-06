@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { PageActions } from '../components/shell/PageSlots';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import DividendChart from '../components/DividendChart';
@@ -7,8 +8,7 @@ import AssetStatistics from '../components/AssetStatistics';
 import MonthlyAssetTrend from '../components/MonthlyAssetTrend';
 import TotalReturnByAsset from '../components/TotalReturnByAsset';
 import AssetDetailView from '../components/AssetDetailView';
-import IconTile from '../components/ui/IconTile';
-import { DollarSign, Filter } from 'lucide-react';
+import { Filter } from 'lucide-react';
 import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
 
 const LIQUIDITY_OPTIONS: { value: LiquidityFilter; label: string }[] = [
@@ -54,15 +54,7 @@ export default function DividendDashboard() {
 
   return (
     <div>
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <IconTile icon={DollarSign} tone="mint" />
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-white">배당금 대시보드</h1>
-            <p className="label-mono mt-0.5">자산 · 수익 · 배당 현황</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <PageActions lead={<span className="label-mono hidden sm:inline">자산 · 수익 · 배당 현황</span>}>
           <div className="glass-pill flex p-1" role="group" aria-label="계좌 유형">
             {LIQUIDITY_OPTIONS.map((opt) => (
               <button
@@ -96,8 +88,7 @@ export default function DividendDashboard() {
             <Filter className="w-4 h-4" />
             필터
           </button>
-        </div>
-      </div>
+      </PageActions>
 
       {showFilters && (
         <div className="surface p-5 sm:p-6 mb-6">

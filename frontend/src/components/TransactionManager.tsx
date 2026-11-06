@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { PageActions } from './shell/PageSlots';
 import { apiClient } from '../api/client';
 import { Account, Asset, Transaction, Holding, RealizedPnL, TickerInfo, PricePoint, PriceHistory } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
@@ -608,18 +609,18 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
 
   return (
     <div>
-      {/* 헤더 */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="text-2xl font-semibold tracking-tight text-white">매매 관리</h2>
+      {/* 헤더: 계좌 선택은 제목 옆, 동작 버튼은 상단 바 오른쪽 */}
+      <PageActions
+        lead={
           <select
+            aria-label="계좌"
             value={selectedAccount}
             onChange={(e) => {
               const id = Number(e.target.value);
               setSelectedAccount(id);
               onAccountChange?.(id);
             }}
-            className="input-field w-auto px-3 py-2 text-sm"
+            className="input-field !w-auto !py-1.5 px-3 text-sm"
           >
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
@@ -627,30 +628,29 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               </option>
             ))}
           </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              resetAssetForm();
-              setShowAssetForm(true);
-            }}
-            className="btn-ghost flex items-center gap-2 px-4 py-2"
-          >
-            <Plus className="w-5 h-5" />
-            자산 추가
-          </button>
-          <button
-            onClick={() => {
-              resetForm();
-              setShowForm(true);
-            }}
-            className="btn-primary flex items-center gap-2 px-4 py-2"
-          >
-            <Plus className="w-5 h-5" />
-            거래 기록
-          </button>
-        </div>
-      </div>
+        }
+      >
+        <button
+          onClick={() => {
+            resetAssetForm();
+            setShowAssetForm(true);
+          }}
+          className="btn-ghost flex items-center gap-2 px-4 py-2"
+        >
+          <Plus className="w-4 h-4" />
+          자산 추가
+        </button>
+        <button
+          onClick={() => {
+            resetForm();
+            setShowForm(true);
+          }}
+          className="btn-primary flex items-center gap-2 px-4 py-2"
+        >
+          <Plus className="w-4 h-4" />
+          거래 기록
+        </button>
+      </PageActions>
 
       {error && (
         <div className="bg-rose-500/10 border border-rose-400/30 text-rose-200 px-4 py-3 rounded-2xl mb-6">{error}</div>

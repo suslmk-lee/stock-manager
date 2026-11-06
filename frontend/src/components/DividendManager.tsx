@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { PageActions } from './shell/PageSlots';
 import { apiClient } from '../api/client';
 import { Account, Asset, Dividend, Transaction } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
@@ -406,13 +407,10 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-          <div className="flex items-center gap-3">
-            <IconTile icon={DollarSign} tone="mint" />
-            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">배당금 관리</h2>
-          </div>
+      <PageActions
+        lead={
           <select
+            aria-label="계좌"
             value={selectedAccount}
             onChange={(e) => {
               const accountId = Number(e.target.value);
@@ -421,7 +419,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 onAccountChange(accountId);
               }
             }}
-            className="input-field sm:!w-auto"
+            className="input-field !w-auto !py-1.5 px-3 text-sm"
           >
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -429,7 +427,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
               </option>
             ))}
           </select>
-        </div>
+        }
+      >
         <button
           onClick={() => {
             if (!showForm) {
@@ -447,12 +446,12 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
             }
             setShowForm(!showForm);
           }}
-          className="btn-primary w-full sm:w-auto"
+          className="btn-primary"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
           배당금 기록
         </button>
-      </div>
+      </PageActions>
 
       {error && (
         <div className={`px-4 py-3 rounded-2xl mb-6 flex items-start justify-between gap-2 ${
