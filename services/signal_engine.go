@@ -281,12 +281,23 @@ func CurrencyForTicker(ticker string) string {
 	return "USD"
 }
 
-func toKRW(amount float64, currency, ticker string, usdKRW float64) float64 {
+// ResolveCurrency 는 기록된 통화와 티커로 금액의 실제 통화를 정한다.
+// 국내 상장(.KS/.KQ) 종목은 기록된 통화와 관계없이 원화로 본다. 과거에 계좌 통화(USD)로
+// 잘못 저장된 실현손익이 있어, 그대로 쓰면 원화 금액에 환율이 곱해져 크게 부풀기 때문이다.
+// 그 밖에는 기록된 통화를 따르고, 비어 있으면 티커로 추정한다.
+func ResolveCurrency(currency, ticker string) string {
+	if CurrencyForTicker(ticker) == "KRW" {
+		return "KRW"
+	}
 	c := strings.ToUpper(strings.TrimSpace(currency))
 	if c == "" {
-		c = CurrencyForTicker(ticker)
+		return CurrencyForTicker(ticker)
 	}
-	if c == "USD" {
+	return c
+}
+
+func toKRW(amount float64, currency, ticker string, usdKRW float64) float64 {
+	if ResolveCurrency(currency, ticker) == "USD" {
 		return amount * usdKRW
 	}
 	return amount
@@ -576,11 +587,7 @@ func computeFxMetrics(item *SignalItem, in SignalAssetInput, priceCur string, us
 		return usdKRW
 	}
 	conv := func(amount float64, cur string, t time.Time) float64 {
-		c := strings.ToUpper(strings.TrimSpace(cur))
-		if c == "" {
-			c = CurrencyForTicker(in.Ticker)
-		}
-		if c == "USD" {
+		if ResolveCurrency(cur, in.Ticker) == "USD" {
 			return amount * fxAt(t)
 		}
 		return amount

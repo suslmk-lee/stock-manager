@@ -35,6 +35,10 @@ func TestComputeOverseasTax(t *testing.T) {
 		{"ISA excluded", []TaxPnL{{kd(2026, 3, 1, 10), 1000, "USD", "AAPL", models.AccountTypeISA}}, fx1300, now, 10, 0, 0, 0, 2_500_000, 0, 0, true},
 		{"pension excluded", []TaxPnL{{kd(2026, 3, 1, 10), 1000, "USD", "AAPL", models.AccountTypePension}}, fx1300, now, 10, 0, 0, 0, 2_500_000, 0, 0, true},
 		{"domestic ETF excluded", []TaxPnL{{kd(2026, 3, 1, 10), 5_000_000, "KRW", "069500.KS", G}}, fx1300, now, 10, 0, 0, 0, 2_500_000, 0, 0, true},
+		// 해외 계좌에서 판 국내 상장 ETF 가 통화 USD 로 잘못 저장된 경우: 원화 손익에 환율을 곱하면 안 된다
+		{"domestic ETF recorded as USD excluded", []TaxPnL{
+			{kd(2026, 3, 5, 10), 24_738, "USD", "379800.KS", G},
+			{kd(2026, 3, 5, 10), 1000, "USD", "AAPL", G}}, fx1300, now, 10, 1_300_000, 0, 1_300_000, 1_200_000, 0, 1, true},
 		{"empty currency falls back to ticker", []TaxPnL{
 			{kd(2026, 3, 1, 10), 1000, "", "AAPL", G},
 			{kd(2026, 3, 1, 10), 9_000_000, "", "069500.KS", G}}, fx1300, now, 10, 1_300_000, 0, 1_300_000, 1_200_000, 0, 1, true},
