@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, ChevronDown, Coins, Info, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { Bell, Coins, Info, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { PageActions } from '../components/shell/PageSlots';
 import SplitView from '../components/shell/SplitView';
 import { useAlerts } from '../components/alerts/AlertsProvider';
@@ -9,7 +9,8 @@ import { SignalItem, SignalProfile, SignalReport, SignalRule, SignalRulesRespons
 import ProfileManager from '../components/signals/ProfileManager';
 import SignalList, { sortItems, type SortKey, type SortState } from '../components/signals/SignalList';
 import SignalDetail, { type DetailTab } from '../components/signals/SignalDetail';
-import { type FilterValue, TaxPanel, fmtKrw, fmtNum } from '../components/signals/SignalCard';
+import { type FilterValue } from '../components/signals/SignalCard';
+import TaxPill from '../components/signals/TaxPill';
 
 // 이미 처리한 포커스 요청 (페이지를 다시 열어도 재실행하지 않도록)
 let handledFocusNonce = 0;
@@ -54,7 +55,6 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
   const [tab, setTab] = useState<DetailTab>('overview');
   const [split, setSplit] = useState<boolean | null>(null); // null = 아직 화면 폭을 재지 않음
   const [flashId, setFlashId] = useState<number | null>(null);
-  const [taxOpen, setTaxOpen] = useState<boolean | null>(null);
   const [managerOpen, setManagerOpen] = useState(false);
 
   const changeSort = (s: SortState) => {
@@ -161,9 +161,6 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
     rules?.overrides?.find((o) => o.asset_id === item.asset_id) ?? profiles?.find((p) => p.id === item.profile_id)?.rule ?? rules?.default;
 
   const tax = report?.tax;
-  const showTax = !!tax && (taxOpen ?? !!tax.harvest_window); // 연말 절세 구간에는 처음부터 펼친다
-  const taxExemption = tax ? tax.exemption_krw || 2500000 : 0;
-  const taxUsedPct = tax ? (Math.max(tax.net_krw, 0) / taxExemption) * 100 : 0;
   const basisNote = items.some((i) => i.return_basis === 'fx')
     ? '수익률은 배당·실현손익 포함, 매수 시점 환율 원화 기준(거래 기록이 없는 수량은 현재 환율).'
     : '수익률은 배당·실현손익 포함, 현재 환율 원화 기준.';
@@ -173,20 +170,7 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
       <span className="text-zinc-500" title={`설정한 규칙에 따른 알림이며 투자 권유가 아닙니다.\n${basisNote}`} aria-label="안내">
         <Info className="h-4 w-4" />
       </span>
-      {tax && (
-        <button
-          type="button"
-          onClick={() => setTaxOpen(!showTax)}
-          aria-expanded={showTax}
-          className="glass-pill inline-flex h-8 items-center gap-2 whitespace-nowrap px-3 text-xs text-zinc-300 transition-colors hover:text-white"
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${taxUsedPct > 100 ? 'bg-amber-400' : 'bg-mint-400'}`} />
-          양도세 공제 <span className={`num ${taxUsedPct > 100 ? 'text-amber-300' : 'text-mint-300'}`}>{fmtNum(taxUsedPct, 0)}%</span>
-          <span className="text-zinc-600">·</span>
-          예상 <span className={`num ${tax.estimated_tax_krw > 0 ? 'text-rose-300' : 'text-zinc-200'}`}>{fmtKrw(tax.estimated_tax_krw)}</span>
-          <ChevronDown className={`h-3.5 w-3.5 text-zinc-500 transition-transform ${showTax ? 'rotate-180' : ''}`} />
-        </button>
-      )}
+      {tax && <TaxPill tax={tax} />}
     </>
   );
 
@@ -219,8 +203,6 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
           </button>
         </div>
       )}
-
-      {showTax && tax && <TaxPanel tax={tax} />}
 
       {loading ? (
         <div className="surface h-[calc(100vh-var(--app-header-h,56px)-3rem)] min-h-[520px] animate-pulse" />

@@ -155,12 +155,12 @@ export function Metric({ label, children, sub }: { label: string; children: Reac
 
 const TAX_RATE_NOTE = '일반(위탁) 계좌의 해외 상장 종목 기준 · 22% · 참고용';
 
-export function TaxPanel({ tax }: { tax: SignalTaxSummary }) {
+export function TaxPanel({ tax, className = 'surface mb-6 p-4 sm:p-5' }: { tax: SignalTaxSummary; className?: string }) {
   const exemption = tax.exemption_krw || 2500000;
   const over = tax.net_krw > exemption;
   const pct = Math.max(0, Math.min(100, (Math.max(tax.net_krw, 0) / exemption) * 100));
   return (
-    <section className="surface mb-6 p-4 sm:p-5" aria-label="해외주식 양도세">
+    <section className={className} aria-label="해외주식 양도세">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-medium text-white">해외주식 양도세</h2>

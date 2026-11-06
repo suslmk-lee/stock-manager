@@ -30,6 +30,20 @@ function toSeries(h: PriceHistory | null): Point[] {
   return out;
 }
 
+/** lo~hi 를 덮는 보기 좋은 눈금 (1·2·5 × 10^n 간격) */
+export function niceTicks(lo: number, hi: number, count = 4): number[] {
+  if (!(hi > lo)) return [lo];
+  const raw = (hi - lo) / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const start = Math.floor(lo / step) * step;
+  const end = Math.ceil(hi / step) * step;
+  const ticks: number[] = [];
+  for (let v = start; v <= end + step / 2; v += step) ticks.push(Number(v.toPrecision(12)));
+  return ticks;
+}
+
 const monthLabel = (t: number) => `${new Date(t * 1000).getMonth() + 1}월`;
 const dayLabel = (t: number) => new Date(t * 1000).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
 
@@ -71,15 +85,14 @@ export default function PriceChart({ ticker, currency, avgPrice }: PriceChartPro
     };
   }, [ticker]);
 
-  const domain = useMemo<[number, number] | undefined>(() => {
+  // 세로축: 종가·200일선·평단을 모두 덮는 보기 좋은 눈금
+  const ticks = useMemo<number[] | undefined>(() => {
     if (!series || series.length === 0) return undefined;
     const vals = series.flatMap((p) => (p.ma200 ? [p.close, p.ma200] : [p.close]));
     if (avgPrice && avgPrice > 0) vals.push(avgPrice);
-    const lo = Math.min(...vals);
-    const hi = Math.max(...vals);
-    const pad = (hi - lo) * 0.08 || hi * 0.05;
-    return [lo - pad, hi + pad];
+    return niceTicks(Math.min(...vals), Math.max(...vals));
   }, [series, avgPrice]);
+  const domain: [number, number] | undefined = ticks && ticks.length > 1 ? [ticks[0], ticks[ticks.length - 1]] : undefined;
 
   const hasMa = !!series?.some((p) => p.ma200);
   const fmt = (v: number) => formatPrice(v, currency);
@@ -136,6 +149,8 @@ export default function PriceChart({ ticker, currency, avgPrice }: PriceChartPro
               <YAxis
                 orientation="right"
                 domain={domain}
+                ticks={ticks}
+                interval={0}
                 tickFormatter={fmt}
                 tick={{ fontSize: 10, fill: tc.axis, fontFamily: 'JetBrains Mono, monospace' }}
                 width={currency === 'USD' ? 58 : 72}
