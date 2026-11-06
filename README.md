@@ -167,8 +167,23 @@ wails dev
 
 # 프로덕션 빌드
 wails build
-# 실행파일: build/bin/stock-manager.exe
+# 실행파일: build/bin/stock-manager.exe (Windows) / build/bin/stock-manager.app (macOS)
 ```
+
+#### macOS 설치 파일(DMG) 만들기
+
+```bash
+scripts/build-dmg.sh              # 이 맥의 아키텍처(Apple Silicon 등)로 빌드
+scripts/build-dmg.sh --universal  # Apple Silicon + Intel 겸용
+scripts/build-dmg.sh --skip-build # build/bin 의 .app 으로 DMG 만 다시 만들기
+# 결과: build/bin/StockManager-<git 버전>-<아키텍처>.dmg
+```
+
+- DMG 를 열고 `Stock Manager` 를 `Applications` 로 끌어다 놓으면 설치됩니다.
+- 설치한 앱은 `~/Library/Application Support/StockManager/.env` 에서 DB 설정을 읽습니다 (아래 `.env` 탐색 순서 참고).
+- 서명은 Wails 의 자체(ad-hoc) 서명입니다. 다른 맥에서 내려받아 열면 "확인되지 않은 개발자" 경고가 뜨므로
+  처음 한 번은 앱을 Control-클릭 → 열기 하거나 `xattr -dr com.apple.quarantine "/Applications/Stock Manager.app"` 를 실행하세요.
+  경고 없이 배포하려면 Apple Developer ID 서명과 공증(notarization)이 필요합니다.
 
 **작동 방식:**
 
