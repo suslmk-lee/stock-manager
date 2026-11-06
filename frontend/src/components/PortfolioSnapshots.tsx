@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { PageActions } from './shell/PageSlots';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
@@ -160,17 +161,13 @@ export default function PortfolioSnapshots() {
 
   return (
     <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <IconTile icon={Camera} tone="mint" />
-          <h2 className="section-title !text-lg">포트폴리오 스냅샷</h2>
-        </div>
-        <div className="flex items-center gap-3">
+      <PageActions
+        lead={
           <select
+            aria-label="계좌"
             value={selectedAccount}
             onChange={(e) => setSelectedAccount(Number(e.target.value))}
-            className="input-field !w-auto !py-2"
+            className="input-field !w-auto !py-1.5 px-3 text-sm"
           >
             {accounts.map((acc) => (
               <option key={acc.id} value={acc.id}>
@@ -178,16 +175,17 @@ export default function PortfolioSnapshots() {
               </option>
             ))}
           </select>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="btn-primary"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? '기록 중...' : '이번달 기록'}
-          </button>
-        </div>
-      </div>
+        }
+      >
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="btn-primary"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? '기록 중...' : '이번달 기록'}
+        </button>
+      </PageActions>
 
       {snapshots.length === 0 ? (
         <div className="surface p-12 text-center">

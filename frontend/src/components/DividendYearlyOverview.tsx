@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
+import { PageActions } from './shell/PageSlots';
 import { apiClient } from '../api/client';
 import { Account, Dividend } from '../types/models';
-import IconTile from './ui/IconTile';
-import { Calendar, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import Portal from './ui/Portal';
 
 interface MonthlyData {
@@ -178,25 +178,20 @@ export default function DividendYearlyOverview() {
 
   return (
     <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <IconTile icon={Calendar} tone="mint" />
-          <h2 className="text-xl font-semibold tracking-tight text-white">연간 배당금 현황</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="label-mono">연도:</label>
+      <PageActions
+        lead={
           <select
+            aria-label="연도"
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="input-field !w-auto !py-2"
+            className="input-field !w-auto !py-1.5 px-3 text-sm"
           >
             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
               <option key={year} value={year}>{year}년</option>
             ))}
           </select>
-        </div>
-      </div>
+        }
+      />
 
       {/* 테이블 */}
       <div className="surface overflow-hidden">

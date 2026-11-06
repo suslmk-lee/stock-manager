@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { PageActions } from './shell/PageSlots';
+import SplitView from './shell/SplitView';
 import { apiClient } from '../api/client';
 import { Asset, Account, TickerInfo, Holding } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
@@ -46,6 +48,8 @@ export default function AssetManager() {
   const [addingHoldingForAsset, setAddingHoldingForAsset] = useState<number | null>(null);
   const [newHoldingData, setNewHoldingData] = useState({accountId: 0, quantity: '', averagePrice: ''});
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [split, setSplit] = useState<boolean | null>(null);
   const [formData, setFormData] = useState({
     ticker: '',
     name: '',
@@ -293,6 +297,16 @@ export default function AssetManager() {
       (asset.sector && asset.sector.toLowerCase().includes(query))
     );
   });
+  const selected = filteredAssets.find((a) => a.id === selectedId) ?? null;
+
+  // 넓은 화면은 항상 자산 하나를 보여 주고, 좁은 화면은 고를 때만 상세로 간다
+  const firstVisibleId = filteredAssets[0]?.id ?? null;
+  const selectedVisible = selected != null;
+  useEffect(() => {
+    if (split === null) return;
+    if (split && !selectedVisible && firstVisibleId != null) setSelectedId(firstVisibleId);
+    if (!split && selectedId != null && !selectedVisible) setSelectedId(null);
+  }, [split, selectedVisible, firstVisibleId, selectedId]);
 
   if (loading) {
     return <div className="text-center py-12 text-zinc-400">로딩 중...</div>;
@@ -300,43 +314,16 @@ export default function AssetManager() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold tracking-tight text-white">주식/ETF 관리</h2>
+      <PageActions>
         <button
           onClick={() => setShowForm(!showForm)}
           className="btn-primary flex items-center gap-2 px-4 py-2"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
           자산 추가
         </button>
-      </div>
+      </PageActions>
 
-      {/* 검색 바 */}
-      <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-zinc-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="티커, 이름, 섹터로 검색... (예: TI, Apple, Technology)"
-            className="input-field pl-10 pr-4 py-3"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-white"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-        {searchQuery && (
-          <p className="text-sm text-zinc-400 mt-2">
-            {filteredAssets.length}개의 자산이 검색되었습니다.
-          </p>
-        )}
-      </div>
 
       {error && (
         <div className="bg-rose-500/10 border border-rose-400/30 text-rose-200 px-4 py-3 rounded-2xl mb-6">
@@ -538,243 +525,280 @@ export default function AssetManager() {
         </Portal>
       )}
 
-      {/* 자산 목록 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {filteredAssets.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-zinc-400">
-            <TrendingUp className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 opacity-50" />
-            <p className="text-base sm:text-lg">등록된 자산이 없습니다.</p>
-            {searchQuery ? (
-              <p className="text-xs sm:text-sm mt-2">검색 조건을 변경해보세요.</p>
-            ) : (
-              <p className="text-xs sm:text-sm mt-2">위의 "자산 추가" 버튼을 눌러 주식/ETF를 등록하세요.</p>
-            )}
-          </div>
-        ) : (
-          filteredAssets.map((asset) => (
-            <div
-              key={asset.id}
-              className="surface p-4 hover:border-white/[0.2] transition-colors"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-white">{asset.name}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-mint-400/15 text-mint-300">
-                      {asset.type}
-                    </span>
-                  </div>
-                  <p className="text-sm text-zinc-400 mt-1">{asset.ticker}</p>
-                  {asset.sector && (
-                    <p className="text-xs text-zinc-500 mt-1">{asset.sector}</p>
-                  )}
+      {/* 자산 목록 + 상세 */}
+      {assets.length === 0 ? (
+        <div className="surface text-center py-12 text-zinc-400">
+          <TrendingUp className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 opacity-50" />
+          <p className="text-base sm:text-lg">등록된 자산이 없습니다.</p>
+          <p className="text-xs sm:text-sm mt-2">위의 "자산 추가" 버튼을 눌러 주식/ETF를 등록하세요.</p>
+        </div>
+      ) : (
+        <SplitView
+          listWidth={420}
+          onSplitChange={setSplit}
+          showDetail={selected != null}
+          onBack={() => setSelectedId(null)}
+          backLabel="자산 목록"
+          list={
+            <>
+              <div className="shrink-0 border-b border-white/[0.07] p-3 sm:p-4">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="티커, 이름, 섹터로 검색"
+                    aria-label="자산 검색"
+                    className="input-field !py-1.5 !pl-8 text-sm"
+                  />
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEditAsset(asset)}
-                    className="text-mint-400 hover:text-mint-300 transition-colors"
-                    title="수정"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteAsset(asset.id)}
-                    className="text-rose-400 hover:text-rose-300 transition-colors"
-                    title="삭제"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <p className="label-mono mt-2">
+                  {searchQuery ? `${filteredAssets.length}개 검색됨 · ` : ''}전체 {assets.length}개
+                </p>
               </div>
-              
-              {/* 가격 및 보유 정보 */}
-              <div className="mt-4 pt-4 border-t border-white/[0.08] space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-zinc-400">현재가</span>
-                  <div className="text-right">
-                    <span className="text-lg font-semibold text-white">
-                      ₩{asset.currentPrice?.toLocaleString('ko-KR', { maximumFractionDigits: 0 }) || '-'}
-                    </span>
-                    {asset.changePercent !== undefined && asset.changePercent !== 0 && (
-                      <span className={`ml-2 text-xs ${asset.changePercent > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {asset.changePercent > 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                {/* 계좌별 보유 내역 */}
-                <div className="mt-3 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <p className="text-xs text-zinc-500 font-medium">계좌별 보유 내역</p>
-                    <button
-                      onClick={() => {
-                        setAddingHoldingForAsset(asset.id);
-                        setNewHoldingData({accountId: 0, quantity: '', averagePrice: ''});
-                      }}
-                      className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
-                    >
-                      <Plus className="w-3 h-3" />
-                      추가
-                    </button>
-                  </div>
-                  
-                  {addingHoldingForAsset === asset.id && (
-                    <div className="bg-white/[0.04] rounded p-3 space-y-2">
-                      <div>
-                        <label className="field-label">계좌</label>
-                        <select
-                          value={newHoldingData.accountId}
-                          onChange={(e) => setNewHoldingData({...newHoldingData, accountId: Number(e.target.value)})}
-                          className="input-field w-full rounded px-2 py-1 text-xs"
-                        >
-                          <option value={0}>선택하세요</option>
-                          {accounts.map((account) => (
-                            <option key={account.id} value={account.id}>
-                              {accountTypePrefix(account)}{account.broker} ({account.name})
-                            </option>
-                          ))}
-                        </select>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {filteredAssets.length === 0 ? (
+                  <p className="px-4 py-12 text-center text-sm text-zinc-400">검색 조건과 일치하는 자산이 없습니다.</p>
+                ) : (
+                  filteredAssets.map((asset) => {
+                    const active = asset.id === selectedId;
+                    const held = (asset.holdings ?? []).reduce((s, h) => s + h.quantity, 0);
+                    return (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        onClick={() => setSelectedId(asset.id)}
+                        aria-current={active ? 'true' : undefined}
+                        className={`grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-white/[0.04] px-4 py-2.5 text-left transition-colors ${
+                          active ? 'bg-mint-400/[0.08] shadow-[inset_3px_0_0_rgb(var(--c-mint-400))]' : 'hover:bg-white/[0.03]'
+                        }`}
+                      >
+                        <span className="min-w-0">
+                          <span className="flex items-center gap-1.5">
+                            <span className={`truncate text-[13px] ${active ? 'font-medium text-white' : 'text-zinc-100'}`}>{asset.name}</span>
+                            <span className="shrink-0 rounded-full bg-mint-400/15 px-1.5 text-[10px] text-mint-300">{asset.type}</span>
+                          </span>
+                          <span className="mt-0.5 block truncate font-mono text-[10.5px] text-zinc-500">
+                            {asset.ticker}
+                            {asset.sector ? ` · ${asset.sector}` : ''}
+                          </span>
+                        </span>
+                        <span className="text-right">
+                          <span className="num block text-[13px] text-zinc-200">
+                            {asset.totalValue ? `₩${asset.totalValue.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}` : '—'}
+                          </span>
+                          <span className="num mt-0.5 block text-[10.5px] text-zinc-500">
+                            {held > 0 ? `${held.toLocaleString()}주` : '보유 없음'}
+                            {asset.changePercent !== undefined && asset.changePercent !== 0 && (
+                              <span className={asset.changePercent > 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                                {' '}
+                                {asset.changePercent > 0 ? '+' : ''}
+                                {asset.changePercent.toFixed(2)}%
+                              </span>
+                            )}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          }
+          detail={
+            selected ? (
+              (() => {
+                const asset = selected;
+                return (
+                  <div>
+                    <header className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h2 className="truncate text-xl font-semibold tracking-tight text-white">{asset.name}</h2>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-mint-400/15 text-mint-300">{asset.type}</span>
+                        </div>
+                        <p className="label-mono mt-1">
+                          {asset.ticker}
+                          {asset.sector ? ` · ${asset.sector}` : ''}
+                        </p>
                       </div>
-                      <div>
-                        <label className="field-label">보유 수량</label>
-                        <input
-                          type="number"
-                          step="0.0001"
-                          value={newHoldingData.quantity}
-                          onChange={(e) => setNewHoldingData({...newHoldingData, quantity: e.target.value})}
-                          className="input-field w-full rounded px-2 py-1 text-xs"
-                          placeholder="수량"
-                        />
-                      </div>
-                      <div>
-                        <label className="field-label">평균 단가 (선택)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={newHoldingData.averagePrice}
-                          onChange={(e) => setNewHoldingData({...newHoldingData, averagePrice: e.target.value})}
-                          className="input-field w-full rounded px-2 py-1 text-xs"
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleAddHolding(asset.id)}
-                          className="btn-primary flex-1 px-3 py-1 text-xs"
-                        >
-                          추가
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <button onClick={() => handleEditAsset(asset)} className="btn-icon" title="자산 수정" aria-label="자산 수정">
+                          <Edit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => {
-                            setAddingHoldingForAsset(null);
-                            setNewHoldingData({accountId: 0, quantity: '', averagePrice: ''});
-                          }}
-                          className="btn-ghost flex-1 px-3 py-1 text-xs"
+                          onClick={() => handleDeleteAsset(asset.id)}
+                          className="btn-icon hover:!border-rose-400/40 hover:!text-rose-300"
+                          title="자산 삭제"
+                          aria-label="자산 삭제"
                         >
-                          취소
+                          <Trash2 className="w-4 h-4" />
                         </button>
+                      </div>
+                    </header>
+
+                    {/* 가격 및 보유 정보 */}
+                    <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                      <div className="surface-inset px-3 py-2.5">
+                        <div className="label-mono">현재가</div>
+                        <div className="num mt-1 text-sm font-medium text-white">
+                          ₩{asset.currentPrice?.toLocaleString('ko-KR', { maximumFractionDigits: 0 }) || '-'}
+                          {asset.changePercent !== undefined && asset.changePercent !== 0 && (
+                            <span className={`ml-2 text-xs ${asset.changePercent > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {asset.changePercent > 0 ? '+' : ''}
+                              {asset.changePercent.toFixed(2)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="surface-inset px-3 py-2.5">
+                        <div className="label-mono">총 보유수량</div>
+                        <div className="num mt-1 text-sm font-medium text-white">{(asset.holdings ?? []).reduce((sum, h) => sum + h.quantity, 0).toLocaleString()} 주</div>
+                      </div>
+                      <div className="surface-inset px-3 py-2.5">
+                        <div className="label-mono">총 평가금액</div>
+                        <div className="num mt-1 text-sm font-medium text-emerald-400">₩{asset.totalValue?.toLocaleString('ko-KR', { maximumFractionDigits: 0 }) || '-'}</div>
                       </div>
                     </div>
-                  )}
-                  
-                  {asset.holdings && asset.holdings.length > 0 && (
-                    <>
-                      {asset.holdings.map((holding, index) => {
-                        const account = accounts.find(acc => acc.id === holding.account_id);
+
+                    {/* 계좌별 보유 내역 */}
+                    <div className="mt-5 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <p className="label-mono">계좌별 보유 내역</p>
+                        <button
+                          onClick={() => {
+                            setAddingHoldingForAsset(asset.id);
+                            setNewHoldingData({ accountId: 0, quantity: '', averagePrice: '' });
+                          }}
+                          className="btn-ghost !px-3 !py-1 !text-xs"
+                        >
+                          <Plus className="w-3 h-3" />
+                          보유 추가
+                        </button>
+                      </div>
+
+                      {addingHoldingForAsset === asset.id && (
+                        <div className="surface-inset grid gap-3 p-3 sm:grid-cols-3">
+                          <div>
+                            <label className="field-label">계좌</label>
+                            <select
+                              value={newHoldingData.accountId}
+                              onChange={(e) => setNewHoldingData({ ...newHoldingData, accountId: Number(e.target.value) })}
+                              className="input-field !py-1.5 text-sm"
+                            >
+                              <option value={0}>선택하세요</option>
+                              {accounts.map((account) => (
+                                <option key={account.id} value={account.id}>
+                                  {accountTypePrefix(account)}
+                                  {account.broker} ({account.name})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="field-label">보유 수량</label>
+                            <input
+                              type="number"
+                              step="0.0001"
+                              value={newHoldingData.quantity}
+                              onChange={(e) => setNewHoldingData({ ...newHoldingData, quantity: e.target.value })}
+                              className="input-field !py-1.5 text-sm"
+                              placeholder="수량"
+                            />
+                          </div>
+                          <div>
+                            <label className="field-label">평균 단가 (선택)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={newHoldingData.averagePrice}
+                              onChange={(e) => setNewHoldingData({ ...newHoldingData, averagePrice: e.target.value })}
+                              className="input-field !py-1.5 text-sm"
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2 sm:col-span-3">
+                            <button
+                              onClick={() => {
+                                setAddingHoldingForAsset(null);
+                                setNewHoldingData({ accountId: 0, quantity: '', averagePrice: '' });
+                              }}
+                              className="btn-ghost !px-3 !py-1 !text-xs"
+                            >
+                              취소
+                            </button>
+                            <button onClick={() => handleAddHolding(asset.id)} className="btn-primary !px-3 !py-1 !text-xs">
+                              추가
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {(asset.holdings ?? []).length === 0 && addingHoldingForAsset !== asset.id && (
+                        <p className="surface-inset px-3 py-6 text-center text-sm text-zinc-500">보유 내역이 없습니다.</p>
+                      )}
+
+                      {(asset.holdings ?? []).map((holding, index) => {
+                        const account = accounts.find((acc) => acc.id === holding.account_id);
                         const holdingValue = (asset.currentPrice || 0) * holding.quantity;
                         const isEditing = editingHolding?.id === holding.id;
                         return (
-                          <div key={holding.id || index} className="bg-white/[0.04] rounded p-2 space-y-1">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-zinc-400">
-                                {account?.name || '알 수 없음'} ({account?.broker || '-'})
-                              </span>
-                              <div className="flex items-center gap-2">
-                                {isEditing && editingHolding ? (
-                                  <input
-                                    type="number"
-                                    step="0.0001"
-                                    value={editingHolding.quantity}
-                                    onChange={(e) => setEditingHolding({...editingHolding, quantity: parseFloat(e.target.value) || 0})}
-                                    className="input-field w-20 rounded px-2 py-1 text-xs"
-                                    placeholder="수량"
-                                  />
-                                ) : (
-                                  <span className="text-xs text-zinc-300">
-                                    {holding.quantity.toLocaleString()} 주
-                                  </span>
-                                )}
-                                {isEditing && editingHolding ? (
-                                  <>
-                                    <button
-                                      onClick={() => handleUpdateHolding(holding.id, editingHolding.quantity, editingHolding.averagePrice)}
-                                      className="text-emerald-400 hover:text-emerald-300 text-xs"
-                                    >
-                                      저장
-                                    </button>
-                                    <button
-                                      onClick={() => setEditingHolding(null)}
-                                      className="text-zinc-400 hover:text-zinc-300 text-xs"
-                                    >
-                                      취소
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => handleEditHolding(holding)}
-                                      className="text-mint-400 hover:text-mint-300"
-                                      title="수정"
-                                    >
-                                      <Edit2 className="w-3 h-3" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteHolding(holding.id)}
-                                      className="text-rose-400 hover:text-rose-300"
-                                      title="삭제"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-zinc-500">평가금액</span>
-                              <span className="text-sm font-semibold text-emerald-400">
-                                ₩{holdingValue.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
-                              </span>
+                          <div key={holding.id || index} className="surface-inset flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 px-3 py-2.5">
+                            <span className="min-w-0 truncate text-sm text-zinc-200">
+                              {account?.name || '알 수 없음'} <span className="label-mono">{account?.broker || '-'}</span>
+                            </span>
+                            <div className="flex items-center gap-3">
+                              {isEditing && editingHolding ? (
+                                <input
+                                  type="number"
+                                  step="0.0001"
+                                  value={editingHolding.quantity}
+                                  onChange={(e) => setEditingHolding({ ...editingHolding, quantity: parseFloat(e.target.value) || 0 })}
+                                  className="input-field !w-24 !py-1 text-xs"
+                                  placeholder="수량"
+                                  aria-label="보유 수량"
+                                />
+                              ) : (
+                                <span className="num text-xs text-zinc-300">{holding.quantity.toLocaleString()} 주</span>
+                              )}
+                              <span className="num text-sm font-semibold text-emerald-400">₩{holdingValue.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}</span>
+                              {isEditing && editingHolding ? (
+                                <>
+                                  <button
+                                    onClick={() => handleUpdateHolding(holding.id, editingHolding.quantity, editingHolding.averagePrice)}
+                                    className="text-emerald-400 hover:text-emerald-300 text-xs"
+                                  >
+                                    저장
+                                  </button>
+                                  <button onClick={() => setEditingHolding(null)} className="text-zinc-400 hover:text-zinc-300 text-xs">
+                                    취소
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button onClick={() => handleEditHolding(holding)} className="text-mint-400 hover:text-mint-300" title="수정" aria-label="보유 수량 수정">
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button onClick={() => handleDeleteHolding(holding.id)} className="text-rose-400 hover:text-rose-300" title="삭제" aria-label="보유 내역 삭제">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         );
                       })}
-                    </>
-                  )}
-                  
-                  {/* 총 보유 정보 */}
-                  {asset.holdings && asset.holdings.length > 1 && (
-                    <div className="mt-3 pt-3 border-t border-white/[0.08]">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-zinc-300">총 보유수량</span>
-                        <span className="text-sm font-semibold text-white">
-                          {asset.holdings.reduce((sum, h) => sum + h.quantity, 0).toLocaleString()} 주
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center mt-1">
-                        <span className="text-sm font-medium text-zinc-300">총 평가금액</span>
-                        <span className="text-lg font-bold text-emerald-400">
-                          ₩{asset.totalValue?.toLocaleString('ko-KR', { maximumFractionDigits: 0 }) || '-'}
-                        </span>
-                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <p className="py-16 text-center text-sm text-zinc-400">왼쪽 목록에서 자산을 고르세요.</p>
+            )
+          }
+        />
+      )}
     </div>
   );
 }

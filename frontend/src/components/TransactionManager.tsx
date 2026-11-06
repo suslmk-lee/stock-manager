@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
+import { PageActions } from './shell/PageSlots';
+import SplitView from './shell/SplitView';
 import { apiClient } from '../api/client';
 import { Account, Asset, Transaction, Holding, RealizedPnL, TickerInfo, PricePoint, PriceHistory } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
 import { useThemeColors } from '../appearance/AppearanceContext';
-import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, TrendingDown, History, X, Search, Info } from 'lucide-react';
+import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, TrendingDown, History, X, Search, Info, Layers } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { calculateFee, roundFee } from '../utils/fees';
 import Portal from './ui/Portal';
@@ -75,6 +77,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
   });
   // 보유 종목 상세(차트/주식정보) 모달
   const [detailHolding, setDetailHolding] = useState<Holding | null>(null);
+  // 좁은 화면: 목록에서 무언가를 골라 상세를 보고 있는지
+  const [picked, setPicked] = useState(false);
   const [detailRange, setDetailRange] = useState('6mo');
   const [detailInfo, setDetailInfo] = useState<{ info: TickerInfo | null; price: any } | null>(null);
   const [detailHistory, setDetailHistory] = useState<PricePoint[]>([]);
@@ -595,6 +599,22 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
     return summary;
   }, [pnls]);
 
+  // 왼쪽 보유 종목: 평가금액 큰 순 (시세가 없으면 이름순)
+  const listHoldings = useMemo(
+    () =>
+      [...holdings].sort((a, b) => {
+        const va = (priceMap[a.asset?.ticker || ''] ?? 0) * a.quantity;
+        const vb = (priceMap[b.asset?.ticker || ''] ?? 0) * b.quantity;
+        return vb - va || (a.asset?.name || '').localeCompare(b.asset?.name || '', 'ko');
+      }),
+    [holdings, priceMap],
+  );
+
+  // 계좌를 바꾸면 이전 계좌의 종목 상세를 닫는다
+  useEffect(() => {
+    setDetailHolding(null);
+  }, [selectedAccount]);
+
   if (loading) return <div className="text-center py-12 text-zinc-400">로딩 중...</div>;
 
   if (accounts.length === 0) {
@@ -606,57 +626,92 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
     );
   }
 
-  return (
-    <div>
-      {/* 헤더 */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="text-2xl font-semibold tracking-tight text-white">매매 관리</h2>
-          <select
-            value={selectedAccount}
-            onChange={(e) => {
-              const id = Number(e.target.value);
-              setSelectedAccount(id);
-              onAccountChange?.(id);
-            }}
-            className="input-field w-auto px-3 py-2 text-sm"
-          >
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {accountTypePrefix(a)}{a.broker} ({a.name})
-              </option>
-            ))}
-          </select>
+  // 오른쪽 상세: 거래 내역
+  const historyPanel = (
+    <div className="space-y-3">
+      {transactions.length === 0 ? (
+        <div className="text-center py-12 text-zinc-400">
+          <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
+          <p>거래 내역이 없습니다.</p>
+          <p className="text-sm mt-1 text-zinc-500">'거래 기록' 버튼으로 매수/매도를 등록하세요.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              resetAssetForm();
-              setShowAssetForm(true);
-            }}
-            className="btn-ghost flex items-center gap-2 px-4 py-2"
-          >
-            <Plus className="w-5 h-5" />
-            자산 추가
-          </button>
-          <button
-            onClick={() => {
-              resetForm();
-              setShowForm(true);
-            }}
-            className="btn-primary flex items-center gap-2 px-4 py-2"
-          >
-            <Plus className="w-5 h-5" />
-            거래 기록
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-rose-500/10 border border-rose-400/30 text-rose-200 px-4 py-3 rounded-2xl mb-6">{error}</div>
+      ) : (
+        [...transactions]
+          .sort((a, b) => {
+            const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+            if (dateDiff !== 0) return dateDiff;
+            const createdDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            if (createdDiff !== 0) return createdDiff;
+            return b.id - a.id;
+          })
+          .map((tx) => {
+          const isBuy = tx.type === 'Buy';
+          const total = tx.price * tx.quantity + (isBuy ? tx.fee : -tx.fee);
+          const txCurrency = getCurrencyFromTicker(tx.asset?.ticker || '');
+          return (
+            <div
+              key={tx.id}
+              onClick={() => openTxDetail(tx)}
+              className="surface p-4 hover:border-white/[0.2] transition-colors cursor-pointer"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`icon-tile ${
+                      isBuy
+                        ? 'icon-tile-mint text-mint-300'
+                        : 'icon-tile-amber text-rose-300'
+                    }`}
+                  >
+                    {isBuy ? <ArrowDownCircle className="w-5 h-5" /> : <ArrowUpCircle className="w-5 h-5" />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-semibold text-white truncate">
+                        {tx.asset?.name || tx.asset?.ticker || `Asset #${tx.asset_id}`}
+                      </h3>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
+                          isBuy ? 'bg-mint-400/15 text-mint-300' : 'bg-rose-500/10 text-rose-300'
+                        }`}
+                      >
+                        {isBuy ? '매수' : '매도'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-1">
+                      {tx.asset?.ticker} · {new Date(tx.date).toLocaleDateString('ko-KR')}
+                    </p>
+                    <p className="text-xs text-zinc-300 mt-0.5">
+                      <span className="text-zinc-500">{isBuy ? '매수가' : '매도가'}</span>{' '}
+                      <span className="font-medium">{formatMoney(tx.price, txCurrency)}</span>
+                      <span className="text-zinc-500"> × </span>
+                      <span className="font-medium">{formatNumber(tx.quantity, 4)}주</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className={`text-base font-bold ${isBuy ? 'text-mint-400' : 'text-rose-400'}`}>
+                    {formatMoney(total, txCurrency)}
+                  </p>
+                  <p className="text-[10px] text-zinc-500">
+                    {isBuy ? '총 지불액' : '실수령액'}
+                  </p>
+                  {tx.fee > 0 && (
+                    <p className="text-[11px] text-zinc-500 mt-0.5">수수료 {formatMoney(tx.fee, txCurrency)}</p>
+                  )}
+                </div>
+              </div>
+              {tx.notes && <p className="text-xs text-zinc-400 mt-2 pl-13 ml-13">{tx.notes}</p>}
+            </div>
+          );
+        })
       )}
+    </div>
+  );
 
-      {/* 실현 손익 요약 카드 */}
+  // 오른쪽 상세: 실현 손익 (통화별 요약 카드 + 내역)
+  const pnlPanel = (
+    <div className="space-y-4">
       {Object.keys(pnlSummary).length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           {Object.entries(pnlSummary).map(([cur, s]) => {
@@ -682,563 +737,731 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
           })}
         </div>
       )}
-
-      {/* 탭 */}
-      <div className="flex gap-2 mb-4 border-b border-white/[0.08]">
-        <button
-          onClick={() => setViewTab('history')}
-          className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
-            viewTab === 'history'
-              ? 'text-white border-b-2 border-mint-400/30'
-              : 'text-zinc-400 hover:text-white'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          거래 내역 ({transactions.length})
-        </button>
-        <button
-          onClick={() => setViewTab('pnl')}
-          className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
-            viewTab === 'pnl'
-              ? 'text-white border-b-2 border-mint-400/30'
-              : 'text-zinc-400 hover:text-white'
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" />
-          실현 손익 ({pnls.length})
-        </button>
-        <button
-          onClick={() => setViewTab('holdings')}
-          className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
-            viewTab === 'holdings'
-              ? 'text-white border-b-2 border-mint-400/30'
-              : 'text-zinc-400 hover:text-white'
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" />
-          보유 현황 ({holdings.length})
-        </button>
-      </div>
-
-      {/* 거래 내역 */}
-      {viewTab === 'history' && (
-        <div className="space-y-3">
-          {transactions.length === 0 ? (
-            <div className="text-center py-12 text-zinc-400">
-              <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>거래 내역이 없습니다.</p>
-              <p className="text-sm mt-1 text-zinc-500">'거래 기록' 버튼으로 매수/매도를 등록하세요.</p>
-            </div>
-          ) : (
-            [...transactions]
-              .sort((a, b) => {
-                const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
-                if (dateDiff !== 0) return dateDiff;
-                const createdDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-                if (createdDiff !== 0) return createdDiff;
-                return b.id - a.id;
-              })
-              .map((tx) => {
-              const isBuy = tx.type === 'Buy';
-              const total = tx.price * tx.quantity + (isBuy ? tx.fee : -tx.fee);
-              const txCurrency = getCurrencyFromTicker(tx.asset?.ticker || '');
-              return (
-                <div
-                  key={tx.id}
-                  onClick={() => openTxDetail(tx)}
-                  className="surface p-4 hover:border-white/[0.2] transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`icon-tile ${
-                          isBuy
-                            ? 'icon-tile-mint text-mint-300'
-                            : 'icon-tile-amber text-rose-300'
-                        }`}
-                      >
-                        {isBuy ? <ArrowDownCircle className="w-5 h-5" /> : <ArrowUpCircle className="w-5 h-5" />}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-base font-semibold text-white truncate">
-                            {tx.asset?.name || tx.asset?.ticker || `Asset #${tx.asset_id}`}
-                          </h3>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
-                              isBuy ? 'bg-mint-400/15 text-mint-300' : 'bg-rose-500/10 text-rose-300'
-                            }`}
-                          >
-                            {isBuy ? '매수' : '매도'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-zinc-400 mt-1">
-                          {tx.asset?.ticker} · {new Date(tx.date).toLocaleDateString('ko-KR')}
-                        </p>
-                        <p className="text-xs text-zinc-300 mt-0.5">
-                          <span className="text-zinc-500">{isBuy ? '매수가' : '매도가'}</span>{' '}
-                          <span className="font-medium">{formatMoney(tx.price, txCurrency)}</span>
-                          <span className="text-zinc-500"> × </span>
-                          <span className="font-medium">{formatNumber(tx.quantity, 4)}주</span>
-                        </p>
-                      </div>
+      <div className="space-y-3">
+        {pnls.length === 0 ? (
+          <div className="text-center py-12 text-zinc-400">
+            <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>실현 손익 내역이 없습니다.</p>
+            <p className="text-sm mt-1 text-zinc-500">매도 거래가 기록되면 자동으로 표시됩니다.</p>
+          </div>
+        ) : (
+          [...pnls]
+            .sort((a, b) => {
+              const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+              if (dateDiff !== 0) return dateDiff;
+              const createdDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+              if (createdDiff !== 0) return createdDiff;
+              return b.id - a.id;
+            })
+            .map((p) => {
+            const isProfit = p.profit >= 0;
+            const pnlCurrency = getCurrencyFromTicker(p.asset?.ticker || '');
+            return (
+              <div
+                key={p.id}
+                onClick={() => setSelectedPnl(p)}
+                className={`rounded-2xl p-4 border transition-colors cursor-pointer ${
+                  isProfit
+                    ? 'bg-mint-400/[0.04] border-mint-400/20 hover:border-mint-400/40'
+                    : 'bg-rose-500/[0.04] border-rose-400/20 hover:border-rose-400/40'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`icon-tile ${
+                        isProfit
+                          ? 'icon-tile-mint text-mint-300'
+                          : 'icon-tile-amber text-rose-300'
+                      }`}
+                    >
+                      {isProfit ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className={`text-base font-bold ${isBuy ? 'text-mint-400' : 'text-rose-400'}`}>
-                        {formatMoney(total, txCurrency)}
+                    <div className="min-w-0">
+                      <h3 className="text-base font-semibold text-white truncate">
+                        {p.asset?.name || p.asset?.ticker || `Asset #${p.asset_id}`}
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        {p.asset?.ticker} · {new Date(p.date).toLocaleDateString('ko-KR')} · {formatNumber(p.quantity, 4)}주
                       </p>
-                      <p className="text-[10px] text-zinc-500">
-                        {isBuy ? '총 지불액' : '실수령액'}
+                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                        평단 {formatMoney(p.buy_avg_price, pnlCurrency)} → 매도 {formatMoney(p.sell_price, pnlCurrency)}
                       </p>
-                      {tx.fee > 0 && (
-                        <p className="text-[11px] text-zinc-500 mt-0.5">수수료 {formatMoney(tx.fee, txCurrency)}</p>
-                      )}
                     </div>
                   </div>
-                  {tx.notes && <p className="text-xs text-zinc-400 mt-2 pl-13 ml-13">{tx.notes}</p>}
+                  <div className="text-right shrink-0">
+                    <p className={`text-lg font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {isProfit ? '+' : ''}
+                      {formatMoney(p.profit, pnlCurrency)}
+                    </p>
+                    <p className={`text-xs ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>
+                      {isProfit ? '+' : ''}
+                      {p.profit_percent.toFixed(2)}%
+                    </p>
+                  </div>
                 </div>
-              );
-            })
-          )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
+  // 오른쪽 상세: 보유 현황 (전체 보유 종목 표)
+  const holdingsPanel = (
+    <div>
+      {priceLoading && (
+        <div className="text-xs text-zinc-500 mb-3 flex items-center gap-2">
+          <div className="w-3 h-3 border border-white/[0.08] border-t-transparent rounded-full animate-spin" />
+          시세 로딩 중...
         </div>
       )}
-
-      {/* 실현 손익 */}
-      {viewTab === 'pnl' && (
+      {holdings.length === 0 ? (
+        <div className="text-center py-12 text-zinc-400">
+          <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
+          <p>보유 종목이 없습니다.</p>
+          <p className="text-sm mt-1 text-zinc-500">매매 기록을 등록하거나 주식/ETF 탭에서 보유를 등록하세요.</p>
+        </div>
+      ) : (
         <div className="space-y-3">
-          {pnls.length === 0 ? (
-            <div className="text-center py-12 text-zinc-400">
-              <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>실현 손익 내역이 없습니다.</p>
-              <p className="text-sm mt-1 text-zinc-500">매도 거래가 기록되면 자동으로 표시됩니다.</p>
+          {/* 종목 검색 */}
+          <div className="relative">
+            <input
+              type="text"
+              value={holdingSearch}
+              onChange={(e) => setHoldingSearch(e.target.value)}
+              placeholder="종목 검색 (티커 또는 종목명)"
+              className="input-field w-full px-3 py-2 text-sm"
+            />
+            {holdingSearch && (
+              <button
+                onClick={() => setHoldingSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-white px-1"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* 시장 필터 */}
+          <div className="flex gap-1.5">
+            {([
+              { key: 'all', label: '모두' },
+              { key: 'kr', label: '🇰🇷 한국' },
+              { key: 'us', label: '🇺🇸 미국' },
+            ] as { key: 'all' | 'kr' | 'us'; label: string }[]).map((m) => (
+              <button
+                key={m.key}
+                onClick={() => setHoldingMarket(m.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  holdingMarket === m.key
+                    ? 'bg-mint-400/20 text-mint-200'
+                    : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 보유 테이블 */}
+          <div className="overflow-x-auto rounded-2xl border border-white/[0.08]">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="table-head border-b border-white/[0.08]">
+                  {([
+                    { key: 'name', label: '종목', align: 'left' },
+                    { key: 'quantity', label: '수량', align: 'right' },
+                    { key: 'price', label: '평단가', align: 'right' },
+                    { key: 'current', label: '현재가', align: 'right' },
+                    { key: 'value', label: '평가금', align: 'right' },
+                    { key: 'profit', label: '손익', align: 'right' },
+                  ] as { key: HoldingSortKey; label: string; align: 'left' | 'right' }[]).map((col) => (
+                    <th
+                      key={col.key}
+                      onClick={() => toggleHoldingSort(col.key)}
+                      className={`font-medium px-3 py-2.5 cursor-pointer select-none hover:text-zinc-200 transition-colors ${
+                        col.align === 'left' ? 'text-left' : 'text-right'
+                      }`}
+                    >
+                      <span className={`inline-flex items-center gap-1 ${col.align === 'right' ? 'flex-row-reverse' : ''}`}>
+                        {col.label}
+                        <span className={holdingSort.key === col.key ? 'text-mint-300' : 'text-zinc-600'}>
+                          {holdingSort.key === col.key ? (holdingSort.dir === 'asc' ? '▲' : '▼') : '⇅'}
+                        </span>
+                      </span>
+                    </th>
+                  ))}
+                  <th className="text-right font-medium px-3 py-2.5">액션</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.06]">
+                {(() => {
+                  const filtered = [...holdings]
+                    .filter((h) => {
+                      if (holdingMarket === 'all') return true;
+                      const isKR = getCurrencyFromTicker(h.asset?.ticker || '') === 'KRW';
+                      return holdingMarket === 'kr' ? isKR : !isKR;
+                    })
+                    .filter((h) => {
+                      const q = holdingSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      const name = (h.asset?.name || '').toLowerCase();
+                      const ticker = (h.asset?.ticker || '').toLowerCase();
+                      return name.includes(q) || ticker.includes(q);
+                    })
+                    .sort((a, b) => {
+                      const dir = holdingSort.dir === 'asc' ? 1 : -1;
+                      if (holdingSort.key === 'name') {
+                        const an = (a.asset?.name || a.asset?.ticker || '').toLowerCase();
+                        const bn = (b.asset?.name || b.asset?.ticker || '').toLowerCase();
+                        return an.localeCompare(bn, 'ko') * dir;
+                      }
+                      const aPrice = priceMap[a.asset?.ticker || ''] || 0;
+                      const bPrice = priceMap[b.asset?.ticker || ''] || 0;
+                      const val = (h: Holding, price: number): number => {
+                        switch (holdingSort.key) {
+                          case 'quantity':
+                            return h.quantity;
+                          case 'price':
+                            return h.average_price;
+                          case 'current':
+                            return price;
+                          case 'value':
+                            return price * h.quantity;
+                          case 'profit':
+                            return price * h.quantity - h.average_price * h.quantity;
+                          default:
+                            return 0;
+                        }
+                      };
+                      return (val(a, aPrice) - val(b, bPrice)) * dir;
+                    });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={7} className="text-center py-8 text-zinc-400 text-sm">
+                          검색 결과가 없습니다.
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filtered.map((h) => {
+                    const ticker = h.asset?.ticker || '';
+                    const curPrice = priceMap[ticker];
+                    const hasPrice = curPrice !== undefined && curPrice > 0;
+                    const marketValue = hasPrice ? curPrice * h.quantity : 0;
+                    const totalCost = h.average_price * h.quantity;
+                    const profit = marketValue - totalCost;
+                    const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+                    const isProfit = profit >= 0;
+                    const currency = getCurrencyFromTicker(ticker);
+
+                    return (
+                      <tr key={h.id} className="hover:bg-white/[0.025] transition-colors">
+                        {/* 종목 */}
+                        <td className="px-3 py-2.5 min-w-[160px]">
+                          <button
+                            onClick={() => openHoldingDetail(h)}
+                            className="text-left group"
+                            title="차트 및 주식정보 보기"
+                          >
+                            <p className="text-white font-medium truncate group-hover:text-mint-300 transition-colors">
+                              {h.asset?.name || ticker}
+                            </p>
+                            <p className="text-xs text-zinc-500">{ticker}</p>
+                          </button>
+                        </td>
+
+                        {/* 수량 */}
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                          {editingHoldingId === h.id && editHoldingField === 'quantity' ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <input
+                                type="number"
+                                step="any"
+                                autoFocus
+                                value={editHoldingQty}
+                                placeholder={formatNumber(h.quantity, 4)}
+                                onChange={(e) => setEditHoldingQty(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleUpdateHolding(h.id, 'quantity', editHoldingQty);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingHoldingId(null);
+                                    setEditHoldingField(null);
+                                  }
+                                }}
+                                className="input-field w-20 rounded px-1 py-0.5 text-xs text-right"
+                              />
+                              <button
+                                onClick={() => handleUpdateHolding(h.id, 'quantity', editHoldingQty)}
+                                className="btn-primary px-1.5 py-0.5 text-[10px] leading-none"
+                              >
+                                저장
+                              </button>
+                              <button
+                                onClick={() => { setEditingHoldingId(null); setEditHoldingField(null); }}
+                                className="btn-ghost px-1.5 py-0.5 text-[10px] leading-none"
+                              >
+                                취소
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingHoldingId(h.id);
+                                setEditHoldingField('quantity');
+                                setEditHoldingQty('');
+                              }}
+                              className="text-zinc-300 hover:text-white underline decoration-white/20 underline-offset-2"
+                            >
+                              {formatNumber(h.quantity, 4)}주
+                            </button>
+                          )}
+                        </td>
+
+                        {/* 평단가 */}
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                          {editingHoldingId === h.id && editHoldingField === 'price' ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <input
+                                type="number"
+                                step="any"
+                                autoFocus
+                                value={editHoldingPrice}
+                                placeholder={String(h.average_price)}
+                                onChange={(e) => setEditHoldingPrice(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleUpdateHolding(h.id, 'price', editHoldingPrice);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingHoldingId(null);
+                                    setEditHoldingField(null);
+                                  }
+                                }}
+                                className="input-field w-20 rounded px-1 py-0.5 text-xs text-right"
+                              />
+                              <button
+                                onClick={() => handleUpdateHolding(h.id, 'price', editHoldingPrice)}
+                                className="btn-primary px-1.5 py-0.5 text-[10px] leading-none"
+                              >
+                                저장
+                              </button>
+                              <button
+                                onClick={() => { setEditingHoldingId(null); setEditHoldingField(null); }}
+                                className="btn-ghost px-1.5 py-0.5 text-[10px] leading-none"
+                              >
+                                취소
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingHoldingId(h.id);
+                                setEditHoldingField('price');
+                                setEditHoldingPrice('');
+                              }}
+                              className="text-zinc-300 hover:text-white underline decoration-white/20 underline-offset-2"
+                            >
+                              {formatMoney(h.average_price, currency)}
+                            </button>
+                          )}
+                        </td>
+
+                        {/* 현재가 */}
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap text-zinc-300">
+                          {hasPrice ? formatMoney(curPrice, currency) : '—'}
+                        </td>
+
+                        {/* 평가금 */}
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap text-white font-medium">
+                          {hasPrice ? formatMoney(marketValue, currency) : '—'}
+                        </td>
+
+                        {/* 손익 */}
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                          {hasPrice ? (
+                            <>
+                              <p className={`font-medium ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {isProfit ? '+' : ''}{formatMoney(profit, currency)}
+                              </p>
+                              <p className={`text-xs ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>
+                                {isProfit ? '+' : ''}{profitPercent.toFixed(2)}%
+                              </p>
+                            </>
+                          ) : (
+                            <span className="text-zinc-500">—</span>
+                          )}
+                        </td>
+
+                        {/* 액션 */}
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => openBuyForm(h.asset_id)}
+                              className="btn-primary px-2 py-1 text-xs"
+                            >
+                              매수
+                            </button>
+                            <button
+                              onClick={() => openSellForm(h.asset_id)}
+                              className="btn-danger px-2 py-1 text-xs"
+                            >
+                              매도
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  });
+                })()}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 합계 - 통화별 분리 */}
+          {(() => {
+            const byCurrency: Record<string, { cost: number; value: number }> = {};
+            holdings.forEach((h) => {
+              const cur = getCurrencyFromTicker(h.asset?.ticker || '');
+              if (holdingMarket === 'kr' && cur !== 'KRW') return;
+              if (holdingMarket === 'us' && cur === 'KRW') return;
+              const p = priceMap[h.asset?.ticker || ''];
+              if (!byCurrency[cur]) byCurrency[cur] = { cost: 0, value: 0 };
+              byCurrency[cur].cost += h.average_price * h.quantity;
+              byCurrency[cur].value += (p ? p * h.quantity : 0);
+            });
+
+            return (
+              <div className="surface-inset mt-4 p-4 space-y-3">
+                {Object.entries(byCurrency).map(([cur, { cost, value }]) => {
+                  const profit = value - cost;
+                  const isProfit = profit >= 0;
+                  return (
+                    <div key={cur} className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex gap-6 flex-wrap">
+                        <div>
+                          <p className="text-xs text-zinc-500">총 매입원가 ({cur})</p>
+                          <p className="text-base font-bold text-white">{formatMoney(cost, cur)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-zinc-500">총 평가금 ({cur})</p>
+                          <p className="text-base font-bold text-white">{formatMoney(value, cur)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-zinc-500">총 손익 ({cur})</p>
+                          <p className={`text-base font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {isProfit ? '+' : ''}{formatMoney(profit, cur)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`text-lg font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {cost > 0 ? `${isProfit ? '+' : ''}${((profit / cost) * 100).toFixed(2)}%` : ''}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  );
+
+  // 오른쪽 상세: 보유 종목 하나 (가격 차트·주식 정보·손익, 매수/매도)
+  const holdingPanel = detailHolding
+    ? (() => {
+        const h = detailHolding;
+        const ticker = h.asset?.ticker || '';
+        const cur = getCurrencyFromTicker(ticker);
+        const price = detailInfo?.price;
+        const info = detailInfo?.info;
+        const curPrice = Number(price?.price ?? priceMap[ticker] ?? 0);
+        const changePercent = Number(price?.change_percent ?? 0);
+        const hasPrice = curPrice > 0;
+        const marketValue = curPrice * h.quantity;
+        const totalCost = h.average_price * h.quantity;
+        const profit = marketValue - totalCost;
+        const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+        const isProfit = profit >= 0;
+        const chartData = detailHistory.map((p) => ({
+          label: new Date(p.time * 1000).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
+          close: p.close,
+        }));
+        const RANGES: { key: string; label: string }[] = [
+          { key: '1mo', label: '1M' },
+          { key: '3mo', label: '3M' },
+          { key: '6mo', label: '6M' },
+          { key: '1y', label: '1Y' },
+          { key: '5y', label: '5Y' },
+        ];
+        return (
+          <div>
+            {/* 헤더 */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="min-w-0">
+                <h3 className="text-xl font-semibold text-white truncate">{h.asset?.name || ticker}</h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  {ticker}
+                  {info?.exchange ? ` · ${info.exchange}` : ''}
+                  {info?.sector ? ` · ${info.sector}` : ''}
+                </p>
+              </div>
             </div>
-          ) : (
-            [...pnls]
-              .sort((a, b) => {
-                const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
-                if (dateDiff !== 0) return dateDiff;
-                const createdDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-                if (createdDiff !== 0) return createdDiff;
-                return b.id - a.id;
-              })
-              .map((p) => {
-              const isProfit = p.profit >= 0;
-              const pnlCurrency = getCurrencyFromTicker(p.asset?.ticker || '');
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => setSelectedPnl(p)}
-                  className={`rounded-2xl p-4 border transition-colors cursor-pointer ${
-                    isProfit
-                      ? 'bg-mint-400/[0.04] border-mint-400/20 hover:border-mint-400/40'
-                      : 'bg-rose-500/[0.04] border-rose-400/20 hover:border-rose-400/40'
+
+            {/* 현재가 */}
+            <div className="flex items-baseline gap-3 mb-4">
+              <span className="text-2xl font-bold text-white">
+                {hasPrice ? formatMoney(curPrice, cur) : '—'}
+              </span>
+              {hasPrice && changePercent !== 0 && (
+                <span className={`text-sm font-medium ${changePercent > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {changePercent > 0 ? '+' : ''}{changePercent.toFixed(2)}%
+                </span>
+              )}
+              {price?.market_state && (
+                <span className="text-[11px] text-zinc-500">{price.market_state}</span>
+              )}
+            </div>
+
+            {/* 기간 선택 */}
+            <div className="flex gap-1.5 mb-2">
+              {RANGES.map((r) => (
+                <button
+                  key={r.key}
+                  onClick={() => setDetailRange(r.key)}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                    detailRange === r.key
+                      ? 'bg-mint-400/20 text-mint-200'
+                      : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`icon-tile ${
-                          isProfit
-                            ? 'icon-tile-mint text-mint-300'
-                            : 'icon-tile-amber text-rose-300'
-                        }`}
-                      >
-                        {isProfit ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-base font-semibold text-white truncate">
-                          {p.asset?.name || p.asset?.ticker || `Asset #${p.asset_id}`}
-                        </h3>
-                        <p className="text-xs text-zinc-400 mt-0.5">
-                          {p.asset?.ticker} · {new Date(p.date).toLocaleDateString('ko-KR')} · {formatNumber(p.quantity, 4)}주
-                        </p>
-                        <p className="text-[11px] text-zinc-500 mt-0.5">
-                          평단 {formatMoney(p.buy_avg_price, pnlCurrency)} → 매도 {formatMoney(p.sell_price, pnlCurrency)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`text-lg font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {isProfit ? '+' : ''}
-                        {formatMoney(p.profit, pnlCurrency)}
-                      </p>
-                      <p className={`text-xs ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>
-                        {isProfit ? '+' : ''}
-                        {p.profit_percent.toFixed(2)}%
-                      </p>
-                    </div>
-                  </div>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 차트 */}
+            <div className="bg-black/30 rounded-lg p-3 mb-4 h-[240px] flex items-center justify-center">
+              {detailLoading ? (
+                <div className="flex items-center gap-2 text-sm text-zinc-500">
+                  <div className="w-4 h-4 border border-white/[0.08] border-t-transparent rounded-full animate-spin" />
+                  차트 로딩 중...
                 </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {/* 보유 현황 */}
-      {viewTab === 'holdings' && (
-        <div>
-          {priceLoading && (
-            <div className="text-xs text-zinc-500 mb-3 flex items-center gap-2">
-              <div className="w-3 h-3 border border-white/[0.08] border-t-transparent rounded-full animate-spin" />
-              시세 로딩 중...
-            </div>
-          )}
-          {holdings.length === 0 ? (
-            <div className="text-center py-12 text-zinc-400">
-              <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>보유 종목이 없습니다.</p>
-              <p className="text-sm mt-1 text-zinc-500">매매 기록을 등록하거나 주식/ETF 탭에서 보유를 등록하세요.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {/* 종목 검색 */}
-              <div className="relative">
-                <input
-                  type="text"
-                  value={holdingSearch}
-                  onChange={(e) => setHoldingSearch(e.target.value)}
-                  placeholder="종목 검색 (티커 또는 종목명)"
-                  className="input-field w-full px-3 py-2 text-sm"
-                />
-                {holdingSearch && (
-                  <button
-                    onClick={() => setHoldingSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-white px-1"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
-              {/* 시장 필터 */}
-              <div className="flex gap-1.5">
-                {([
-                  { key: 'all', label: '모두' },
-                  { key: 'kr', label: '🇰🇷 한국' },
-                  { key: 'us', label: '🇺🇸 미국' },
-                ] as { key: 'all' | 'kr' | 'us'; label: string }[]).map((m) => (
-                  <button
-                    key={m.key}
-                    onClick={() => setHoldingMarket(m.key)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      holdingMarket === m.key
-                        ? 'bg-mint-400/20 text-mint-200'
-                        : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* 보유 테이블 */}
-              <div className="overflow-x-auto rounded-2xl border border-white/[0.08]">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="table-head border-b border-white/[0.08]">
-                      {([
-                        { key: 'name', label: '종목', align: 'left' },
-                        { key: 'quantity', label: '수량', align: 'right' },
-                        { key: 'price', label: '평단가', align: 'right' },
-                        { key: 'current', label: '현재가', align: 'right' },
-                        { key: 'value', label: '평가금', align: 'right' },
-                        { key: 'profit', label: '손익', align: 'right' },
-                      ] as { key: HoldingSortKey; label: string; align: 'left' | 'right' }[]).map((col) => (
-                        <th
-                          key={col.key}
-                          onClick={() => toggleHoldingSort(col.key)}
-                          className={`font-medium px-3 py-2.5 cursor-pointer select-none hover:text-zinc-200 transition-colors ${
-                            col.align === 'left' ? 'text-left' : 'text-right'
-                          }`}
-                        >
-                          <span className={`inline-flex items-center gap-1 ${col.align === 'right' ? 'flex-row-reverse' : ''}`}>
-                            {col.label}
-                            <span className={holdingSort.key === col.key ? 'text-mint-300' : 'text-zinc-600'}>
-                              {holdingSort.key === col.key ? (holdingSort.dir === 'asc' ? '▲' : '▼') : '⇅'}
-                            </span>
-                          </span>
-                        </th>
-                      ))}
-                      <th className="text-right font-medium px-3 py-2.5">액션</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/[0.06]">
-                    {(() => {
-                      const filtered = [...holdings]
-                        .filter((h) => {
-                          if (holdingMarket === 'all') return true;
-                          const isKR = getCurrencyFromTicker(h.asset?.ticker || '') === 'KRW';
-                          return holdingMarket === 'kr' ? isKR : !isKR;
-                        })
-                        .filter((h) => {
-                          const q = holdingSearch.trim().toLowerCase();
-                          if (!q) return true;
-                          const name = (h.asset?.name || '').toLowerCase();
-                          const ticker = (h.asset?.ticker || '').toLowerCase();
-                          return name.includes(q) || ticker.includes(q);
-                        })
-                        .sort((a, b) => {
-                          const dir = holdingSort.dir === 'asc' ? 1 : -1;
-                          if (holdingSort.key === 'name') {
-                            const an = (a.asset?.name || a.asset?.ticker || '').toLowerCase();
-                            const bn = (b.asset?.name || b.asset?.ticker || '').toLowerCase();
-                            return an.localeCompare(bn, 'ko') * dir;
-                          }
-                          const aPrice = priceMap[a.asset?.ticker || ''] || 0;
-                          const bPrice = priceMap[b.asset?.ticker || ''] || 0;
-                          const val = (h: Holding, price: number): number => {
-                            switch (holdingSort.key) {
-                              case 'quantity':
-                                return h.quantity;
-                              case 'price':
-                                return h.average_price;
-                              case 'current':
-                                return price;
-                              case 'value':
-                                return price * h.quantity;
-                              case 'profit':
-                                return price * h.quantity - h.average_price * h.quantity;
-                              default:
-                                return 0;
-                            }
-                          };
-                          return (val(a, aPrice) - val(b, bPrice)) * dir;
-                        });
-
-                      if (filtered.length === 0) {
-                        return (
-                          <tr>
-                            <td colSpan={7} className="text-center py-8 text-zinc-400 text-sm">
-                              검색 결과가 없습니다.
-                            </td>
-                          </tr>
-                        );
+              ) : chartData.length === 0 ? (
+                <p className="text-sm text-zinc-500">시세 데이터를 가져올 수 없습니다.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 10, fill: tc.axis }}
+                      minTickGap={40}
+                      axisLine={{ stroke: tc.grid }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: tc.axis }}
+                      domain={['auto', 'auto']}
+                      width={60}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v: number) =>
+                        cur === 'USD' ? `$${v.toFixed(0)}` : `₩${Math.round(v).toLocaleString('ko-KR')}`
                       }
-
-                      return filtered.map((h) => {
-                        const ticker = h.asset?.ticker || '';
-                        const curPrice = priceMap[ticker];
-                        const hasPrice = curPrice !== undefined && curPrice > 0;
-                        const marketValue = hasPrice ? curPrice * h.quantity : 0;
-                        const totalCost = h.average_price * h.quantity;
-                        const profit = marketValue - totalCost;
-                        const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
-                        const isProfit = profit >= 0;
-                        const currency = getCurrencyFromTicker(ticker);
-
-                        return (
-                          <tr key={h.id} className="hover:bg-white/[0.025] transition-colors">
-                            {/* 종목 */}
-                            <td className="px-3 py-2.5 min-w-[160px]">
-                              <button
-                                onClick={() => openHoldingDetail(h)}
-                                className="text-left group"
-                                title="차트 및 주식정보 보기"
-                              >
-                                <p className="text-white font-medium truncate group-hover:text-mint-300 transition-colors">
-                                  {h.asset?.name || ticker}
-                                </p>
-                                <p className="text-xs text-zinc-500">{ticker}</p>
-                              </button>
-                            </td>
-
-                            {/* 수량 */}
-                            <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                              {editingHoldingId === h.id && editHoldingField === 'quantity' ? (
-                                <div className="flex items-center justify-end gap-1">
-                                  <input
-                                    type="number"
-                                    step="any"
-                                    autoFocus
-                                    value={editHoldingQty}
-                                    placeholder={formatNumber(h.quantity, 4)}
-                                    onChange={(e) => setEditHoldingQty(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        handleUpdateHolding(h.id, 'quantity', editHoldingQty);
-                                      } else if (e.key === 'Escape') {
-                                        setEditingHoldingId(null);
-                                        setEditHoldingField(null);
-                                      }
-                                    }}
-                                    className="input-field w-20 rounded px-1 py-0.5 text-xs text-right"
-                                  />
-                                  <button
-                                    onClick={() => handleUpdateHolding(h.id, 'quantity', editHoldingQty)}
-                                    className="btn-primary px-1.5 py-0.5 text-[10px] leading-none"
-                                  >
-                                    저장
-                                  </button>
-                                  <button
-                                    onClick={() => { setEditingHoldingId(null); setEditHoldingField(null); }}
-                                    className="btn-ghost px-1.5 py-0.5 text-[10px] leading-none"
-                                  >
-                                    취소
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => {
-                                    setEditingHoldingId(h.id);
-                                    setEditHoldingField('quantity');
-                                    setEditHoldingQty('');
-                                  }}
-                                  className="text-zinc-300 hover:text-white underline decoration-white/20 underline-offset-2"
-                                >
-                                  {formatNumber(h.quantity, 4)}주
-                                </button>
-                              )}
-                            </td>
-
-                            {/* 평단가 */}
-                            <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                              {editingHoldingId === h.id && editHoldingField === 'price' ? (
-                                <div className="flex items-center justify-end gap-1">
-                                  <input
-                                    type="number"
-                                    step="any"
-                                    autoFocus
-                                    value={editHoldingPrice}
-                                    placeholder={String(h.average_price)}
-                                    onChange={(e) => setEditHoldingPrice(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        handleUpdateHolding(h.id, 'price', editHoldingPrice);
-                                      } else if (e.key === 'Escape') {
-                                        setEditingHoldingId(null);
-                                        setEditHoldingField(null);
-                                      }
-                                    }}
-                                    className="input-field w-20 rounded px-1 py-0.5 text-xs text-right"
-                                  />
-                                  <button
-                                    onClick={() => handleUpdateHolding(h.id, 'price', editHoldingPrice)}
-                                    className="btn-primary px-1.5 py-0.5 text-[10px] leading-none"
-                                  >
-                                    저장
-                                  </button>
-                                  <button
-                                    onClick={() => { setEditingHoldingId(null); setEditHoldingField(null); }}
-                                    className="btn-ghost px-1.5 py-0.5 text-[10px] leading-none"
-                                  >
-                                    취소
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => {
-                                    setEditingHoldingId(h.id);
-                                    setEditHoldingField('price');
-                                    setEditHoldingPrice('');
-                                  }}
-                                  className="text-zinc-300 hover:text-white underline decoration-white/20 underline-offset-2"
-                                >
-                                  {formatMoney(h.average_price, currency)}
-                                </button>
-                              )}
-                            </td>
-
-                            {/* 현재가 */}
-                            <td className="px-3 py-2.5 text-right whitespace-nowrap text-zinc-300">
-                              {hasPrice ? formatMoney(curPrice, currency) : '—'}
-                            </td>
-
-                            {/* 평가금 */}
-                            <td className="px-3 py-2.5 text-right whitespace-nowrap text-white font-medium">
-                              {hasPrice ? formatMoney(marketValue, currency) : '—'}
-                            </td>
-
-                            {/* 손익 */}
-                            <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                              {hasPrice ? (
-                                <>
-                                  <p className={`font-medium ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                    {isProfit ? '+' : ''}{formatMoney(profit, currency)}
-                                  </p>
-                                  <p className={`text-xs ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>
-                                    {isProfit ? '+' : ''}{profitPercent.toFixed(2)}%
-                                  </p>
-                                </>
-                              ) : (
-                                <span className="text-zinc-500">—</span>
-                              )}
-                            </td>
-
-                            {/* 액션 */}
-                            <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <button
-                                  onClick={() => openBuyForm(h.asset_id)}
-                                  className="btn-primary px-2 py-1 text-xs"
-                                >
-                                  매수
-                                </button>
-                                <button
-                                  onClick={() => openSellForm(h.asset_id)}
-                                  className="btn-danger px-2 py-1 text-xs"
-                                >
-                                  매도
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })()}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* 합계 - 통화별 분리 */}
-              {(() => {
-                const byCurrency: Record<string, { cost: number; value: number }> = {};
-                holdings.forEach((h) => {
-                  const cur = getCurrencyFromTicker(h.asset?.ticker || '');
-                  if (holdingMarket === 'kr' && cur !== 'KRW') return;
-                  if (holdingMarket === 'us' && cur === 'KRW') return;
-                  const p = priceMap[h.asset?.ticker || ''];
-                  if (!byCurrency[cur]) byCurrency[cur] = { cost: 0, value: 0 };
-                  byCurrency[cur].cost += h.average_price * h.quantity;
-                  byCurrency[cur].value += (p ? p * h.quantity : 0);
-                });
-
-                return (
-                  <div className="surface-inset mt-4 p-4 space-y-3">
-                    {Object.entries(byCurrency).map(([cur, { cost, value }]) => {
-                      const profit = value - cost;
-                      const isProfit = profit >= 0;
-                      return (
-                        <div key={cur} className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex gap-6 flex-wrap">
-                            <div>
-                              <p className="text-xs text-zinc-500">총 매입원가 ({cur})</p>
-                              <p className="text-base font-bold text-white">{formatMoney(cost, cur)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-zinc-500">총 평가금 ({cur})</p>
-                              <p className="text-base font-bold text-white">{formatMoney(value, cur)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-zinc-500">총 손익 ({cur})</p>
-                              <p className={`text-base font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                {isProfit ? '+' : ''}{formatMoney(profit, cur)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className={`text-lg font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {cost > 0 ? `${isProfit ? '+' : ''}${((profit / cost) * 100).toFixed(2)}%` : ''}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+                    />
+                    <Tooltip
+                      contentStyle={{ ...tc.tooltip.contentStyle, fontSize: 12 }}
+                      labelStyle={tc.tooltip.labelStyle}
+                      itemStyle={tc.tooltip.itemStyle}
+                      formatter={(v: number) => [formatMoney(v, cur), '종가']}
+                    />
+                    <Line type="monotone" dataKey="close" stroke={tc.accent} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
-          )}
-        </div>
+
+            {/* 내 보유 정보 */}
+            <div className="surface-inset p-4">
+              <p className="text-xs text-zinc-500 mb-3">내 보유 정보 ({currentAccount?.name})</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
+                <div>
+                  <p className="label-mono mb-0.5">보유 수량</p>
+                  <p className="text-white font-medium">{formatNumber(h.quantity, 4)}주</p>
+                </div>
+                <div>
+                  <p className="label-mono mb-0.5">평단가</p>
+                  <p className="text-white font-medium">{formatMoney(h.average_price, cur)}</p>
+                </div>
+                <div>
+                  <p className="label-mono mb-0.5">평가금</p>
+                  <p className="text-white font-medium">{hasPrice ? formatMoney(marketValue, cur) : '—'}</p>
+                </div>
+                <div>
+                  <p className="label-mono mb-0.5">평가 손익</p>
+                  {hasPrice ? (
+                    <p className={`font-medium ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {isProfit ? '+' : ''}{formatMoney(profit, cur)}
+                      <span className="text-xs ml-1">({isProfit ? '+' : ''}{profitPercent.toFixed(2)}%)</span>
+                    </p>
+                  ) : (
+                    <p className="text-zinc-500">—</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => openBuyForm(h.asset_id)}
+                  className="btn-primary flex-1 px-3 py-2 text-sm"
+                >
+                  매수
+                </button>
+                <button
+                  onClick={() => openSellForm(h.asset_id)}
+                  className="btn-danger flex-1 px-3 py-2 text-sm"
+                >
+                  매도
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()
+    : null;
+
+  // 왼쪽 목록
+  const navRow = (key: ViewTab, Icon: typeof History, label: string, count: number) => {
+    const active = !detailHolding && viewTab === key;
+    return (
+      <button
+        key={key}
+        type="button"
+        onClick={() => {
+          setDetailHolding(null);
+          setViewTab(key);
+          setPicked(true);
+        }}
+        aria-current={active ? 'true' : undefined}
+        className={`flex w-full items-center gap-3 border-b border-white/[0.06] px-4 py-3 text-left transition-colors ${active ? 'bg-mint-400/[0.08] shadow-[inset_3px_0_0_rgb(var(--c-mint-400))]' : 'hover:bg-white/[0.03]'}`}
+      >
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 ${active ? 'bg-mint-400/15 text-mint-300' : 'bg-white/[0.04] text-zinc-400'}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className={`flex-1 text-sm ${active ? 'font-medium text-white' : 'text-zinc-200'}`}>{label}</span>
+        <span className="label-mono">{count}</span>
+      </button>
+    );
+  };
+
+  const tradeList = (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      {navRow('history', History, '거래 내역', transactions.length)}
+      {navRow('pnl', TrendingUp, '실현 손익', pnls.length)}
+      {navRow('holdings', Layers, '보유 현황', holdings.length)}
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-ink-900/95 px-4 py-2 backdrop-blur">
+        <span className="text-xs font-medium text-zinc-300">보유 종목</span>
+        <span className="label-mono">{holdings.length}개</span>
+      </div>
+      {holdings.length === 0 ? (
+        <p className="px-4 py-8 text-center text-sm text-zinc-500">보유 종목이 없습니다.</p>
+      ) : (
+        listHoldings.map((h) => {
+          const ticker = h.asset?.ticker || '';
+          const cur = getCurrencyFromTicker(ticker);
+          const price = priceMap[ticker] ?? 0;
+          const value = price * h.quantity;
+          const pct = price > 0 && h.average_price > 0 ? ((price - h.average_price) / h.average_price) * 100 : null;
+          const active = detailHolding?.id === h.id;
+          return (
+            <button
+              key={h.id}
+              type="button"
+              onClick={() => {
+                openHoldingDetail(h);
+                setPicked(true);
+              }}
+              aria-current={active ? 'true' : undefined}
+              className={`grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-white/[0.04] px-4 py-2.5 text-left transition-colors ${active ? 'bg-mint-400/[0.08] shadow-[inset_3px_0_0_rgb(var(--c-mint-400))]' : 'hover:bg-white/[0.03]'}`}
+            >
+              <span className="min-w-0">
+                <span className={`block truncate text-[13px] ${active ? 'font-medium text-white' : 'text-zinc-100'}`}>{h.asset?.name || ticker}</span>
+                <span className="mt-0.5 block truncate font-mono text-[10.5px] text-zinc-500">{ticker} · {h.quantity.toLocaleString()}주</span>
+              </span>
+              <span className="text-right">
+                <span className="num block text-[13px] text-zinc-200">{price > 0 ? formatMoney(value, cur) : '—'}</span>
+                {pct !== null && <span className={`num mt-0.5 block text-[10.5px] ${pct >= 0 ? 'text-mint-300' : 'text-rose-300'}`}>{pct >= 0 ? '+' : ''}{pct.toFixed(2)}%</span>}
+              </span>
+            </button>
+          );
+        })
       )}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* 헤더: 계좌 선택은 제목 옆, 동작 버튼은 상단 바 오른쪽 */}
+      <PageActions
+        lead={
+          <select
+            aria-label="계좌"
+            value={selectedAccount}
+            onChange={(e) => {
+              const id = Number(e.target.value);
+              setSelectedAccount(id);
+              onAccountChange?.(id);
+            }}
+            className="input-field !w-auto !py-1.5 px-3 text-sm"
+          >
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {accountTypePrefix(a)}{a.broker} ({a.name})
+              </option>
+            ))}
+          </select>
+        }
+      >
+        <button
+          onClick={() => {
+            resetAssetForm();
+            setShowAssetForm(true);
+          }}
+          className="btn-ghost flex items-center gap-2 px-4 py-2"
+        >
+          <Plus className="w-4 h-4" />
+          자산 추가
+        </button>
+        <button
+          onClick={() => {
+            resetForm();
+            setShowForm(true);
+          }}
+          className="btn-primary flex items-center gap-2 px-4 py-2"
+        >
+          <Plus className="w-4 h-4" />
+          거래 기록
+        </button>
+      </PageActions>
+
+      {error && (
+        <div className="bg-rose-500/10 border border-rose-400/30 text-rose-200 px-4 py-3 rounded-2xl mb-6">{error}</div>
+      )}
+
+      {/* 왼쪽: 거래 내역 / 실현 손익 / 보유 현황 + 보유 종목, 오른쪽: 상세 */}
+      <SplitView
+        listWidth={380}
+        showDetail={picked}
+        onBack={() => setPicked(false)}
+        backLabel="매매 목록"
+        list={tradeList}
+        detail={detailHolding ? holdingPanel : viewTab === 'history' ? historyPanel : viewTab === 'pnl' ? pnlPanel : holdingsPanel}
+      />
 
       {/* 실현 손익 상세 모달 */}
       {selectedPnl && (() => {
@@ -1588,178 +1811,6 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
         );
       })()}
 
-      {/* 보유 종목 상세(차트/주식정보) 모달 */}
-      {detailHolding && (() => {
-        const h = detailHolding;
-        const ticker = h.asset?.ticker || '';
-        const cur = getCurrencyFromTicker(ticker);
-        const price = detailInfo?.price;
-        const info = detailInfo?.info;
-        const curPrice = Number(price?.price ?? priceMap[ticker] ?? 0);
-        const changePercent = Number(price?.change_percent ?? 0);
-        const hasPrice = curPrice > 0;
-        const marketValue = curPrice * h.quantity;
-        const totalCost = h.average_price * h.quantity;
-        const profit = marketValue - totalCost;
-        const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
-        const isProfit = profit >= 0;
-        const chartData = detailHistory.map((p) => ({
-          label: new Date(p.time * 1000).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
-          close: p.close,
-        }));
-        const RANGES: { key: string; label: string }[] = [
-          { key: '1mo', label: '1M' },
-          { key: '3mo', label: '3M' },
-          { key: '6mo', label: '6M' },
-          { key: '1y', label: '1Y' },
-          { key: '5y', label: '5Y' },
-        ];
-        return (
-          <Portal>
-            <div
-              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-              onClick={() => setDetailHolding(null)}
-            >
-              <div
-                className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* 헤더 */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="min-w-0">
-                    <h3 className="text-xl font-semibold text-white truncate">{h.asset?.name || ticker}</h3>
-                    <p className="text-xs text-zinc-400 mt-0.5">
-                      {ticker}
-                      {info?.exchange ? ` · ${info.exchange}` : ''}
-                      {info?.sector ? ` · ${info.sector}` : ''}
-                    </p>
-                  </div>
-                  <button onClick={() => setDetailHolding(null)} className="text-zinc-400 hover:text-white shrink-0">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* 현재가 */}
-                <div className="flex items-baseline gap-3 mb-4">
-                  <span className="text-2xl font-bold text-white">
-                    {hasPrice ? formatMoney(curPrice, cur) : '—'}
-                  </span>
-                  {hasPrice && changePercent !== 0 && (
-                    <span className={`text-sm font-medium ${changePercent > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {changePercent > 0 ? '+' : ''}{changePercent.toFixed(2)}%
-                    </span>
-                  )}
-                  {price?.market_state && (
-                    <span className="text-[11px] text-zinc-500">{price.market_state}</span>
-                  )}
-                </div>
-
-                {/* 기간 선택 */}
-                <div className="flex gap-1.5 mb-2">
-                  {RANGES.map((r) => (
-                    <button
-                      key={r.key}
-                      onClick={() => setDetailRange(r.key)}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                        detailRange === r.key
-                          ? 'bg-mint-400/20 text-mint-200'
-                          : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100'
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* 차트 */}
-                <div className="bg-black/30 rounded-lg p-3 mb-4 h-[240px] flex items-center justify-center">
-                  {detailLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-zinc-500">
-                      <div className="w-4 h-4 border border-white/[0.08] border-t-transparent rounded-full animate-spin" />
-                      차트 로딩 중...
-                    </div>
-                  ) : chartData.length === 0 ? (
-                    <p className="text-sm text-zinc-500">시세 데이터를 가져올 수 없습니다.</p>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                        <XAxis
-                          dataKey="label"
-                          tick={{ fontSize: 10, fill: tc.axis }}
-                          minTickGap={40}
-                          axisLine={{ stroke: tc.grid }}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 10, fill: tc.axis }}
-                          domain={['auto', 'auto']}
-                          width={60}
-                          axisLine={false}
-                          tickLine={false}
-                          tickFormatter={(v: number) =>
-                            cur === 'USD' ? `$${v.toFixed(0)}` : `₩${Math.round(v).toLocaleString('ko-KR')}`
-                          }
-                        />
-                        <Tooltip
-                          contentStyle={{ ...tc.tooltip.contentStyle, fontSize: 12 }}
-                          labelStyle={tc.tooltip.labelStyle}
-                          itemStyle={tc.tooltip.itemStyle}
-                          formatter={(v: number) => [formatMoney(v, cur), '종가']}
-                        />
-                        <Line type="monotone" dataKey="close" stroke={tc.accent} strokeWidth={2} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-
-                {/* 내 보유 정보 */}
-                <div className="surface-inset p-4">
-                  <p className="text-xs text-zinc-500 mb-3">내 보유 정보 ({currentAccount?.name})</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
-                    <div>
-                      <p className="label-mono mb-0.5">보유 수량</p>
-                      <p className="text-white font-medium">{formatNumber(h.quantity, 4)}주</p>
-                    </div>
-                    <div>
-                      <p className="label-mono mb-0.5">평단가</p>
-                      <p className="text-white font-medium">{formatMoney(h.average_price, cur)}</p>
-                    </div>
-                    <div>
-                      <p className="label-mono mb-0.5">평가금</p>
-                      <p className="text-white font-medium">{hasPrice ? formatMoney(marketValue, cur) : '—'}</p>
-                    </div>
-                    <div>
-                      <p className="label-mono mb-0.5">평가 손익</p>
-                      {hasPrice ? (
-                        <p className={`font-medium ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {isProfit ? '+' : ''}{formatMoney(profit, cur)}
-                          <span className="text-xs ml-1">({isProfit ? '+' : ''}{profitPercent.toFixed(2)}%)</span>
-                        </p>
-                      ) : (
-                        <p className="text-zinc-500">—</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => { setDetailHolding(null); openBuyForm(h.asset_id); }}
-                      className="btn-primary flex-1 px-3 py-2 text-sm"
-                    >
-                      매수
-                    </button>
-                    <button
-                      onClick={() => { setDetailHolding(null); openSellForm(h.asset_id); }}
-                      className="btn-danger flex-1 px-3 py-2 text-sm"
-                    >
-                      매도
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Portal>
-        );
-      })()}
 
       {/* 자산 추가 모달 */}
       {showAssetForm && (

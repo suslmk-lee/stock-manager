@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X, Loader2, Coins, EyeOff, Info } from 'lucide-react';
+import { Loader2, EyeOff, Info } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { ProfileCandidate, SignalProfile } from '../../types/models';
 import Chip from '../ui/Chip';
 import ProfileChip from './ProfileChip';
-import Portal from '../ui/Portal';
+import { PageActions } from '../shell/PageSlots';
+import { useAlerts } from '../alerts/AlertsProvider';
 
 interface DividendCandidatesProps {
+  /** 알림에서 넘어온 종목: 강조하고 미리 선택한다 */
   highlightAssetId?: number;
-  onClose: (changed: boolean) => void;
 }
 
 function errMsg(err: unknown, fallback: string): string {
@@ -28,7 +29,9 @@ function ScoreDots({ score, max }: { score: number; max: number }) {
   );
 }
 
-export default function DividendCandidates({ highlightAssetId, onClose }: DividendCandidatesProps) {
+// 배당 종목 정리 페이지 (사이드바 '배당 후보'): 배당 성향이 뚜렷한 보유 종목을 골라 프로필에 한꺼번에 지정한다.
+export default function DividendCandidates({ highlightAssetId }: DividendCandidatesProps) {
+  const { notifyProfilesChanged } = useAlerts();
   const [candidates, setCandidates] = useState<ProfileCandidate[]>([]);
   const [profiles, setProfiles] = useState<SignalProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,9 +41,6 @@ export default function DividendCandidates({ highlightAssetId, onClose }: Divide
   const [applying, setApplying] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [changed, setChanged] = useState(false);
-  const changedRef = useRef(false);
-  changedRef.current = changed;
   const initRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -75,12 +75,6 @@ export default function DividendCandidates({ highlightAssetId, onClose }: Divide
   }, [load]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose(changedRef.current);
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  useEffect(() => {
     if (loading || !highlightAssetId) return;
     document.getElementById('cand-row-' + highlightAssetId)?.scrollIntoView({ block: 'center' });
   }, [loading, highlightAssetId]);
@@ -90,6 +84,7 @@ export default function DividendCandidates({ highlightAssetId, onClose }: Divide
   const rows = useMemo(() => [...candidates].sort((a, b) => Number(a.profile_id === targetId) - Number(b.profile_id === targetId)), [candidates, targetId]);
   const selectable = useMemo(() => candidates.filter((c) => c.profile_id !== targetId), [candidates, targetId]);
   const selectedCount = useMemo(() => selectable.filter((c) => selected.has(c.asset_id)).length, [selectable, selected]);
+  const candidateCount = useMemo(() => candidates.filter((c) => c.is_candidate).length, [candidates]);
 
   const toggle = (id: number) =>
     setSelected((prev) => {
@@ -107,7 +102,7 @@ export default function DividendCandidates({ highlightAssetId, onClose }: Divide
       setError(null);
       setMessage(null);
       await apiClient.AssignSignalProfile(target.id, ids);
-      setChanged(true);
+      notifyProfilesChanged();
       setSelected(new Set());
       setMessage(`${ids.length}개 종목을 '${target.name}' 프로필로 지정했습니다.`);
       await load();
@@ -128,152 +123,132 @@ export default function DividendCandidates({ highlightAssetId, onClose }: Divide
         next.delete(assetId);
         return next;
       });
-      setChanged(true);
+      notifyProfilesChanged();
     } catch (err) {
       setError(errMsg(err, '제안을 무시하지 못했습니다.'));
     }
   };
 
+  const ready = !loading && !loadError;
+
   return (
-    <Portal>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4" onClick={() => onClose(changed)}>
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="배당 종목 정리"
-          className="surface flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-start justify-between gap-3 border-b border-white/[0.07] px-5 py-4 sm:px-6">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sky-400/30 bg-sky-400/10 text-sky-300">
-                <Coins className="h-[18px] w-[18px]" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="section-title !text-lg">배당 종목 정리</h2>
-                <p className="label-mono mt-0.5">배당 성향이 뚜렷한 보유 종목을 장기보유 프로필로 모아 보세요</p>
-              </div>
-            </div>
-            <button type="button" onClick={() => onClose(changed)} className="btn-icon" aria-label="닫기">
-              <X className="h-4 w-4" />
+    <>
+      <PageActions lead={<span className="label-mono hidden sm:inline">배당 성향이 뚜렷한 보유 종목을 장기보유 프로필로 모아 보세요</span>}>
+        {ready && (
+          <>
+            <label className="label-mono hidden sm:inline" htmlFor="cand-target">
+              지정할 프로필
+            </label>
+            <select id="cand-target" className="input-field !w-auto !py-1.5 text-sm" value={targetId} onChange={(e) => setTargetId(Number(e.target.value))}>
+              {profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="btn-primary" disabled={applying || selectedCount === 0 || !target} onClick={apply}>
+              {applying && <Loader2 className="h-4 w-4 animate-spin" />}
+              {target ? `'${target.name}'로 지정` : '지정'}
+              {selectedCount > 0 && <span className="num">({selectedCount})</span>}
             </button>
+          </>
+        )}
+      </PageActions>
+
+      {loading ? (
+        <div className="surface flex h-64 items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+        </div>
+      ) : loadError ? (
+        <div className="surface flex h-64 flex-col items-center justify-center gap-3 p-6 text-center">
+          <p className="text-sm text-rose-200">{loadError}</p>
+          <button type="button" className="btn-ghost" onClick={load}>
+            다시 시도
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 px-1">
+            <p className="flex items-center gap-1.5 text-xs text-zinc-400">
+              <Info className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              자동으로 바꾸지 않습니다 · 선택한 종목만 적용 · 후보 <span className="num text-zinc-200">{candidateCount}</span>개 / 보유 <span className="num text-zinc-200">{candidates.length}</span>개
+            </p>
+            <p className="text-xs" role="status">
+              {error ? <span className="text-rose-300">{error}</span> : message ? <span className="text-mint-300">{message}</span> : <span className="text-zinc-500">선택 {selectedCount}개</span>}
+            </p>
           </div>
 
-          {loading ? (
-            <div className="flex h-64 items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
-            </div>
-          ) : loadError ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-3 p-6 text-center">
-              <p className="text-sm text-rose-200">{loadError}</p>
-              <button type="button" className="btn-ghost" onClick={load}>다시 시도</button>
-            </div>
+          {candidates.length === 0 ? (
+            <p className="surface py-12 text-center text-sm text-zinc-400">보유 중인 종목이 없습니다.</p>
           ) : (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white/[0.06] px-5 py-3 sm:px-6">
-                <p className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <Info className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-                  자동으로 바꾸지 않습니다 · 선택한 종목만 적용
-                </p>
-                <div className="flex items-center gap-2">
-                  <label className="label-mono" htmlFor="cand-target">지정할 프로필</label>
-                  <select id="cand-target" className="input-field !w-auto !py-1.5" value={targetId} onChange={(e) => setTargetId(Number(e.target.value))}>
-                    {profiles.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
-                {candidates.length === 0 ? (
-                  <p className="py-12 text-center text-sm text-zinc-400">보유 중인 종목이 없습니다.</p>
-                ) : (
-                  <ul className="space-y-2.5">
-                    {rows.map((c) => {
-                      const already = c.profile_id === targetId;
-                      const checked = !already && selected.has(c.asset_id);
-                      const hl = c.asset_id === highlightAssetId;
-                      return (
-                        <li
-                          key={c.asset_id}
-                          id={'cand-row-' + c.asset_id}
-                          className={`surface-inset p-3.5 transition-colors ${already ? 'opacity-60' : ''} ${hl ? '!border-sky-400/50 ring-1 ring-sky-400/30' : ''} ${checked ? '!bg-sky-400/[0.06]' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <input
-                              type="checkbox"
-                              className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-sky-400 disabled:cursor-not-allowed disabled:opacity-40"
-                              checked={checked}
-                              disabled={already}
-                              onChange={() => toggle(c.asset_id)}
-                              aria-label={`${c.name} 선택`}
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                                  <span className="truncate text-sm font-medium text-white">{c.name}</span>
-                                  <span className="label-mono">{c.ticker}</span>
-                                  {already ? (
-                                    <span className="badge border border-white/10 bg-white/[0.05] text-zinc-400">적용 중</span>
-                                  ) : (
-                                    c.is_candidate && <span className="badge border border-sky-400/30 bg-sky-400/10 text-sky-200">후보</span>
-                                  )}
-                                </div>
-                                <ScoreDots score={c.score} max={c.max_score} />
-                              </div>
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {c.reasons.map((r) =>
-                                  r.met ? (
-                                    <Chip key={r.code} check className="!border-sky-400/30 !bg-sky-400/10 !text-sky-200 [&_svg]:!text-sky-300">
-                                      <span title={r.detail}>{r.label}</span>
-                                    </Chip>
-                                  ) : (
-                                    <Chip key={r.code} className="!text-zinc-500">
-                                      <span title={r.detail}>{r.label}</span>
-                                    </Chip>
-                                  ),
-                                )}
-                              </div>
-                              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="label-mono">현재</span>
-                                  <ProfileChip name={c.profile_name} kind={profiles.find((p) => p.id === c.profile_id)?.kind} />
-                                  {c.has_override && <span className="badge border border-amber-400/25 bg-amber-400/10 text-amber-200">개별 전략 있음</span>}
-                                </div>
-                                {c.is_candidate && !already && (
-                                  <button type="button" className="inline-flex items-center gap-1 text-xs text-zinc-500 transition-colors hover:text-zinc-200" onClick={() => dismiss(c.asset_id)}>
-                                    <EyeOff className="h-3.5 w-3.5" />
-                                    무시
-                                  </button>
-                                )}
-                              </div>
-                            </div>
+            <ul className="grid gap-2.5 xl:grid-cols-2">
+              {rows.map((c) => {
+                const already = c.profile_id === targetId;
+                const checked = !already && selected.has(c.asset_id);
+                const hl = c.asset_id === highlightAssetId;
+                return (
+                  <li
+                    key={c.asset_id}
+                    id={'cand-row-' + c.asset_id}
+                    className={`surface-inset p-3.5 transition-colors ${already ? 'opacity-60' : ''} ${hl ? '!border-sky-400/50 ring-1 ring-sky-400/30' : ''} ${checked ? '!bg-sky-400/[0.06]' : ''}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-sky-400 disabled:cursor-not-allowed disabled:opacity-40"
+                        checked={checked}
+                        disabled={already}
+                        onChange={() => toggle(c.asset_id)}
+                        aria-label={`${c.name} 선택`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                            <span className="truncate text-sm font-medium text-white">{c.name}</span>
+                            <span className="label-mono">{c.ticker}</span>
+                            {already ? (
+                              <span className="badge border border-white/10 bg-white/[0.05] text-zinc-400">적용 중</span>
+                            ) : (
+                              c.is_candidate && <span className="badge border border-sky-400/30 bg-sky-400/10 text-sky-200">후보</span>
+                            )}
                           </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] px-5 py-4 sm:px-6">
-                <div className="min-w-0 text-xs">
-                  {error ? <span className="text-rose-300">{error}</span> : message ? <span className="text-mint-300">{message}</span> : <span className="text-zinc-500">선택 {selectedCount}개</span>}
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" className="btn-ghost" onClick={() => onClose(changed)}>닫기</button>
-                  <button type="button" className="btn-primary" disabled={applying || selectedCount === 0 || !target} onClick={apply}>
-                    {applying && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {target ? `'${target.name}'로 지정` : '지정'}
-                    {selectedCount > 0 && <span className="num">({selectedCount})</span>}
-                  </button>
-                </div>
-              </div>
-            </>
+                          <ScoreDots score={c.score} max={c.max_score} />
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {c.reasons.map((r) =>
+                            r.met ? (
+                              <Chip key={r.code} check className="!border-sky-400/30 !bg-sky-400/10 !text-sky-200 [&_svg]:!text-sky-300">
+                                <span title={r.detail}>{r.label}</span>
+                              </Chip>
+                            ) : (
+                              <Chip key={r.code} className="!text-zinc-500">
+                                <span title={r.detail}>{r.label}</span>
+                              </Chip>
+                            ),
+                          )}
+                        </div>
+                        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="label-mono">현재</span>
+                            <ProfileChip name={c.profile_name} kind={profiles.find((p) => p.id === c.profile_id)?.kind} />
+                            {c.has_override && <span className="badge border border-amber-400/25 bg-amber-400/10 text-amber-200">개별 전략 있음</span>}
+                          </div>
+                          {c.is_candidate && !already && (
+                            <button type="button" className="inline-flex items-center gap-1 text-xs text-zinc-500 transition-colors hover:text-zinc-200" onClick={() => dismiss(c.asset_id)}>
+                              <EyeOff className="h-3.5 w-3.5" />
+                              무시
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
-      </div>
-    </Portal>
+      )}
+    </>
   );
 }

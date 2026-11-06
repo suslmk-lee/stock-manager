@@ -1315,10 +1315,12 @@ interface SignalRuleEditorProps {
   assetRule?: SignalRule | null; // 이미 개별 전략이 있으면 전달
   onClose: () => void;
   onSaved: () => void;
+  /** true 면 팝업 대신 상세 패널 안에 그대로 그린다 (섹션 목록은 왼쪽 세로 배치) */
+  inline?: boolean;
 }
 
 // 종목별 전략 설정: 프로필 따르기 / 이 종목만 개별 전략
-export default function SignalRuleEditor({ assetId, assetName, profiles, currentProfileId, assetRule, onClose, onSaved }: SignalRuleEditorProps) {
+export default function SignalRuleEditor({ assetId, assetName, profiles, currentProfileId, assetRule, onClose, onSaved, inline = false }: SignalRuleEditorProps) {
   const fallbackProfile = profiles.find((p) => p.key === 'default') ?? profiles[0];
   const [choice, setChoice] = useState<'profile' | 'own'>(assetRule ? 'own' : 'profile');
   const [profileId, setProfileId] = useState<number>(currentProfileId ?? fallbackProfile?.id ?? 0);
@@ -1331,10 +1333,11 @@ export default function SignalRuleEditor({ assetId, assetName, profiles, current
   const [section, setSection] = useState<SectionId>(DEFAULT_SECTION);
 
   useEffect(() => {
+    if (inline) return; // 패널 안에서는 Esc 로 닫지 않는다
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, inline]);
 
   const readOnly = choice === 'profile';
 
@@ -1381,26 +1384,8 @@ export default function SignalRuleEditor({ assetId, assetName, profiles, current
     { value: 'own', title: '이 종목만 개별 전략', desc: '이 종목에만 적용되는 규칙을 만듭니다. 시작 값은 프로필 값입니다.' },
   ];
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="종목별 전략 설정"
-        className="surface flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-white/[0.07] px-5 py-4 sm:px-6">
-          <div className="min-w-0">
-            <h2 className="section-title !text-lg">종목별 전략 설정</h2>
-            <p className="label-mono mt-0.5 truncate">{assetName}</p>
-          </div>
-          <button type="button" onClick={onClose} className="btn-icon" aria-label="닫기">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+  const body = (
+    <>
           <div role="radiogroup" aria-label="전략 적용 방식" className="grid gap-2.5 sm:grid-cols-2">
             {choices.map((c) => {
               const active = choice === c.value;
@@ -1449,23 +1434,58 @@ export default function SignalRuleEditor({ assetId, assetName, profiles, current
             showNote={false}
             section={section}
             onSection={setSection}
-            navLayout="pills"
+            navLayout={inline ? 'side' : 'pills'}
             readOnlyHint={`선택한 프로필(${selected?.name ?? ''})의 규칙입니다. 값을 바꾸려면 프로필 관리에서 수정하거나 '이 종목만 개별 전략'을 선택하세요.`}
           />
 
           {submitError && (
             <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{submitError}</div>
           )}
-        </div>
+    </>
+  );
 
-        <div className="flex items-center justify-end gap-2 border-t border-white/[0.07] px-5 py-4 sm:px-6">
-          {touched && rd.hasErrors && !readOnly && <span className="mr-auto text-xs text-rose-300">입력값을 확인하세요</span>}
-          <button type="button" onClick={onClose} className="btn-ghost">취소</button>
-          <button type="button" onClick={handleSave} disabled={saving || (!readOnly && touched && rd.hasErrors)} className="btn-primary">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            저장
+  const footer = (
+    <>
+      {touched && rd.hasErrors && !readOnly && <span className="mr-auto text-xs text-rose-300">입력값을 확인하세요</span>}
+      <button type="button" onClick={onClose} className="btn-ghost">취소</button>
+      <button type="button" onClick={handleSave} disabled={saving || (!readOnly && touched && rd.hasErrors)} className="btn-primary">
+        {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+        저장
+      </button>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div className="space-y-5" aria-label="종목별 전략 설정">
+        {body}
+        <div className="flex items-center justify-end gap-2 border-t border-white/[0.07] pt-4">{footer}</div>
+      </div>
+    );
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="종목별 전략 설정"
+        className="surface flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-white/[0.07] px-5 py-4 sm:px-6">
+          <div className="min-w-0">
+            <h2 className="section-title !text-lg">종목별 전략 설정</h2>
+            <p className="label-mono mt-0.5 truncate">{assetName}</p>
+          </div>
+          <button type="button" onClick={onClose} className="btn-icon" aria-label="닫기">
+            <X className="h-4 w-4" />
           </button>
         </div>
+
+        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">{body}</div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-white/[0.07] px-5 py-4 sm:px-6">{footer}</div>
       </div>
     </div>,
     document.body,
