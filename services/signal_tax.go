@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"stock-manager/models"
@@ -46,11 +45,8 @@ func ComputeOverseasTax(pnls []TaxPnL, fxAt func(time.Time) float64, now time.Ti
 		if p.AccountType != models.AccountTypeGeneral || p.Date.In(kst).Year() != s.Year {
 			continue
 		}
-		cur := strings.ToUpper(strings.TrimSpace(p.Currency))
-		if cur == "" {
-			cur = CurrencyForTicker(p.Ticker)
-		}
-		if cur != "USD" {
+		// 국내 상장 종목은 기록된 통화가 USD 여도 해외주식이 아니다 (ResolveCurrency 참고)
+		if ResolveCurrency(p.Currency, p.Ticker) != "USD" {
 			continue
 		}
 		krw := p.ProfitLocal * fxAt(p.Date)

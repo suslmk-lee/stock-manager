@@ -242,7 +242,29 @@ func runMigrations() error {
 	); err != nil {
 		return err
 	}
-	return backfillAccountTypes()
+	if err := backfillAccountTypes(); err != nil {
+		return err
+	}
+	return repairKoreanTickerPnLCurrency(DB)
+}
+
+// repairKoreanTickerPnLCurrency 는 국내 상장(.KS/.KQ) 종목인데 원화가 아닌 통화로 저장된 실현손익을 원화로 고친다.
+// 과거 해외 계좌에서 판 국내 상장 ETF 의 실현손익이 계좌 통화(USD)로 저장돼, 양도세·수익률 계산에서
+// 원화 손익에 환율이 곱해졌다. 지금은 매도 시 티커로 통화를 정하므로 새 기록에는 생기지 않는다. 멱등.
+func repairKoreanTickerPnLCurrency(db *gorm.DB) error {
+	krAssets := db.Unscoped().Model(&models.Asset{}).Select("id").
+		Where("UPPER(ticker) LIKE ? OR UPPER(ticker) LIKE ?", "%.KS", "%.KQ")
+	res := db.Model(&models.RealizedPnL{}).
+		Where("asset_id IN (?)", krAssets).
+		Where("UPPER(currency) <> ?", "KRW").
+		UpdateColumn("currency", "KRW")
+	if res.Error != nil {
+		return fmt.Errorf("failed to repair realized PnL currency: %w", res.Error)
+	}
+	if res.RowsAffected > 0 {
+		log.Printf("Repaired currency to KRW for %d realized PnL record(s) of Korean-listed tickers", res.RowsAffected)
+	}
+	return nil
 }
 
 // backfillAccountTypes account_type이 비어 있는 기존 계좌에 이름/설명 기반으로 유형을 채운다.
