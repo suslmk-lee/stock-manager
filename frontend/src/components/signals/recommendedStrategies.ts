@@ -112,6 +112,32 @@ export const RECOMMENDED_STRATEGIES: RecommendedStrategy[] = [
     },
   },
   {
+    // CONY·TSLY 같은 YieldMax, 팔란티어·테슬라 커버드콜처럼 한 종목에 기대는 고분배 상품.
+    // 분배금 대부분이 원금 반환이라 주가가 깎이므로 분배금 포함 총수익률로 판단하고,
+    // 주가가 빠질수록 분배율이 높아 보이는 착시를 피하려고 배당수익률 기준 매수는 쓰지 않는다.
+    id: 'single-stock-option-income',
+    label: '고분배 옵션 인컴 (개별 종목 커버드콜)',
+    short: '고분배 옵션 인컴',
+    kind: 'dividend',
+    summary:
+      'CONY 같은 YieldMax, 팔란티어·테슬라 커버드콜처럼 한 종목에 기대 분배율이 매우 높은 상품용: 분배금 포함 총수익률이 손절선 아래로 가거나 6개월째 손실이면 정리를, 원금의 절반을 분배금으로 돌려받으면 이익 실현을 검토합니다. 주가가 빠질수록 분배율이 높아 보이는 착시 때문에 배당수익률 기준 매수는 끄고 200일선 회복·과매도 반등이 확인될 때만, 비중 10% 안에서 매수합니다.',
+    patch: {
+      take_profit_enabled: true, take_profit_pct: 25,
+      sell_profit_min_count: 1,
+      stop_loss_enabled: true, stop_loss_pct: -20,
+      time_stop_enabled: true, time_stop_days: 180, time_stop_max_return_pct: 0,
+      dividend_payback_enabled: true, dividend_payback_pct: 50, dividend_payback_min_return_pct: 0,
+      short_drop_enabled: true, short_drop_days: 20, short_drop_pct: -20,
+      sell_risk_min_count: 1,
+      below_ma_enabled: true, below_ma_mode: 'reclaim', below_ma_pct: -5, below_ma_reclaim_days: 10,
+      rsi_buy_enabled: true, rsi_buy_level: 30,
+      buy_mode: 'any', buy_min_count: 0,
+      rebound_confirm_enabled: true,
+      // 운용 설정이지만 이 상품군은 비중 관리가 핵심이라 함께 정한다
+      buy_max_weight_enabled: true, buy_max_weight_pct: 10,
+    },
+  },
+  {
     id: 'index-accumulate',
     label: '지수 ETF 적립',
     short: '지수 적립',

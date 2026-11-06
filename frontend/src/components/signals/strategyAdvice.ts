@@ -54,6 +54,12 @@ const COVERED_CALL_TICKERS = new Set([
   'JEPI', 'JEPQ', 'QYLD', 'XYLD', 'RYLD', 'DIVO', 'SPYI', 'QQQI', 'GPIX', 'GPIQ', 'SVOL', 'JEPY', 'ISPY', 'QDTE', 'XDTE', 'RDTE',
   'TSLY', 'NVDY', 'CONY', 'MSTY', 'YMAX', 'ULTY',
 ]);
+// 한 종목을 기초로 하는 옵션 인컴 상품 (YieldMax 등). ULTY·YMAX 같은 여러 종목 묶음은 뺀다.
+const SINGLE_OPTION_TICKERS = new Set([
+  'TSLY', 'NVDY', 'CONY', 'MSTY', 'AMZY', 'APLY', 'GOOY', 'FBY', 'OARK', 'NFLY', 'MRNY', 'PLTY', 'AMDY', 'AIYY', 'YBIT',
+  'DISO', 'SQY', 'PYPY', 'XOMO', 'JPMO', 'SMCY', 'MARO', 'BABO', 'CVNY', 'HOOY', 'ABNY', 'SNOY', 'TSMY', 'CRSH', 'GDXY', 'MSFO',
+]);
+const SINGLE_NAME_RE = /팔란티어|테슬라|엔비디아|애플|아마존|마이크로소프트|메타|알파벳|구글|코인베이스|스트래티지|브로드컴|넷플릭스|삼성전자|하이닉스|palantir|tesla|nvidia|apple|amazon|microsoft|alphabet|google|coinbase|microstrategy|broadcom|netflix|\b(COIN|TSLA|NVDA|PLTR|MSTR|AAPL|AMZN|MSFT|META|GOOGL|AMD|AVGO|NFLX)\b/i;
 const DIVIDEND_RE = /배당|dividend|인컴|income|리츠|reit|고배당|high\s?yield|분배/i;
 const DIVIDEND_TICKERS = new Set(['SCHD', 'VYM', 'DGRO', 'HDV', 'SPYD', 'NOBL', 'SDY', 'VIG', 'DVY', 'SCHY', 'VYMI', 'IDV', 'FDVV', 'DGRW', 'O', 'VNQ']);
 const INCOME_SECTOR_RE = /real\s?estate|부동산|reit|리츠|utilit|유틸리티/i;
@@ -72,6 +78,8 @@ const isKoreanTicker = (t: string) => /\.(KS|KQ)$/i.test(t);
 export interface AssetTraits {
   isEtf: boolean;
   coveredCall: boolean;
+  /** 한 종목에 기대는 커버드콜·옵션 인컴 (CONY, 팔란티어커버드콜 등) */
+  singleStockOption: boolean;
   dividendLike: boolean;
   index: boolean;
   growthSector: boolean;
@@ -81,11 +89,12 @@ export function traitsOf(item: Pick<SignalItem, 'ticker' | 'name'>, asset: Asset
   const t = bareTicker(item.ticker);
   const text = `${item.name} ${item.ticker}`;
   const sector = asset?.sector ?? '';
-  const coveredCall = COVERED_CALL_TICKERS.has(t) || COVERED_CALL_RE.test(text);
+  const coveredCall = COVERED_CALL_TICKERS.has(t) || SINGLE_OPTION_TICKERS.has(t) || COVERED_CALL_RE.test(text);
   const dividendLike = DIVIDEND_TICKERS.has(t) || DIVIDEND_RE.test(text) || INCOME_SECTOR_RE.test(sector);
   return {
-    isEtf: asset?.type === 'ETF' || ETF_NAME_RE.test(item.name) || INDEX_TICKERS.has(t) || COVERED_CALL_TICKERS.has(t),
+    isEtf: asset?.type === 'ETF' || ETF_NAME_RE.test(item.name) || INDEX_TICKERS.has(t) || COVERED_CALL_TICKERS.has(t) || SINGLE_OPTION_TICKERS.has(t),
     coveredCall,
+    singleStockOption: SINGLE_OPTION_TICKERS.has(t) || (coveredCall && SINGLE_NAME_RE.test(item.name)),
     dividendLike,
     // 배당·커버드콜 지수(예: 미국배당다우존스)는 지수 적립이 아니라 배당 전략으로 본다
     index: (INDEX_TICKERS.has(t) || INDEX_RE.test(item.name) || KR_INDEX_RE.test(item.name)) && !coveredCall && !dividendLike,
@@ -147,7 +156,7 @@ function fit(strategyId: string, reasons: FitReason[]): StrategyFit {
 }
 
 // 같은 점수면 더 구체적인 전략을 앞에 둔다
-const SPECIFICITY = ['covered-call-income', 'index-accumulate', 'dividend-hold', 'growth-short', 'general'];
+const SPECIFICITY = ['single-stock-option-income', 'covered-call-income', 'index-accumulate', 'dividend-hold', 'growth-short', 'general'];
 
 export function adviseStrategy(item: SignalItem, asset?: AssetInfo): StrategyAdvice {
   const tr = traitsOf(item, asset);
@@ -158,12 +167,31 @@ export function adviseStrategy(item: SignalItem, asset?: AssetInfo): StrategyAdv
   const divChange = n(item.dividend_change_pct);
   const yText = y > 0 ? `현재 ${plain(y, 2)}` : '배당 없음';
   const volText = volKnown ? `현재 ${plain(vol, 0)}` : '시세 이력 부족으로 판단 못 함';
+  // 이름으로 못 알아봐도 분배율이 30% 이상인 커버드콜은 한 종목 기초 상품으로 본다
+  const singleOption = tr.singleStockOption || (tr.coveredCall && y >= 30);
 
   const fits: StrategyFit[] = [
+    fit('single-stock-option-income', [
+      {
+        label: '한 종목에 기대는 커버드콜·옵션 인컴',
+        detail: tr.singleStockOption ? 'YieldMax·개별 종목 커버드콜 (이름·티커 기준)' : `커버드콜인데 분배율이 ${plain(y, 0)}`,
+        met: singleOption,
+        points: 50,
+      },
+      { label: '분배율 15% 이상 (상당 부분이 원금 반환일 수 있음)', detail: yText, met: y >= 15, points: 25 },
+      {
+        label: '기초 종목 변동성 30% 이상 또는 분배율 50% 이상',
+        detail: volKnown ? `변동성 ${plain(vol, 0)} · 분배율 ${plain(y, 0)}` : yText,
+        met: vol >= 30 || y >= 50,
+        points: 15,
+      },
+      { label: 'ETF', met: tr.isEtf, points: 10 },
+    ]),
     fit('covered-call-income', [
       { label: '커버드콜·옵션 프리미엄 상품', detail: '이름·티커 기준', met: tr.coveredCall, points: 55 },
       { label: '분배율 7% 이상', detail: yText, met: y >= 7, points: 30 },
       { label: 'ETF', met: tr.isEtf, points: 15 },
+      { label: '한 종목 기초 상품 (고분배 옵션 인컴 전략이 더 맞음)', met: singleOption, points: -30 },
     ]),
     fit('index-accumulate', [
       { label: '시장 지수를 따르는 ETF', detail: 'S&P 500·나스닥 100·코스피 200 등', met: tr.index, points: 60 },
@@ -251,6 +279,7 @@ export function tuneStrategy(strategy: RecommendedStrategy, item: SignalItem, ba
     scale('from_high_enabled', 'from_high_pct', '52주 고점 대비 하락 (매수)', -clamp(Math.round(vol * 0.6), 8, 35));
     scale('last_buy_dip_enabled', 'last_buy_dip_pct', '마지막 매수가 대비 하락 (매수)', -clamp(Math.round(vol * 0.35), 5, 20));
     scale('crash_enabled', 'crash_pct', '큰 폭락 경고', -clamp(Math.round(vol * 2), 30, 50));
+    scale('stop_loss_enabled', 'stop_loss_pct', '손절 (분배금 포함 총수익률)', -clamp(Math.round(vol * 0.4), 15, 30));
   }
 
   const off = (keys: (keyof SignalRule)[], label: string, why: string) => {

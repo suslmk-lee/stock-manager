@@ -730,8 +730,17 @@ export function listRuleConditions(rule: SignalRule): { profit: string[]; risk: 
   const d = toDraft(rule);
   // 단위가 숫자에 바로 붙는 접미사 (% · σ · 일 · 배 · 주)
   const tight = /^[%σ일배주]/;
-  const fmt = (def: RuleDef) =>
-    `${def.label} (${def.fields.map((f) => `${f.label} ${fmtNum(d.nums[f.key])}${tight.test(f.suffix) ? '' : ' '}${f.suffix}`).join(', ')})`;
+  const fmt = (def: RuleDef) => {
+    // 방식이 있는 조건은 방식을 이름에 드러낸다 (하회 / 하회 후 반등 / 200일선 회복)
+    if (def.enabled === 'below_ma_enabled') {
+      if (d.below_ma_mode === 'reclaim') return `200일선 상향 돌파 (최근 ${fmtNum(d.nums.below_ma_reclaim_days)}거래일 안)`;
+      if (d.below_ma_mode === 'rebound') return `장기 이평 하회 후 반등 (기준 ${fmtNum(d.nums.below_ma_pct)}%)`;
+    }
+    if (def.enabled === 'from_high_enabled' && d.from_high_mode === 'rebound') {
+      return `52주 고점 대비 하락 후 반등 (기준 ${fmtNum(d.nums.from_high_pct)}%)`;
+    }
+    return `${def.label} (${def.fields.map((f) => `${f.label} ${fmtNum(d.nums[f.key])}${tight.test(f.suffix) ? '' : ' '}${f.suffix}`).join(', ')})`;
+  };
   const pick = (defs: RuleDef[]) => defs.filter((def) => d.flags[def.enabled]).map(fmt);
   return { profit: pick(SELL_PROFIT_RULES), risk: pick(SELL_RISK_RULES), buy: pick(BUY_RULES) };
 }
