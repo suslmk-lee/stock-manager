@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { ArrowLeftRight, BarChart3, Calendar, Camera, DollarSign, Radar, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowLeftRight, BarChart3, Calendar, Camera, Coins, DollarSign, Radar, SlidersHorizontal, TrendingUp, Wallet } from 'lucide-react';
 
-export type RouteId = 'accounts' | 'assets' | 'trades' | 'portfolio' | 'dividends' | 'stats' | 'yearly' | 'signals';
+export type RouteId = 'accounts' | 'assets' | 'trades' | 'portfolio' | 'dividends' | 'stats' | 'yearly' | 'signals' | 'profiles' | 'candidates';
 
 export interface NavItem {
   id: RouteId;
@@ -19,7 +19,7 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-// 사이드바 묶음. 통계 분리(자산 추이 / 배당 분석)와 전략 프로필·배당 후보 페이지는 이후 단계에서 추가한다.
+// 사이드바 묶음. 통계 분리(자산 추이 / 배당 분석)는 이후 단계에서 한다.
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: '자산',
@@ -40,7 +40,11 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: '신호',
-    items: [{ id: 'signals', label: '매매 신호', title: '매매 신호', icon: Radar, isNew: true }],
+    items: [
+      { id: 'signals', label: '매매 신호', title: '매매 신호', icon: Radar, isNew: true },
+      { id: 'profiles', label: '전략 프로필', title: '전략 프로필', icon: SlidersHorizontal },
+      { id: 'candidates', label: '배당 후보', title: '배당 종목 정리', icon: Coins },
+    ],
   },
 ];
 

@@ -9,6 +9,8 @@ import SignalsDashboard from './pages/SignalsDashboard';
 import DividendYearlyOverview from './components/DividendYearlyOverview';
 import PortfolioSnapshots from './components/PortfolioSnapshots';
 import TransactionManager from './components/TransactionManager';
+import ProfileManager from './components/signals/ProfileManager';
+import DividendCandidates from './components/signals/DividendCandidates';
 import AlertsBell from './components/alerts/AlertsBell';
 import Sidebar from './components/shell/Sidebar';
 import { PageSlotsProvider } from './components/shell/PageSlots';
@@ -38,7 +40,7 @@ export default function Dashboard() {
   const [leadSlot, setLeadSlot] = useState<HTMLDivElement | null>(null);
   const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLElement>(null);
-  const { focusRequest } = useAlerts();
+  const { focusRequest, candidatesRequest } = useAlerts();
 
   // 상단 바 높이를 CSS 변수로 알려 준다 (목록-상세 패널이 남은 창 높이를 채울 때 쓴다)
   useEffect(() => {
@@ -159,6 +161,9 @@ export default function Dashboard() {
             {route === 'signals' && <SignalsDashboard focusAssetId={focusRequest?.assetId} focusNonce={focusRequest?.nonce} />}
             {route === 'yearly' && <DividendYearlyOverview />}
             {route === 'portfolio' && <PortfolioSnapshots />}
+            {route === 'profiles' && <ProfileManager />}
+            {/* 알림에서 다른 종목으로 다시 열면 nonce 가 바뀌어 새로 그린다 */}
+            {route === 'candidates' && <DividendCandidates key={candidatesRequest?.nonce ?? 0} highlightAssetId={candidatesRequest?.assetId} />}
           </main>
         </PageSlotsProvider>
       </div>

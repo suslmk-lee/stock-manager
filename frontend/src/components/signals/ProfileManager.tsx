@@ -1,7 +1,8 @@
-import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X, Plus, Loader2, RotateCcw, Trash2, Layers, Coins, Lock, Sparkles } from 'lucide-react';
+import { Plus, Loader2, RotateCcw, Trash2, Layers, Coins, Lock, Sparkles } from 'lucide-react';
 import { apiClient } from '../../api/client';
+import { PageActions } from '../shell/PageSlots';
+import { useAlerts } from '../alerts/AlertsProvider';
 import type { ProfileAssignment, ProfileKind, SignalItem, SignalProfile } from '../../types/models';
 import ProfileAssignmentTable, { AssignFilter } from './ProfileAssignmentTable';
 import { DEFAULT_SECTION, ProfileRuleEditor, SectionId } from './SignalRuleEditor';
@@ -18,12 +19,6 @@ async function createWithStrategy(
   const created = await apiClient.CreateSignalProfile(req);
   const updated = await apiClient.UpdateSignalProfile(created.id, { rule: applyRecommended(created.rule, strategy.patch) });
   return updated ?? created;
-}
-
-interface ProfileManagerProps {
-  items: SignalItem[]; // 보유 종목 (신호 리포트)
-  initialProfileId?: number;
-  onClose: (changed: boolean) => void;
 }
 
 function errMsg(err: unknown, fallback: string): string {
@@ -145,14 +140,19 @@ function NewProfileForm({ profiles, onCreated, onCancel }: { profiles: SignalPro
   );
 }
 
-export default function ProfileManager({ items, initialProfileId, onClose }: ProfileManagerProps) {
+// 전략 프로필 페이지 (사이드바 '전략 프로필'). 왼쪽 프로필 목록 + 오른쪽 전략 편집 / 종목 배정.
+export default function ProfileManager() {
+  const { notifyProfilesChanged } = useAlerts();
   const [profiles, setProfiles] = useState<SignalProfile[]>([]);
   const [assignments, setAssignments] = useState<ProfileAssignment[]>([]);
+  // 종목 배정 표와 소속 종목 수에 쓰는 보유 종목 (신호 리포트). 늦게 와도 화면은 먼저 연다.
+  const [items, setItems] = useState<SignalItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<number | null>(initialProfileId ?? null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  const [changed, setChanged] = useState(false);
+  // 다른 화면(매매 신호 등)이 다시 불러오도록 프로필 변경을 알린다
+  const setChanged = (_changed: true) => notifyProfilesChanged();
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<'reset' | 'delete' | null>(null);
@@ -173,8 +173,6 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
   // 이름/설명/유형 편집 (사용자 정의 프로필)
   const [meta, setMeta] = useState({ name: '', description: '', kind: 'standard' as ProfileKind });
   const detailRef = useRef<HTMLElement>(null);
-  const changedRef = useRef(false);
-  changedRef.current = changed;
 
   const load = useCallback(async (keepSelection = true) => {
     try {
@@ -197,10 +195,18 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
   }, [load]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose(changedRef.current);
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    let cancelled = false;
+    apiClient
+      .GetSignals()
+      .then((r) => !cancelled && setItems(r.items ?? []))
+      .catch((err) => {
+        console.error('Failed to load holdings for profiles:', err);
+        if (!cancelled) setItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     detailRef.current?.scrollTo(0, 0);
@@ -251,7 +257,11 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
     [assignments, defaultProfile?.id],
   );
 
-  const memberCount = useMemo(() => (selected ? items.filter((i) => profileIdOf(i.asset_id) === selected.id).length : 0), [items, selected, profileIdOf]);
+  // 보유 종목을 아직 못 받았으면 서버가 센 종목 수를 쓴다
+  const memberCount = useMemo(
+    () => (selected ? (items ? items.filter((i) => profileIdOf(i.asset_id) === selected.id).length : selected.asset_count) : 0),
+    [items, selected, profileIdOf],
+  );
 
   const run = async (fn: () => Promise<void>, fallback: string) => {
     try {
@@ -312,25 +322,11 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
 
   const metaDirty = !!selected && !selected.built_in && (meta.name !== selected.name || meta.description !== (selected.description ?? '') || meta.kind !== selected.kind);
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4" onClick={() => onClose(changed)}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="전략 프로필"
-        className="surface flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-white/[0.07] px-5 py-4 sm:px-6">
-          <div className="min-w-0">
-            <h2 className="section-title !text-lg">전략 프로필</h2>
-            <p className="label-mono mt-0.5">종목 성격별로 매매 규칙을 묶어 관리합니다</p>
-          </div>
-          <button type="button" onClick={() => onClose(changed)} className="btn-icon" aria-label="닫기">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
+  return (
+    <>
+      <PageActions lead={<span className="label-mono hidden sm:inline">종목 성격별로 매매 규칙을 묶어 관리합니다</span>} />
+      {/* 넓은 화면은 남은 창 높이를 채우고 목록·상세가 각자 스크롤한다 */}
+      <div className="surface flex min-h-[520px] flex-col overflow-hidden md:h-[calc(100vh_-_var(--app-header-h,56px)_-_3rem)]">
         {loading ? (
           <div className="flex flex-1 items-center justify-center">
             <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
@@ -420,7 +416,14 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
                 </div>
               )}
               {!creating && mode === 'assign' ? (
-                <ProfileAssignmentTable items={items} profiles={profiles} profileIdOf={profileIdOf} initialFilter={assignFilter} onAssign={assignAssets} />
+                items ? (
+                  <ProfileAssignmentTable items={items} profiles={profiles} profileIdOf={profileIdOf} initialFilter={assignFilter} onAssign={assignAssets} />
+                ) : (
+                  <div className="flex h-48 items-center justify-center gap-2 text-sm text-zinc-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    보유 종목을 불러오는 중…
+                  </div>
+                )
               ) : creating ? (
                 <NewProfileForm
                   profiles={profiles}
@@ -546,7 +549,6 @@ export default function ProfileManager({ items, initialProfileId, onClose }: Pro
           </div>
         )}
       </div>
-    </div>,
-    document.body,
+    </>
   );
 }

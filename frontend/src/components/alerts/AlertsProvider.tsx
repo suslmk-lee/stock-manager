@@ -4,7 +4,6 @@ import { onSignalsNew } from '../../api/events';
 import type { SignalEvent } from '../../types/models';
 import NotificationSettings from './NotificationSettings';
 import ToastStack from './ToastStack';
-import DividendCandidates from '../signals/DividendCandidates';
 import { isSuggestion } from './alertMeta';
 
 const isWeb = !(window as any).go;
@@ -14,6 +13,11 @@ const RECENT_LIMIT = 30;
 
 export interface FocusRequest {
   assetId: number;
+  nonce: number;
+}
+
+export interface CandidatesRequest {
+  assetId?: number;
   nonce: number;
 }
 
@@ -29,10 +33,14 @@ interface AlertsContextValue {
   /** 알림 항목(토스트/알림함 행)을 눌렀을 때: 읽음 처리 + 해당 종목으로 이동 */
   openEvent: (e: SignalEvent) => void;
   openSettings: () => void;
-  /** 배당 종목 정리 화면 열기 (assetId 가 있으면 그 종목을 강조/미리 선택) */
+  /** 배당 후보 페이지로 이동 (assetId 가 있으면 그 종목을 강조/미리 선택) */
   openCandidates: (assetId?: number) => void;
+  /** 마지막 배당 후보 이동 요청 — 페이지가 강조할 종목과 다시 그릴 기준(nonce) */
+  candidatesRequest: CandidatesRequest | null;
   /** 프로필 지정/변경이 일어날 때마다 올라가는 값 — 신호 화면이 다시 불러오는 데 쓴다 */
   profilesVersion: number;
+  /** 프로필 관리·배당 후보 페이지에서 지정이 바뀌었음을 알린다 */
+  notifyProfilesChanged: () => void;
   /** 제안 알림의 종목을 제안된 프로필로 지정 */
   acceptSuggestion: (e: SignalEvent) => Promise<void>;
   /** 제안 알림을 무시 */
@@ -53,7 +61,7 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<SignalEvent[]>([]);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [candidates, setCandidates] = useState<{ assetId?: number; nonce: number } | null>(null);
+  const [candidatesRequest, setCandidatesRequest] = useState<CandidatesRequest | null>(null);
   const [profilesVersion, setProfilesVersion] = useState(0);
   const lastCheckRef = useRef(0);
   const nonceRef = useRef(0);
@@ -165,23 +173,32 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
     setFocusRequest({ assetId, nonce: nonceRef.current });
   }, []);
 
+  // 배당 후보는 팝업이 아니라 페이지(#candidates)로 연다. Dashboard 가 해시를 보고 페이지를 바꾼다.
+  const openCandidates = useCallback((assetId?: number) => {
+    nonceRef.current += 1;
+    setCandidatesRequest({ assetId, nonce: nonceRef.current });
+    window.location.hash = 'candidates';
+  }, []);
+
   const openEvent = useCallback(
     (e: SignalEvent) => {
       if (!e.read_at) markRead([e.id]);
       dismissToast(e.id);
-      if (isSuggestion(e)) {
-        nonceRef.current += 1;
-        setCandidates({ assetId: e.asset_id, nonce: nonceRef.current });
-      } else {
-        focusAsset(e.asset_id);
-      }
+      if (isSuggestion(e)) openCandidates(e.asset_id);
+      else focusAsset(e.asset_id);
     },
-    [markRead, dismissToast, focusAsset],
+    [markRead, dismissToast, focusAsset, openCandidates],
   );
 
-  const openCandidates = useCallback((assetId?: number) => {
-    nonceRef.current += 1;
-    setCandidates({ assetId, nonce: nonceRef.current });
+  const notifyProfilesChanged = useCallback(() => setProfilesVersion((v) => v + 1), []);
+
+  // 배당 후보 페이지를 떠나면 요청을 지운다 (나중에 메뉴로 다시 들어왔을 때 예전 종목을 또 강조하지 않도록)
+  useEffect(() => {
+    const onHash = () => {
+      if (window.location.hash !== '#candidates') setCandidatesRequest(null);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   const acceptSuggestion = useCallback(
@@ -210,24 +227,14 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
   const openSettings = useCallback(() => setSettingsOpen(true), []);
 
   const value = useMemo<AlertsContextValue>(
-    () => ({ unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings, openCandidates, profilesVersion, acceptSuggestion, dismissSuggestion }),
-    [unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings, openCandidates, profilesVersion, acceptSuggestion, dismissSuggestion],
+    () => ({ unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings, openCandidates, candidatesRequest, profilesVersion, notifyProfilesChanged, acceptSuggestion, dismissSuggestion }),
+    [unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings, openCandidates, candidatesRequest, profilesVersion, notifyProfilesChanged, acceptSuggestion, dismissSuggestion],
   );
 
   return (
     <AlertsContext.Provider value={value}>
       {children}
       <ToastStack />
-      {candidates && (
-        <DividendCandidates
-          key={candidates.nonce}
-          highlightAssetId={candidates.assetId}
-          onClose={(changed) => {
-            setCandidates(null);
-            if (changed) setProfilesVersion((v) => v + 1);
-          }}
-        />
-      )}
       <NotificationSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </AlertsContext.Provider>
   );

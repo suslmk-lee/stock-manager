@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, Coins, Info, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { Bell, Info, RefreshCw } from 'lucide-react';
 import { PageActions } from '../components/shell/PageSlots';
 import SplitView from '../components/shell/SplitView';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import SignalHistory from '../components/alerts/SignalHistory';
 import { apiClient } from '../api/client';
 import { SignalItem, SignalProfile, SignalReport, SignalRule, SignalRulesResponse } from '../types/models';
-import ProfileManager from '../components/signals/ProfileManager';
 import SignalList, { sortItems, type SortKey, type SortState } from '../components/signals/SignalList';
 import SignalDetail, { type DetailTab } from '../components/signals/SignalDetail';
 import { type FilterValue } from '../components/signals/SignalCard';
@@ -39,7 +38,7 @@ const matchesQuery = (i: SignalItem, q: string) => {
 };
 
 export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDashboardProps = {}) {
-  const { openSettings, openCandidates, profilesVersion } = useAlerts();
+  const { openSettings, profilesVersion } = useAlerts();
   const [report, setReport] = useState<SignalReport | null>(null);
   const [rules, setRules] = useState<SignalRulesResponse | null>(null);
   const [profiles, setProfiles] = useState<SignalProfile[] | null>(null);
@@ -55,7 +54,6 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
   const [tab, setTab] = useState<DetailTab>('overview');
   const [split, setSplit] = useState<boolean | null>(null); // null = 아직 화면 폭을 재지 않음
   const [flashId, setFlashId] = useState<number | null>(null);
-  const [managerOpen, setManagerOpen] = useState(false);
 
   const changeSort = (s: SortState) => {
     setSort(s);
@@ -182,14 +180,6 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
           <Bell className="h-4 w-4" />
           <span className="hidden lg:inline">알림 설정</span>
         </button>
-        <button type="button" className="btn-ghost" onClick={() => openCandidates()} title="배당 종목 정리">
-          <Coins className="h-4 w-4 text-sky-300" />
-          <span className="hidden lg:inline">배당 종목 정리</span>
-        </button>
-        <button type="button" className="btn-ghost" disabled={!profiles} onClick={() => setManagerOpen(true)} title="전략 프로필">
-          <SlidersHorizontal className="h-4 w-4" />
-          <span className="hidden lg:inline">전략 프로필</span>
-        </button>
         <button type="button" className="btn-icon !h-9 !w-9" onClick={() => load(false)} disabled={refreshing} aria-label="새로고침" title="새로고침">
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
         </button>
@@ -205,7 +195,7 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
       )}
 
       {loading ? (
-        <div className="surface h-[calc(100vh-var(--app-header-h,56px)-3rem)] min-h-[520px] animate-pulse" />
+        <div className="surface h-[calc(100vh_-_var(--app-header-h,56px)_-_3rem)] min-h-[520px] animate-pulse" />
       ) : report ? (
         items.length === 0 ? (
           <div className="surface py-16 text-center">
@@ -260,16 +250,6 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
       ) : null}
 
       <SignalHistory />
-
-      {managerOpen && (
-        <ProfileManager
-          items={items}
-          onClose={(changed) => {
-            setManagerOpen(false);
-            if (changed) load(false);
-          }}
-        />
-      )}
     </div>
   );
 }
