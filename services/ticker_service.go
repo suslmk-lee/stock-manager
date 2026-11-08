@@ -21,8 +21,9 @@ type TickerService struct {
 	priceCache map[string]priceCacheEntry
 	cacheTTL   time.Duration
 
-	histCache2 dailyHistoryStore // see ticker_history_cache.go (zero value usable)
-	divEvCache dividendEventsStore // see ticker_dividends.go (zero value usable)
+	histCache2   dailyHistoryStore   // see ticker_history_cache.go (zero value usable)
+	divEvCache   dividendEventsStore // see ticker_dividends.go (zero value usable)
+	monthlyCache monthlySeriesStore  // see ticker_monthly.go (zero value usable)
 }
 
 func NewTickerService() *TickerService {
@@ -417,6 +418,10 @@ func (s *TickerService) SearchTicker(query string) ([]TickerInfo, error) {
 	query = strings.TrimSpace(strings.ToUpper(query))
 	if query == "" || len(query) < 1 {
 		return []TickerInfo{}, nil
+	}
+	// 한글 이름은 Yahoo 가 받지 못한다 (400) → 네이버 자동완성 (ticker_search_naver.go)
+	if containsHangul(query) {
+		return searchTickerNaver(query)
 	}
 
 	baseURL := "https://query2.finance.yahoo.com/v1/finance/search"

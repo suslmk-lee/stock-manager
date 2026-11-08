@@ -62,6 +62,26 @@ func registerUtilityRoutes(api *gin.RouterGroup, s *Services) {
 		c.JSON(http.StatusOK, res)
 	})
 
+	// 투자 시뮬레이션용 월봉 + 주당 배당 (range: 5y | 10y | 20y | max, 기본 max)
+	api.GET("/ticker/monthly", func(c *gin.Context) {
+		ticker := strings.TrimSpace(c.Query("ticker"))
+		rangeStr := c.DefaultQuery("range", "max")
+		if ticker == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ticker parameter is required"})
+			return
+		}
+		if !services.MonthlySeriesRanges[rangeStr] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "range must be one of 5y, 10y, 20y, max"})
+			return
+		}
+		res, err := s.Ticker.GetMonthlySeriesCached(ticker, rangeStr)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
 	api.GET("/exchange-rate/usd-krw", func(c *gin.Context) {
 		res, err := s.ExchangeRate.GetUSDToKRW()
 		if err != nil {
