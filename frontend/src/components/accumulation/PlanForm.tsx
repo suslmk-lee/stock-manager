@@ -225,8 +225,9 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
-        <div className="surface flex max-h-[92vh] w-full max-w-xl flex-col" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={editing ? '주식 모으기 수정' : '주식 모으기 추가'}>
+      {/* 입력 중인 값을 잃지 않도록 바깥을 눌러도 닫지 않는다 — 닫기(X)·취소로만 닫는다 */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-4">
+        <div className="surface flex max-h-[92vh] w-full max-w-xl flex-col" role="dialog" aria-modal="true" aria-label={editing ? '주식 모으기 수정' : '주식 모으기 추가'}>
           <div className="flex items-start justify-between gap-3 border-b border-white/[0.07] px-5 py-4">
             <div className="min-w-0">
               <h3 className="section-title">{editing ? '주식 모으기 수정' : '주식 모으기 추가'}</h3>
