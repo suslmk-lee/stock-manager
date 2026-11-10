@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Check, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { AccumulationFill, AccumulationPlanRequest, AccumulationPlanView, PlanCurrency, PlanStatus } from '../../types/models';
-import { belowMinimum, fmtAmount, fmtDay, fmtPrice, fmtQty, fmtSignedAmount, fmtSignedPct, nextText, ruleText, signTone, stepLabel } from './planText';
+import { accountLabel, assetTitle, belowMinimum, fmtAmount, fmtDay, fmtPrice, fmtQty, fmtSignedAmount, fmtSignedPct, nextText, ruleText, signTone, stepLabel } from './planText';
 
 interface PlanDetailProps {
   plan: AccumulationPlanView;
@@ -47,6 +47,7 @@ export const toRequest = (p: AccumulationPlanView): AccumulationPlanRequest => (
 export default function PlanDetail({ plan, onEdit, onChanged, onDeleted }: PlanDetailProps) {
   const ccy = plan.amount_currency;
   const assetCcy = plan.asset_currency as PlanCurrency;
+  const title = assetTitle(plan.asset);
   const [fills, setFills] = useState<AccumulationFill[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -90,7 +91,7 @@ export default function PlanDetail({ plan, onEdit, onChanged, onDeleted }: PlanD
   };
 
   const remove = () => {
-    if (!window.confirm(`${plan.asset?.name ?? '이'} 모으기를 지울까요?\n이미 기록한 매수는 실제로 산 것이라 매매 기록에 그대로 남습니다.`)) return;
+    if (!window.confirm(`${title.primary || '이'} 모으기를 지울까요?\n이미 기록한 매수는 실제로 산 것이라 매매 기록에 그대로 남습니다.`)) return;
     setBusy(true);
     apiClient
       .DeleteAccumulationPlan(plan.id)
@@ -135,12 +136,15 @@ export default function PlanDetail({ plan, onEdit, onChanged, onDeleted }: PlanD
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="truncate text-lg font-semibold text-white">{plan.asset?.name ?? plan.asset?.ticker}</h2>
+              <h2 className={`truncate font-semibold text-white ${title.tickerFirst ? 'text-2xl tracking-tight' : 'text-lg'}`}>{title.primary}</h2>
               {plan.status === 'paused' && <span className="badge border border-white/10 bg-white/[0.05] text-zinc-400">중지</span>}
             </div>
-            <p className="mt-0.5 font-mono text-[11px] text-zinc-500">
-              {plan.asset?.ticker} · {plan.account?.name}
-              {plan.account?.broker ? ` (${plan.account.broker})` : ''}
+            <p className="mt-0.5 truncate text-[12px] text-zinc-400">
+              {title.secondary && <span className={title.tickerFirst ? '' : 'font-mono text-[11px] text-zinc-500'}>{title.secondary}</span>}
+              <span className="font-mono text-[11px] text-zinc-500">
+                {title.secondary ? ' · ' : ''}
+                {accountLabel(plan.account)}
+              </span>
             </p>
             <p className="mt-2 text-sm text-zinc-200">{ruleText(plan, assetCcy)}</p>
             <p className="mt-0.5 text-[11px] text-zinc-500">

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import type { AccumulationPlanView, PlanCurrency, PlanStatus } from '../../types/models';
-import { belowMinimum, fmtAmount, fmtSignedPct, ruleText, signTone } from './planText';
+import { assetTitle, belowMinimum, fmtAmount, fmtSignedPct, ruleText, signTone } from './planText';
 
 interface PlanListProps {
   plans: AccumulationPlanView[];
@@ -77,6 +77,7 @@ export default function PlanList({ plans, status, onStatus, counts, selectedId, 
             const active = p.id === selectedId;
             const ccy = p.asset_currency as PlanCurrency;
             const ret = p.holding_return_pct;
+            const title = assetTitle(p.asset);
             return (
               <button
                 key={p.id}
@@ -94,9 +95,18 @@ export default function PlanList({ plans, status, onStatus, counts, selectedId, 
                 }`}
               >
                 <span className="min-w-0 flex-1">
-                  <span className={`flex items-center gap-1.5 text-[14px] ${active ? 'font-medium text-white' : 'text-zinc-100'}`}>
-                    <span className="truncate">{p.asset?.name ?? p.asset?.ticker}</span>
-                    <span className="shrink-0 font-mono text-[10.5px] text-zinc-500">{p.asset?.ticker}</span>
+                  <span className={`flex items-baseline gap-1.5 ${active ? 'text-white' : 'text-zinc-100'}`}>
+                    {title.tickerFirst ? (
+                      <>
+                        <span className="shrink-0 text-[15px] font-semibold tracking-tight">{title.primary}</span>
+                        <span className="truncate text-[11px] text-zinc-500">{title.secondary}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className={`truncate text-[14px] ${active ? 'font-medium' : ''}`}>{title.primary}</span>
+                        <span className="shrink-0 font-mono text-[10.5px] text-zinc-500">{title.secondary}</span>
+                      </>
+                    )}
                   </span>
                   <span className="mt-0.5 block truncate text-xs text-zinc-400">
                     {ruleText(p, ccy)}

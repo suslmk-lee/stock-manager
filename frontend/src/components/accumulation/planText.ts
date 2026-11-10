@@ -1,4 +1,4 @@
-import type { Account, AccumulationPlanRequest, AccumulationPlanView, PlanCurrency } from '../../types/models';
+import type { Account, AccumulationPlanRequest, AccumulationPlanView, Asset, PlanCurrency } from '../../types/models';
 
 // 주식 모으기 화면의 문구·숫자 표기와 기본값
 
@@ -132,3 +132,18 @@ export function monthlyTimes(p: Pick<AccumulationPlanRequest, 'schedule' | 'week
   for (let d = 1; d <= 5; d++) if ((p.weekdays >> d) & 1) n++;
   return (n * 52) / 12;
 }
+
+/**
+ * 종목 제목: 미국 종목은 티커가 알아보기 쉬워 티커를 크게(이름은 작게),
+ * 국내 종목은 티커가 숫자 코드라 이름을 크게(코드는 작게) 보여 준다.
+ */
+export function assetTitle(asset?: Pick<Asset, 'ticker' | 'name'> | null): { primary: string; secondary: string; tickerFirst: boolean } {
+  const ticker = asset?.ticker ?? '';
+  const name = asset?.name ?? '';
+  if (!ticker || isKRTicker(ticker) || !name) return { primary: name || ticker, secondary: name && ticker ? ticker : '', tickerFirst: false };
+  return { primary: ticker, secondary: name === ticker ? '' : name, tickerFirst: true };
+}
+
+/** 계좌 이름 (증권사 이름이 계좌 이름과 다를 때만 덧붙인다) */
+export const accountLabel = (account?: Pick<Account, 'name' | 'broker'> | null) =>
+  account ? `${account.name}${account.broker && account.broker !== account.name ? ` (${account.broker})` : ''}` : '';

@@ -6,6 +6,8 @@ import { apiClient } from '../../api/client';
 import type { Account, AccumulationPlanRequest, AccumulationPlanView, Asset, Holding, PlanCondition, PlanCurrency, PlanSchedule } from '../../types/models';
 import {
   QTY_STEPS,
+  accountLabel,
+  assetTitle,
   WEEKDAY_LABELS,
   currencyOfTicker,
   defaultAutoFrom,
@@ -242,10 +244,11 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
             {/* 계좌·종목 */}
             {editing ? (
               <div className="surface-inset flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 text-sm">
-                <span className="min-w-0 truncate text-white">{asset?.name}</span>
-                <span className="shrink-0 font-mono text-[11px] text-zinc-500">
-                  {ticker} · {account?.name}
+                <span className="flex min-w-0 items-baseline gap-1.5">
+                  <span className={`shrink-0 text-white ${assetTitle(asset).tickerFirst ? 'font-semibold' : ''}`}>{assetTitle(asset).primary}</span>
+                  <span className="truncate text-xs text-zinc-500">{assetTitle(asset).secondary}</span>
                 </span>
+                <span className="shrink-0 font-mono text-[11px] text-zinc-500">{accountLabel(account)}</span>
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
