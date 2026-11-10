@@ -90,12 +90,8 @@ export default function NotificationSettings({ open, onClose }: { open: boolean;
 
   return (
     <Portal>
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-6"
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
-      >
+      {/* 입력 중인 값을 잃지 않도록 바깥을 눌러도 닫지 않는다 — 닫기·취소로만 닫는다 */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-6">
         <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="알림 설정" className="surface flex max-h-[85vh] w-full max-w-md flex-col outline-none">
           <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-3.5">
             <h2 className="text-base font-semibold text-white">알림 설정</h2>

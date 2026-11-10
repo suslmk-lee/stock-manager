@@ -1490,7 +1490,8 @@ export default function SignalRuleEditor({ assetId, assetName, profiles, current
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+    // 입력 중인 값을 잃지 않도록 바깥을 눌러도 닫지 않는다
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div
         role="dialog"
         aria-modal="true"

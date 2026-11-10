@@ -1665,7 +1665,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
           <Portal>
             <div
               className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-              onClick={() => { if (!txActionLoading) { setSelectedTx(null); setTxEditMode(false); } }}
+              onClick={() => { if (!txActionLoading && !txEditMode) setSelectedTx(null); }}
             >
               <div
                 className="surface p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
@@ -1892,10 +1892,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       {/* 자산 추가 모달 */}
       {showAssetForm && (
         <Portal>
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => !submitting && (setShowAssetForm(false), resetAssetForm())}
-          >
+          {/* 입력 중인 값을 잃지 않도록 바깥을 눌러도 닫지 않는다 — 닫기·취소로만 닫는다 */}
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div
               className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
@@ -2041,10 +2039,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       {/* 거래 기록 모달 */}
       {showForm && (
         <Portal>
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => !submitting && setShowForm(false)}
-          >
+          {/* 입력 중인 값을 잃지 않도록 바깥을 눌러도 닫지 않는다 — 닫기·취소로만 닫는다 */}
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div
               className="surface p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}

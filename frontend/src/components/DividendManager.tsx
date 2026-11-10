@@ -1004,10 +1004,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
 
       {showForm && (
         <Portal>
-          <div 
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            onClick={handleCancelEdit}
-          >
+          {/* 입력 중인 값을 잃지 않도록 바깥을 눌러도 닫지 않는다 — 닫기·취소로만 닫는다 */}
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div 
               className="surface p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
