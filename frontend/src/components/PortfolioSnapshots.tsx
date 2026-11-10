@@ -288,7 +288,7 @@ export default function PortfolioSnapshots() {
                                 )}
                               </div>
                               <p className="num text-sm text-zinc-300 text-right whitespace-nowrap">
-                                {item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(2)}주
+                                {item.quantity % 1 === 0 ? item.quantity : item.quantity.toLocaleString('ko-KR', { maximumFractionDigits: item.quantity < 1 ? 6 : 2 })}주
                               </p>
                               <p className="num text-sm text-zinc-300 text-right whitespace-nowrap">
                                 {item.currency === 'USD' ? `$${item.price.toFixed(2)}` : `₩${item.price.toLocaleString()}`}

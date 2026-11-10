@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult } from '../types/models';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -480,5 +480,57 @@ export const apiClient = {
       return;
     }
     return WailsApp.DismissProfileSuggestion(assetId);
+  },
+
+  // ==========================================
+  // 주식 모으기
+  // ==========================================
+  GetAccumulationPlans: async (): Promise<{ plans: AccumulationPlanView[] }> => {
+    if (isWeb) return fetchApi<{ plans: AccumulationPlanView[] }>('/accumulations');
+    return (await WailsApp.GetAccumulationPlans()) as { plans: AccumulationPlanView[] };
+  },
+
+  CreateAccumulationPlan: async (req: AccumulationPlanRequest): Promise<AccumulationPlanView> => {
+    if (isWeb) return fetchApi<AccumulationPlanView>('/accumulations', { method: 'POST', body: JSON.stringify(req) });
+    return (await WailsApp.CreateAccumulationPlan(req as unknown as Parameters<typeof WailsApp.CreateAccumulationPlan>[0])) as AccumulationPlanView;
+  },
+
+  UpdateAccumulationPlan: async (id: number, req: AccumulationPlanRequest): Promise<AccumulationPlanView> => {
+    if (isWeb) return fetchApi<AccumulationPlanView>(`/accumulations/${id}`, { method: 'PUT', body: JSON.stringify(req) });
+    return (await WailsApp.UpdateAccumulationPlan(id, req as unknown as Parameters<typeof WailsApp.UpdateAccumulationPlan>[1])) as AccumulationPlanView;
+  },
+
+  DeleteAccumulationPlan: async (id: number): Promise<void> => {
+    if (isWeb) {
+      await fetchApi(`/accumulations/${id}`, { method: 'DELETE' });
+      return;
+    }
+    return WailsApp.DeleteAccumulationPlan(id);
+  },
+
+  GetAccumulationFills: async (id: number): Promise<{ fills: AccumulationFill[] }> => {
+    if (isWeb) return fetchApi<{ fills: AccumulationFill[] }>(`/accumulations/${id}/fills`);
+    return (await WailsApp.GetAccumulationFills(id)) as { fills: AccumulationFill[] };
+  },
+
+  UpdateAccumulationFill: async (txId: number, quantity: number, amount: number): Promise<void> => {
+    if (isWeb) {
+      await fetchApi(`/accumulation-fills/${txId}`, { method: 'PUT', body: JSON.stringify({ quantity, amount }) });
+      return;
+    }
+    return WailsApp.UpdateAccumulationFill(txId, quantity, amount);
+  },
+
+  DeleteAccumulationFill: async (txId: number): Promise<void> => {
+    if (isWeb) {
+      await fetchApi(`/accumulation-fills/${txId}`, { method: 'DELETE' });
+      return;
+    }
+    return WailsApp.DeleteAccumulationFill(txId);
+  },
+
+  RunAccumulations: async (): Promise<AccumulationRunResult> => {
+    if (isWeb) return fetchApi<AccumulationRunResult>('/accumulations/run', { method: 'POST' });
+    return (await WailsApp.RunAccumulations()) as AccumulationRunResult;
   },
 };

@@ -239,6 +239,7 @@ func runMigrations() error {
 		&models.ProfileSuggestion{},
 		&models.NotificationSetting{},
 		&models.FundamentalSnapshot{},
+		&models.AccumulationPlan{},
 	); err != nil {
 		return err
 	}

@@ -94,6 +94,8 @@ export interface Transaction {
   quantity: number;
   fee: number;
   notes: string;
+  /** 주식 모으기가 자동으로 남긴 회차 */
+  plan_id?: number;
   created_at: string;
   updated_at: string;
   account?: Account;
@@ -590,4 +592,82 @@ export interface DailyAssetSeries {
 export interface DailyCaptureResult {
   snapshot: Record<string, any>;
   backfill_started: boolean;
+}
+
+// ── 주식 모으기 (정기 소액 매수) ──
+export type PlanSchedule = 'daily' | 'weekly' | 'monthly';
+export type PlanCondition = 'always' | 'return_below' | 'price_below';
+export type PlanStatus = 'active' | 'paused';
+export type PlanCurrency = 'KRW' | 'USD';
+
+export interface AccumulationPlanRequest {
+  account_id: number;
+  asset_id: number;
+  amount: number;
+  amount_currency: PlanCurrency;
+  /** 수량 단위 (카카오페이 0.001주, 금액에 맞춰 사는 곳 0.000001주) */
+  qty_step: number;
+  schedule: PlanSchedule;
+  /** 매주: bit0=일 … bit6=토 */
+  weekdays: number;
+  month_day: number;
+  condition: PlanCondition;
+  condition_value: number;
+  status: PlanStatus;
+  started_on: string;
+  /** 이 거래일부터 자동 기록 (YYYY-MM-DD) */
+  auto_from: string;
+  opening_rounds: number;
+  opening_amount: number;
+  opening_quantity: number;
+  /** 등록할 때만: 지금까지 모은 수량을 보유에 더한다 */
+  add_opening_to_holdings?: boolean;
+  notes: string;
+}
+
+export interface AccumulationPlanView extends Omit<AccumulationPlanRequest, 'add_opening_to_holdings'> {
+  id: number;
+  processed_through: string;
+  opening_tx_id?: number;
+  created_at: string;
+  updated_at: string;
+  account?: Account;
+  asset?: Asset;
+  asset_currency: PlanCurrency;
+  rounds: number;
+  auto_rounds: number;
+  invested: number;
+  quantity: number;
+  current_price: number;
+  price_date?: string;
+  value?: number;
+  pnl?: number;
+  pnl_pct?: number;
+  holding_quantity: number;
+  holding_avg_price: number;
+  holding_return_pct?: number;
+  condition_met?: boolean;
+  last_fill_date?: string;
+  next_date?: string;
+  monthly_max: number;
+  /** 지금 가격에서 수량 단위 하나를 사는 데 드는 금액 (금액 통화) */
+  min_amount?: number;
+}
+
+export interface AccumulationFill {
+  transaction_id: number;
+  round: number;
+  date: string;
+  price: number;
+  quantity: number;
+  amount: number;
+  fx?: number;
+  edited: boolean;
+}
+
+export interface AccumulationRunResult {
+  created: number;
+  skipped: number;
+  plans: number;
+  errors?: string[];
 }

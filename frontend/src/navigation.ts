@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { ArrowLeftRight, BarChart3, Coins, DollarSign, LineChart, Radar, SlidersHorizontal, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowLeftRight, BarChart3, Coins, DollarSign, LineChart, PiggyBank, Radar, SlidersHorizontal, TrendingUp, Wallet } from 'lucide-react';
 
-export type RouteId = 'accounts' | 'assets' | 'trades' | 'trend' | 'dividends' | 'dividend-analysis' | 'signals' | 'profiles' | 'candidates';
+export type RouteId = 'accounts' | 'assets' | 'trades' | 'accumulate' | 'trend' | 'dividends' | 'dividend-analysis' | 'signals' | 'profiles' | 'candidates';
 export type GroupId = 'assets' | 'dividends' | 'signals';
 
 export interface NavItem {
@@ -33,6 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'accounts', label: '계좌', title: '계좌 관리', icon: Wallet },
       { id: 'assets', label: '주식/ETF', title: '주식/ETF 관리', icon: TrendingUp },
       { id: 'trades', label: '매매 기록', title: '매매 관리', icon: ArrowLeftRight },
+      { id: 'accumulate', label: '모으기', title: '주식 모으기', icon: PiggyBank, isNew: true },
       { id: 'trend', label: '자산 추이', title: '자산 추이', icon: LineChart },
     ],
   },

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"stock-manager/database"
 	"stock-manager/httpapi"
@@ -37,6 +39,9 @@ func main() {
 	// 일별 총자산: 오늘 실측 보장 + 2년 추정 백필 (비동기)
 	svc.DailySnap.EnsureTodayAsync()
 	svc.DailySnap.BackfillAsync(services.DefaultBackfillDays)
+
+	// 주식 모으기 자동 기록 (데스크톱 앱과 같은 DB — 같은 날은 한 건만 남는다)
+	go svc.Accumulation.RunEvery(context.Background(), 4*time.Hour)
 
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)

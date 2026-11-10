@@ -24,6 +24,7 @@ type App struct {
 	realizedPnLService  *services.RealizedPnLService
 	signalService       *services.SignalService
 	dailySnapService    *services.DailySnapshotService
+	accumulationService *services.AccumulationService
 	updater             *updater.Updater
 }
 
@@ -44,6 +45,7 @@ func NewApp() *App {
 	a.realizedPnLService = services.NewRealizedPnLService()
 	a.signalService = services.NewSignalService(database.GetDB(), a.tickerService, a.exchangeRateService)
 	a.dailySnapService = services.NewDailySnapshotService(database.GetDB(), a.tickerService)
+	a.accumulationService = services.NewAccumulationService(database.GetDB(), a.tickerService)
 	fundamentals := services.NewFundamentalsService(nil)
 	a.signalService.SetFundamentals(fundamentals)
 	a.signalService.SetValuation(services.NewValuationService(database.GetDB(), a.tickerService, fundamentals))
@@ -67,6 +69,7 @@ func (a *App) apiServices() *httpapi.Services {
 		RealizedPnL:  a.realizedPnLService,
 		Signal:       a.signalService,
 		DailySnap:    a.dailySnapService,
+		Accumulation: a.accumulationService,
 	}
 }
 
@@ -93,6 +96,9 @@ func (a *App) startup(ctx context.Context) {
 			}
 		}
 	}()
+
+	// 주식 모으기: 장이 끝난 거래일의 회차를 지금 한 번, 이후 몇 시간마다 채운다
+	go a.accumulationService.RunEvery(ctx, 4*time.Hour)
 
 	// 신호 백그라운드 점검 (ctx 종료 시 중단)
 	a.startSignalMonitor(ctx)

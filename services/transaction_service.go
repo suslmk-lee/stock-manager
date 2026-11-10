@@ -21,6 +21,11 @@ func NewTransactionService() *TransactionService {
 	}
 }
 
+// NewTransactionServiceWithDB 는 지정한 DB 로 동작하는 서비스를 만든다 (테스트·다른 서비스 조립용).
+func NewTransactionServiceWithDB(db *gorm.DB) *TransactionService {
+	return &TransactionService{db: db}
+}
+
 type CreateTransactionRequest struct {
 	AccountID uint
 	AssetID   uint
@@ -30,6 +35,7 @@ type CreateTransactionRequest struct {
 	Quantity  float64
 	Fee       float64
 	Notes     string
+	PlanID    *uint // 주식 모으기 자동 기록일 때만
 }
 
 func (s *TransactionService) CreateTransaction(req CreateTransactionRequest) (*models.Transaction, error) {
@@ -62,6 +68,7 @@ func (s *TransactionService) CreateTransaction(req CreateTransactionRequest) (*m
 		Quantity:  req.Quantity,
 		Fee:       req.Fee,
 		Notes:     req.Notes,
+		PlanID:    req.PlanID,
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
