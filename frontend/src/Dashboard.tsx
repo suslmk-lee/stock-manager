@@ -138,9 +138,9 @@ export default function Dashboard() {
 
         {/* 상단 바: 페이지 제목 + 페이지 도구(PageActions 포털) + 알림.
             모바일은 도구가 여러 줄로 늘어나므로 고정 바에는 제목만 두고 도구 줄은 아래로 내려 함께 스크롤되게 한다. */}
-        <header ref={headerRef} className="app-header sticky top-0 z-20 border-b border-white/[0.07] backdrop-blur-xl">
+        <header ref={headerRef} className="app-header drag-region sticky top-0 z-20 border-b border-white/[0.07] backdrop-blur-xl">
           {/* 데스크톱에서 도구가 한 줄에 다 안 들어가면 오른쪽 묶음이 다음 줄로 내려간다 (높이는 --app-header-h 로 전달) */}
-          <div className={`mx-auto flex min-h-14 max-w-screen-2xl items-center gap-x-3 px-4 py-2.5 sm:px-6 ${mobile ? '' : 'flex-wrap gap-y-2'}`}>
+          <div className={`mx-auto flex min-h-14 max-w-screen-2xl items-center gap-x-3 px-4 py-2.5 sm:px-6 ${mobile ? 'mac-titlebar-pad' : 'flex-wrap gap-y-2'}`}>
             <h1 className={`flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white ${mobile ? 'min-w-0' : 'shrink-0 whitespace-nowrap'}`}>
               <current.icon className="h-7 w-7 shrink-0 text-zinc-200" />
               <span className={mobile ? 'truncate' : ''}>{current.title}</span>

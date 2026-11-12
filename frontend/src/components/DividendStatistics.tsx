@@ -108,7 +108,7 @@ export default function DividendStatistics({ accountId, marketType, liquidity = 
         {kpis.map((k) => (
           <div key={k.label} className="surface p-5">
             <div className="flex items-center justify-between mb-4">
-              <p className="label-mono !text-zinc-400">{k.label}</p>
+              <p className="stat-label">{k.label}</p>
               <CardIcon icon={k.icon} tone={k.tone} size="sm" />
             </div>
             <p className="num text-2xl font-light tracking-tight text-white">{k.value}</p>

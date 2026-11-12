@@ -65,7 +65,9 @@ export default function Sidebar({
         }`}
         aria-label="메뉴"
       >
-        <div className={`flex h-14 shrink-0 items-center ${rail ? 'justify-center' : 'justify-between px-4'}`}>
+        {/* 맥 데스크톱 앱: 창 단추(빨강·노랑·초록) 자리. 잡고 끌면 창이 움직인다 */}
+        <div className="titlebar-row drag-region h-14 shrink-0" aria-hidden />
+        <div className={`drag-region flex h-14 shrink-0 items-center ${rail ? 'justify-center' : 'justify-between px-4'}`}>
           <Brand wordmark={rail ? 'hide' : 'show'} tagline={false} />
           {mobile && (
             <button type="button" className="btn-icon" onClick={onCloseMobile} aria-label="메뉴 닫기">

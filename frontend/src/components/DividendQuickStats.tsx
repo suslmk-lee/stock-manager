@@ -278,7 +278,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
           <div className="lg:flex-1 lg:pr-6">
             <div className="flex items-center gap-3 mb-3">
               <CardIcon icon={IconCoin} tone="mint" size="sm" />
-              <p className="label-mono">총 배당금</p>
+              <p className="stat-label">총 배당금</p>
             </div>
             <p className="num text-2xl sm:text-3xl font-light tracking-tight text-white">{formatCurrency(totalDividend)}</p>
           </div>
@@ -288,7 +288,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
           <div className="lg:flex-1 lg:px-6">
             <div className="flex items-center gap-3 mb-3">
               <CardIcon icon={IconCalendar} tone="sky" size="sm" />
-              <p className="label-mono">{new Date().getFullYear()}년 배당금</p>
+              <p className="stat-label">{new Date().getFullYear()}년 배당금</p>
             </div>
             <p className="num text-2xl sm:text-3xl font-light tracking-tight text-white">{formatCurrency(yearlyTotal)}</p>
             <p className="label-mono mt-1.5">
@@ -301,7 +301,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
           <div className="lg:flex-1 lg:px-6">
             <div className="flex items-center gap-3 mb-3">
               <CardIcon icon={IconTrend} size="sm" />
-              <p className="label-mono">월평균 배당금</p>
+              <p className="stat-label">월평균 배당금</p>
             </div>
             <p className="num text-2xl sm:text-3xl font-light tracking-tight text-white">
               {formatCurrency(monthlyStats.length > 0 ? yearlyTotal / (new Date().getMonth() + 1) : 0)}
@@ -313,7 +313,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
           <div className="lg:flex-1 lg:pl-6">
             <div className="flex items-center gap-3 mb-3">
               <CardIcon icon={IconPercent} tone="amber" size="sm" />
-              <p className="label-mono">올해 누적 연배당률</p>
+              <p className="stat-label">올해 누적 연배당률</p>
             </div>
             <div className="flex items-center gap-4">
               <RingGauge

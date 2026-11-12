@@ -174,6 +174,11 @@ body {
     @apply font-mono text-[11px] tracking-wide text-zinc-500;
   }
 
+  /* 통계 카드 제목 (아이콘 옆 작은 제목) */
+  .stat-label {
+    @apply text-[13px] font-medium tracking-tight text-zinc-300;
+  }
+
   /* 섹션 제목 */
   .section-title {
     @apply text-[15px] font-semibold tracking-tight text-white;
@@ -192,6 +197,25 @@ body {
   /* 상단 고정 헤더 바탕 (오로라처럼 배경을 살려야 하는 스타일은 더 투명하게) */
   .app-header {
     background: var(--header-bg, rgb(var(--c-ink-950) / 0.7));
+  }
+
+  /* macOS 데스크톱 앱: 제목 표시줄 자리까지 앱이 그린다. 창을 끌어 옮길 수 있는 곳 (안의 버튼·입력은 제외) */
+  .drag-region {
+    --wails-draggable: drag;
+  }
+  .drag-region :is(button, a, input, select, textarea, label, [role='button'], [role='tab'], [role='tablist']) {
+    --wails-draggable: no-drag;
+  }
+  /* 사이드바 맨 위 창 단추 줄: 맥 데스크톱 앱에서만 보인다 (상단 바와 같은 높이라 경계선이 맞는다) */
+  .titlebar-row {
+    display: none;
+  }
+  html.mac-titlebar .titlebar-row {
+    display: block;
+  }
+  /* 사이드바 없는 좁은 창: 상단 바 왼쪽을 창 단추만큼 비운다 */
+  html.mac-titlebar .mac-titlebar-pad {
+    padding-left: 84px;
   }
 
   /* 왼쪽 사이드바 (components/shell/Sidebar.tsx) */

@@ -55,6 +55,19 @@ function tauriInvoke(): TauriInvoke | undefined {
 
 const wailsApp = () => g().go?.main?.App;
 
+/**
+ * macOS 데스크톱 앱(Wails)인지 — 제목 표시줄이 투명하게 숨겨져(main.go TitleBarHiddenInset)
+ * 창 단추 자리를 비우고 끌어서 창을 옮길 자리를 만들어야 한다.
+ */
+export function isMacDesktop(): boolean {
+  return detectShell() === 'wails' && /Macintosh|Mac OS X/i.test(navigator.userAgent);
+}
+
+/** 첫 화면 전에 한 번: 맥 데스크톱 앱이면 html 에 mac-titlebar 를 단다 (CSS 가 창 단추 자리를 비운다) */
+export function markDesktopChrome(): void {
+  if (isMacDesktop()) document.documentElement.classList.add('mac-titlebar');
+}
+
 export const desktop = {
   /** 제목 표시줄 배경·글자색(#rrggbb)과 어두운 모드 여부. 지원하지 않는 환경이면 조용히 무시한다. */
   async setTitleBarColors(background: string, text: string, dark: boolean): Promise<void> {
