@@ -5,8 +5,9 @@ import { apiClient } from './api/client';
 import { Account, AccountType } from './types/models';
 import { Plus, Trash2, Wallet, Pencil, Lock } from 'lucide-react';
 import AccountDashboard from './components/AccountDashboard';
-import IconTile from './components/ui/IconTile';
+import CardIcon from './components/ui/CardIcon';
 import { ACCOUNT_TYPES, getAccountType, getAccountTypeMeta, isRestrictedAccount } from './utils/accountType';
+import { IconWallet } from './components/ui/appIcons';
 
 const DOMESTIC_BROKERS = [
   '삼성증권',
@@ -375,7 +376,7 @@ function App() {
 
       {accounts.length === 0 && !showForm ? (
         <div className="surface text-center py-14 px-4 text-zinc-400">
-          <IconTile icon={Wallet} tone="mint" className="mx-auto mb-4" />
+          <CardIcon icon={IconWallet} size="lg" className="mx-auto mb-4 block" />
           <p className="text-base sm:text-lg text-zinc-200">등록된 계좌가 없습니다.</p>
           <p className="label-mono mt-2">위의 "계좌 추가" 버튼을 눌러 새 계좌를 생성하세요.</p>
         </div>

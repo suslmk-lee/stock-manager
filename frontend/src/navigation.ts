@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { IconAccumulate, IconBars, IconCandidates, IconChart, IconCoin, IconRadar, IconSliders, IconTrades, IconTrend, IconWallet, type NavIcon } from './components/ui/navIcons';
+import { IconAccumulate, IconBars, IconCandidates, IconChart, IconCoin, IconRadar, IconSliders, IconTrades, IconTrend, IconWallet, type AppIcon } from './components/ui/appIcons';
 
 export type RouteId = 'accounts' | 'assets' | 'trades' | 'accumulate' | 'trend' | 'dividends' | 'dividend-analysis' | 'signals' | 'profiles' | 'candidates';
 export type GroupId = 'assets' | 'dividends' | 'signals';
@@ -10,7 +10,7 @@ export interface NavItem {
   label: string;
   /** 상단 바 페이지 제목 */
   title: string;
-  icon: NavIcon;
+  icon: AppIcon;
   isNew?: boolean;
 }
 
@@ -18,7 +18,7 @@ export interface NavGroup {
   id: GroupId;
   label: string;
   /** 모바일 하단 탭 아이콘 */
-  icon: NavIcon;
+  icon: AppIcon;
   items: NavItem[];
 }
 

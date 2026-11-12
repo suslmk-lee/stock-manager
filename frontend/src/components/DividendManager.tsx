@@ -5,10 +5,11 @@ import { apiClient } from '../api/client';
 import { Account, Asset, Dividend, Transaction } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
 import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock, TrendingUp, Wallet } from 'lucide-react';
-import IconTile from './ui/IconTile';
+import CardIcon from './ui/CardIcon';
 import DividendQuickStats from './DividendQuickStats';
 import Portal from './ui/Portal';
 import DatePicker from './ui/DatePicker';
+import { IconClock, IconCoin, IconTrend } from './ui/appIcons';
 
 interface DividendManagerProps {
   selectedAccountId?: number;
@@ -445,7 +446,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
           <div className="relative overflow-hidden surface p-6">
             <div className="relative flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <IconTile icon={Clock} tone="sky" size="sm" />
+                <CardIcon icon={IconClock} tone="sky" size="sm" />
                 <h3 className="section-title">최근 배당금 내역</h3>
               </div>
               <div className="flex items-center gap-2">
@@ -528,13 +529,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                           onClick={() => openAssetDetail(dividend.asset_id, dividend.asset?.ticker || '', dividend.asset?.name || '')}
                           className="w-full h-full surface-inset surface-interactive p-3 hover:border-mint-400/40 hover:-translate-y-1 cursor-pointer flex flex-col">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                              dividend.is_received
-                                ? 'bg-mint-400/15 text-mint-300'
-                                : 'bg-amber-400/15 text-amber-300'
-                            }`}>
-                              <DollarSign className="w-3.5 h-3.5" />
-                            </div>
+                            <IconCoin className="h-6 w-6 shrink-0 text-zinc-200" tone={dividend.is_received ? 'accent' : 'amber'} />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium text-white truncate">
                                 {(dividend.asset?.ticker?.includes('.KS') || dividend.asset?.ticker?.includes('.KQ'))
@@ -602,7 +597,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <IconTile icon={DollarSign} tone="mint" className="!w-12 !h-12" />
+                      <CardIcon icon={IconCoin} size="lg" />
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-medium text-white">
@@ -890,7 +885,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
           aria-current={selectedKey === 'summary' ? 'true' : undefined}
           className={`flex w-full items-center gap-3 border-b border-white/[0.06] px-4 py-3 text-left transition-colors ${selectedKey === 'summary' ? 'bg-mint-400/[0.08] shadow-[inset_3px_0_0_rgb(var(--c-mint-400))]' : 'hover:bg-white/[0.03]'}`}
         >
-          <IconTile icon={TrendingUp} tone="mint" size="sm" />
+          <CardIcon icon={IconTrend} tone="mint" size="sm" />
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-white">계좌 요약</span>
             <span className="label-mono mt-0.5 block truncate">최근 배당 · 월별 추이 · 상위 종목</span>
@@ -1259,7 +1254,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <IconTile icon={DollarSign} tone="mint" />
+                        <CardIcon icon={IconCoin} tone="mint" />
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold text-white">

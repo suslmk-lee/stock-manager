@@ -5,11 +5,12 @@ import { apiClient } from '../api/client';
 import { Account, Asset, Transaction, Holding, RealizedPnL, TickerInfo, PricePoint, PriceHistory } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
 import { useThemeColors } from '../appearance/AppearanceContext';
-import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, TrendingDown, History, X, Search, Info, Layers, PiggyBank, ChevronDown } from 'lucide-react';
+import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, X, Search, Info, ChevronDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { calculateFee, roundFee } from '../utils/fees';
 import Portal from './ui/Portal';
 import DatePicker from './ui/DatePicker';
+import { IconAccumulate, IconBuy, IconHistory, IconLayers, IconSell, IconTrend, IconTrendDown, type AppIcon } from './ui/appIcons';
 
 interface TransactionManagerProps {
   selectedAccountId?: number;
@@ -679,9 +680,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
         <button type="button" onClick={() => togglePlanGroup(g.key)} aria-expanded={open} className="surface w-full p-4 text-left hover:border-white/[0.2] transition-colors">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="icon-tile icon-tile-mint text-mint-300">
-                <PiggyBank className="w-5 h-5" />
-              </div>
+              <IconAccumulate className="h-7 w-7 shrink-0 text-zinc-200" />
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base font-semibold text-white truncate">{newest.asset?.name || newest.asset?.ticker || `Asset #${newest.asset_id}`}</h3>
@@ -722,15 +721,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`icon-tile ${
-                      isBuy
-                        ? 'icon-tile-mint text-mint-300'
-                        : 'icon-tile-amber text-rose-300'
-                    }`}
-                  >
-                    {isBuy ? <ArrowDownCircle className="w-5 h-5" /> : <ArrowUpCircle className="w-5 h-5" />}
-                  </div>
+                  {isBuy ? <IconBuy className="h-7 w-7 shrink-0 text-zinc-200" /> : <IconSell className="h-7 w-7 shrink-0 text-zinc-200" tone="rose" />}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-base font-semibold text-white truncate">
@@ -846,15 +837,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`icon-tile ${
-                        isProfit
-                          ? 'icon-tile-mint text-mint-300'
-                          : 'icon-tile-amber text-rose-300'
-                      }`}
-                    >
-                      {isProfit ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                    </div>
+                    {isProfit ? <IconTrend className="h-7 w-7 shrink-0 text-zinc-200" /> : <IconTrendDown className="h-7 w-7 shrink-0 text-zinc-200" tone="rose" />}
                     <div className="min-w-0">
                       <h3 className="text-base font-semibold text-white truncate">
                         {p.asset?.name || p.asset?.ticker || `Asset #${p.asset_id}`}
@@ -1414,7 +1397,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
     : null;
 
   // 왼쪽 목록
-  const navRow = (key: ViewTab, Icon: typeof History, label: string, count: number) => {
+  const navRow = (key: ViewTab, Icon: AppIcon, label: string, count: number) => {
     const active = !detailHolding && viewTab === key;
     return (
       <button
@@ -1428,9 +1411,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
         aria-current={active ? 'true' : undefined}
         className={`flex w-full items-center gap-3 border-b border-white/[0.06] px-4 py-3 text-left transition-colors ${active ? 'bg-mint-400/[0.08] shadow-[inset_3px_0_0_rgb(var(--c-mint-400))]' : 'hover:bg-white/[0.03]'}`}
       >
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 ${active ? 'bg-mint-400/15 text-mint-300' : 'bg-white/[0.04] text-zinc-400'}`}>
-          <Icon className="h-4 w-4" />
-        </span>
+        <Icon className={`h-[22px] w-[22px] shrink-0 ${active ? 'text-mint-300' : 'text-zinc-300'}`} />
         <span className={`flex-1 text-sm ${active ? 'font-medium text-white' : 'text-zinc-200'}`}>{label}</span>
         <span className="label-mono">{count}</span>
       </button>
@@ -1439,9 +1420,9 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
 
   const tradeList = (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      {navRow('history', History, '거래 내역', transactions.length)}
-      {navRow('pnl', TrendingUp, '실현 손익', pnls.length)}
-      {navRow('holdings', Layers, '보유 현황', holdings.length)}
+      {navRow('history', IconHistory, '거래 내역', transactions.length)}
+      {navRow('pnl', IconTrend, '실현 손익', pnls.length)}
+      {navRow('holdings', IconLayers, '보유 현황', holdings.length)}
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-ink-900/95 px-4 py-2 backdrop-blur">
         <span className="text-xs font-medium text-zinc-300">보유 종목</span>
         <span className="label-mono">{holdings.length}개</span>
@@ -1560,15 +1541,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               >
                 <div className="flex items-start justify-between mb-5">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`icon-tile w-11 h-11 ${
-                        isProfit
-                          ? 'icon-tile-mint text-mint-300'
-                          : 'icon-tile-amber text-rose-300'
-                      }`}
-                    >
-                      {isProfit ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
-                    </div>
+                    {isProfit ? <IconTrend className="h-10 w-10 shrink-0 text-zinc-200" /> : <IconTrendDown className="h-10 w-10 shrink-0 text-zinc-200" tone="rose" />}
                     <div className="min-w-0">
                       <h3 className="text-xl font-semibold text-white truncate">
                         {p.asset?.name || p.asset?.ticker || `Asset #${p.asset_id}`}
@@ -1674,15 +1647,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               >
                 <div className="flex items-start justify-between mb-5">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`icon-tile w-11 h-11 ${
-                        isBuy
-                          ? 'icon-tile-mint text-mint-300'
-                          : 'icon-tile-amber text-rose-300'
-                      }`}
-                    >
-                      {isBuy ? <ArrowDownCircle className="w-6 h-6" /> : <ArrowUpCircle className="w-6 h-6" />}
-                    </div>
+                    {isBuy ? <IconBuy className="h-10 w-10 shrink-0 text-zinc-200" /> : <IconSell className="h-10 w-10 shrink-0 text-zinc-200" tone="rose" />}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-xl font-semibold text-white truncate">

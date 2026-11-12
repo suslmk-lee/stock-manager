@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Asset, Account } from '../types/models';
-import { TrendingUp, Wallet, Globe, Home, ChevronDown, ChevronUp, LineChart } from 'lucide-react';
+import { Wallet, Globe, Home, ChevronDown, ChevronUp, LineChart } from 'lucide-react';
 import TotalAssetTrendModal from './TotalAssetTrendModal';
 import { LiquidityFilter, matchesLiquidity, isRestrictedAccount, getAccountTypeMeta } from '../utils/accountType';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import CountUp from './CountUp';
-import IconTile from './ui/IconTile';
+import CardIcon from './ui/CardIcon';
 import RingGauge from './ui/RingGauge';
 import Chip from './ui/Chip';
 import { useThemeColors } from '../appearance/AppearanceContext';
+import { IconTrend, IconWallet } from './ui/appIcons';
 
 const TOP_N = 5; // 기본 축소보기에서 노출할 계좌 수
 
@@ -246,7 +247,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
         <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-8 items-center">
           <div>
             <div className="flex items-center gap-2.5 mb-5">
-              <IconTile icon={TrendingUp} tone="mint" size="sm" />
+              <CardIcon icon={IconTrend} tone="mint" size="sm" />
               <span className="label-mono !text-zinc-400">총 자산 평가액</span>
               <button onClick={() => setShowTrend(true)} className="btn-ghost !py-1 !px-2.5 !text-xs ml-1" title="총자산 추이 보기">
                 <LineChart className="w-3.5 h-3.5" />
@@ -327,7 +328,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
       {!accountId && accountValues.size > 0 && (
         <div className="surface p-5 sm:p-6">
           <div className="flex items-center gap-3 mb-5">
-            <IconTile icon={Wallet} tone="sky" size="sm" />
+            <CardIcon icon={IconWallet} tone="sky" size="sm" />
             <h3 className="section-title">계좌별 자산 분포</h3>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

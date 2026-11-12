@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Dividend, Holding, Transaction } from '../types/models';
 import { useThemeColors } from '../appearance/AppearanceContext';
-import IconTile from './ui/IconTile';
+import CardIcon from './ui/CardIcon';
 import RingGauge from './ui/RingGauge';
-import { DollarSign, TrendingUp, Calendar, PieChart, Percent } from 'lucide-react';
+import { IconCalendar, IconCoin, IconPercent, IconPie, IconTrend } from './ui/appIcons';
 
 interface DividendQuickStatsProps {
   accountId: number;
@@ -277,7 +277,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
           {/* 총 배당금 */}
           <div className="lg:flex-1 lg:pr-6">
             <div className="flex items-center gap-3 mb-3">
-              <IconTile icon={DollarSign} tone="mint" size="sm" />
+              <CardIcon icon={IconCoin} tone="mint" size="sm" />
               <p className="label-mono">총 배당금</p>
             </div>
             <p className="num text-2xl sm:text-3xl font-light tracking-tight text-white">{formatCurrency(totalDividend)}</p>
@@ -287,7 +287,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
           {/* 올해 배당금 */}
           <div className="lg:flex-1 lg:px-6">
             <div className="flex items-center gap-3 mb-3">
-              <IconTile icon={Calendar} tone="sky" size="sm" />
+              <CardIcon icon={IconCalendar} tone="sky" size="sm" />
               <p className="label-mono">{new Date().getFullYear()}년 배당금</p>
             </div>
             <p className="num text-2xl sm:text-3xl font-light tracking-tight text-white">{formatCurrency(yearlyTotal)}</p>
@@ -300,7 +300,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
           {/* 평균 배당금 */}
           <div className="lg:flex-1 lg:px-6">
             <div className="flex items-center gap-3 mb-3">
-              <IconTile icon={TrendingUp} size="sm" />
+              <CardIcon icon={IconTrend} size="sm" />
               <p className="label-mono">월평균 배당금</p>
             </div>
             <p className="num text-2xl sm:text-3xl font-light tracking-tight text-white">
@@ -312,7 +312,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
           {/* 연배당률 */}
           <div className="lg:flex-1 lg:pl-6">
             <div className="flex items-center gap-3 mb-3">
-              <IconTile icon={Percent} tone="amber" size="sm" />
+              <CardIcon icon={IconPercent} tone="amber" size="sm" />
               <p className="label-mono">올해 누적 연배당률</p>
             </div>
             <div className="flex items-center gap-4">
@@ -345,7 +345,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
       <div className="relative overflow-hidden surface p-6">
                 <div className="relative flex items-center justify-between gap-3 mb-5">
           <div className="flex items-center gap-3">
-            <IconTile icon={PieChart} tone="mint" />
+            <CardIcon icon={IconPie} tone="mint" />
             <div>
               <h3 className="section-title leading-none">월별 배당금</h3>
               <p className="label-mono mt-1">최근 6개월 흐름</p>
@@ -401,7 +401,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
         {/* 배당금 Top10 */}
         <div className="surface p-6">
           <div className="flex items-center gap-3 mb-4">
-            <IconTile icon={TrendingUp} tone="amber" size="sm" />
+            <CardIcon icon={IconTrend} tone="amber" size="sm" />
             <h3 className="section-title">배당금 Top 10</h3>
           </div>
           {topAssets.length === 0 ? (
@@ -463,7 +463,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
         {/* 배당금 분포 원그래프 */}
         <div className="surface p-6">
           <div className="flex items-center gap-3 mb-4">
-            <IconTile icon={PieChart} tone="sky" size="sm" />
+            <CardIcon icon={IconPie} tone="sky" size="sm" />
             <h3 className="section-title">배당금 분포</h3>
           </div>
           {topAssets.length === 0 ? (

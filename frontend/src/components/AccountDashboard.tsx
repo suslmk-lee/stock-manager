@@ -2,12 +2,13 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import { getAccountTypeMeta } from '../utils/accountType';
-import { Wallet, Lock, TrendingUp } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import TotalReturnByAsset from './TotalReturnByAsset';
 import AssetDetailView from './AssetDetailView';
-import IconTile from './ui/IconTile';
+import CardIcon from './ui/CardIcon';
 import { useThemeColors } from '../appearance/AppearanceContext';
+import { IconTrend, IconWallet } from './ui/appIcons';
 
 interface AccountDashboardProps {
   account: Account;
@@ -65,7 +66,7 @@ export default function AccountDashboard({ account, actions }: AccountDashboardP
       {/* 헤더 */}
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <IconTile icon={Wallet} tone="mint" className="shrink-0" />
+          <CardIcon icon={IconWallet} tone="mint" className="shrink-0" />
           <div className="min-w-0">
             <h2 className="truncate text-xl font-semibold tracking-tight text-white">{account.name}</h2>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -87,7 +88,7 @@ export default function AccountDashboard({ account, actions }: AccountDashboardP
       {/* 평가금 추세 */}
       <div className="surface-inset p-4 sm:p-5 mb-5">
         <div className="flex items-center gap-3 mb-4">
-          <IconTile icon={TrendingUp} tone="mint" size="sm" />
+          <CardIcon icon={IconTrend} tone="mint" size="sm" />
           <p className="section-title">평가금 추세</p>
         </div>
         <div className="h-56">

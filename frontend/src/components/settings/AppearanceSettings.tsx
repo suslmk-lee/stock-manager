@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Palette, LayoutTemplate, Type, RotateCcw, MousePointer2, Contrast, SunMedium, Box } from 'lucide-react';
+import { X, RotateCcw } from 'lucide-react';
 import {
   useAppearance,
   DEFAULT_CURSOR_TRAIL,
@@ -16,6 +16,7 @@ import { THEMES, mix, type AppTheme } from '../../appearance/themes';
 import Portal from '../ui/Portal';
 import Slider from '../ui/Slider';
 import { SettingsGroup, SettingRow } from '../ui/SettingsGroup';
+import { IconBox, IconContrast, IconFont, IconGlow, IconLayout, IconPalette, IconPointer } from '../ui/appIcons';
 import {
   CARD_STYLES,
   SANS_FONTS,
@@ -91,7 +92,7 @@ function ThemeGroup({ title, themes }: { title: string; themes: AppTheme[] }) {
 
 function ThemeSection() {
   return (
-    <SettingsGroup icon={Palette} title="앱 테마">
+    <SettingsGroup icon={IconPalette} title="앱 테마">
       <ThemeGroup title="다크" themes={THEMES.filter((t) => t.mode === 'dark')} />
       <ThemeGroup title="라이트" themes={THEMES.filter((t) => t.mode === 'light')} />
     </SettingsGroup>
@@ -101,7 +102,7 @@ function ThemeSection() {
 function CardSection() {
   const { settings, update } = useAppearance();
   return (
-    <SettingsGroup icon={LayoutTemplate} title="카드 스타일">
+    <SettingsGroup icon={IconLayout} title="카드 스타일">
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       {CARD_STYLES.map((s) => (
         <button
@@ -168,7 +169,7 @@ function FontSection() {
   const { settings, update } = useAppearance();
   const sizeIdx = Math.max(0, FONT_SIZES.findIndex((f) => f.id === settings.fontSize));
   return (
-    <SettingsGroup icon={Type} title="글꼴">
+    <SettingsGroup icon={IconFont} title="글꼴">
       <div className="surface p-4">
         <div className="label-mono">총 자산</div>
         <div className="mt-1 text-3xl font-semibold tracking-tight text-white">₩152,257,659</div>
@@ -210,7 +211,7 @@ function CardGlowGroup() {
   ];
   return (
     <SettingsGroup
-      icon={SunMedium}
+      icon={IconGlow}
       title="카드 그라데이션"
       action={<Switch checked={glow.enabled} onChange={(v) => set({ enabled: v })} label="카드 그라데이션 켜기" />}
     >
@@ -276,7 +277,7 @@ function CardDepthGroup() {
   ];
   return (
     <SettingsGroup
-      icon={Box}
+      icon={IconBox}
       title="카드 입체감"
       action={<Switch checked={depth.enabled} onChange={(v) => set({ enabled: v })} label="카드 입체감 켜기" />}
     >
@@ -369,7 +370,7 @@ function EffectsSection() {
       <CardGlowGroup />
       <CardDepthGroup />
       <SettingsGroup
-        icon={MousePointer2}
+        icon={IconPointer}
         title="트레일 세부 조정"
         action={<span className="label-mono">{trail.enabled ? presetName : '없음'}</span>}
       >
@@ -391,7 +392,7 @@ function EffectsSection() {
           </SettingRow>
         ))}
       </SettingsGroup>
-      <SettingsGroup icon={Contrast} title="색상">
+      <SettingsGroup icon={IconContrast} title="색상">
         <SettingRow label="그라데이션" hint="강조색에서 하늘색으로">
           <Switch checked={trail.gradient} onChange={(v) => set({ gradient: v })} label="그라데이션" disabled={!trail.enabled} />
         </SettingRow>

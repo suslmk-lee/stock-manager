@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account, Holding, RealizedPnL, Dividend } from '../types/models';
-import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { TrendingDown, Wallet } from 'lucide-react';
 import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
-import IconTile from './ui/IconTile';
+import CardIcon from './ui/CardIcon';
+import { IconTrend } from './ui/appIcons';
 
 interface TotalReturnByAssetProps {
   accountId?: number;
@@ -201,7 +202,7 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
   return (
     <div className="surface p-5 sm:p-6">
       <div className="flex items-center gap-3 mb-1.5">
-        <IconTile icon={TrendingUp} tone="amber" size="sm" />
+        <CardIcon icon={IconTrend} tone="amber" size="sm" />
         <h2 className="section-title">종목별 실질 손익</h2>
       </div>
       <p className="label-mono mb-5 normal-case">

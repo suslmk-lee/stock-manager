@@ -3,8 +3,9 @@ import { PageActions } from './shell/PageSlots';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
 import { accountTypePrefix } from '../utils/accountType';
-import IconTile from './ui/IconTile';
-import { Camera, TrendingUp, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import CardIcon from './ui/CardIcon';
+import { Camera, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { IconCamera, IconTrend } from './ui/appIcons';
 
 interface SnapshotItem {
   id: number;
@@ -199,7 +200,7 @@ export default function PortfolioSnapshots() {
           {chartData.length > 1 && (
             <div className="surface p-5">
               <h3 className="section-title mb-4 flex items-center gap-3">
-                <IconTile icon={TrendingUp} tone="mint" size="sm" />
+                <CardIcon icon={IconTrend} tone="mint" size="sm" />
                 월별 총 평가금 추이
               </h3>
               <div className="flex items-end gap-2 h-40">
@@ -242,7 +243,7 @@ export default function PortfolioSnapshots() {
                     className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.03] transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <IconTile icon={Camera} tone="mint" />
+                      <CardIcon icon={IconCamera} tone="mint" />
                       <div className="text-left">
                         <p className="text-base font-semibold text-white">{group.label}</p>
                         <p className="label-mono mt-0.5">{group.items.length}개 종목</p>

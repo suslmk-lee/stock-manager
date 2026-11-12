@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { apiClient } from '../api/client';
 import { Account, MonthlySnapshotSummary, PriceHistory } from '../types/models';
 import { LiquidityFilter, matchesLiquidity, isRestrictedAccount } from '../utils/accountType';
-import { ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceArea } from 'recharts';
 import CountUp from './CountUp';
 import { useThemeColors } from '../appearance/AppearanceContext';
-import IconTile from './ui/IconTile';
+import CardIcon from './ui/CardIcon';
 import Chip from './ui/Chip';
+import { IconTrend } from './ui/appIcons';
 
 interface MonthlyAssetTrendProps {
   accountId?: number;
@@ -219,7 +220,7 @@ export default function MonthlyAssetTrend({
 
   const header = (
     <div className="flex items-center gap-3 mb-5">
-      <IconTile icon={TrendingUp} tone="mint" size="sm" />
+      <CardIcon icon={IconTrend} tone="mint" size="sm" />
       <h3 className="section-title">월별 자산 추이</h3>
     </div>
   );

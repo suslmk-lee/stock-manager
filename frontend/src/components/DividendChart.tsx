@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { apiClient } from '../api/client';
-import { TrendingUp, Calendar } from 'lucide-react';
-import IconTile from './ui/IconTile';
+import { Calendar } from 'lucide-react';
+import CardIcon from './ui/CardIcon';
 import { useThemeColors } from '../appearance/AppearanceContext';
+import { IconTrend } from './ui/appIcons';
 
 interface MonthlyDividend {
   year: number;
@@ -124,7 +125,7 @@ export default function DividendChart({ accountId, months = 12 }: DividendChartP
     <div className="surface p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <IconTile icon={TrendingUp} tone="mint" />
+          <CardIcon icon={IconTrend} tone="mint" />
           <div>
             <h2 className="section-title !text-lg">월별 배당금 현황</h2>
             <p className="label-mono mt-0.5">최근 {months}개월</p>

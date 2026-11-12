@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Account } from '../types/models';
-import { TrendingUp, DollarSign, Calendar, PieChart, Receipt } from 'lucide-react';
-import IconTile from './ui/IconTile';
+import CardIcon from './ui/CardIcon';
 import { useThemeColors } from '../appearance/AppearanceContext';
 import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
+import { IconCalendar, IconCoin, IconPie, IconReceipt, IconTrend } from './ui/appIcons';
 
 interface DividendStatisticsProps {
   accountId?: number;
@@ -84,14 +84,14 @@ export default function DividendStatistics({ accountId, marketType, liquidity = 
   const averageDividendKRW = totalCount > 0 ? totalDividendsKRW / totalCount : 0;
 
   const kpis = [
-    { label: '총 배당금', value: formatCurrency(totalDividendsKRW), sub: '세전 금액', icon: DollarSign, tone: 'mint' as const },
-    { label: '순 배당금', value: formatCurrency(netDividendsKRW), sub: '세후 금액', icon: TrendingUp, tone: 'sky' as const },
-    { label: '평균 배당금', value: formatCurrency(averageDividendKRW), sub: '건당 평균', icon: PieChart, tone: 'warm' as const },
+    { label: '총 배당금', value: formatCurrency(totalDividendsKRW), sub: '세전 금액', icon: IconCoin, tone: 'mint' as const },
+    { label: '순 배당금', value: formatCurrency(netDividendsKRW), sub: '세후 금액', icon: IconTrend, tone: 'sky' as const },
+    { label: '평균 배당금', value: formatCurrency(averageDividendKRW), sub: '건당 평균', icon: IconPie, tone: 'warm' as const },
     {
       label: '배당 건수',
       value: `${stats.received_count + stats.pending_count}건`,
       sub: `수령 ${stats.received_count} / 예정 ${stats.pending_count}`,
-      icon: Calendar,
+      icon: IconCalendar,
       tone: 'amber' as const,
     },
   ];
@@ -109,7 +109,7 @@ export default function DividendStatistics({ accountId, marketType, liquidity = 
           <div key={k.label} className="surface p-5">
             <div className="flex items-center justify-between mb-4">
               <p className="label-mono !text-zinc-400">{k.label}</p>
-              <IconTile icon={k.icon} tone={k.tone} size="sm" />
+              <CardIcon icon={k.icon} tone={k.tone} size="sm" />
             </div>
             <p className="num text-2xl font-light tracking-tight text-white">{k.value}</p>
             <p className="label-mono mt-1.5">{k.sub}</p>
@@ -144,7 +144,7 @@ export default function DividendStatistics({ accountId, marketType, liquidity = 
       {/* 세금 정보 */}
       <div className="surface p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
-          <IconTile icon={Receipt} tone="amber" size="sm" />
+          <CardIcon icon={IconReceipt} tone="amber" size="sm" />
           <h3 className="section-title">세금 정보</h3>
         </div>
         <div className="surface-inset flex flex-col sm:flex-row items-stretch gap-4 sm:gap-0 p-5">

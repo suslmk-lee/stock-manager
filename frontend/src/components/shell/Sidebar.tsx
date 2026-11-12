@@ -1,5 +1,5 @@
 import { Download, Loader2, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
-import { IconPalette } from '../ui/navIcons';
+import { IconPalette } from '../ui/appIcons';
 import Brand from '../ui/Brand';
 import { useUpdates } from '../update/UpdateProvider';
 import { NAV_GROUPS, type NavItem, type RouteId } from '../../navigation';

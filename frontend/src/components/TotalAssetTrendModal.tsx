@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, LineChart as LineChartIcon, RefreshCw } from 'lucide-react';
+import { X, RefreshCw } from 'lucide-react';
 import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceArea, CartesianGrid } from 'recharts';
 import { apiClient } from '../api/client';
 import { DailyAssetPoint, DailyAssetSeries } from '../types/models';
 import CountUp from './CountUp';
 import Portal from './ui/Portal';
-import IconTile from './ui/IconTile';
+import CardIcon from './ui/CardIcon';
 import { useThemeColors } from '../appearance/AppearanceContext';
+import { IconChart } from './ui/appIcons';
 
 interface TotalAssetTrendModalProps {
   onClose: () => void;
@@ -253,7 +254,7 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
           {/* 헤더 */}
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-3 min-w-0">
-              <IconTile icon={LineChartIcon} tone="mint" size="sm" />
+              <CardIcon icon={IconChart} tone="mint" size="sm" />
               <div className="min-w-0">
                 <h3 className="section-title">총자산 추이</h3>
                 <p className="label-mono !normal-case !text-zinc-500 mt-0.5 break-words">{subtitle}</p>

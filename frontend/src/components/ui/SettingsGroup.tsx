@@ -1,20 +1,20 @@
 import type { ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
-import IconTile from './IconTile';
+import type { AppIcon } from './appIcons';
+import CardIcon from './CardIcon';
 
 interface SettingsGroupProps {
-  icon: LucideIcon;
+  icon: AppIcon;
   title: string;
   children: ReactNode;
   action?: ReactNode;
 }
 
-// 아이콘 타일 + 제목 헤더를 가진 설정 섹션 카드
+// 두 색 아이콘 + 제목 헤더를 가진 설정 섹션 카드
 export function SettingsGroup({ icon, title, children, action }: SettingsGroupProps) {
   return (
     <section className="surface-inset p-4">
       <div className="mb-3 flex items-center gap-3">
-        <IconTile icon={icon} size="sm" />
+        <CardIcon icon={icon} size="sm" />
         <h3 className="section-title flex-1 min-w-0 truncate">{title}</h3>
         {action}
       </div>

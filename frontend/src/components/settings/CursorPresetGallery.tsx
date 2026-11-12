@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { MousePointer2 } from 'lucide-react';
 import { useAppearance } from '../../appearance/AppearanceContext';
 import { POINTER_PRESETS, TRAIL_PRESETS, type PointerPresetId, type TrailPresetId } from '../../appearance/options';
 import { SettingsGroup } from '../ui/SettingsGroup';
+import { IconPointer } from '../ui/appIcons';
 
 const selectedCls = 'ring-2 ring-mint-400 bg-mint-400/10';
 const idleCls = 'ring-1 ring-white/10 hover:bg-white/[0.04]';
@@ -161,7 +161,7 @@ export default function CursorPresetGallery() {
   const trail = settings.cursorTrail;
   const pointer = settings.cursorPointer.style;
   return (
-    <SettingsGroup icon={MousePointer2} title="프리셋">
+    <SettingsGroup icon={IconPointer} title="프리셋">
       <style>{PREVIEW_CSS}</style>
       <Group label="포인터">
         {POINTER_PRESETS.map((p) => (
