@@ -3,6 +3,7 @@ package services
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -45,8 +46,12 @@ func TestLockSetupAndRestart(t *testing.T) {
 		t.Fatal("PIN 이 있는데 다시 만들 수 없어야 한다")
 	}
 	info, err := os.Stat(filepath.Join(dir, lockFileName))
-	if err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("lock.json perm = %v %v", info.Mode().Perm(), err)
+	if err != nil {
+		t.Fatalf("lock.json stat: %v", err)
+	}
+	// Windows 에는 Unix 권한 비트가 없어 항상 0666 으로 보고된다 (사용자 폴더 ACL 로 보호) → 권한 검사는 Unix 에서만
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Fatalf("lock.json perm = %v", info.Mode().Perm())
 	}
 	b, _ := os.ReadFile(filepath.Join(dir, lockFileName))
 	if strings.Contains(string(b), "482913") || strings.Contains(string(b), strings.ReplaceAll(code, "-", "")) {
