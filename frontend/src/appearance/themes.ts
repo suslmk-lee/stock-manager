@@ -15,12 +15,21 @@ export interface AppTheme {
   surface?: string; // 카드 바탕 (기본: bg 에서 fg 쪽으로 살짝)
   // 상태 색 덮어쓰기 — 강조색이 주황·노랑 계열이면 '인출 제한'(amber)과 겹치지 않게 바꾼다
   status?: Partial<Record<'amber' | 'rose' | 'emerald' | 'sky' | 'orange', string>>;
+  // 설정 화면 미리보기의 세 점 색 (기본: 강조색 + 흐린 색 둘)
+  swatches?: [string, string, string];
 }
+
+// 퀀텀 · 천지인: 회사 로고 세 색 (빨강 · 초록 · 파랑 = 천지인). 원본은 quantum-mate 의 themes.css
+const TRI_RED = '#f24941';
+const TRI_GREEN = '#79ba37';
 
 export const THEMES: AppTheme[] = [
   { id: 'default', name: '기본 (블랙 · 민트)', mode: 'dark', bg: '#060607', fg: '#ffffff', accent: '#7ddfb0' },
+  // 바탕은 파랑 쪽으로 기운 그라파이트, 강조는 어두운 바탕에서 읽히게 조금 밝힌 로고 파랑. 손실은 로고 빨강, 상승 표시는 로고 초록
+  { id: 'quantum', name: '퀀텀 · 천지인', mode: 'dark', bg: '#17191d', fg: '#e7e9ec', accent: '#5b8ad6', status: { rose: TRI_RED, emerald: TRI_GREEN }, swatches: [TRI_RED, TRI_GREEN, '#5b8ad6'] },
   { id: 'graphite-blue', name: '그라파이트 · 파랑', mode: 'dark', bg: '#111113', fg: '#f4f4f5', accent: '#6aa8ff' },
   { id: 'graphite-orange', name: '그라파이트 · 주황', mode: 'dark', bg: '#111113', fg: '#f4f4f5', accent: '#f59e6b', status: { amber: '#a5b4fc', orange: '#f472b6' } },
+  { id: 'graphite-green', name: '그라파이트 · 초록', mode: 'dark', bg: '#111113', fg: '#f4f4f5', accent: '#5cbf8a' },
   { id: 'monochrome', name: '모노크롬', mode: 'dark', bg: '#0a0a0a', fg: '#fafafa', accent: '#d4d4d8' },
   { id: 'mauve', name: '모브 (회보라)', mode: 'dark', bg: '#16131b', fg: '#f3eef7', accent: '#c4a7e7' },
   { id: 'mocha', name: '모카 (갈색)', mode: 'dark', bg: '#191411', fg: '#f5ede6', accent: '#d9a46f', status: { amber: '#9fc4d9', orange: '#e48fa8' } },
@@ -33,6 +42,9 @@ export const THEMES: AppTheme[] = [
   { id: 'rose-pine', name: 'Rosé Pine', mode: 'dark', bg: '#191724', fg: '#e0def4', accent: '#ebbcba' },
   { id: 'solarized-dark', name: 'Solarized Dark', mode: 'dark', bg: '#002b36', fg: '#eee8d5', accent: '#2aa198' },
   { id: 'light', name: '라이트 (민트)', mode: 'light', bg: '#f4f5f7', fg: '#111113', accent: '#0f9f6e', surface: '#ffffff' },
+  // 흰 바탕이라 로고 원색 그대로, 바탕은 파랑 쪽으로 기운 회백
+  { id: 'quantum-light', name: '퀀텀 · 천지인 (밝게)', mode: 'light', bg: '#f3f5f8', fg: '#1b1f26', accent: '#4572ba', surface: '#ffffff', status: { rose: TRI_RED, emerald: TRI_GREEN }, swatches: [TRI_RED, TRI_GREEN, '#4572ba'] },
+  { id: 'light-orange', name: '라이트 (주황)', mode: 'light', bg: '#f6f6f4', fg: '#1f2023', accent: '#d0663a', surface: '#ffffff', status: { amber: '#a5b4fc', orange: '#f472b6' } },
   { id: 'solarized-light', name: 'Solarized Light', mode: 'light', bg: '#fdf6e3', fg: '#073642', accent: '#268bd2', surface: '#fffbef' },
   { id: 'catppuccin-latte', name: 'Catppuccin Latte', mode: 'light', bg: '#eff1f5', fg: '#4c4f69', accent: '#8839ef', surface: '#ffffff' },
 ];

@@ -43,15 +43,16 @@ const idleCls = 'ring-1 ring-white/10 hover:bg-white/[0.04]';
 function ThemePreview({ theme }: { theme: AppTheme }) {
   const bar = theme.surface ?? mix(theme.bg, theme.fg, 0.05);
   const dim = mix(theme.bg, theme.fg, 0.35);
+  const dots = theme.swatches ?? [theme.accent, dim, dim];
   return (
     <div
       className="shrink-0 overflow-hidden rounded-md"
       style={{ width: 64, height: 40, background: theme.bg, boxShadow: `inset 0 0 0 1px ${mix(theme.bg, theme.fg, 0.15)}` }}
     >
       <div className="flex items-center gap-[3px] px-1.5" style={{ height: 11, background: bar }}>
-        <span className="rounded-full" style={{ width: 4, height: 4, background: theme.accent }} />
-        <span className="rounded-full" style={{ width: 4, height: 4, background: dim }} />
-        <span className="rounded-full" style={{ width: 4, height: 4, background: dim }} />
+        {dots.map((c, i) => (
+          <span key={i} className="rounded-full" style={{ width: 4, height: 4, background: c }} />
+        ))}
       </div>
       <div className="px-1.5 pt-1.5">
         <div className="rounded-full" style={{ height: 3, width: '75%', background: theme.fg, opacity: 0.9 }} />
