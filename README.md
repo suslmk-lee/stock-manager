@@ -199,7 +199,8 @@ git tag v1.2.0 && git push origin v1.2.0
   응용 프로그램 폴더 등 쓰기 권한이 있는 곳에 설치된 앱이어야 합니다.
 - 버전은 `scripts/build-dmg.sh` 가 `git describe`(또는 `APP_VERSION`)로 앱에 넣습니다. `wails dev`·`wails build` 로 직접 만든 빌드는
   버전이 `dev` 라 업데이트를 확인하지 않습니다.
-- Windows 는 새 버전 알림만 하고, 설치는 릴리스 페이지에서 직접 받습니다.
+- Windows 도 같은 Release 의 `StockManager-<버전>-windows-amd64.exe`(+ `.sha256`)를 내려받아 SHA-256 을 확인한 뒤, 실행 파일을 바꿔 놓고 앱을 다시 엽니다 (exe 가 있는 폴더에 쓰기 권한이 있어야 합니다. 없으면 릴리스 페이지에서 직접 받습니다).
+- Windows 에서 버전이 들어간 빌드는 `powershell -File scripts\build-windows.ps1` 로 만듭니다 (`git describe` 버전 사용). 그냥 `wails build` 는 `dev` 빌드라 업데이트 확인이 없습니다.
 
 **작동 방식:**
 

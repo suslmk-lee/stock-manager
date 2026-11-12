@@ -1,4 +1,4 @@
-// Package updater 는 GitHub Releases 의 최신 버전을 확인하고 (macOS 에서는) 앱을 내려받아 교체한다.
+// Package updater 는 GitHub Releases 의 최신 버전을 확인하고 앱을 내려받아 교체한다.
 package updater
 
 import (
@@ -74,23 +74,52 @@ type Release struct {
 	Assets      []Asset   `json:"assets"`
 }
 
-// PickAsset 은 이 컴퓨터에 맞는 설치 파일을 고른다. macOS 만: .dmg 중 universal → 아키텍처 이름 순.
+// PickAsset 은 이 컴퓨터에 맞는 설치 파일을 고른다.
+// macOS: .dmg 중 universal → 아키텍처 이름 순. Windows: 이름에 windows 와 아키텍처가 들어간 .exe.
 func PickAsset(assets []Asset, goos, goarch string) *Asset {
-	if goos != "darwin" {
-		return nil
-	}
-	archNames := map[string][]string{"arm64": {"arm64"}, "amd64": {"amd64", "x86_64", "intel"}}[goarch]
-	var dmgs []Asset
-	for _, a := range assets {
-		if strings.HasSuffix(strings.ToLower(a.Name), ".dmg") {
-			dmgs = append(dmgs, a)
+	switch goos {
+	case "darwin":
+		archNames := map[string][]string{"arm64": {"arm64"}, "amd64": {"amd64", "x86_64", "intel"}}[goarch]
+		var dmgs []Asset
+		for _, a := range assets {
+			if strings.HasSuffix(strings.ToLower(a.Name), ".dmg") {
+				dmgs = append(dmgs, a)
+			}
+		}
+		for _, want := range append([]string{"universal"}, archNames...) {
+			for i := range dmgs {
+				if strings.Contains(strings.ToLower(dmgs[i].Name), want) {
+					return &dmgs[i]
+				}
+			}
+		}
+	case "windows":
+		archNames := map[string][]string{"arm64": {"arm64"}, "amd64": {"amd64", "x64", "x86_64"}}[goarch]
+		for _, want := range archNames {
+			for i := range assets {
+				n := strings.ToLower(assets[i].Name)
+				if strings.HasSuffix(n, ".exe") && strings.Contains(n, "windows") && strings.Contains(n, want) {
+					return &assets[i]
+				}
+			}
 		}
 	}
-	for _, want := range append([]string{"universal"}, archNames...) {
-		for i := range dmgs {
-			if strings.Contains(strings.ToLower(dmgs[i].Name), want) {
-				return &dmgs[i]
-			}
+	return nil
+}
+
+// PickChecksum 은 exeName 의 SHA-256 을 담은 릴리스 파일을 찾는다:
+// "<exeName>.sha256" 또는 SHA256SUMS / checksums.txt. 없으면 nil.
+func PickChecksum(assets []Asset, exeName string) *Asset {
+	want := strings.ToLower(exeName) + ".sha256"
+	for i := range assets {
+		if strings.ToLower(assets[i].Name) == want {
+			return &assets[i]
+		}
+	}
+	for i := range assets {
+		switch strings.ToLower(assets[i].Name) {
+		case "sha256sums", "sha256sums.txt", "checksums.txt":
+			return &assets[i]
 		}
 	}
 	return nil
@@ -102,7 +131,7 @@ type CheckResult struct {
 	Current     string    `json:"current"`
 	Latest      string    `json:"latest,omitempty"`
 	Available   bool      `json:"available"`
-	CanInstall  bool      `json:"can_install"` // 앱 안에서 바로 설치할 수 있는지 (macOS + DMG 있음)
+	CanInstall  bool      `json:"can_install"` // 앱 안에서 바로 설치할 수 있는지 (macOS DMG 또는 Windows exe 있음)
 	Notes       string    `json:"notes,omitempty"`
 	URL         string    `json:"url,omitempty"`
 	PublishedAt string    `json:"published_at,omitempty"`
@@ -202,6 +231,8 @@ func (u *Updater) Check(ctx context.Context) (*CheckResult, error) {
 		res.AssetSize = a.Size
 	} else if u.GOOS == "darwin" {
 		res.Reason = "이 릴리스에 macOS 설치 파일(DMG)이 없습니다"
+	} else if u.GOOS == "windows" {
+		res.Reason = "이 릴리스에 Windows 실행 파일이 없습니다"
 	} else {
 		res.Reason = ErrUnsupported.Error() + ". 릴리스 페이지에서 내려받으세요"
 	}

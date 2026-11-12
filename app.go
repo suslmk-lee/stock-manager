@@ -84,6 +84,9 @@ func (a *App) apiServices() *httpapi.Services {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
+	// 지난 자동 업데이트(Windows)가 남긴 .old·임시 파일 정리 (실패해도 무시)
+	go updater.CleanupOld()
+
 	// 앱 시작 시 이번 달 스냅샷 자동 기록
 	a.snapshotService.EnsureCurrentMonthSnapshotAsync()
 
