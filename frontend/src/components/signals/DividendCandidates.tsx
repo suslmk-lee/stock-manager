@@ -21,7 +21,7 @@ function ScoreDots({ score, max }: { score: number; max: number }) {
   return (
     <span className="inline-flex items-center gap-1" role="img" aria-label={`점수 ${score} / ${max}`}>
       {Array.from({ length: max }, (_, i) => (
-        <span key={i} className={`h-1.5 w-1.5 rounded-full ${i < score ? 'bg-sky-400' : 'bg-white/[0.14]'}`} />
+        <span key={i} className={`h-1.5 w-1.5 rounded-full ${i < score ? 'bg-mint-400' : 'bg-white/[0.14]'}`} />
       ))}
       <span className="num ml-1 text-[11px] text-zinc-400">
         {score}/{max}
@@ -191,12 +191,12 @@ export default function DividendCandidates({ highlightAssetId }: DividendCandida
                   <li
                     key={c.asset_id}
                     id={'cand-row-' + c.asset_id}
-                    className={`surface-inset p-3.5 transition-colors ${already ? 'opacity-60' : ''} ${hl ? '!border-sky-400/50 ring-1 ring-sky-400/30' : ''} ${checked ? '!bg-sky-400/[0.06]' : ''}`}
+                    className={`surface-inset p-3.5 transition-colors ${already ? 'opacity-60' : ''} ${hl ? '!border-mint-400/50 ring-1 ring-mint-400/30' : ''} ${checked ? '!bg-mint-400/[0.06]' : ''}`}
                   >
                     <div className="flex items-start gap-3">
                       <input
                         type="checkbox"
-                        className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-sky-400 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-mint-400 disabled:cursor-not-allowed disabled:opacity-40"
                         checked={checked}
                         disabled={already}
                         onChange={() => toggle(c.asset_id)}
@@ -210,7 +210,7 @@ export default function DividendCandidates({ highlightAssetId }: DividendCandida
                             {already ? (
                               <span className="badge border border-white/10 bg-white/[0.05] text-zinc-400">적용 중</span>
                             ) : (
-                              c.is_candidate && <span className="badge border border-sky-400/30 bg-sky-400/10 text-sky-200">후보</span>
+                              c.is_candidate && <span className="badge border border-mint-400/30 bg-mint-400/10 text-mint-200">후보</span>
                             )}
                           </div>
                           <ScoreDots score={c.score} max={c.max_score} />
@@ -218,7 +218,7 @@ export default function DividendCandidates({ highlightAssetId }: DividendCandida
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {c.reasons.map((r) =>
                             r.met ? (
-                              <Chip key={r.code} check className="!border-sky-400/30 !bg-sky-400/10 !text-sky-200 [&_svg]:!text-sky-300">
+                              <Chip key={r.code} check className="!border-mint-400/30 !bg-mint-400/10 !text-mint-200 [&_svg]:!text-mint-300">
                                 <span title={r.detail}>{r.label}</span>
                               </Chip>
                             ) : (
