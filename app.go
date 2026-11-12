@@ -25,6 +25,7 @@ type App struct {
 	signalService       *services.SignalService
 	dailySnapService    *services.DailySnapshotService
 	accumulationService *services.AccumulationService
+	cashService         *services.CashService
 	updater             *updater.Updater
 }
 
@@ -46,6 +47,7 @@ func NewApp() *App {
 	a.signalService = services.NewSignalService(database.GetDB(), a.tickerService, a.exchangeRateService)
 	a.dailySnapService = services.NewDailySnapshotService(database.GetDB(), a.tickerService)
 	a.accumulationService = services.NewAccumulationService(database.GetDB(), a.tickerService)
+	a.cashService = services.NewCashService(database.GetDB(), a.tickerService)
 	fundamentals := services.NewFundamentalsService(nil)
 	a.signalService.SetFundamentals(fundamentals)
 	a.signalService.SetValuation(services.NewValuationService(database.GetDB(), a.tickerService, fundamentals))
@@ -70,6 +72,7 @@ func (a *App) apiServices() *httpapi.Services {
 		Signal:       a.signalService,
 		DailySnap:    a.dailySnapService,
 		Accumulation: a.accumulationService,
+		Cash:         a.cashService,
 	}
 }
 
@@ -112,7 +115,7 @@ func (a *App) GetAccount(id uint) (interface{}, error) {
 	return a.accountService.GetAccount(id)
 }
 
-func (a *App) CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType string) (interface{}, error) {
+func (a *App) CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle string) (interface{}, error) {
 	return a.accountService.CreateAccount(services.CreateAccountRequest{
 		Name:          name,
 		Broker:        broker,
@@ -121,10 +124,11 @@ func (a *App) CreateAccount(name, broker, accountNumber, marketType, currency, d
 		Currency:      currency,
 		Description:   description,
 		AccountType:   models.AccountType(accountType),
+		ForeignSettle: foreignSettle,
 	})
 }
 
-func (a *App) UpdateAccount(id uint, name, broker, accountNumber, marketType, currency, description, accountType string) (interface{}, error) {
+func (a *App) UpdateAccount(id uint, name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle string) (interface{}, error) {
 	return a.accountService.UpdateAccount(id, services.UpdateAccountRequest{
 		Name:          name,
 		Broker:        broker,
@@ -133,6 +137,7 @@ func (a *App) UpdateAccount(id uint, name, broker, accountNumber, marketType, cu
 		Currency:      currency,
 		Description:   description,
 		AccountType:   models.AccountType(accountType),
+		ForeignSettle: foreignSettle,
 	})
 }
 

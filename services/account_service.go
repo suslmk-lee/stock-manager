@@ -27,6 +27,7 @@ type CreateAccountRequest struct {
 	Currency      string
 	Description   string
 	AccountType   models.AccountType
+	ForeignSettle string // "" = 기본(USD)
 }
 
 type UpdateAccountRequest struct {
@@ -37,7 +38,11 @@ type UpdateAccountRequest struct {
 	Currency      string
 	Description   string
 	AccountType   models.AccountType
+	ForeignSettle string // "" = 그대로
 }
+
+// validSettle: 미국 주식 결제 통화는 USD 또는 KRW
+func validSettle(v string) bool { return v == "USD" || v == "KRW" }
 
 func (s *AccountService) CreateAccount(req CreateAccountRequest) (*models.Account, error) {
 	if req.Name == "" {
@@ -62,6 +67,12 @@ func (s *AccountService) CreateAccount(req CreateAccountRequest) (*models.Accoun
 	if !req.AccountType.IsValid() {
 		return nil, fmt.Errorf("invalid account type: %s", req.AccountType)
 	}
+	if req.ForeignSettle == "" {
+		req.ForeignSettle = "USD"
+	}
+	if !validSettle(req.ForeignSettle) {
+		return nil, fmt.Errorf("invalid foreign settle currency: %s", req.ForeignSettle)
+	}
 
 	account := &models.Account{
 		Name:          req.Name,
@@ -71,6 +82,7 @@ func (s *AccountService) CreateAccount(req CreateAccountRequest) (*models.Accoun
 		Currency:      req.Currency,
 		Description:   req.Description,
 		AccountType:   req.AccountType,
+		ForeignSettle: req.ForeignSettle,
 	}
 
 	if err := s.db.Create(account).Error; err != nil {
@@ -132,6 +144,12 @@ func (s *AccountService) UpdateAccount(id uint, req UpdateAccountRequest) (*mode
 			return nil, fmt.Errorf("invalid account type: %s", req.AccountType)
 		}
 		account.AccountType = req.AccountType
+	}
+	if req.ForeignSettle != "" {
+		if !validSettle(req.ForeignSettle) {
+			return nil, fmt.Errorf("invalid foreign settle currency: %s", req.ForeignSettle)
+		}
+		account.ForeignSettle = req.ForeignSettle
 	}
 	account.Description = req.Description
 

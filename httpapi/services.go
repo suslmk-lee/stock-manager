@@ -21,6 +21,7 @@ type Services struct {
 	Signal       *services.SignalService
 	DailySnap    *services.DailySnapshotService
 	Accumulation *services.AccumulationService
+	Cash         *services.CashService
 }
 
 // NewServices 는 기본 서비스 묶음을 생성한다.
@@ -49,5 +50,6 @@ func NewServices() *Services {
 		Signal:       signal,
 		DailySnap:    dailySnap,
 		Accumulation: services.NewAccumulationService(database.GetDB(), ticker),
+		Cash:         services.NewCashService(database.GetDB(), ticker),
 	}
 }

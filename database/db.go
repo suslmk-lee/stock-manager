@@ -240,6 +240,7 @@ func runMigrations() error {
 		&models.NotificationSetting{},
 		&models.FundamentalSnapshot{},
 		&models.AccumulationPlan{},
+		&models.CashEntry{},
 	); err != nil {
 		return err
 	}

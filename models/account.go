@@ -70,6 +70,8 @@ type Account struct {
 	MarketType     MarketType     `gorm:"size:20;not null;default:'Domestic'" json:"market_type"`
 	AccountType    AccountType    `gorm:"size:20" json:"account_type"`
 	Currency       string         `gorm:"size:10;not null;default:'KRW'" json:"currency"`
+	// 미국 주식 결제 통화: USD = 달러 예수금에서 사고팔기, KRW = 원화로 바로 사고팔기(자동 환전, 카카오페이 원화 주문 등)
+	ForeignSettle  string         `gorm:"size:3;not null;default:'USD'" json:"foreign_settle"`
 	Description    string         `gorm:"size:500" json:"description"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`

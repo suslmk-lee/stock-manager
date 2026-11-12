@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest } from '../types/models';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -55,24 +55,24 @@ export const apiClient = {
     return WailsApp.GetAccount(id);
   },
 
-  CreateAccount: async (name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string) => {
+  CreateAccount: async (name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string, foreignSettle = 'USD') => {
     if (isWeb) {
       return fetchApi<Account>('/accounts', {
         method: 'POST',
-        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType }),
+        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType, foreign_settle: foreignSettle }),
       });
     }
-    return WailsApp.CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType);
+    return WailsApp.CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle);
   },
 
-  UpdateAccount: async (id: number, name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string) => {
+  UpdateAccount: async (id: number, name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string, foreignSettle = '') => {
     if (isWeb) {
       return fetchApi<Account>(`/accounts/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType }),
+        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType, foreign_settle: foreignSettle }),
       });
     }
-    return WailsApp.UpdateAccount(id, name, broker, accountNumber, marketType, currency, description, accountType);
+    return WailsApp.UpdateAccount(id, name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle);
   },
 
   DeleteAccount: async (id: number) => {
@@ -532,5 +532,46 @@ export const apiClient = {
   RunAccumulations: async (): Promise<AccumulationRunResult> => {
     if (isWeb) return fetchApi<AccumulationRunResult>('/accumulations/run', { method: 'POST' });
     return (await WailsApp.RunAccumulations()) as AccumulationRunResult;
+  },
+  // ==========================================
+  // 예수금
+  // ==========================================
+  GetCashBalances: async (): Promise<{ balances: CashBalance[]; usd_krw: number }> => {
+    if (isWeb) return fetchApi<{ balances: CashBalance[]; usd_krw: number }>('/cash/balances');
+    return (await WailsApp.GetCashBalances()) as { balances: CashBalance[]; usd_krw: number };
+  },
+
+  GetAccountCash: async (accountId: number): Promise<CashSummary> => {
+    if (isWeb) return fetchApi<CashSummary>(`/accounts/${accountId}/cash`);
+    return (await WailsApp.GetAccountCash(accountId)) as CashSummary;
+  },
+
+  CreateCashEntry: async (accountId: number, req: CashEntryRequest): Promise<void> => {
+    if (isWeb) {
+      await fetchApi(`/accounts/${accountId}/cash`, { method: 'POST', body: JSON.stringify(req) });
+      return;
+    }
+    await WailsApp.CreateCashEntry(accountId, req as unknown as Parameters<typeof WailsApp.CreateCashEntry>[1]);
+  },
+
+  CreateCashExchange: async (accountId: number, req: CashExchangeRequest): Promise<void> => {
+    if (isWeb) {
+      await fetchApi(`/accounts/${accountId}/cash/exchange`, { method: 'POST', body: JSON.stringify(req) });
+      return;
+    }
+    await WailsApp.CreateCashExchange(accountId, req as unknown as Parameters<typeof WailsApp.CreateCashExchange>[1]);
+  },
+
+  ReconcileCash: async (accountId: number, req: CashReconcileRequest): Promise<{ entry: unknown | null }> => {
+    if (isWeb) return fetchApi<{ entry: unknown | null }>(`/accounts/${accountId}/cash/reconcile`, { method: 'POST', body: JSON.stringify(req) });
+    return (await WailsApp.ReconcileCash(accountId, req as unknown as Parameters<typeof WailsApp.ReconcileCash>[1])) as { entry: unknown | null };
+  },
+
+  DeleteCashEntry: async (id: number): Promise<void> => {
+    if (isWeb) {
+      await fetchApi(`/cash-entries/${id}`, { method: 'DELETE' });
+      return;
+    }
+    return WailsApp.DeleteCashEntry(id);
   },
 };

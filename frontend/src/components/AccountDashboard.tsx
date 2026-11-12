@@ -5,6 +5,7 @@ import { getAccountTypeMeta } from '../utils/accountType';
 import { Lock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import TotalReturnByAsset from './TotalReturnByAsset';
+import CashPanel from './cash/CashPanel';
 import AssetDetailView from './AssetDetailView';
 import CardIcon from './ui/CardIcon';
 import { useThemeColors } from '../appearance/AppearanceContext';
@@ -77,6 +78,7 @@ export default function AccountDashboard({ account, actions }: AccountDashboardP
                 {getAccountTypeMeta(account).short}
               </span>
               <span className="chip">{account.currency}</span>
+              {account.market_type === 'International' && account.foreign_settle === 'KRW' && <span className="chip">원화 결제</span>}
               {account.account_number && <span className="label-mono">{account.account_number}</span>}
             </div>
           </div>
@@ -84,6 +86,9 @@ export default function AccountDashboard({ account, actions }: AccountDashboardP
         {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
       </header>
       {account.description && <p className="-mt-2 mb-5 text-sm text-zinc-400">{account.description}</p>}
+
+      {/* 예수금 · 계좌 총액 */}
+      <CashPanel account={account} />
 
       {/* 평가금 추세 */}
       <div className="surface-inset p-4 sm:p-5 mb-5">

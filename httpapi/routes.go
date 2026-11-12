@@ -17,4 +17,5 @@ func RegisterRoutes(api *gin.RouterGroup, s *Services) {
 	registerSignalEventRoutes(api, s)
 	registerSignalProfileRoutes(api, s)
 	registerAccumulationRoutes(api, s)
+	registerCashRoutes(api, s)
 }

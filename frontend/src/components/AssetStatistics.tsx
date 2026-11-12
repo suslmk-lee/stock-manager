@@ -45,6 +45,9 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
   const [expanded, setExpanded] = useState(false);
   const [liquidValue, setLiquidValue] = useState(0);
   const [restrictedValue, setRestrictedValue] = useState(0);
+  const [stockValue, setStockValue] = useState(0);
+  const [cashValue, setCashValue] = useState(0);
+
 
   useEffect(() => {
     loadAssetValues();
@@ -53,10 +56,11 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
   const loadAssetValues = async () => {
     try {
       setLoading(true);
-      const [assetsData, accountsData, rate] = await Promise.all([
+      const [assetsData, accountsData, rate, cashData] = await Promise.all([
         apiClient.GetAllAssets(),
         apiClient.GetAllAccounts(),
-        apiClient.GetUSDToKRW()
+        apiClient.GetUSDToKRW(),
+        apiClient.GetCashBalances().catch(() => null),
       ]);
 
       const assets = assetsData as Asset[];
@@ -107,9 +111,26 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
         }
       }
 
-      // 총 자산 계산
-      const total = assetValues.reduce((sum, av) => sum + av.value, 0);
-      setTotalValue(total);
+      // 예수금: 계좌마다 원화 + 달러(현재 환율). 필터는 주식과 같게 적용
+      const usdKrw = (cashData?.usd_krw || (rate as number)) || 0;
+      const cashByAccount = new Map<number, number>();
+      for (const b of cashData?.balances ?? []) {
+        const account = accountsList.find((acc) => acc.id === b.account_id);
+        if (!account) continue;
+        if (accountId && b.account_id !== accountId) continue;
+        if (marketType === 'domestic' && account.market_type !== 'Domestic') continue;
+        if (marketType === 'international' && account.market_type !== 'International') continue;
+        if (!matchesLiquidity(account, liquidity)) continue;
+        const v = b.krw + b.usd * usdKrw;
+        if (v !== 0) cashByAccount.set(b.account_id, v);
+      }
+      const cashTotal = Array.from(cashByAccount.values()).reduce((s, v) => s + v, 0);
+
+      // 총 자산 계산 (주식 평가금 + 예수금)
+      const stockTotal = assetValues.reduce((sum, av) => sum + av.value, 0);
+      setStockValue(stockTotal);
+      setCashValue(cashTotal);
+      setTotalValue(stockTotal + cashTotal);
 
       // 계좌별 자산 계산
       const accountValuesMap = new Map<number, number>();
@@ -117,19 +138,22 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
         const current = accountValuesMap.get(av.accountId) || 0;
         accountValuesMap.set(av.accountId, current + av.value);
       });
+      cashByAccount.forEach((v, id) => accountValuesMap.set(id, (accountValuesMap.get(id) || 0) + v));
       setAccountValues(accountValuesMap);
 
-      // 국내/해외별 자산 계산
+      // 국내/해외별 자산 계산 (예수금은 계좌의 시장 구분을 따른다)
+      const cashOf = (pred: (a: Account | undefined) => boolean) =>
+        Array.from(cashByAccount.entries()).filter(([id]) => pred(accountsList.find((a) => a.id === id))).reduce((s, [, v]) => s + v, 0);
       const domestic = assetValues
         .filter(av => av.marketType === 'Domestic')
-        .reduce((sum, av) => sum + av.value, 0);
+        .reduce((sum, av) => sum + av.value, 0) + cashOf((a) => a?.market_type === 'Domestic');
       const international = assetValues
         .filter(av => av.marketType === 'International')
-        .reduce((sum, av) => sum + av.value, 0);
-      
+        .reduce((sum, av) => sum + av.value, 0) + cashOf((a) => a?.market_type === 'International');
+
       // 인출 가능/제한별 자산 계산
-      let liquid = 0;
-      let restricted = 0;
+      let liquid = cashOf((a) => !isRestrictedAccount(a));
+      let restricted = cashOf((a) => isRestrictedAccount(a));
       assetValues.forEach(av => {
         const acc = accountsList.find(a => a.id === av.accountId);
         if (isRestrictedAccount(acc)) restricted += av.value;
@@ -261,6 +285,11 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
             >
               <CountUp value={totalValue} format={formatCurrency} />
             </p>
+            {cashValue !== 0 && (
+              <p className="mt-2 text-sm text-zinc-400 num">
+                주식 <CountUp value={stockValue} format={formatCurrency} /> · 예수금 <CountUp value={cashValue} format={formatCurrency} />
+              </p>
+            )}
             {restrictedValue > 0 && liquidity === 'all' && (
               <p className="mt-3 text-sm text-mint-300 num">
                 즉시 인출 가능 <CountUp value={liquidValue} format={formatCurrency} />

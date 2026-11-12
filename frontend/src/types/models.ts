@@ -46,6 +46,8 @@ export interface Account {
   account_number: string;
   market_type: MarketType;
   account_type?: AccountType;
+  /** 미국 주식 결제 통화: USD = 달러 예수금, KRW = 원화로 바로 (자동 환전) */
+  foreign_settle?: 'USD' | 'KRW';
   currency: string;
   description: string;
   created_at: string;
@@ -670,4 +672,61 @@ export interface AccumulationRunResult {
   skipped: number;
   plans: number;
   errors?: string[];
+}
+
+// ── 예수금 ──
+export type CashKind = 'deposit' | 'withdraw' | 'exchange' | 'interest' | 'adjust';
+export type CashFlowKind = CashKind | 'buy' | 'sell' | 'dividend';
+
+export interface CashFlow {
+  date: string;
+  kind: CashFlowKind;
+  currency: 'KRW' | 'USD';
+  amount: number;
+  balance: number;
+  label: string;
+  detail?: string;
+  fx?: number;
+  entry_id?: number;
+  transaction_id?: number;
+  plan_fill?: boolean;
+  notes?: string;
+}
+
+export interface CashBalance {
+  account_id: number;
+  krw: number;
+  usd: number;
+  total_krw: number;
+  last_adjusted?: string;
+}
+
+export interface CashSummary extends CashBalance {
+  account: Account;
+  usd_krw: number;
+  stock_value_krw?: number;
+  account_total_krw?: number;
+  flows: CashFlow[];
+}
+
+export interface CashEntryRequest {
+  currency: 'KRW' | 'USD';
+  date: string;
+  kind: 'deposit' | 'withdraw' | 'interest';
+  amount: number;
+  notes: string;
+}
+
+export interface CashExchangeRequest {
+  date: string;
+  from_currency: 'KRW' | 'USD';
+  from_amount: number;
+  to_amount: number;
+  notes: string;
+}
+
+export interface CashReconcileRequest {
+  currency: 'KRW' | 'USD';
+  balance: number;
+  date: string;
 }

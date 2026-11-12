@@ -43,6 +43,7 @@ const EMPTY_FORM = {
   currency: 'KRW',
   description: '',
   accountType: 'General' as AccountType,
+  foreignSettle: 'USD' as 'USD' | 'KRW',
 };
 
 
@@ -107,6 +108,7 @@ function App() {
       currency: account.currency,
       description: account.description || '',
       accountType: getAccountType(account),
+      foreignSettle: account.foreign_settle === 'KRW' ? 'KRW' : 'USD',
     });
     setShowForm(true);
   };
@@ -123,7 +125,8 @@ function App() {
           formData.marketType,
           formData.currency,
           formData.description,
-          formData.accountType
+          formData.accountType,
+          formData.foreignSettle
         );
       } else {
         const created = (await apiClient.CreateAccount(
@@ -133,7 +136,8 @@ function App() {
           formData.marketType,
           formData.currency,
           formData.description,
-          formData.accountType
+          formData.accountType,
+          formData.foreignSettle
         )) as Account | null;
         if (created?.id) setSelectedId(created.id);
       }
@@ -305,6 +309,18 @@ function App() {
             <option value="JPY">JPY (엔)</option>
           </select>
         </div>
+        {formData.marketType === 'International' && (
+          <div>
+            <label className="field-label">미국 주식 결제</label>
+            <select value={formData.foreignSettle} onChange={(e) => setFormData({ ...formData, foreignSettle: e.target.value as 'USD' | 'KRW' })} className="input-field">
+              <option value="USD">달러 예수금에서 사고팔기</option>
+              <option value="KRW">원화로 바로 사고팔기 (자동 환전)</option>
+            </select>
+            <p className="mt-1.5 text-xs text-zinc-500">
+              예수금 계산에 씁니다. 카카오페이 원화 모으기·원화 주문처럼 원화가 바로 빠지는 계좌는 '원화로 바로'를 고르세요. 미국 주식 매매·배당이 그날 환율로 원화 예수금에 반영됩니다.
+            </p>
+          </div>
+        )}
         <div>
           <label className="field-label">설명</label>
           <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="input-field" placeholder="계좌에 대한 설명을 입력하세요" rows={3} />

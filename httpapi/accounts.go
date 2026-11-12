@@ -41,6 +41,7 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				Currency      string `json:"currency"`
 				Description   string `json:"description"`
 				AccountType   string `json:"account_type"`
+				ForeignSettle string `json:"foreign_settle"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -54,6 +55,7 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				Currency:      req.Currency,
 				Description:   req.Description,
 				AccountType:   models.AccountType(req.AccountType),
+				ForeignSettle: req.ForeignSettle,
 			})
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -72,6 +74,7 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				Currency      string `json:"currency"`
 				Description   string `json:"description"`
 				AccountType   string `json:"account_type"`
+				ForeignSettle string `json:"foreign_settle"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -85,6 +88,7 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				Currency:      req.Currency,
 				Description:   req.Description,
 				AccountType:   models.AccountType(req.AccountType),
+				ForeignSettle: req.ForeignSettle,
 			})
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
