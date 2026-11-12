@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import Portal from '../ui/Portal';
 import Switch from '../ui/Switch';
+import DatePicker from '../ui/DatePicker';
 import { apiClient } from '../../api/client';
 import type { Account, AccumulationPlanRequest, AccumulationPlanView, Asset, Holding, PlanCondition, PlanCurrency, PlanSchedule } from '../../types/models';
 import {
@@ -397,10 +398,10 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
                   <input inputMode="decimal" className="input-field num !px-2.5" value={openingQty} onChange={(e) => setOpeningQty(e.target.value)} placeholder="0.087" />
                 </label>
               </div>
-              <label className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <span className="label-mono shrink-0">처음 시작한 날</span>
-                <input type="date" className="input-field !w-auto !py-1.5" value={startedOn} max={kstDate()} onChange={(e) => setStartedOn(e.target.value)} />
-              </label>
+                <DatePicker value={startedOn} onChange={setStartedOn} max={kstDate()} clearable placeholder="선택 (안 적어도 됨)" className="!w-auto !py-1.5" ariaLabel="처음 시작한 날" />
+              </div>
               {!editing && (
                 <div className="flex items-start justify-between gap-3 border-t border-white/[0.06] pt-3">
                   <div className="min-w-0 text-xs">
@@ -435,15 +436,14 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
               }
             >
               <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  className="input-field !w-auto !py-1.5"
+                <DatePicker
                   value={autoFrom}
-                  onChange={(e) => {
-                    setAutoFrom(e.target.value);
+                  onChange={(v) => {
+                    setAutoFrom(v);
                     setAutoFromTouched(true);
                   }}
-                  aria-label="자동 기록 시작일"
+                  className="!w-auto !py-1.5"
+                  ariaLabel="자동 기록 시작일"
                 />
                 {autoFrom && <span className="text-xs text-zinc-400">{fmtDay(autoFrom)} 장부터</span>}
               </div>

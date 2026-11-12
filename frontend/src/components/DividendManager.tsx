@@ -8,6 +8,7 @@ import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Cl
 import IconTile from './ui/IconTile';
 import DividendQuickStats from './DividendQuickStats';
 import Portal from './ui/Portal';
+import DatePicker from './ui/DatePicker';
 
 interface DividendManagerProps {
   selectedAccountId?: number;
@@ -54,7 +55,6 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
     date: new Date().toISOString().split('T')[0],
     amount: '',
     currency: 'USD',
-    tax: '',
     isReceived: true,
     notes: '',
   });
@@ -244,6 +244,12 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
 
   const handleCreateDividend = async (e: React.FormEvent) => {
     e.preventDefault();
+    // 배당금은 세금을 뺀 실제 받은 금액으로 입력한다 (세금 칸 없음)
+    const net = parseFloat(formData.amount);
+    const original = editingDividend ? editingDividend.amount - (editingDividend.tax || 0) : NaN;
+    const keepOriginal = !!editingDividend && Math.abs(net - original) < 0.005;
+    const amount = keepOriginal ? editingDividend!.amount : net;
+    const tax = keepOriginal ? editingDividend!.tax || 0 : 0;
     try {
       if (editingDividend) {
         await apiClient.UpdateDividend(
@@ -251,8 +257,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
           formData.accountId,
           formData.assetId,
           formData.date,
-          parseFloat(formData.amount),
-          parseFloat(formData.tax),
+          amount,
+          tax,
           formData.currency,
           true,
           formData.notes
@@ -262,8 +268,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
           formData.accountId,
           formData.assetId,
           formData.date,
-          parseFloat(formData.amount),
-          parseFloat(formData.tax),
+          amount,
+          tax,
           formData.currency,
           true,
           formData.notes
@@ -283,7 +289,6 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
         date: formData.date, // 이전 선택 날짜 유지
         amount: '',
         currency: 'USD',
-        tax: '',
         isReceived: true,
         notes: '',
       });
@@ -304,9 +309,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       accountId: dividend.account_id,
       assetId: dividend.asset_id,
       date: dividend.date.split('T')[0],
-      amount: dividend.amount.toString(),
+      amount: String(Math.round((dividend.amount - (dividend.tax || 0)) * 100) / 100), // 세후 금액
       currency: dividend.currency,
-      tax: dividend.tax.toString(),
       isReceived: dividend.is_received,
       notes: dividend.notes || '',
     });
@@ -346,7 +350,6 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       date: new Date().toISOString().split('T')[0],
       amount: '',
       currency: 'USD',
-      tax: '',
       isReceived: true,
       notes: '',
     });
@@ -955,7 +958,6 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                 date: formData.date || new Date().toISOString().split('T')[0], // 이전 날짜 유지, 없으면 오늘
                 amount: '',
                 currency: 'USD',
-                tax: '',
                 isReceived: true,
                 notes: '',
               });
@@ -1152,39 +1154,24 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="field-label">지급일 *</label>
-                  <input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="input-field"
-                    required
-                  />
+                  <DatePicker value={formData.date} onChange={(date) => setFormData({ ...formData, date })} ariaLabel="지급일" />
                 </div>
                 <div>
-                  <label className="field-label">배당금액 *</label>
+                  <label className="field-label">받은 배당금 (세후) *</label>
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
                     value={formData.amount}
                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                     className="input-field"
                     placeholder="0.00"
                     required
                   />
-                </div>
-                <div>
-                  <label className="field-label">세금</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.tax}
-                    onChange={(e) => setFormData({ ...formData, tax: e.target.value })}
-                    className="input-field"
-                    placeholder="0.00"
-                  />
+                  <p className="mt-1 text-[11px] text-zinc-500">세금을 뺀, 계좌에 실제로 들어온 금액</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

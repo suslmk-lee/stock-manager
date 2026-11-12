@@ -9,6 +9,7 @@ import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, TrendingDown, History
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { calculateFee, roundFee } from '../utils/fees';
 import Portal from './ui/Portal';
+import DatePicker from './ui/DatePicker';
 
 interface TransactionManagerProps {
   selectedAccountId?: number;
@@ -1740,12 +1741,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="field-label">거래일</label>
-                        <input
-                          type="date"
-                          value={txEditData.date}
-                          onChange={(e) => setTxEditData({ ...txEditData, date: e.target.value })}
-                          className="input-field w-full px-3 py-2 text-sm"
-                        />
+                        <DatePicker value={txEditData.date} onChange={(date) => setTxEditData({ ...txEditData, date })} className="px-3 py-2 text-sm" ariaLabel="거래일" />
                       </div>
                       <div>
                         <label className="field-label">{txEditData.type === 'Buy' ? '매수가' : '매도가'} ({cur})</label>
@@ -2154,13 +2150,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="field-label">거래일 *</label>
-                    <input
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      className="input-field w-full px-3 py-2"
-                      required
-                    />
+                    <DatePicker value={formData.date} onChange={(date) => setFormData({ ...formData, date })} className="px-3 py-2" ariaLabel="거래일" />
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-2">
