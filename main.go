@@ -26,7 +26,7 @@ func main() {
 
 	app := NewApp()
 
-	// 백그라운드에서 API 서버 실행
+	// 개발용 내장 API 서버 (STOCK_MANAGER_LOCAL_API=1 일 때만, 이 PC 안에서만)
 	if !bindingsMode {
 		go StartAPIServer(app)
 	}
