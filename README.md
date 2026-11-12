@@ -206,7 +206,10 @@ git tag v1.2.0 && git push origin v1.2.0
 - Wails가 Go 백엔드와 React 프론트엔드를 하나의 데스크톱 앱으로 번들링
 - 프론트엔드는 Wails 바인딩을 통해 Go 메서드를 직접 호출
 - Go 백엔드가 `.env`의 `DB_TYPE`에 따라 Supabase 또는 SQLite에 연결
-- 백그라운드로 REST API 서버도 `:8080`에서 실행 (외부 접근용)
+- 앱을 켜면 이 PC의 6자리 PIN을 묻는다 (PC마다 따로, 처음 실행 때 만든다). '이 PC 기억하기'를 켜면 해제할 때까지 묻지 않는다.
+  기록은 `~/Library/Application Support/StockManager/lock.json`(Windows 는 `%APPDATA%\StockManager\lock.json`)에만 있다.
+- 내장 REST API 서버(`127.0.0.1:8080`)는 기본으로 꺼져 있다. 웹 화면을 이 PC 데이터로 개발할 때만 `.env` 에
+  `STOCK_MANAGER_LOCAL_API=1` 을 넣어 켠다 (인증이 없으므로 이 PC 안에서만 받는다). 모바일·웹은 Fly 서버에 붙는다.
 
 ### 2. 프론트엔드만 로컬 실행 (웹 브라우저)
 

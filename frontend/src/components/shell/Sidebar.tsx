@@ -1,5 +1,5 @@
 import { Download, Loader2, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
-import { IconPalette } from '../ui/appIcons';
+import { IconLock, IconPalette } from '../ui/appIcons';
 import Brand from '../ui/Brand';
 import { useUpdates } from '../update/UpdateProvider';
 import { NAV_GROUPS, type NavItem, type RouteId } from '../../navigation';
@@ -17,6 +17,8 @@ interface SidebarProps {
   onCloseMobile: () => void;
   usdKrw: number | null;
   onOpenSettings: () => void;
+  /** 잠금 설정 (데스크톱 앱만) */
+  onOpenLock?: () => void;
 }
 
 export default function Sidebar({
@@ -29,6 +31,7 @@ export default function Sidebar({
   onCloseMobile,
   usdKrw,
   onOpenSettings,
+  onOpenLock,
 }: SidebarProps) {
   const rail = collapsed && !mobile;
   const updates = useUpdates();
@@ -111,6 +114,12 @@ export default function Sidebar({
             <IconPalette className="nav-item-icon h-[18px] w-[18px] shrink-0" />
             {!rail && <span>모양 설정</span>}
           </button>
+          {onOpenLock && (
+            <button type="button" onClick={onOpenLock} className={`nav-item ${rail ? 'justify-center !px-0' : ''}`} title={rail ? '잠금 설정' : undefined}>
+              <IconLock className="nav-item-icon h-[18px] w-[18px] shrink-0" />
+              {!rail && <span>잠금 설정</span>}
+            </button>
+          )}
           {!mobile && (
             <button
               type="button"

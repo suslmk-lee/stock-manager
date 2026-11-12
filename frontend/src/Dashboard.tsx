@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import AppearanceSettings from './components/settings/AppearanceSettings';
+import LockSettings from './components/lock/LockSettings';
+import { appLock } from './platform/desktop';
 import App from './App';
 import AssetManager from './components/AssetManager';
 import DividendManager from './components/DividendManager';
@@ -34,6 +36,7 @@ export default function Dashboard() {
   const [selectedAccountId, setSelectedAccountId] = useState<number>(0);
   const [usdKrw, setUsdKrw] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [lockOpen, setLockOpen] = useState(false);
   const [pinnedCollapsed, setPinnedCollapsed] = useState(loadCollapsed);
   const [narrowExpanded, setNarrowExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -126,6 +129,7 @@ export default function Dashboard() {
         onCloseMobile={() => setMobileOpen(false)}
         usdKrw={usdKrw}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenLock={appLock.supported() ? () => setLockOpen(true) : undefined}
       />
 
       <div className={`relative transition-[padding] duration-300 ${mobile ? '' : collapsed ? 'pl-16' : 'pl-52'}`}>
@@ -200,6 +204,7 @@ export default function Dashboard() {
       {mobile && <MobileTabBar activeGroup={GROUP_OF[route]} onGroup={openGroup} onMore={() => setMobileOpen(true)} />}
 
       <AppearanceSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <LockSettings open={lockOpen} onClose={() => setLockOpen(false)} />
     </div>
   );
 }

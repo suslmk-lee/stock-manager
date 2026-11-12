@@ -25,8 +25,31 @@ export interface UpdateProgress {
   percent: number;
 }
 
+/** 앱 잠금 상태 (Go services.LockStatus) */
+export interface LockStatus {
+  state: 'setup' | 'locked' | 'unlocked';
+  /** 이 PC 기억하기 */
+  trusted: boolean;
+  /** 이 PC 이름 */
+  device: string;
+  /** 너무 많이 틀려 기다려야 하는 초 */
+  retry_after?: number;
+  locked_until?: string;
+  /** 기다리지 않고 더 틀릴 수 있는 횟수 */
+  remaining?: number;
+  /** 방금 시도가 실패한 이유 */
+  error?: string;
+}
+
 type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 interface WailsApp {
+  GetLockStatus?: () => Promise<LockStatus>;
+  SetupLock?: (pin: string, remember: boolean) => Promise<{ status: LockStatus; recovery_code: string }>;
+  UnlockApp?: (pin: string, remember: boolean) => Promise<LockStatus>;
+  RecoverLock?: (code: string, newPin: string, remember: boolean) => Promise<LockStatus>;
+  ChangeLockPIN?: (current: string, newPin: string) => Promise<void>;
+  SetLockTrusted?: (trusted: boolean) => Promise<LockStatus>;
+  NewLockRecoveryCode?: (pin: string) => Promise<string>;
   SetTitleBarColors?: (background: string, text: string, dark: boolean) => Promise<void>;
   CheckForUpdate?: () => Promise<UpdateInfo>;
   InstallUpdate?: () => Promise<void>;
@@ -34,7 +57,10 @@ interface WailsApp {
 }
 interface DesktopGlobals {
   go?: { main?: { App?: WailsApp } };
-  runtime?: { EventsOn?: (name: string, cb: (...data: unknown[]) => void) => (() => void) | void };
+  runtime?: {
+    EventsOn?: (name: string, cb: (...data: unknown[]) => void) => (() => void) | void;
+    ClipboardSetText?: (text: string) => Promise<boolean>;
+  };
   __TAURI__?: { core?: { invoke?: TauriInvoke } }; // tauri.conf.json 의 app.withGlobalTauri: true 일 때
   __TAURI_INTERNALS__?: { invoke?: TauriInvoke };
 }
@@ -112,4 +138,36 @@ export const desktop = {
     const off = g().runtime?.EventsOn?.('update:progress', (p: unknown) => cb(p as UpdateProgress));
     return typeof off === 'function' ? off : () => {};
   },
+
+  /** 클립보드에 복사 (데스크톱 앱은 Wails 런타임, 아니면 브라우저) */
+  async copyText(text: string): Promise<boolean> {
+    try {
+      const fn = g().runtime?.ClipboardSetText;
+      if (fn) return await fn(text);
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
+
+const lockFn = <K extends keyof WailsApp>(name: K): NonNullable<WailsApp[K]> => {
+  const fn = wailsApp()?.[name];
+  if (!fn) throw new Error('이 환경에서는 앱 잠금을 쓸 수 없습니다');
+  return fn as NonNullable<WailsApp[K]>;
+};
+
+/** 앱 잠금 (PC마다 따로 6자리 PIN) — 데스크톱 앱에서만. 웹·모바일은 서버의 API Key 로 막는다. */
+export const appLock = {
+  supported(): boolean {
+    return detectShell() === 'wails' && typeof wailsApp()?.GetLockStatus === 'function';
+  },
+  status: () => lockFn('GetLockStatus')(),
+  setup: (pin: string, remember: boolean) => lockFn('SetupLock')(pin, remember),
+  unlock: (pin: string, remember: boolean) => lockFn('UnlockApp')(pin, remember),
+  recover: (code: string, newPin: string, remember: boolean) => lockFn('RecoverLock')(code, newPin, remember),
+  changePin: (current: string, newPin: string) => lockFn('ChangeLockPIN')(current, newPin),
+  setTrusted: (trusted: boolean) => lockFn('SetLockTrusted')(trusted),
+  newRecoveryCode: (pin: string) => lockFn('NewLockRecoveryCode')(pin),
 };

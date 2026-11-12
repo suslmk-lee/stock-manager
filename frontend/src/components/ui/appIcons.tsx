@@ -156,6 +156,11 @@ export const ICON_PATHS = {
     '<path d="M12 4l8.5 4.5L12 13 3.5 8.5z"/><path d="M3.5 12.5 12 17l8.5-4.5M3.5 16.5 12 21l8.5-4.5"/>',
     '<path d="M12 4l8.5 4.5L12 13 3.5 8.5z"/>',
   ],
+  // 잠금 설정: 자물쇠 (면 = 몸통)
+  lock: [
+    '<rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.5v2.5"/>',
+    '<rect x="5" y="10.5" width="14" height="10" rx="2.2"/>',
+  ],
   // 색상: 반쪽 원 (면 = 왼쪽 반)
   contrast: [
     '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17"/>',
@@ -201,3 +206,4 @@ export const IconPointer = make(ICON_PATHS.pointer);
 export const IconContrast = make(ICON_PATHS.contrast);
 export const IconHistory = make(ICON_PATHS.history);
 export const IconLayers = make(ICON_PATHS.layers);
+export const IconLock = make(ICON_PATHS.lock);

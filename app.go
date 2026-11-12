@@ -26,6 +26,7 @@ type App struct {
 	dailySnapService    *services.DailySnapshotService
 	accumulationService *services.AccumulationService
 	cashService         *services.CashService
+	lockService         *services.LockService // 앱 잠금 (이 PC의 설정 폴더)
 	updater             *updater.Updater
 }
 
@@ -55,6 +56,7 @@ func NewApp() *App {
 	// 자산 추이(일별·월별)에 예수금을 더한다
 	a.dailySnapService.SetCash(a.cashService)
 	a.snapshotService.SetCash(a.cashService)
+	a.lockService = services.NewLockService(services.DefaultLockDir())
 	a.updater = updater.New(appVersion)
 	return a
 }
