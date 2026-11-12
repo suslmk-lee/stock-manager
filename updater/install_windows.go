@@ -16,7 +16,9 @@ import (
 
 const (
 	createNewProcessGroup = 0x00000200
-	detachedProcess       = 0x00000008
+	// 콘솔 창 없이 숨은 콘솔로 띄운다. DETACHED_PROCESS(콘솔 없음)로 띄우면 powershell 이
+	// 명령을 실행하지 못하고 바로 끝나 새 버전이 다시 열리지 않는다 (Windows 11 에서 확인).
+	createNoWindow = 0x08000000
 )
 
 var unsafeNameRe = regexp.MustCompile(`[^A-Za-z0-9._-]`)
@@ -79,8 +81,8 @@ func (u *Updater) Install(ctx context.Context, pid int, progress func(Progress))
 
 	// 4) 이 앱이 끝나면 새 exe 를 여는 도우미
 	script := fmt.Sprintf("Wait-Process -Id %d -Timeout 60 -ErrorAction SilentlyContinue; Start-Process -FilePath %s", pid, psQuote(target))
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNewProcessGroup | detachedProcess}
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNewProcessGroup | createNoWindow}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("새 버전은 설치했지만 자동으로 다시 열지 못했습니다. 프로그램을 직접 다시 실행하세요: %w", err)
 	}

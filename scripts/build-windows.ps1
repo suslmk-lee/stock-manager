@@ -1,4 +1,4 @@
-# Windows 용 버전이 들어간 빌드를 만든다 (앱 안 업데이트 확인이 켜진다).
+﻿# Windows 용 버전이 들어간 빌드를 만든다 (앱 안 업데이트 확인이 켜진다).
 #   powershell -File scripts\build-windows.ps1
 # 결과: build\bin\stock-manager.exe
 # 그냥 `wails build` 로 만들면 버전이 "dev" 라 업데이트를 확인하지 않는다.
