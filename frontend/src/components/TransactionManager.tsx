@@ -2058,7 +2058,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                     <input
                       type="text"
-                      value={selectedAsset ? `${selectedAsset.ticker} - ${selectedAsset.name}` : assetSearch}
+                      value={selectedAsset ? [assetPrimary(selectedAsset), assetSecondary(selectedAsset)].filter(Boolean).join(' · ') : assetSearch}
                       onChange={(e) => {
                         setAssetSearch(e.target.value);
                         setFormData({ ...formData, assetId: 0 });
@@ -2071,7 +2071,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     />
                   </div>
                   {showAssetDropdown && filteredAssetOptions.length > 0 && !selectedAsset && (
-                    <div className="absolute z-10 w-full mt-1 bg-white/[0.07] border border-white/[0.08] rounded-lg max-h-48 overflow-y-auto shadow-lg">
+                    // 아래 입력칸이 비치지 않게 불투명한 바탕 (예전 bg-white/[0.07] 은 반투명이라 겹쳐 보였다)
+                    <div className="absolute z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-white/[0.12] bg-ink-850 p-1 shadow-[0_14px_36px_rgb(var(--c-shadow)/calc(0.45*var(--shadow-k)))]">
                       {filteredAssetOptions.map((a) => {
                         const h = holdings.find((x) => x.asset_id === a.id);
                         return (
@@ -2083,13 +2084,14 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                               setShowAssetDropdown(false);
                               setAssetSearch('');
                             }}
-                            className="w-full text-left px-3 py-2 hover:bg-white/[0.1] text-sm flex items-center justify-between"
+                            className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.07]"
                           >
-                            <span className="text-white">
-                              <span className="font-medium">{a.ticker}</span> · {a.name}
+                            <span className="flex min-w-0 items-baseline gap-2">
+                              <span className="truncate font-medium text-white">{assetPrimary(a)}</span>
+                              <span className="truncate text-xs text-zinc-500">{assetSecondary(a)}</span>
                             </span>
                             {h && (
-                              <span className="text-xs text-zinc-400">
+                              <span className="shrink-0 text-xs text-zinc-400">
                                 {formatNumber(h.quantity, 4)}주 · 평단 {formatMoney(h.average_price, getCurrencyFromTicker(a.ticker))}
                               </span>
                             )}
