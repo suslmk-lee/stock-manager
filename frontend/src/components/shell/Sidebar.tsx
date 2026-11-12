@@ -1,4 +1,5 @@
-import { Download, Loader2, PanelLeftClose, PanelLeftOpen, Settings2, X } from 'lucide-react';
+import { Download, Loader2, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
+import { IconPalette } from '../ui/navIcons';
 import Brand from '../ui/Brand';
 import { useUpdates } from '../update/UpdateProvider';
 import { NAV_GROUPS, type NavItem, type RouteId } from '../../navigation';
@@ -45,7 +46,7 @@ export default function Sidebar({
         aria-current={active ? 'page' : undefined}
         title={rail ? item.label : undefined}
       >
-        <Icon className="nav-item-icon h-4 w-4 shrink-0" strokeWidth={1.75} />
+        <Icon className="nav-item-icon h-[18px] w-[18px] shrink-0" />
         {!rail && <span className="truncate">{item.label}</span>}
         {!rail && item.isNew && <span className="badge-new ml-auto">New</span>}
         {rail && item.isNew && <span className="absolute right-2.5 top-2 h-1.5 w-1.5 rounded-full bg-mint-400" aria-hidden />}
@@ -105,7 +106,7 @@ export default function Sidebar({
             className={`nav-item ${rail ? 'justify-center !px-0' : ''}`}
             title={rail ? '모양 설정' : undefined}
           >
-            <Settings2 className="nav-item-icon h-4 w-4 shrink-0" strokeWidth={1.75} />
+            <IconPalette className="nav-item-icon h-[18px] w-[18px] shrink-0" />
             {!rail && <span>모양 설정</span>}
           </button>
           {!mobile && (
@@ -117,9 +118,9 @@ export default function Sidebar({
               aria-expanded={!rail}
             >
               {rail ? (
-                <PanelLeftOpen className="nav-item-icon h-4 w-4 shrink-0" strokeWidth={1.75} />
+                <PanelLeftOpen className="nav-item-icon h-[18px] w-[18px] shrink-0" strokeWidth={1.6} />
               ) : (
-                <PanelLeftClose className="nav-item-icon h-4 w-4 shrink-0" strokeWidth={1.75} />
+                <PanelLeftClose className="nav-item-icon h-[18px] w-[18px] shrink-0" strokeWidth={1.6} />
               )}
               {!rail && <span>메뉴 접기</span>}
             </button>

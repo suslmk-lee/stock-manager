@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
-import { ArrowLeftRight, BarChart3, Coins, DollarSign, LineChart, PiggyBank, Radar, SlidersHorizontal, TrendingUp, Wallet } from 'lucide-react';
+import { IconAccumulate, IconBars, IconCandidates, IconChart, IconCoin, IconRadar, IconSliders, IconTrades, IconTrend, IconWallet, type NavIcon } from './components/ui/navIcons';
 
 export type RouteId = 'accounts' | 'assets' | 'trades' | 'accumulate' | 'trend' | 'dividends' | 'dividend-analysis' | 'signals' | 'profiles' | 'candidates';
 export type GroupId = 'assets' | 'dividends' | 'signals';
@@ -11,7 +10,7 @@ export interface NavItem {
   label: string;
   /** 상단 바 페이지 제목 */
   title: string;
-  icon: LucideIcon;
+  icon: NavIcon;
   isNew?: boolean;
 }
 
@@ -19,7 +18,7 @@ export interface NavGroup {
   id: GroupId;
   label: string;
   /** 모바일 하단 탭 아이콘 */
-  icon: LucideIcon;
+  icon: NavIcon;
   items: NavItem[];
 }
 
@@ -28,32 +27,32 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'assets',
     label: '자산',
-    icon: Wallet,
+    icon: IconWallet,
     items: [
-      { id: 'accounts', label: '계좌', title: '계좌 관리', icon: Wallet },
-      { id: 'assets', label: '주식/ETF', title: '주식/ETF 관리', icon: TrendingUp },
-      { id: 'trades', label: '매매 기록', title: '매매 관리', icon: ArrowLeftRight },
-      { id: 'accumulate', label: '모으기', title: '주식 모으기', icon: PiggyBank, isNew: true },
-      { id: 'trend', label: '자산 추이', title: '자산 추이', icon: LineChart },
+      { id: 'accounts', label: '계좌', title: '계좌 관리', icon: IconWallet },
+      { id: 'assets', label: '주식/ETF', title: '주식/ETF 관리', icon: IconTrend },
+      { id: 'trades', label: '매매 기록', title: '매매 관리', icon: IconTrades },
+      { id: 'accumulate', label: '모으기', title: '주식 모으기', icon: IconAccumulate, isNew: true },
+      { id: 'trend', label: '자산 추이', title: '자산 추이', icon: IconChart },
     ],
   },
   {
     id: 'dividends',
     label: '배당',
-    icon: DollarSign,
+    icon: IconCoin,
     items: [
-      { id: 'dividends', label: '배당 기록', title: '배당금 관리', icon: DollarSign },
-      { id: 'dividend-analysis', label: '배당 분석', title: '배당 분석', icon: BarChart3 },
+      { id: 'dividends', label: '배당 기록', title: '배당금 관리', icon: IconCoin },
+      { id: 'dividend-analysis', label: '배당 분석', title: '배당 분석', icon: IconBars },
     ],
   },
   {
     id: 'signals',
     label: '신호',
-    icon: Radar,
+    icon: IconRadar,
     items: [
-      { id: 'signals', label: '매매 신호', title: '매매 신호', icon: Radar, isNew: true },
-      { id: 'profiles', label: '전략 프로필', title: '전략 프로필', icon: SlidersHorizontal },
-      { id: 'candidates', label: '배당 후보', title: '배당 종목 정리', icon: Coins },
+      { id: 'signals', label: '매매 신호', title: '매매 신호', icon: IconRadar, isNew: true },
+      { id: 'profiles', label: '전략 프로필', title: '전략 프로필', icon: IconSliders },
+      { id: 'candidates', label: '배당 후보', title: '배당 종목 정리', icon: IconCandidates },
     ],
   },
 ];

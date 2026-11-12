@@ -24,13 +24,13 @@ export default function MobileTabBar({ activeGroup, onGroup, onMore }: MobileTab
           const active = g.id === activeGroup;
           return (
             <button key={g.id} type="button" onClick={() => onGroup(g.id)} className={item(active)} aria-current={active ? 'page' : undefined}>
-              <Icon className="h-5 w-5" strokeWidth={1.75} />
+              <Icon className="h-[22px] w-[22px]" />
               {g.label}
             </button>
           );
         })}
         <button type="button" onClick={onMore} className={item(false)}>
-          <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
+          <MoreHorizontal className="h-[22px] w-[22px]" strokeWidth={1.6} />
           더보기
         </button>
       </div>

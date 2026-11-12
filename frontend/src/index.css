@@ -224,7 +224,7 @@ body {
     border-color: rgb(var(--c-mint-400) / 0.28);
   }
   .nav-item-active .nav-item-icon {
-    @apply text-mint-400;
+    @apply text-mint-300;
   }
 
   /* 버튼: 주 행동 */
