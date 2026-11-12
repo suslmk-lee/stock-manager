@@ -4,13 +4,14 @@ import SplitView from './shell/SplitView';
 import { apiClient } from '../api/client';
 import { Account, Asset, Transaction, Holding, RealizedPnL, TickerInfo, PricePoint, PriceHistory } from '../types/models';
 import { useThemeColors } from '../appearance/AppearanceContext';
-import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, X, Search, Info, ChevronDown } from 'lucide-react';
+import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, X, Search, Info } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { calculateFee, roundFee } from '../utils/fees';
 import Portal from './ui/Portal';
 import DatePicker from './ui/DatePicker';
-import { IconAccumulate, IconBuy, IconHistory, IconLayers, IconSell, IconTrend, IconTrendDown, type AppIcon } from './ui/appIcons';
+import { IconBuy, IconHistory, IconLayers, IconSell, IconTrend, IconTrendDown, type AppIcon } from './ui/appIcons';
 import AccountSelect from './ui/AccountSelect';
+import TradeHistory from './trades/TradeHistory';
 import { assetPrimary, assetSecondary } from '../utils/assetLabel';
 
 interface TransactionManagerProps {
@@ -49,8 +50,6 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
   const [assets, setAssets] = useState<Asset[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  // 펼친 주식 모으기 묶음 (계획:YYYY-MM)
-  const [openPlanGroups, setOpenPlanGroups] = useState<Set<string>>(() => new Set());
   const [pnls, setPnls] = useState<RealizedPnL[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -631,153 +630,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
     );
   }
 
-  // 주식 모으기가 남긴 회차는 계획·월별로 접어서 보여 준다 (매일 쌓이면 목록이 넘치므로)
-  type HistoryItem = { kind: 'tx'; tx: Transaction } | { kind: 'plan'; key: string; txs: Transaction[] };
-  const historyItems: HistoryItem[] = [];
-  {
-    const groups = new Map<string, Extract<HistoryItem, { kind: 'plan' }>>();
-    const sorted = [...transactions].sort((a, b) => {
-      const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
-      if (dateDiff !== 0) return dateDiff;
-      const createdDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      if (createdDiff !== 0) return createdDiff;
-      return b.id - a.id;
-    });
-    for (const tx of sorted) {
-      if (tx.plan_id == null) {
-        historyItems.push({ kind: 'tx', tx });
-        continue;
-      }
-      const key = `${tx.plan_id}:${tx.date.slice(0, 7)}`;
-      let g = groups.get(key);
-      if (!g) {
-        g = { kind: 'plan', key, txs: [] };
-        groups.set(key, g);
-        historyItems.push(g);
-      }
-      g.txs.push(tx);
-    }
-  }
-
-  const togglePlanGroup = (key: string) =>
-    setOpenPlanGroups((cur) => {
-      const next = new Set(cur);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-
-  const renderPlanGroup = (g: Extract<HistoryItem, { kind: 'plan' }>) => {
-    const newest = g.txs[0];
-    const oldest = g.txs[g.txs.length - 1];
-    const open = openPlanGroups.has(g.key);
-    const cur = getCurrencyFromTicker(newest.asset?.ticker || '');
-    const total = g.txs.reduce((s, t) => s + t.price * t.quantity + t.fee, 0);
-    const qty = g.txs.reduce((s, t) => s + t.quantity, 0);
-    const month = Number(newest.date.slice(5, 7));
-    const day = (d: string) => new Date(d).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
-    return (
-      <div key={`plan-${g.key}`} className="space-y-2">
-        <button type="button" onClick={() => togglePlanGroup(g.key)} aria-expanded={open} className="surface w-full p-4 text-left hover:border-white/[0.2] transition-colors">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <IconAccumulate className="h-7 w-7 shrink-0 text-zinc-200" />
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base font-semibold text-white truncate">{assetPrimary(newest.asset, `Asset #${newest.asset_id}`)}</h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap bg-sky-400/10 text-sky-200">모으기</span>
-                </div>
-                <p className="text-xs text-zinc-400 mt-1">
-                  {assetSecondary(newest.asset)} · {month}월 {g.txs.length}회{g.txs.length > 1 ? ` (${day(oldest.date)}~${day(newest.date)})` : ` (${day(newest.date)})`}
-                </p>
-                <p className="text-xs text-zinc-300 mt-0.5">
-                  <span className="font-medium">{formatNumber(qty, 6)}주</span>
-                  <span className="text-zinc-500"> · 자동 기록</span>
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="text-right">
-                <p className="text-base font-bold text-mint-400">{formatMoney(total, cur)}</p>
-                <p className="text-[10px] text-zinc-500">합계</p>
-              </div>
-              <ChevronDown className={`h-4 w-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />
-            </div>
-          </div>
-        </button>
-        {open && <div className="ml-5 space-y-2 border-l border-white/[0.06] pl-4">{g.txs.map(renderTx)}</div>}
-      </div>
-    );
-  };
-
-  const renderTx = (tx: Transaction) => {
-          const isBuy = tx.type === 'Buy';
-          const total = tx.price * tx.quantity + (isBuy ? tx.fee : -tx.fee);
-          const txCurrency = getCurrencyFromTicker(tx.asset?.ticker || '');
-          return (
-            <div
-              key={tx.id}
-              onClick={() => openTxDetail(tx)}
-              className="surface p-4 hover:border-white/[0.2] transition-colors cursor-pointer"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  {isBuy ? <IconBuy className="h-7 w-7 shrink-0 text-zinc-200" /> : <IconSell className="h-7 w-7 shrink-0 text-zinc-200" tone="rose" />}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base font-semibold text-white truncate">
-                        {assetPrimary(tx.asset, `Asset #${tx.asset_id}`)}
-                      </h3>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
-                          isBuy ? 'bg-mint-400/15 text-mint-300' : 'bg-rose-500/10 text-rose-300'
-                        }`}
-                      >
-                        {isBuy ? '매수' : '매도'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-400 mt-1">
-                      {assetSecondary(tx.asset)} ·  {new Date(tx.date).toLocaleDateString('ko-KR')}
-                    </p>
-                    <p className="text-xs text-zinc-300 mt-0.5">
-                      <span className="text-zinc-500">{isBuy ? '매수가' : '매도가'}</span>{' '}
-                      <span className="font-medium">{formatMoney(tx.price, txCurrency)}</span>
-                      <span className="text-zinc-500"> × </span>
-                      <span className="font-medium">{formatNumber(tx.quantity, tx.plan_id != null ? 6 : 4)}주</span>
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className={`text-base font-bold ${isBuy ? 'text-mint-400' : 'text-rose-400'}`}>
-                    {formatMoney(total, txCurrency)}
-                  </p>
-                  <p className="text-[10px] text-zinc-500">
-                    {isBuy ? '총 지불액' : '실수령액'}
-                  </p>
-                  {tx.fee > 0 && (
-                    <p className="text-[11px] text-zinc-500 mt-0.5">수수료 {formatMoney(tx.fee, txCurrency)}</p>
-                  )}
-                </div>
-              </div>
-              {tx.notes && <p className="text-xs text-zinc-400 mt-2 pl-13 ml-13">{tx.notes}</p>}
-            </div>
-          );
-  };
-
-  // 오른쪽 상세: 거래 내역
-  const historyPanel = (
-    <div className="space-y-3">
-      {transactions.length === 0 ? (
-        <div className="text-center py-12 text-zinc-400">
-          <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p>거래 내역이 없습니다.</p>
-          <p className="text-sm mt-1 text-zinc-500">'거래 기록' 버튼으로 매수/매도를 등록하세요.</p>
-        </div>
-      ) : (
-        historyItems.map((item) => (item.kind === 'tx' ? renderTx(item.tx) : renderPlanGroup(item)))
-      )}
-    </div>
-  );
+  // 오른쪽 상세: 거래 내역 (월별 막대 + 종목별 묶음 / 날짜순)
+  const historyPanel = <TradeHistory transactions={transactions} onOpen={openTxDetail} />;
 
   // 오른쪽 상세: 실현 손익 (통화별 요약 카드 + 내역)
   const pnlPanel = (
