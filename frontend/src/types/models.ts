@@ -16,6 +16,8 @@ export interface MonthlySnapshotSummary {
   total_value: number;
   asset_count: number;
   estimated?: boolean;
+  /** 예수금 행 (그 달 초 잔액) */
+  cash?: boolean;
 }
 
 export interface PriceHistory {
@@ -579,6 +581,8 @@ export interface DailyAssetPoint {
   dividends_cum_krw: number;
   usd_krw: number;
   estimated: boolean;
+  /** 예수금 (total·liquid·restricted 에 이미 포함) */
+  cash_krw?: number;
 }
 
 export interface DailyAssetSeries {
@@ -701,11 +705,26 @@ export interface CashBalance {
   last_adjusted?: string;
 }
 
+export interface PendingSettle {
+  /** 매도일 */
+  date: string;
+  /** 결제 예정일 — 이 날부터 출금 가능 */
+  settle_date: string;
+  currency: 'KRW' | 'USD';
+  amount: number;
+  label: string;
+  transaction_id?: number;
+}
+
 export interface CashSummary extends CashBalance {
   account: Account;
   usd_krw: number;
   stock_value_krw?: number;
   account_total_krw?: number;
+  /** 예수금 − 결제 전 매도 대금 (0 아래로 내려가지 않음) */
+  withdrawable_krw: number;
+  withdrawable_usd: number;
+  pending?: PendingSettle[];
   flows: CashFlow[];
 }
 

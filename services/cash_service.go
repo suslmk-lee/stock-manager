@@ -102,8 +102,9 @@ type CashFlow struct {
 	PlanFill bool    `json:"plan_fill,omitempty"` // 주식 모으기 자동 기록
 	Notes    string  `json:"notes,omitempty"`
 
-	order int // 같은 날 정렬: 들어오는 것 → 나가는 것 → 조정
-	seq   uint
+	order  int // 같은 날 정렬: 들어오는 것 → 나가는 것 → 조정
+	seq    uint
+	ticker string // 매매 종목 (결제일 계산)
 }
 
 // 같은 날에는 들어오는 돈을 먼저, 잔액 맞추기는 그날 마지막에 둔다
@@ -234,7 +235,7 @@ func (s *CashService) flows(account *models.Account) ([]CashFlow, error) {
 		out = append(out, CashFlow{
 			Date: dayString(t.Date), Kind: kind, Currency: ccy, Amount: amt, Fx: fx,
 			Label: assetLabel(t.Asset), Detail: detail, TxID: &id, PlanFill: t.PlanID != nil,
-			order: cashKindOrder[kind], seq: t.ID,
+			order: cashKindOrder[kind], seq: t.ID, ticker: t.Asset.Ticker,
 		})
 	}
 	for i := range divs {
@@ -282,10 +283,69 @@ type CashBalance struct {
 type CashSummary struct {
 	Account models.Account `json:"account"`
 	CashBalance
-	UsdKrw        float64    `json:"usd_krw"`
-	StockValueKRW *float64   `json:"stock_value_krw,omitempty"` // 보유 주식 평가금 (시세 실패 시 없음)
-	TotalKRW      *float64   `json:"account_total_krw,omitempty"`
-	Flows         []CashFlow `json:"flows"` // 최근 것부터
+	UsdKrw        float64  `json:"usd_krw"`
+	StockValueKRW *float64 `json:"stock_value_krw,omitempty"` // 보유 주식 평가금 (시세 실패 시 없음)
+	TotalKRW      *float64 `json:"account_total_krw,omitempty"`
+	// 출금 가능 금액: 예수금에서 아직 결제되지 않은 매도 대금을 뺀 것 (0 아래로는 내려가지 않음)
+	WithdrawableKRW float64         `json:"withdrawable_krw"`
+	WithdrawableUSD float64         `json:"withdrawable_usd"`
+	Pending         []PendingSettle `json:"pending,omitempty"` // 결제 전 매도 대금 (결제일 순)
+	Flows           []CashFlow      `json:"flows"`             // 최근 것부터
+}
+
+// PendingSettle 은 아직 결제되지 않은 매도 대금 한 건
+type PendingSettle struct {
+	Date       string  `json:"date"`        // 매도일
+	SettleDate string  `json:"settle_date"` // 결제 예정일 (이 날부터 출금 가능)
+	Currency   string  `json:"currency"`
+	Amount     float64 `json:"amount"`
+	Label      string  `json:"label"`
+	TxID       *uint   `json:"transaction_id,omitempty"`
+}
+
+// settleDay: 매도 대금 결제 예정일 — 국내 주식 2영업일, 미국 주식 1영업일 뒤 (주말만 건너뛴다. 휴장일은 모른다)
+func settleDay(tradeDay, ticker string) string {
+	d, ok := parseDay(tradeDay)
+	if !ok {
+		return tradeDay
+	}
+	n := 1
+	if isKRTicker(ticker) {
+		n = 2
+	}
+	for n > 0 {
+		d = d.AddDate(0, 0, 1)
+		if wd := d.Weekday(); wd != time.Saturday && wd != time.Sunday {
+			n--
+		}
+	}
+	return dayString(d)
+}
+
+// pendingSells: 오늘(KST) 아직 결제되지 않은 매도 대금
+func pendingSells(flows []CashFlow, today string) []PendingSettle {
+	var out []PendingSettle
+	for _, f := range flows {
+		if f.Kind != "sell" || f.Amount <= 0 {
+			continue
+		}
+		if sd := settleDay(f.Date, f.ticker); sd > today {
+			out = append(out, PendingSettle{Date: f.Date, SettleDate: sd, Currency: f.Currency, Amount: f.Amount, Label: f.Label, TxID: f.TxID})
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].SettleDate < out[j].SettleDate })
+	return out
+}
+
+// withdrawable: 잔액 − 결제 전 매도 대금 (0 아래면 0)
+func withdrawable(balance float64, pending []PendingSettle, ccy string) float64 {
+	v := balance
+	for _, p := range pending {
+		if p.Currency == ccy {
+			v -= p.Amount
+		}
+	}
+	return math.Max(0, math.Round(v*100)/100)
 }
 
 func (s *CashService) currentFx() float64 {
@@ -334,6 +394,9 @@ func (s *CashService) GetSummary(accountID uint) (*CashSummary, error) {
 	}
 	fx := s.currentFx()
 	sum := &CashSummary{Account: *acc, CashBalance: balanceOf(acc.ID, flows, fx), UsdKrw: fx}
+	sum.Pending = pendingSells(flows, todayKST(s.clock()))
+	sum.WithdrawableKRW = withdrawable(sum.KRW, sum.Pending, "KRW")
+	sum.WithdrawableUSD = withdrawable(sum.USD, sum.Pending, "USD")
 
 	// 보유 주식 평가금 (종목 통화 → 원화)
 	var hs []models.Holding
@@ -390,6 +453,94 @@ func (s *CashService) GetBalances() ([]CashBalance, float64, error) {
 		out = append(out, balanceOf(accounts[i].ID, flows, fx))
 	}
 	return out, fx, nil
+}
+
+// ───────────────────────── 날짜별 잔액 (자산 추이 그래프) ─────────────────────────
+
+// CashTimeline 은 한 계좌의 날짜별 예수금 (그날 마감 잔액)
+type CashTimeline struct {
+	AccountID  uint
+	Restricted bool   // 인출 제한 계좌 (연금 등)
+	Start      string // 이 날부터 그래프에 넣는다
+	days       []string
+	krw, usd   []float64
+}
+
+// At: day(YYYY-MM-DD) 마감 잔액. 시작일 전이면 ok=false.
+func (t *CashTimeline) At(day string) (krw, usd float64, ok bool) {
+	if day < t.Start {
+		return 0, 0, false
+	}
+	i := sort.SearchStrings(t.days, day) // day 이상인 첫 자리
+	if i < len(t.days) && t.days[i] == day {
+		return t.krw[i], t.usd[i], true
+	}
+	if i == 0 {
+		return 0, 0, true
+	}
+	return t.krw[i-1], t.usd[i-1], true
+}
+
+// buildTimeline: 흐름(오래된 것부터)에서 날짜별 마감 잔액을 만든다.
+// 시작일은 첫 '잔액 맞추기' 날 — 그 전은 지난 입금 기록이 빠져 계산이 틀릴 수 있다.
+// 잔액 맞추기가 없으면 첫 현금 기록 날, 현금 기록이 하나도 없으면 매매로만 계산한 값이라 넣지 않는다 (nil).
+func buildTimeline(acc models.Account, flows []CashFlow) *CashTimeline {
+	start, firstEntry := "", ""
+	for _, f := range flows {
+		if f.EntryID == nil {
+			continue
+		}
+		if firstEntry == "" {
+			firstEntry = f.Date
+		}
+		if f.Kind == models.CashAdjust {
+			start = f.Date
+			break
+		}
+	}
+	if start == "" {
+		start = firstEntry
+	}
+	if start == "" {
+		return nil
+	}
+	t := &CashTimeline{AccountID: acc.ID, Restricted: acc.AccountType.IsWithdrawalRestricted(), Start: start}
+	krw, usd := 0.0, 0.0
+	for _, f := range flows {
+		switch f.Currency {
+		case "KRW":
+			krw += f.Amount
+		case "USD":
+			usd += f.Amount
+		}
+		if n := len(t.days); n > 0 && t.days[n-1] == f.Date {
+			t.krw[n-1], t.usd[n-1] = krw, usd
+			continue
+		}
+		t.days = append(t.days, f.Date)
+		t.krw = append(t.krw, krw)
+		t.usd = append(t.usd, usd)
+	}
+	return t
+}
+
+// Timelines: 자산 추이 그래프에 더할 계좌별 날짜별 예수금. 계산하지 못한 계좌(환율 실패 등)는 건너뛴다.
+func (s *CashService) Timelines() []CashTimeline {
+	var accounts []models.Account
+	if err := s.db.Find(&accounts).Error; err != nil {
+		return nil
+	}
+	var out []CashTimeline
+	for i := range accounts {
+		flows, err := s.flows(&accounts[i])
+		if err != nil {
+			continue
+		}
+		if t := buildTimeline(accounts[i], flows); t != nil {
+			out = append(out, *t)
+		}
+	}
+	return out
 }
 
 // ───────────────────────── 기록 ─────────────────────────

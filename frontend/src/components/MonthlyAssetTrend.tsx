@@ -23,6 +23,8 @@ interface MonthPoint {
   liquid: number;
   restricted: number;
   total: number;
+  /** 예수금 (월초 잔액, total 에 포함) */
+  cash: number;
   estimated: boolean;
 }
 
@@ -157,12 +159,13 @@ export default function MonthlyAssetTrend({
       const value = row.currency === 'USD' ? (row.total_value || 0) * rateFor(key) : row.total_value || 0;
       let p = agg.get(key);
       if (!p) {
-        p = { key, label: key.slice(2).replace('-', '.'), liquid: 0, restricted: 0, total: 0, estimated: !!row.estimated };
+        p = { key, label: key.slice(2).replace('-', '.'), liquid: 0, restricted: 0, total: 0, cash: 0, estimated: !!row.estimated };
         agg.set(key, p);
       }
       if (acc && isRestrictedAccount(acc)) p.restricted += value;
       else p.liquid += value;
       p.total += value;
+      if (row.cash) p.cash += value;
     }
     return Array.from(agg.values()).sort((a, b) => a.key.localeCompare(b.key));
   }, [summary, accounts, currentRate, fxMap, accountId, marketType, liquidity]);
@@ -203,6 +206,7 @@ export default function MonthlyAssetTrend({
 
   const stacked = liquidity === 'all' && !accountId;
   const showRestricted = stacked && windowed.some((p) => p.restricted > 0);
+  const hasCash = windowed.some((p) => Math.abs(p.cash) >= 1);
 
   if (loading) {
     return (
@@ -275,6 +279,7 @@ export default function MonthlyAssetTrend({
       <div className="flex flex-wrap items-center gap-2 mt-3 mb-5">
         <Chip check>입금·매수에 따른 증감 포함</Chip>
         <Chip check>{fxMap === null ? '환율: 현재 환율 기준' : '환율: 월초 기준'}</Chip>
+        {hasCash && <Chip check>예수금 포함 (월초 잔액)</Chip>}
       </div>
 
       <div className="h-64">
@@ -315,6 +320,7 @@ export default function MonthlyAssetTrend({
                     ) : (
                       <p style={{ color: SINGLE_COLOR }}>평가액: {formatKRW(p.total)}</p>
                     )}
+                    {Math.abs(p.cash) >= 1 && <p style={{ color: tc.muted }}>└ 예수금: {formatKRW(p.cash)}</p>}
                   </div>
                 );
               }}
@@ -368,6 +374,7 @@ export default function MonthlyAssetTrend({
                 <th className="text-left py-2.5 pr-3 font-normal">월</th>
                 {stacked && <th className="text-right py-2.5 px-3 font-normal">인출 가능</th>}
                 {stacked && <th className="text-right py-2.5 px-3 font-normal">인출 제한</th>}
+                {hasCash && <th className="text-right py-2.5 px-3 font-normal">예수금</th>}
                 <th className="text-right py-2.5 px-3 font-normal">합계</th>
                 <th className="text-right py-2.5 pl-3 font-normal">전월 대비</th>
               </tr>
@@ -382,6 +389,7 @@ export default function MonthlyAssetTrend({
                   </td>
                   {stacked && <td className="text-right py-2.5 px-3 whitespace-nowrap">{formatKRW(p.liquid)}</td>}
                   {stacked && <td className="text-right py-2.5 px-3 whitespace-nowrap">{formatKRW(p.restricted)}</td>}
+                  {hasCash && <td className="text-right py-2.5 px-3 whitespace-nowrap text-zinc-400">{Math.abs(p.cash) >= 1 ? formatKRW(p.cash) : '—'}</td>}
                   <td className="text-right py-2.5 px-3 whitespace-nowrap font-medium text-white">{formatKRW(p.total)}</td>
                   <td className="text-right py-2.5 pl-3 whitespace-nowrap">
                     <DeltaText delta={momDelta.get(p.key) || null} />

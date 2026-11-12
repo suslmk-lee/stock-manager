@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
+import { useEffect, useRef, type KeyboardEvent } from 'react';
 import type { AccumulationPlanView, PlanCurrency, PlanStatus } from '../../types/models';
 import { assetTitle, belowMinimum, fmtAmount, fmtSignedPct, ruleText, signTone } from './planText';
+import { cashAmount, daysText, daysTone, LOW_DAYS, type AccountCashNeed } from './cashNeed';
 
 interface PlanListProps {
   plans: AccumulationPlanView[];
@@ -9,37 +10,45 @@ interface PlanListProps {
   counts: Record<PlanStatus, number>;
   selectedId: number | null;
   onSelect: (id: number) => void;
+  /** 계좌별 한 달 필요 금액 · 예수금 */
+  needs: Map<number, AccountCashNeed>;
 }
 
-/** 계좌별 한 달 최대 금액 (조건을 늘 만족할 때) — 예수금 준비용 */
-function MonthlyNeed({ plans }: { plans: AccumulationPlanView[] }) {
-  const rows = useMemo(() => {
-    const m = new Map<string, { name: string; krw: number; usd: number }>();
-    for (const p of plans) {
-      if (p.status !== 'active') continue;
-      const key = String(p.account_id);
-      const r = m.get(key) ?? { name: p.account?.name ?? `계좌 ${p.account_id}`, krw: 0, usd: 0 };
-      if (p.amount_currency === 'KRW') r.krw += p.monthly_max;
-      else r.usd += p.monthly_max;
-      m.set(key, r);
-    }
-    return [...m.values()];
-  }, [plans]);
+/** 계좌별 한 달 최대 금액 (조건을 늘 만족할 때)과 지금 예수금으로 버티는 거래일 수 */
+function MonthlyNeed({ needs }: { needs: Map<number, AccountCashNeed> }) {
+  const rows = [...needs.values()];
   if (rows.length === 0) return null;
+  const unknown = rows.filter((r) => !r.reconciled).length;
   return (
-    <div className="space-y-1" title="조건을 늘 만족한다고 볼 때 한 달(거래일 21일)에 필요한 금액입니다.">
-      <p className="label-mono">한 달 최대 필요 금액</p>
-      {rows.map((r) => (
-        <div key={r.name} className="flex items-center justify-between gap-2 text-xs">
-          <span className="truncate text-zinc-400">{r.name}</span>
-          <span className="num shrink-0 text-zinc-200">{[r.krw > 0 && fmtAmount(r.krw, 'KRW'), r.usd > 0 && fmtAmount(r.usd, 'USD')].filter(Boolean).join(' + ')}</span>
-        </div>
-      ))}
+    <div className="space-y-1.5" title={'조건을 늘 만족한다고 볼 때 한 달(거래일 21일)에 필요한 금액입니다.\n미국 주식은 원화 결제 계좌면 원화로 바꿔 셉니다.'}>
+      <p className="label-mono">한 달 최대 필요 금액 · 예수금</p>
+      {rows.map((r) => {
+        const cash = [r.needKRW > 0 && cashAmount(r.cashKRW, 'KRW'), r.needUSD > 0 && cashAmount(r.cashUSD, 'USD')].filter(Boolean).join(' + ');
+        const low = r.days != null && r.days < LOW_DAYS;
+        return (
+          <div key={r.accountId} className={`text-xs ${low ? '-mx-2 rounded-lg bg-amber-500/[0.07] px-2 py-1' : ''}`}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-zinc-400">{r.name}</span>
+              <span className="num shrink-0 text-zinc-200">
+                {[r.needKRW > 0 && fmtAmount(r.needKRW, 'KRW'), r.needUSD > 0 && fmtAmount(r.needUSD, 'USD')].filter(Boolean).join(' + ')}
+                <span className="text-zinc-500"> / 월</span>
+              </span>
+            </div>
+            {r.reconciled && (
+              <div className="num mt-0.5 flex items-center justify-between gap-2 text-[11px]">
+                <span className="truncate text-zinc-500">예수금 {cash}</span>
+                <span className={`shrink-0 ${daysTone(r.days)}`}>{daysText(r.days)}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {unknown > 0 && <p className="text-[11px] leading-relaxed text-zinc-500">계좌 화면에서 '잔액 맞추기'를 하면 예수금으로 며칠 버틸 수 있는지 보여 줍니다.</p>}
     </div>
   );
 }
 
-export default function PlanList({ plans, status, onStatus, counts, selectedId, onSelect }: PlanListProps) {
+export default function PlanList({ plans, status, onStatus, counts, selectedId, onSelect, needs }: PlanListProps) {
   const rowRefs = useRef(new Map<number, HTMLButtonElement>());
   const visible = plans.filter((p) => p.status === status);
 
@@ -66,7 +75,7 @@ export default function PlanList({ plans, status, onStatus, counts, selectedId, 
             </button>
           ))}
         </div>
-        {status === 'active' && <MonthlyNeed plans={plans} />}
+        {status === 'active' && <MonthlyNeed needs={needs} />}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto" onKeyDown={onKeyDown} role="listbox" aria-label="주식 모으기 목록">

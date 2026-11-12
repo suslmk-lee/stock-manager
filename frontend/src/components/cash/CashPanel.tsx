@@ -230,6 +230,12 @@ export default function CashPanel({ account }: { account: Account }) {
   const negative = !!summary && (summary.krw < -0.5 || summary.usd < -0.005);
   const neverAdjusted = !!summary && !summary.last_adjusted && summary.flows.some((f) => f.kind === 'buy' || f.kind === 'sell');
   const flows = useMemo(() => summary?.flows ?? [], [summary]);
+  const pending = useMemo(() => summary?.pending ?? [], [summary]);
+  const pendingOf = (ccy: Ccy) => pending.filter((p) => p.currency === ccy);
+  // 결제 대기 매도 (흐름 목록에 표시)
+  const settleByTx = useMemo(() => new Map(pending.filter((p) => p.transaction_id != null).map((p) => [p.transaction_id!, p.settle_date])), [pending]);
+  // 계좌 총액에서 예수금이 차지하는 비중
+  const cashShare = summary?.account_total_krw && summary.account_total_krw > 0 ? (summary.total_krw / summary.account_total_krw) * 100 : null;
 
   return (
     <section className="surface-inset mb-5 p-4 sm:p-5">
@@ -268,6 +274,7 @@ export default function CashPanel({ account }: { account: Account }) {
               <div>
                 <p className="label-mono">원화 예수금</p>
                 <p className={`num mt-0.5 text-xl font-light ${summary.krw < -0.5 ? 'text-rose-300' : 'text-white'}`}>{money(summary.krw, 'KRW')}</p>
+                {pendingOf('KRW').length > 0 && <p className="num text-[11px] text-zinc-400">출금 가능 {money(summary.withdrawable_krw, 'KRW')}</p>}
               </div>
             )}
             {showUSD && (
@@ -275,6 +282,7 @@ export default function CashPanel({ account }: { account: Account }) {
                 <p className="label-mono">달러 예수금</p>
                 <p className={`num mt-0.5 text-xl font-light ${summary.usd < -0.005 ? 'text-rose-300' : 'text-white'}`}>{money(summary.usd, 'USD')}</p>
                 {summary.usd_krw > 0 && <p className="num text-[11px] text-zinc-500">≈ {money(summary.usd * summary.usd_krw, 'KRW')}</p>}
+                {pendingOf('USD').length > 0 && <p className="num text-[11px] text-zinc-400">출금 가능 {money(summary.withdrawable_usd, 'USD')}</p>}
               </div>
             )}
             <div>
@@ -284,9 +292,27 @@ export default function CashPanel({ account }: { account: Account }) {
             <div>
               <p className="label-mono">계좌 총액</p>
               <p className="num mt-0.5 text-xl font-semibold text-mint-300">{summary.account_total_krw != null ? money(summary.account_total_krw, 'KRW') : '—'}</p>
-              <p className="text-[11px] text-zinc-500">평가금 + 예수금</p>
+              <p className="num text-[11px] text-zinc-500">
+                평가금 + 예수금{cashShare != null && Math.abs(summary.total_krw) >= 1 ? ` · 예수금 ${cashShare.toFixed(cashShare < 10 && cashShare > -10 ? 1 : 0)}%` : ''}
+              </p>
             </div>
           </div>
+
+          {pending.length > 0 && (
+            <div className="mt-3 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2 text-xs text-zinc-300">
+              <p className="text-zinc-400">매도 대금은 결제일부터 출금할 수 있습니다 (국내 2영업일 · 미국 1영업일 뒤, 휴장일은 빼지 않은 예정일).</p>
+              <ul className="mt-1 space-y-0.5">
+                {pending.map((p, i) => (
+                  <li key={`${p.transaction_id ?? i}-${p.settle_date}`} className="num flex items-center justify-between gap-3">
+                    <span className="truncate">
+                      {shortDay(p.settle_date)} 결제 · {p.label} <span className="text-zinc-500">({shortDay(p.date)} 매도)</span>
+                    </span>
+                    <span className="shrink-0 text-zinc-200">{money(p.amount, p.currency)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {(negative || neverAdjusted) && (
             <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
@@ -311,7 +337,15 @@ export default function CashPanel({ account }: { account: Account }) {
                     <span className="flex min-w-0 flex-1 items-baseline gap-2">
                       <span className="truncate text-[13px] text-zinc-100">{f.label}</span>
                       <span className="truncate text-[11px] text-zinc-500">
-                        {[f.detail, f.plan_fill ? '모으기' : '', f.fx ? `환율 ${Math.round(f.fx).toLocaleString('ko-KR')}` : '', f.notes].filter(Boolean).join(' · ')}
+                        {[
+                          f.detail,
+                          f.plan_fill ? '모으기' : '',
+                          f.fx ? `환율 ${Math.round(f.fx).toLocaleString('ko-KR')}` : '',
+                          f.transaction_id != null && settleByTx.has(f.transaction_id) ? `${shortDay(settleByTx.get(f.transaction_id)!)} 결제 예정` : '',
+                          f.notes,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </span>
                     </span>
                     <span className={`num shrink-0 text-[13px] font-medium ${f.amount >= 0 ? 'text-mint-300' : 'text-rose-300'}`}>{signed(f.amount, f.currency)}</span>

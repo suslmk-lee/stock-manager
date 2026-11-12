@@ -35,7 +35,13 @@ interface ChartPoint extends DailyAssetPoint {
   total_real: number | null;
   total_est: number | null;
   with_div: number;
+  /** 주식 평가금 (총자산 − 예수금) */
+  stock_krw: number;
+  /** 투자 원금 + 예수금 — 총자산과의 차이가 평가 손익이 되도록 */
+  base_krw: number;
 }
+
+const cashOf = (p: DailyAssetPoint) => p.cash_krw ?? 0;
 
 const formatKRW = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`;
 const compactKRW = (v: number) => {
@@ -121,11 +127,15 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
       // 구간 경계에서 선이 끊기지 않도록 추정 구간 끝에 맞닿은 실제 점도 추정 시리즈에 포함
       const joinEst = !p.estimated && prev?.estimated;
       const joinReal = p.estimated && next && !next.estimated;
+      const stock = p.total_krw - cashOf(p);
       return {
         ...p,
         total_real: !p.estimated || joinReal ? p.total_krw : null,
         total_est: p.estimated || joinEst ? p.total_krw : null,
-        with_div: p.total_krw + p.dividends_cum_krw,
+        // 받은 배당은 예수금에 이미 들어 있으므로 '배당 포함'은 주식 + 누적 배당으로 본다
+        with_div: stock + p.dividends_cum_krw,
+        stock_krw: stock,
+        base_krw: p.cost_krw + cashOf(p),
       };
     });
   }, [points]);
@@ -133,9 +143,10 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
   // 세로축 범위: 0부터 그리면 변화가 납작해 보이므로 값이 있는 구간에 맞춘다 (쌓은 영역 보기는 0 기준 유지)
   const yDomain = useMemo<[number, number] | [number, 'auto']>(() => {
     if (view === 'split' || points.length === 0) return [0, 'auto'];
-    const vals = points.flatMap((p) =>
-      view === 'dividend' ? [p.total_krw, p.cost_krw, p.total_krw + p.dividends_cum_krw] : [p.total_krw, p.cost_krw],
-    ).filter((v) => v > 0);
+    const vals = points.flatMap((p) => {
+      const stock = p.total_krw - cashOf(p);
+      return view === 'dividend' ? [stock, p.cost_krw, stock + p.dividends_cum_krw] : [p.total_krw, p.cost_krw + cashOf(p)];
+    }).filter((v) => v > 0);
     if (vals.length === 0) return [0, 'auto'];
     const lo = Math.min(...vals);
     const hi = Math.max(...vals);
@@ -178,7 +189,8 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
       if (peak > 0) maxDd = Math.max(maxDd, (peak - p.total_krw) / peak);
     }
     const change = last.total_krw - first.total_krw;
-    const pl = last.total_krw - last.cost_krw;
+    // 손익은 주식만 (예수금은 손익이 아니다)
+    const pl = last.total_krw - cashOf(last) - last.cost_krw;
     return {
       first,
       last,
@@ -200,6 +212,7 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
   };
 
   const showRestricted = points.some((p) => p.restricted_krw > 0);
+  const hasCash = points.some((p) => Math.abs(cashOf(p)) >= 1);
   const hasEstimated = estimatedRuns.length > 0;
   const axisTick = { fontSize: 11, fill: tc.axis, fontFamily: 'JetBrains Mono, monospace' };
 
@@ -213,7 +226,7 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
   const renderTooltip = ({ active, payload }: any) => {
     if (!active || !payload || payload.length === 0) return null;
     const p = payload[0].payload as ChartPoint;
-    const pl = p.total_krw - p.cost_krw;
+    const pl = p.stock_krw - p.cost_krw;
     const row = (label: string, value: string, color?: string) => (
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
         <span style={{ color: tc.muted }}>{label}</span>
@@ -227,8 +240,10 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
           {p.estimated && <span className="ml-1.5 chip !px-1.5 !py-0 !text-[10px]">추정</span>}
         </p>
         {row('총자산', formatKRW(p.total_krw), TOTAL_COLOR)}
+        {hasCash && row('· 주식', formatKRW(p.stock_krw))}
+        {hasCash && row('· 예수금', formatKRW(cashOf(p)))}
         {row('투자 원금', formatKRW(p.cost_krw))}
-        {row('손익', signed(pl), pl >= 0 ? undefined : undefined)}
+        {row(hasCash ? '주식 손익' : '손익', signed(pl))}
         {row('인출 가능', formatKRW(p.liquid_krw))}
         {row('인출 제한', formatKRW(p.restricted_krw))}
         {row('누적 배당', formatKRW(p.dividends_cum_krw), DIV_COLOR)}
@@ -393,7 +408,7 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
                       <>
                         <Area type="monotone" dataKey="total_est" name="총자산 (추정)" legendType="none" stroke={TOTAL_COLOR} strokeOpacity={0.55} strokeDasharray="4 3" strokeWidth={1.5} fill="url(#tat-total-est)" connectNulls={false} dot={false} isAnimationActive={false} />
                         <Area type="monotone" dataKey="total_real" name="총자산" stroke={TOTAL_COLOR} strokeWidth={1.75} fill="url(#tat-total)" connectNulls={false} dot={false} isAnimationActive={false} />
-                        <Line type="monotone" dataKey="cost_krw" name="투자 원금" stroke={COST_COLOR} strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="base_krw" name={hasCash ? '원금 + 예수금' : '투자 원금'} stroke={COST_COLOR} strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
                       </>
                     )}
                     {view === 'split' && (
@@ -406,8 +421,8 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
                     )}
                     {view === 'dividend' && (
                       <>
-                        <Line type="monotone" dataKey="total_krw" name="총자산" stroke={TOTAL_COLOR} strokeWidth={1.75} dot={false} isAnimationActive={false} />
-                        <Line type="monotone" dataKey="with_div" name="총자산 + 누적 배당" stroke={DIV_COLOR} strokeWidth={1.75} dot={false} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="stock_krw" name={hasCash ? '주식 평가금' : '총자산'} stroke={TOTAL_COLOR} strokeWidth={1.75} dot={false} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="with_div" name={hasCash ? '주식 + 누적 배당' : '총자산 + 누적 배당'} stroke={DIV_COLOR} strokeWidth={1.75} dot={false} isAnimationActive={false} />
                         <Line type="monotone" dataKey="cost_krw" name="투자 원금" stroke={COST_COLOR} strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
                       </>
                     )}
@@ -418,6 +433,11 @@ export default function TotalAssetTrendModal({ onClose }: TotalAssetTrendModalPr
               {hasEstimated && (
                 <p className="mt-2 label-mono !text-zinc-500 normal-case">
                   추정 구간(음영·점선): 거래 내역과 과거 시세로 계산
+                </p>
+              )}
+              {hasCash && (
+                <p className="mt-1 label-mono !text-zinc-500 normal-case">
+                  예수금은 계좌마다 처음 '잔액 맞추기'를 한 날(없으면 첫 입금 기록)부터 더합니다 · 원금 대비 손익은 주식만
                 </p>
               )}
             </>

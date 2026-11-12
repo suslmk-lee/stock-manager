@@ -196,3 +196,129 @@ func TestCashValidation(t *testing.T) {
 		t.Fatalf("withdraw = %+v err %v", e, err)
 	}
 }
+
+// 매도 대금 결제일: 국내 2영업일, 미국 1영업일 (주말 건너뜀)
+func TestCashSettleDay(t *testing.T) {
+	cases := []struct{ day, ticker, want string }{
+		{"2026-11-13", "005930.KS", "2026-11-17"}, // 금 → 화
+		{"2026-11-11", "005930.KS", "2026-11-13"}, // 수 → 금
+		{"2026-11-13", "SCHD", "2026-11-16"},      // 금 → 월
+		{"2026-11-10", "SCHD", "2026-11-11"},      // 화 → 수
+	}
+	for _, c := range cases {
+		if got := settleDay(c.day, c.ticker); got != c.want {
+			t.Errorf("settleDay(%s, %s) = %s, want %s", c.day, c.ticker, got, c.want)
+		}
+	}
+}
+
+// 출금 가능 금액 = 예수금 − 아직 결제되지 않은 매도 대금
+func TestCashWithdrawable(t *testing.T) {
+	f := newCashFixture(t) // 오늘 11/12 (목) KST
+	acc := f.account(t, "달러", "USD")
+	schd := f.asset(t, "SCHD")
+	f.svc.CreateEntry(acc.ID, CashEntryRequest{Currency: "USD", Date: "2026-11-01", Kind: "deposit", Amount: 100})
+	f.tx(t, acc.ID, schd.ID, models.TransactionTypeSell, "2026-11-10", 28, 1, 0) // 11/11 결제 — 끝남
+	f.tx(t, acc.ID, schd.ID, models.TransactionTypeSell, "2026-11-12", 30, 2, 0) // 11/13 결제 — 대기
+
+	sum, err := f.svc.GetSummary(acc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cashNear(sum.USD, 188) || !cashNear(sum.WithdrawableUSD, 128) || sum.WithdrawableKRW != 0 {
+		t.Fatalf("usd %.2f withdrawable %.2f / %.0f", sum.USD, sum.WithdrawableUSD, sum.WithdrawableKRW)
+	}
+	if len(sum.Pending) != 1 || sum.Pending[0].SettleDate != "2026-11-13" || !cashNear(sum.Pending[0].Amount, 60) {
+		t.Fatalf("pending = %+v", sum.Pending)
+	}
+}
+
+// 그래프용 날짜별 잔액: 잔액 맞추기가 있으면 그 날부터, 없으면 첫 현금 기록부터, 현금 기록이 없으면 빼기
+func TestCashTimelines(t *testing.T) {
+	f := newCashFixture(t)
+	nvda := f.asset(t, "NVDA")
+
+	recon := f.account(t, "맞춘 계좌", "USD")
+	f.tx(t, recon.ID, nvda.ID, models.TransactionTypeBuy, "2026-11-02", 150, 1, 0) // 입금 기록 없이 산 것 → 그 전 계산은 믿을 수 없다
+	if _, err := f.svc.Reconcile(recon.ID, CashReconcileRequest{Currency: "USD", Balance: 40, Date: "2026-11-05"}); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.CreateEntry(recon.ID, CashEntryRequest{Currency: "USD", Date: "2026-11-09", Kind: "deposit", Amount: 10})
+
+	plain := f.account(t, "입금만", "USD")
+	f.svc.CreateEntry(plain.ID, CashEntryRequest{Currency: "USD", Date: "2026-11-03", Kind: "deposit", Amount: 50})
+
+	none := f.account(t, "기록 없음", "USD")
+	f.tx(t, none.ID, nvda.ID, models.TransactionTypeBuy, "2026-11-02", 150, 1, 0)
+
+	tls := f.svc.Timelines()
+	if len(tls) != 2 {
+		t.Fatalf("timelines = %d, want 2 (현금 기록 없는 계좌는 뺀다)", len(tls))
+	}
+	byID := map[uint]CashTimeline{}
+	for _, tl := range tls {
+		byID[tl.AccountID] = tl
+	}
+	r := byID[recon.ID]
+	if r.Start != "2026-11-05" {
+		t.Fatalf("start = %s", r.Start)
+	}
+	check := func(tl CashTimeline, day string, wantUSD float64, wantOK bool) {
+		t.Helper()
+		_, usd, ok := tl.At(day)
+		if ok != wantOK || (ok && !cashNear(usd, wantUSD)) {
+			t.Errorf("%d At(%s) = %.2f %v, want %.2f %v", tl.AccountID, day, usd, ok, wantUSD, wantOK)
+		}
+	}
+	check(r, "2026-11-04", 0, false)
+	check(r, "2026-11-05", 40, true)
+	check(r, "2026-11-08", 40, true)
+	check(r, "2026-11-09", 50, true)
+	check(r, "2026-12-01", 50, true)
+	p := byID[plain.ID]
+	check(p, "2026-11-02", 0, false)
+	check(p, "2026-11-03", 50, true)
+}
+
+// 자산 추이: 예수금을 총자산·인출 가능/제한에 더한다 (달러는 그날 환율)
+func TestAddCashToSeries(t *testing.T) {
+	liquid := CashTimeline{AccountID: 1, Start: "2026-11-02", days: []string{"2026-11-01", "2026-11-03"}, krw: []float64{1000, 3000}, usd: []float64{0, 10}}
+	pension := CashTimeline{AccountID: 2, Restricted: true, Start: "2026-11-01", days: []string{"2026-11-01"}, krw: []float64{500}, usd: []float64{0}}
+	pts := []DailyPoint{
+		{Date: "2026-11-01", TotalKRW: 100, LiquidKRW: 100, UsdKrw: 1400},
+		{Date: "2026-11-02", TotalKRW: 100, LiquidKRW: 100, UsdKrw: 1400},
+		{Date: "2026-11-04", TotalKRW: 100, LiquidKRW: 100}, // 환율 없음 → 현재 환율
+	}
+	addCashToSeries(pts, []CashTimeline{liquid, pension}, func() float64 { return 1500 })
+	want := []struct{ cash, total, liquid, restricted float64 }{
+		{500, 600, 100, 500},       // 첫 계좌는 시작 전
+		{1500, 1600, 1100, 500},    // 1000 + 500
+		{18500, 18600, 18100, 500}, // 3000 + $10×1500 + 500
+	}
+	for i, w := range want {
+		p := pts[i]
+		if !cashNear(p.CashKRW, w.cash) || !cashNear(p.TotalKRW, w.total) || !cashNear(p.LiquidKRW, w.liquid) || !cashNear(p.RestrictedKRW, w.restricted) {
+			t.Errorf("%s = %+v, want %+v", p.Date, p, w)
+		}
+	}
+}
+
+// 월별 요약: 월초 기준이라 전달 말일 잔액, 통화별 행
+func TestCashMonthRows(t *testing.T) {
+	tl := CashTimeline{AccountID: 7, Start: "2026-09-15", days: []string{"2026-09-15", "2026-10-31", "2026-11-05"}, krw: []float64{1000, 2000, 9000}, usd: []float64{0, 5, 5}}
+	window := []monthKey{{2026, 9}, {2026, 10}, {2026, 11}}
+	rows := cashMonthRows(window, []CashTimeline{tl}, map[monthKey]bool{{2026, 10}: true})
+	// 9월: 8/31 은 시작 전 → 없음 · 10월: 9/30 잔액 ₩1000 · 11월: 10/31 잔액 ₩2000 + $5
+	if len(rows) != 3 {
+		t.Fatalf("rows = %+v", rows)
+	}
+	if r := rows[0]; r.Month != 10 || r.Currency != "KRW" || r.TotalValue != 1000 || r.Estimated || !r.Cash {
+		t.Errorf("oct = %+v", r)
+	}
+	if r := rows[1]; r.Month != 11 || r.Currency != "KRW" || r.TotalValue != 2000 || !r.Estimated {
+		t.Errorf("nov krw = %+v", r)
+	}
+	if r := rows[2]; r.Month != 11 || r.Currency != "USD" || r.TotalValue != 5 {
+		t.Errorf("nov usd = %+v", r)
+	}
+}

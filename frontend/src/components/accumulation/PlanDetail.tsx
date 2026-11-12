@@ -3,9 +3,12 @@ import { Check, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { AccumulationFill, AccumulationPlanRequest, AccumulationPlanView, PlanCurrency, PlanStatus } from '../../types/models';
 import { accountLabel, assetTitle, belowMinimum, fmtAmount, fmtDay, fmtPrice, fmtQty, fmtSignedAmount, fmtSignedPct, nextText, ruleText, signTone, stepLabel } from './planText';
+import { cashAmount, LOW_DAYS, type AccountCashNeed } from './cashNeed';
 
 interface PlanDetailProps {
   plan: AccumulationPlanView;
+  /** 이 계좌의 모으기 전체 필요 금액 · 예수금 */
+  need?: AccountCashNeed;
   onEdit: () => void;
   /** 계획·회차가 바뀌었을 때 (목록 다시 불러오기). 중지·다시 시작이면 바뀐 상태를 넘긴다 */
   onChanged: (nextStatus?: PlanStatus) => void;
@@ -44,7 +47,7 @@ export const toRequest = (p: AccumulationPlanView): AccumulationPlanRequest => (
   notes: p.notes,
 });
 
-export default function PlanDetail({ plan, onEdit, onChanged, onDeleted }: PlanDetailProps) {
+export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }: PlanDetailProps) {
   const ccy = plan.amount_currency;
   const assetCcy = plan.asset_currency as PlanCurrency;
   const title = assetTitle(plan.asset);
@@ -168,6 +171,16 @@ export default function PlanDetail({ plan, onEdit, onChanged, onDeleted }: PlanD
         {belowMinimum(plan) && (
           <p className="mt-3 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
             지금 가격에서는 {stepLabel(plan.qty_step).replace(' 단위', '')}가 {fmtAmount(plan.min_amount!, ccy)}이라 {fmtAmount(plan.amount, ccy)}으로는 살 수 없어 회차가 건너뛰어집니다. 증권사 앱의 수량을 보고 수량 단위를 바꿔 주세요.
+          </p>
+        )}
+        {plan.status === 'active' && need?.days != null && need.days < LOW_DAYS && (
+          <p
+            className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
+              need.days <= 0 ? 'border-rose-400/30 bg-rose-500/10 text-rose-100' : 'border-amber-400/30 bg-amber-500/10 text-amber-100'
+            }`}
+          >
+            {need.name} 예수금 {[need.needKRW > 0 && cashAmount(need.cashKRW, 'KRW'), need.needUSD > 0 && cashAmount(need.cashUSD, 'USD')].filter(Boolean).join(' + ')} —{' '}
+            {need.days <= 0 ? '다음 회차를 살 돈이 부족합니다.' : `이 계좌 모으기 전체로 약 ${need.days}거래일분 남았습니다.`} 입금하지 않으면 증권사에서 회차가 빠질 수 있어요.
           </p>
         )}
         {error && <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{error}</p>}

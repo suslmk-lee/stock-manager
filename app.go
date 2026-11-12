@@ -52,6 +52,9 @@ func NewApp() *App {
 	a.signalService.SetFundamentals(fundamentals)
 	a.signalService.SetValuation(services.NewValuationService(database.GetDB(), a.tickerService, fundamentals))
 	a.dailySnapService.SetFundamentals(fundamentals)
+	// 자산 추이(일별·월별)에 예수금을 더한다
+	a.dailySnapService.SetCash(a.cashService)
+	a.snapshotService.SetCash(a.cashService)
 	a.updater = updater.New(appVersion)
 	return a
 }

@@ -28,6 +28,8 @@ type DailyPoint struct {
 	DividendsCumKRW float64 `json:"dividends_cum_krw"`
 	UsdKrw          float64 `json:"usd_krw"`
 	Estimated       bool    `json:"estimated"`
+	// 예수금 (원화 + 달러 × 그날 환율). TotalKRW·LiquidKRW·RestrictedKRW 에 이미 더해져 있다.
+	CashKRW float64 `json:"cash_krw"`
 }
 
 // DailySeries 는 GetSeries 응답.
@@ -46,6 +48,7 @@ type DailySnapshotService struct {
 	db     *gorm.DB
 	ticker *TickerService
 	fund   *FundamentalsService // 일별 펀더멘털 저장 (nil 이면 건너뜀)
+	cash   *CashService         // 조회할 때 예수금을 더한다 (nil 이면 주식만)
 
 	// 외부 의존성 (테스트에서 교체)
 	now           func() time.Time
@@ -80,6 +83,9 @@ func NewDailySnapshotService(db *gorm.DB, ticker *TickerService) *DailySnapshotS
 	}
 	return s
 }
+
+// SetCash: 시계열 조회에 예수금을 더한다.
+func (s *DailySnapshotService) SetCash(c *CashService) { s.cash = c }
 
 func (s *DailySnapshotService) today() string { return kstDateString(s.now()) }
 
@@ -521,7 +527,53 @@ func (s *DailySnapshotService) GetSeries(rangeStr, interval string) (*DailySerie
 	if err := q.Order("date ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	return buildSeries(rows, rangeStr, interval), nil
+	out := buildSeries(rows, rangeStr, interval)
+	if s.cash != nil && len(out.Points) > 0 {
+		// 예수금은 저장하지 않고 조회할 때 원장에서 계산한다 (잔액 맞추기·입금 기록이 지난 날짜에도 바로 반영되도록)
+		addCashToSeries(out.Points, s.cash.Timelines(), s.currentFx)
+	}
+	return out, nil
+}
+
+// addCashToSeries: 각 점에 그날 예수금을 더한다 (달러는 그날 환율, 없으면 현재 환율). 인출 가능/제한도 계좌를 따른다.
+func addCashToSeries(points []DailyPoint, tls []CashTimeline, fallbackFx func() float64) {
+	if len(tls) == 0 {
+		return
+	}
+	fxNow := -1.0
+	for i := range points {
+		p := &points[i]
+		for j := range tls {
+			krw, usd, ok := tls[j].At(p.Date)
+			if !ok {
+				continue
+			}
+			v := krw
+			if usd != 0 {
+				fx := p.UsdKrw
+				if fx <= 0 {
+					if fxNow < 0 {
+						fxNow = 0
+						if fallbackFx != nil {
+							fxNow = fallbackFx()
+						}
+					}
+					fx = fxNow
+				}
+				v += usd * fx
+			}
+			if !finite(v) || v == 0 {
+				continue
+			}
+			p.CashKRW += v
+			p.TotalKRW += v
+			if tls[j].Restricted {
+				p.RestrictedKRW += v
+			} else {
+				p.LiquidKRW += v
+			}
+		}
+	}
 }
 
 func sanitizeF(v float64) float64 {

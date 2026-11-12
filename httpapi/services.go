@@ -36,6 +36,10 @@ func NewServices() *Services {
 	signal.SetFundamentals(fundamentals)
 	signal.SetValuation(services.NewValuationService(database.GetDB(), ticker, fundamentals))
 	dailySnap.SetFundamentals(fundamentals)
+	cash := services.NewCashService(database.GetDB(), ticker)
+	dailySnap.SetCash(cash)
+	snapshot := services.NewPortfolioSnapshotService(database.GetDB(), ticker)
+	snapshot.SetCash(cash)
 
 	return &Services{
 		Account:      services.NewAccountService(),
@@ -45,11 +49,11 @@ func NewServices() *Services {
 		Dividend:     services.NewDividendService(),
 		Ticker:       ticker,
 		ExchangeRate: exchange,
-		Snapshot:     services.NewPortfolioSnapshotService(database.GetDB(), ticker),
+		Snapshot:     snapshot,
 		RealizedPnL:  services.NewRealizedPnLService(),
 		Signal:       signal,
 		DailySnap:    dailySnap,
 		Accumulation: services.NewAccumulationService(database.GetDB(), ticker),
-		Cash:         services.NewCashService(database.GetDB(), ticker),
+		Cash:         cash,
 	}
 }

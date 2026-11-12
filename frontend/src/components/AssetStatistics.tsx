@@ -288,6 +288,7 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
             {cashValue !== 0 && (
               <p className="mt-2 text-sm text-zinc-400 num">
                 주식 <CountUp value={stockValue} format={formatCurrency} /> · 예수금 <CountUp value={cashValue} format={formatCurrency} />
+                {totalValue > 0 && <span className="ml-1.5 text-zinc-500">(현금 비중 {((cashValue / totalValue) * 100).toFixed(1)}%)</span>}
               </p>
             )}
             {restrictedValue > 0 && liquidity === 'all' && (

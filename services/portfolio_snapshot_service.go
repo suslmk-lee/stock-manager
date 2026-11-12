@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"log"
+	"math"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 type PortfolioSnapshotService struct {
 	db            *gorm.DB
 	tickerService *TickerService
+	cash          *CashService // 월별 요약에 예수금 행을 더한다 (nil 이면 주식만)
 	histCache     historyCache
 	fetchHistory  func(ticker string) (*PriceHistory, error)
 }
@@ -25,6 +27,9 @@ func NewPortfolioSnapshotService(db *gorm.DB, tickerService *TickerService) *Por
 	}
 	return s
 }
+
+// SetCash: 월별 요약에 계좌별 예수금 행을 더한다.
+func (s *PortfolioSnapshotService) SetCash(c *CashService) { s.cash = c }
 
 // EnsureCurrentMonthSnapshot checks if current month snapshot exists, if not, records it.
 // Returns true if a new snapshot was created.
@@ -144,10 +149,10 @@ func (s *PortfolioSnapshotService) GetSnapshotsByAsset(assetID uint) ([]models.P
 // GetMonthlyTotalByAccount returns monthly total market value per account
 func (s *PortfolioSnapshotService) GetMonthlyTotalByAccount(accountID uint) ([]map[string]interface{}, error) {
 	var results []struct {
-		Year        int
-		Month       int
-		TotalValue  float64
-		AssetCount  int64
+		Year       int
+		Month      int
+		TotalValue float64
+		AssetCount int64
 	}
 
 	err := s.db.Model(&models.PortfolioSnapshot{}).
@@ -182,6 +187,7 @@ type MonthlySnapshotSummary struct {
 	TotalValue float64 `json:"total_value"`
 	AssetCount int64   `json:"asset_count"`
 	Estimated  bool    `json:"estimated"`
+	Cash       bool    `json:"cash,omitempty"` // 예수금 행 (그 달 초 잔액)
 }
 
 // GetMonthlySummary returns monthly aggregates for the last `months` calendar months (KST, oldest first).
@@ -231,8 +237,39 @@ ORDER BY year ASC, month ASC, account_id ASC`, first.index()+1, window[len(windo
 			out = append(out, est...)
 		}
 	}
+	if s.cash != nil {
+		out = append(out, cashMonthRows(window, s.cash.Timelines(), have)...)
+	}
 	sortSummaries(out)
 	return out, nil
+}
+
+// cashMonthRows: 달마다 계좌별 예수금 행. 월별 스냅샷이 월초 기준이라 예수금도 전달 말일 마감 잔액을 쓴다.
+// 추정 표시는 그 달 주식 행과 같게 맞춘다 (실측 스냅샷이 없는 달이면 추정).
+func cashMonthRows(window []monthKey, tls []CashTimeline, recorded map[monthKey]bool) []MonthlySnapshotSummary {
+	var out []MonthlySnapshotSummary
+	for _, m := range window {
+		day := m.start().AddDate(0, 0, -1).Format(dateLayout)
+		for i := range tls {
+			krw, usd, ok := tls[i].At(day)
+			if !ok {
+				continue
+			}
+			for _, c := range []struct {
+				ccy string
+				v   float64
+			}{{"KRW", krw}, {"USD", usd}} {
+				if math.Abs(c.v) < 0.005 {
+					continue
+				}
+				out = append(out, MonthlySnapshotSummary{
+					Year: m.Year, Month: m.Month, AccountID: tls[i].AccountID, Currency: c.ccy,
+					TotalValue: math.Round(c.v*100) / 100, Estimated: !recorded[m], Cash: true,
+				})
+			}
+		}
+	}
+	return out
 }
 
 // EnsureCurrentMonthSnapshotAsync runs snapshot in background (non-blocking)

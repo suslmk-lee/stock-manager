@@ -6,7 +6,8 @@ import PlanList from '../components/accumulation/PlanList';
 import PlanDetail from '../components/accumulation/PlanDetail';
 import PlanForm from '../components/accumulation/PlanForm';
 import { apiClient } from '../api/client';
-import type { AccumulationPlanView, PlanStatus } from '../types/models';
+import type { AccumulationPlanView, CashBalance, PlanStatus } from '../types/models';
+import { cashNeeds } from '../components/accumulation/cashNeed';
 
 const errText = (err: unknown) => (err instanceof Error ? err.message : typeof err === 'string' ? err : '');
 
@@ -21,13 +22,16 @@ export default function AccumulationPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [split, setSplit] = useState<boolean | null>(null);
   const [form, setForm] = useState<{ plan: AccumulationPlanView | null } | null>(null);
+  const [cash, setCash] = useState<{ balances: CashBalance[]; usd_krw: number } | null>(null);
 
   const load = useCallback(async (initial = false) => {
     try {
       if (initial) setLoading(true);
       setError(null);
-      const r = await apiClient.GetAccumulationPlans();
+      // 예수금은 경고용이라 실패해도 목록은 보여 준다
+      const [r, c] = await Promise.all([apiClient.GetAccumulationPlans(), apiClient.GetCashBalances().catch(() => null)]);
       setPlans(r.plans ?? []);
+      setCash(c);
     } catch (e) {
       const d = errText(e);
       setError(d ? `주식 모으기를 불러오지 못했습니다: ${d}` : '주식 모으기를 불러오지 못했습니다.');
@@ -75,6 +79,8 @@ export default function AccumulationPage() {
   }, [plans]);
   const visible = useMemo(() => (plans ?? []).filter((p) => p.status === status), [plans, status]);
   const selected = (plans ?? []).find((p) => p.id === selectedId) ?? null;
+  // 계좌별 한 달 필요 금액과 예수금으로 버티는 거래일 수
+  const needs = useMemo(() => cashNeeds(plans ?? [], cash?.balances ?? null, cash?.usd_krw ?? 0), [plans, cash]);
 
   // 넓은 화면은 항상 하나를 보여 주고, 좁은 화면은 고를 때만 상세로 간다
   useEffect(() => {
@@ -139,12 +145,13 @@ export default function AccumulationPage() {
           showDetail={selected != null}
           onBack={() => setSelectedId(null)}
           listWidth={420}
-          list={<PlanList plans={plans} status={status} onStatus={setStatus} counts={counts} selectedId={selectedId} onSelect={setSelectedId} />}
+          list={<PlanList plans={plans} status={status} onStatus={setStatus} counts={counts} selectedId={selectedId} onSelect={setSelectedId} needs={needs} />}
           detail={
             selected ? (
               <PlanDetail
                 key={selected.id}
                 plan={selected}
+                need={needs.get(selected.account_id)}
                 onEdit={() => setForm({ plan: selected })}
                 onChanged={(nextStatus) => {
                   // 중지·다시 시작한 계획은 옮겨 간 쪽 목록에서 계속 보여 준다 (선택이 풀리지 않게 상태를 먼저 같이 바꾼다)
