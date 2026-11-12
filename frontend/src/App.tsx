@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PageActions } from './components/shell/PageSlots';
 import SplitView from './components/shell/SplitView';
 import { apiClient } from './api/client';
-import { Account, AccountType } from './types/models';
+import { Account, AccountType, type ForeignSettle } from './types/models';
 import { Plus, Trash2, Wallet, Pencil, Lock } from 'lucide-react';
 import AccountDashboard from './components/AccountDashboard';
 import CardIcon from './components/ui/CardIcon';
@@ -43,7 +43,14 @@ const EMPTY_FORM = {
   currency: 'KRW',
   description: '',
   accountType: 'General' as AccountType,
-  foreignSettle: 'USD' as 'USD' | 'KRW',
+  foreignSettle: 'USD' as ForeignSettle,
+  fxFeePct: '0',
+};
+
+const SETTLE_HINT: Record<ForeignSettle, string> = {
+  USD: "미국 주식은 외화예수금(달러)에서 사고팝니다. 원화↔달러는 예수금의 '환전'으로 기록합니다.",
+  AFX: '달러를 먼저 쓰고, 모자란 만큼만 그날 환율로 원화에서 자동으로 바꿉니다. 주문 때 더 잡아 두었다가 다음 날 돌려주는 차액은 기록하지 않고 최종 금액만 남깁니다.',
+  KRW: '미국 주식 매매·배당이 그날 환율로 원화예수금에 바로 반영됩니다 (카카오페이 원화 모으기·원화 주문 등).',
 };
 
 
@@ -108,13 +115,19 @@ function App() {
       currency: account.currency,
       description: account.description || '',
       accountType: getAccountType(account),
-      foreignSettle: account.foreign_settle === 'KRW' ? 'KRW' : 'USD',
+      foreignSettle: account.foreign_settle === 'KRW' || account.foreign_settle === 'AFX' ? account.foreign_settle : 'USD',
+      fxFeePct: String(account.fx_fee_pct ?? 0),
     });
     setShowForm(true);
   };
 
   const handleSubmitAccount = async (e: React.FormEvent) => {
     e.preventDefault();
+    const fxFee = formData.foreignSettle === 'USD' ? 0 : Number(formData.fxFeePct.trim() || '0');
+    if (!Number.isFinite(fxFee) || fxFee < 0 || fxFee > 5) {
+      setError('자동 환전 수수료는 0~5% 사이로 넣어 주세요.');
+      return;
+    }
     try {
       if (editingId !== null) {
         await apiClient.UpdateAccount(
@@ -126,7 +139,8 @@ function App() {
           formData.currency,
           formData.description,
           formData.accountType,
-          formData.foreignSettle
+          formData.foreignSettle,
+          fxFee
         );
       } else {
         const created = (await apiClient.CreateAccount(
@@ -137,7 +151,8 @@ function App() {
           formData.currency,
           formData.description,
           formData.accountType,
-          formData.foreignSettle
+          formData.foreignSettle,
+          fxFee
         )) as Account | null;
         if (created?.id) setSelectedId(created.id);
       }
@@ -309,15 +324,27 @@ function App() {
             <option value="JPY">JPY (엔)</option>
           </select>
         </div>
-        {formData.marketType === 'International' && (
+        <div>
+          <label className="field-label">예수금 구성</label>
+          <select value={formData.foreignSettle} onChange={(e) => setFormData({ ...formData, foreignSettle: e.target.value as ForeignSettle })} className="input-field">
+            <option value="USD">원화예수금 + 외화예수금(달러) 따로 · 환전은 직접</option>
+            <option value="AFX">원화 + 외화 따로 · 달러가 모자라면 원화에서 자동 환전</option>
+            <option value="KRW">원화예수금 하나 · 미국 주식도 원화로 바로</option>
+          </select>
+          <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{SETTLE_HINT[formData.foreignSettle]}</p>
+        </div>
+        {formData.foreignSettle !== 'USD' && (
           <div>
-            <label className="field-label">미국 주식 결제</label>
-            <select value={formData.foreignSettle} onChange={(e) => setFormData({ ...formData, foreignSettle: e.target.value as 'USD' | 'KRW' })} className="input-field">
-              <option value="USD">달러 예수금에서 사고팔기</option>
-              <option value="KRW">원화로 바로 사고팔기 (자동 환전)</option>
-            </select>
-            <p className="mt-1.5 text-xs text-zinc-500">
-              예수금 계산에 씁니다. 카카오페이 원화 모으기·원화 주문처럼 원화가 바로 빠지는 계좌는 '원화로 바로'를 고르세요. 미국 주식 매매·배당이 그날 환율로 원화 예수금에 반영됩니다.
+            <label className="field-label">자동 환전 수수료 (%)</label>
+            <input
+              inputMode="decimal"
+              value={formData.fxFeePct}
+              onChange={(e) => setFormData({ ...formData, fxFeePct: e.target.value.replace(/[^0-9.]/g, '') })}
+              className="input-field num"
+              placeholder="0"
+            />
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+              자동 환전 때 환율에 얹히는 수수료입니다 (살 때는 비싸게, 팔 때·배당은 싸게). 예: 0.25. 모르면 0으로 두고 잔액 맞추기로 맞추세요.
             </p>
           </div>
         )}

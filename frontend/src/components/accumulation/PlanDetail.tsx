@@ -3,7 +3,7 @@ import { Check, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { AccumulationFill, AccumulationPlanRequest, AccumulationPlanView, PlanCurrency, PlanStatus } from '../../types/models';
 import { accountLabel, assetTitle, belowMinimum, fmtAmount, fmtDay, fmtPrice, fmtQty, fmtSignedAmount, fmtSignedPct, nextText, ruleText, signTone, stepLabel } from './planText';
-import { cashAmount, LOW_DAYS, type AccountCashNeed } from './cashNeed';
+import { cashText, LOW_DAYS, type AccountCashNeed } from './cashNeed';
 
 interface PlanDetailProps {
   plan: AccumulationPlanView;
@@ -179,7 +179,7 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
               need.days <= 0 ? 'border-rose-400/30 bg-rose-500/10 text-rose-100' : 'border-amber-400/30 bg-amber-500/10 text-amber-100'
             }`}
           >
-            {need.name} 예수금 {[need.needKRW > 0 && cashAmount(need.cashKRW, 'KRW'), need.needUSD > 0 && cashAmount(need.cashUSD, 'USD')].filter(Boolean).join(' + ')} —{' '}
+            {need.name} 예수금 {cashText(need)} —{' '}
             {need.days <= 0 ? '다음 회차를 살 돈이 부족합니다.' : `이 계좌 모으기 전체로 약 ${need.days}거래일분 남았습니다.`} 입금하지 않으면 증권사에서 회차가 빠질 수 있어요.
           </p>
         )}

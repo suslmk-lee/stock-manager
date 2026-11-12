@@ -322,3 +322,85 @@ func TestCashMonthRows(t *testing.T) {
 		t.Errorf("nov usd = %+v", r)
 	}
 }
+
+// 자동 환전(통합증거금): 달러 먼저, 모자란 만큼 원화에서 그날 환율 + 수수료로 바꾼다. 같은 날 매도 대금은 먼저 쓴다.
+func TestCashAutoFX(t *testing.T) {
+	f := newCashFixture(t)
+	acc := f.account(t, "통합증거금", models.SettleAutoFX)
+	f.db.Model(&acc).Update("fx_fee_pct", 0.25)
+	schd := f.asset(t, "SCHD")
+	f.svc.CreateEntry(acc.ID, CashEntryRequest{Currency: "KRW", Date: "2026-11-01", Kind: "deposit", Amount: 100000})
+	f.svc.CreateEntry(acc.ID, CashEntryRequest{Currency: "USD", Date: "2026-11-01", Kind: "deposit", Amount: 10})
+	f.tx(t, acc.ID, schd.ID, models.TransactionTypeBuy, "2026-11-10", 27, 0.5, 0)  // $13.50 → 달러 $10 + 원화로 $3.50
+	f.tx(t, acc.ID, schd.ID, models.TransactionTypeSell, "2026-11-11", 28, 0.1, 0) // +$2.80 (같은 날 매수보다 먼저)
+	f.tx(t, acc.ID, schd.ID, models.TransactionTypeBuy, "2026-11-11", 28, 0.2, 0)  // $5.60 → $2.80 쓰고 $2.80 원화로
+
+	sum, err := f.svc.GetSummary(acc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k1 := math.Round(3.5 * 1450 * 1.0025) // 5088
+	k2 := math.Round(2.8 * 1450 * 1.0025) // 4070
+	if !cashNear(sum.USD, 0) || !cashNear(sum.KRW, 100000-k1-k2) {
+		t.Fatalf("balance = %+v, want USD 0 KRW %.0f", sum.CashBalance, 100000-k1-k2)
+	}
+	auto := 0
+	for _, fl := range sum.Flows {
+		if fl.Kind == "autofx" {
+			auto++
+			if fl.Currency == "USD" && !(cashNear(fl.Amount, 3.5) || cashNear(fl.Amount, 2.8)) {
+				t.Errorf("autofx usd = %+v", fl)
+			}
+			if !cashNear(fl.Fx, 1450*1.0025) {
+				t.Errorf("autofx fx = %v", fl.Fx)
+			}
+		}
+		if fl.Currency == "USD" && fl.Balance < -0.001 {
+			t.Errorf("달러 잔액이 마이너스가 되면 안 된다: %+v", fl)
+		}
+	}
+	if auto != 4 {
+		t.Fatalf("autofx lines = %d, want 4 (두 번 × 원화·달러)", auto)
+	}
+
+	// 달러를 잔액 맞추기로 넉넉히 맞추면 그 뒤 매수는 원화를 쓰지 않는다
+	f.svc.Reconcile(acc.ID, CashReconcileRequest{Currency: "USD", Balance: 100, Date: "2026-11-11"})
+	f.tx(t, acc.ID, schd.ID, models.TransactionTypeBuy, "2026-11-12", 28, 1, 0)
+	sum, _ = f.svc.GetSummary(acc.ID)
+	if !cashNear(sum.USD, 72) || !cashNear(sum.KRW, 100000-k1-k2) {
+		t.Fatalf("after reconcile = %+v", sum.CashBalance)
+	}
+}
+
+// 원화로 바로(KRW) 계좌의 자동 환전 수수료: 살 때는 환율 +, 배당은 환율 −
+func TestCashKRWFee(t *testing.T) {
+	f := newCashFixture(t)
+	acc := f.account(t, "원화 주문", models.SettleKRW)
+	f.db.Model(&acc).Update("fx_fee_pct", 1)
+	nvda := f.asset(t, "NVDA")
+	f.tx(t, acc.ID, nvda.ID, models.TransactionTypeBuy, "2026-11-10", 100, 0.1, 0)
+	f.db.Create(&models.Dividend{AccountID: acc.ID, AssetID: nvda.ID, Date: cashDay("2026-11-10"), Amount: 1, Currency: "USD", IsReceived: true})
+	sum, err := f.svc.GetSummary(acc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := -10*1450*1.01 + 1*1450*0.99
+	if !cashNear(sum.KRW, math.Round(want*100)/100) || sum.USD != 0 {
+		t.Fatalf("balance = %+v, want KRW %.2f", sum.CashBalance, want)
+	}
+}
+
+// 예수금 구성 값 검사
+func TestValidSettle(t *testing.T) {
+	for _, v := range []string{models.SettleUSD, models.SettleKRW, models.SettleAutoFX} {
+		if !validSettle(v) {
+			t.Errorf("%s 는 받아야 한다", v)
+		}
+	}
+	if validSettle("JPY") || validSettle("") {
+		t.Error("모르는 값은 거절해야 한다")
+	}
+	if validFxFee(-0.1) || validFxFee(5.1) || !validFxFee(0) || !validFxFee(0.25) {
+		t.Error("수수료는 0~5%")
+	}
+}

@@ -55,24 +55,24 @@ export const apiClient = {
     return WailsApp.GetAccount(id);
   },
 
-  CreateAccount: async (name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string, foreignSettle = 'USD') => {
+  CreateAccount: async (name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string, foreignSettle = 'USD', fxFeePct = 0) => {
     if (isWeb) {
       return fetchApi<Account>('/accounts', {
         method: 'POST',
-        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType, foreign_settle: foreignSettle }),
+        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType, foreign_settle: foreignSettle, fx_fee_pct: fxFeePct }),
       });
     }
-    return WailsApp.CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle);
+    return WailsApp.CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle, fxFeePct);
   },
 
-  UpdateAccount: async (id: number, name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string, foreignSettle = '') => {
+  UpdateAccount: async (id: number, name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string, foreignSettle = '', fxFeePct = 0) => {
     if (isWeb) {
       return fetchApi<Account>(`/accounts/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType, foreign_settle: foreignSettle }),
+        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType, foreign_settle: foreignSettle, fx_fee_pct: fxFeePct }),
       });
     }
-    return WailsApp.UpdateAccount(id, name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle);
+    return WailsApp.UpdateAccount(id, name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle, fxFeePct);
   },
 
   DeleteAccount: async (id: number) => {

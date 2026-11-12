@@ -48,8 +48,10 @@ export interface Account {
   account_number: string;
   market_type: MarketType;
   account_type?: AccountType;
-  /** 미국 주식 결제 통화: USD = 달러 예수금, KRW = 원화로 바로 (자동 환전) */
-  foreign_settle?: 'USD' | 'KRW';
+  /** 예수금 구성: USD = 원화·외화(달러) 따로, AFX = 따로 + 달러 모자라면 원화에서 자동 환전, KRW = 원화 하나 (미국 주식도 원화로 바로) */
+  foreign_settle?: ForeignSettle;
+  /** 자동 환전 수수료 (%) — KRW·AFX 일 때 환율에 얹는다 */
+  fx_fee_pct?: number;
   currency: string;
   description: string;
   created_at: string;
@@ -679,8 +681,9 @@ export interface AccumulationRunResult {
 }
 
 // ── 예수금 ──
+export type ForeignSettle = 'USD' | 'KRW' | 'AFX';
 export type CashKind = 'deposit' | 'withdraw' | 'exchange' | 'interest' | 'adjust';
-export type CashFlowKind = CashKind | 'buy' | 'sell' | 'dividend';
+export type CashFlowKind = CashKind | 'buy' | 'sell' | 'dividend' | 'autofx';
 
 export interface CashFlow {
   date: string;

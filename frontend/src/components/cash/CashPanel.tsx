@@ -38,7 +38,10 @@ const KIND: Record<CashFlowKind, { label: string; cls: string }> = {
   buy: { label: '매수', cls: 'bg-mint-400/10 text-zinc-300' },
   sell: { label: '매도', cls: 'bg-rose-500/10 text-zinc-300' },
   dividend: { label: '배당', cls: 'bg-mint-400/15 text-mint-300' },
+  autofx: { label: '자동 환전', cls: 'border border-white/10 bg-white/[0.05] text-zinc-300' },
 };
+
+const CCY_NAME: Record<Ccy, string> = { KRW: '원화예수금', USD: '외화예수금 (USD)' };
 
 function Seg<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
   return (
@@ -64,8 +67,25 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
 
 // ───────────────────────── 입력 창 ─────────────────────────
 
-function CashForm({ mode, account, summary, onClose, onSaved }: { mode: Mode; account: Account; summary: CashSummary; onClose: () => void; onSaved: (msg: string) => void }) {
-  const defaultCcy: Ccy = account.market_type === 'Domestic' || account.foreign_settle === 'KRW' ? 'KRW' : 'USD';
+function CashForm({
+  mode,
+  account,
+  summary,
+  currencies,
+  onClose,
+  onSaved,
+}: {
+  mode: Mode;
+  account: Account;
+  summary: CashSummary;
+  /** 계좌 화면에 보이는 예수금 통화 — 둘이면 잔액 맞추기를 한 번에 */
+  currencies: Ccy[];
+  onClose: () => void;
+  onSaved: (msg: string) => void;
+}) {
+  const defaultCcy: Ccy = account.market_type === 'Domestic' || account.foreign_settle === 'KRW' || account.foreign_settle === 'AFX' ? 'KRW' : 'USD';
+  const dual = mode === 'reconcile' && currencies.length === 2;
+  const [both, setBoth] = useState<Record<Ccy, string>>({ KRW: '', USD: '' });
   const [kind, setKind] = useState<'deposit' | 'withdraw' | 'interest'>('deposit');
   const [ccy, setCcy] = useState<Ccy>(defaultCcy);
   const [amount, setAmount] = useState('');
@@ -94,6 +114,18 @@ function CashForm({ mode, account, summary, onClose, onSaved }: { mode: Mode; ac
         if (!(a > 0) || !(b > 0)) throw new Error('내준 금액과 받은 금액을 모두 입력하세요.');
         await apiClient.CreateCashExchange(account.id, { date, from_currency: from, from_amount: a, to_amount: b, notes });
         onSaved(`환전 ${money(a, from)} → ${money(b, to)}을 기록했습니다.`);
+      } else if (dual) {
+        const filled = (['USD', 'KRW'] as Ccy[]).filter((c) => both[c].trim() !== '');
+        if (filled.length === 0) throw new Error('증권사 앱에 보이는 예수금을 하나 이상 입력하세요.');
+        if (filled.some((c) => !Number.isFinite(num(both[c])))) throw new Error('금액이 올바르지 않습니다.');
+        // 달러 먼저: 자동 환전 계좌는 달러 잔액에 따라 원화에서 바꾼 금액이 달라진다
+        const changed = new Set<Ccy>();
+        for (const c of filled) {
+          const r = await apiClient.ReconcileCash(account.id, { currency: c, balance: num(both[c]), date });
+          if (r.entry) changed.add(c);
+        }
+        const text = (['KRW', 'USD'] as Ccy[]).filter((c) => changed.has(c)).map((c) => `${CCY_NAME[c].replace(' (USD)', '')} ${money(num(both[c]), c)}`);
+        onSaved(text.length ? `${text.join(' · ')}에 맞췄습니다.` : '이미 증권사 잔액과 같습니다.');
       } else {
         if (amount.trim() === '' || !Number.isFinite(a)) throw new Error('증권사 앱에 보이는 예수금을 입력하세요.');
         const r = await apiClient.ReconcileCash(account.id, { currency: ccy, balance: a, date });
@@ -126,7 +158,31 @@ function CashForm({ mode, account, summary, onClose, onSaved }: { mode: Mode; ac
                 <Seg label="종류" value={kind} onChange={setKind} options={[{ value: 'deposit', label: '입금' }, { value: 'withdraw', label: '출금' }, { value: 'interest', label: '이자' }]} />
               </Field>
             )}
-            {mode !== 'exchange' ? (
+            {dual ? (
+              <>
+                {(['KRW', 'USD'] as Ccy[]).map((c, i) => {
+                  const cur = c === 'KRW' ? summary.krw : summary.usd;
+                  const v = both[c].trim();
+                  return (
+                    <Field
+                      key={c}
+                      label={`증권사 앱의 ${CCY_NAME[c]}`}
+                      hint={`지금 계산 ${money(cur, c)}${v !== '' && Number.isFinite(num(v)) ? ` · 차이 ${signed(num(v) - cur, c)}` : ''}`}
+                    >
+                      <input
+                        inputMode="decimal"
+                        className="input-field num"
+                        value={both[c]}
+                        onChange={(e) => setBoth((b) => ({ ...b, [c]: e.target.value }))}
+                        placeholder={c === 'KRW' ? '예: 35420' : '예: 38.12'}
+                        autoFocus={i === 0}
+                      />
+                    </Field>
+                  );
+                })}
+                <p className="text-[11px] leading-relaxed text-zinc-500">비워 둔 칸은 맞추지 않습니다. 차이는 '잔액 맞추기'로 남습니다.</p>
+              </>
+            ) : mode !== 'exchange' ? (
               <>
                 <Field label="통화">
                   <Seg label="통화" value={ccy} onChange={setCcy} options={[{ value: 'KRW', label: '원화' }, { value: 'USD', label: '달러' }]} />
@@ -225,8 +281,12 @@ export default function CashPanel({ account }: { account: Account }) {
   };
 
   // 원화·달러 중 보여 줄 통화: 쓰고 있거나 계좌 성격상 쓰는 통화
-  const showUSD = !!summary && (summary.usd !== 0 || (account.market_type === 'International' && account.foreign_settle !== 'KRW') || summary.flows.some((f) => f.currency === 'USD'));
-  const showKRW = !!summary && (summary.krw !== 0 || !showUSD || summary.flows.some((f) => f.currency === 'KRW'));
+  // 원화·외화가 따로인 계좌(달러 따로·자동 환전)는 두 칸을 늘 보여 준다 — 증권사 앱의 원화예수금·외화예수금과 같게
+  const settle = account.foreign_settle ?? 'USD';
+  const split = settle === 'AFX' || (settle === 'USD' && account.market_type === 'International');
+  const showUSD = !!summary && (split || summary.usd !== 0 || summary.flows.some((f) => f.currency === 'USD'));
+  const showKRW = !!summary && (split || summary.krw !== 0 || !showUSD || summary.flows.some((f) => f.currency === 'KRW'));
+  const shownCcys: Ccy[] = [...(showKRW ? (['KRW'] as Ccy[]) : []), ...(showUSD ? (['USD'] as Ccy[]) : [])];
   const negative = !!summary && (summary.krw < -0.5 || summary.usd < -0.005);
   const neverAdjusted = !!summary && !summary.last_adjusted && summary.flows.some((f) => f.kind === 'buy' || f.kind === 'sell');
   const flows = useMemo(() => summary?.flows ?? [], [summary]);
@@ -272,14 +332,14 @@ export default function CashPanel({ account }: { account: Account }) {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {showKRW && (
               <div>
-                <p className="label-mono">원화 예수금</p>
+                <p className="label-mono">원화예수금</p>
                 <p className={`num mt-0.5 text-xl font-light ${summary.krw < -0.5 ? 'text-rose-300' : 'text-white'}`}>{money(summary.krw, 'KRW')}</p>
                 {pendingOf('KRW').length > 0 && <p className="num text-[11px] text-zinc-400">출금 가능 {money(summary.withdrawable_krw, 'KRW')}</p>}
               </div>
             )}
             {showUSD && (
               <div>
-                <p className="label-mono">달러 예수금</p>
+                <p className="label-mono">외화예수금 (USD)</p>
                 <p className={`num mt-0.5 text-xl font-light ${summary.usd < -0.005 ? 'text-rose-300' : 'text-white'}`}>{money(summary.usd, 'USD')}</p>
                 {summary.usd_krw > 0 && <p className="num text-[11px] text-zinc-500">≈ {money(summary.usd * summary.usd_krw, 'KRW')}</p>}
                 {pendingOf('USD').length > 0 && <p className="num text-[11px] text-zinc-400">출금 가능 {money(summary.withdrawable_usd, 'USD')}</p>}
@@ -375,6 +435,7 @@ export default function CashPanel({ account }: { account: Account }) {
           mode={mode}
           account={account}
           summary={summary}
+          currencies={shownCcys}
           onClose={() => setMode(null)}
           onSaved={(msg) => {
             setMode(null);

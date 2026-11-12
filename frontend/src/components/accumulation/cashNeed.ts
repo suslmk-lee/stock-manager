@@ -16,6 +16,8 @@ export interface AccountCashNeed {
   cashUSD: number;
   /** 잔액 맞추기를 한 계좌만 예수금을 믿을 수 있다 */
   reconciled: boolean;
+  /** 자동 환전 계좌: 달러가 모자라면 원화로 사므로 원화·달러를 합쳐 본다 */
+  autoFx: boolean;
   /** 지금 예수금으로 버티는 거래일 수 (잔액을 맞추지 않았으면 null) */
   days: number | null;
 }
@@ -41,6 +43,7 @@ export function cashNeeds(plans: AccumulationPlanView[], balances: CashBalance[]
         cashKRW: b?.krw ?? 0,
         cashUSD: b?.usd ?? 0,
         reconciled: !!b?.last_adjusted,
+        autoFx: p.account?.foreign_settle === 'AFX',
         days: null,
       };
       byAcc.set(p.account_id, r);
@@ -55,8 +58,14 @@ export function cashNeeds(plans: AccumulationPlanView[], balances: CashBalance[]
   for (const r of byAcc.values()) {
     if (!r.reconciled || !balances) continue;
     const ds: number[] = [];
-    if (r.needKRW > 0) ds.push(Math.max(0, r.cashKRW) / (r.needKRW / TRADING_DAYS));
-    if (r.needUSD > 0) ds.push(Math.max(0, r.cashUSD) / (r.needUSD / TRADING_DAYS));
+    if (r.autoFx && usdKrw > 0) {
+      // 달러 먼저, 모자라면 원화에서 바꾸므로 둘을 원화로 합쳐서 본다
+      const need = r.needKRW + r.needUSD * usdKrw;
+      if (need > 0) ds.push(Math.max(0, r.cashKRW + r.cashUSD * usdKrw) / (need / TRADING_DAYS));
+    } else {
+      if (r.needKRW > 0) ds.push(Math.max(0, r.cashKRW) / (r.needKRW / TRADING_DAYS));
+      if (r.needUSD > 0) ds.push(Math.max(0, r.cashUSD) / (r.needUSD / TRADING_DAYS));
+    }
     if (ds.length > 0) r.days = Math.floor(Math.min(...ds));
   }
   return byAcc;
@@ -68,3 +77,7 @@ export const daysText = (days: number | null) => (days == null ? '' : days <= 0 
 
 /** 예수금 금액 (마이너스는 −1,000원 꼴) */
 export const cashAmount = (v: number, ccy: PlanCurrency) => (v < 0 ? `−${fmtAmount(-v, ccy)}` : fmtAmount(v, ccy));
+
+/** 계좌의 예수금 표시 (모으기에 쓰는 통화만, 자동 환전 계좌는 원화·달러 둘 다) */
+export const cashText = (r: AccountCashNeed) =>
+  [(r.needKRW > 0 || r.autoFx) && cashAmount(r.cashKRW, 'KRW'), (r.needUSD > 0 || (r.autoFx && r.cashUSD !== 0)) && cashAmount(r.cashUSD, 'USD')].filter(Boolean).join(' + ');

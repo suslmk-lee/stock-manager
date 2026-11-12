@@ -1,7 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import type { AccumulationPlanView, PlanCurrency, PlanStatus } from '../../types/models';
 import { assetTitle, belowMinimum, fmtAmount, fmtSignedPct, ruleText, signTone } from './planText';
-import { cashAmount, daysText, daysTone, LOW_DAYS, type AccountCashNeed } from './cashNeed';
+import { cashText, daysText, daysTone, LOW_DAYS, type AccountCashNeed } from './cashNeed';
 
 interface PlanListProps {
   plans: AccumulationPlanView[];
@@ -23,7 +23,7 @@ function MonthlyNeed({ needs }: { needs: Map<number, AccountCashNeed> }) {
     <div className="space-y-1.5" title={'조건을 늘 만족한다고 볼 때 한 달(거래일 21일)에 필요한 금액입니다.\n미국 주식은 원화 결제 계좌면 원화로 바꿔 셉니다.'}>
       <p className="label-mono">한 달 최대 필요 금액 · 예수금</p>
       {rows.map((r) => {
-        const cash = [r.needKRW > 0 && cashAmount(r.cashKRW, 'KRW'), r.needUSD > 0 && cashAmount(r.cashUSD, 'USD')].filter(Boolean).join(' + ');
+        const cash = cashText(r);
         const low = r.days != null && r.days < LOW_DAYS;
         return (
           <div key={r.accountId} className={`text-xs ${low ? '-mx-2 rounded-lg bg-amber-500/[0.07] px-2 py-1' : ''}`}>

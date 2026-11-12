@@ -17,7 +17,9 @@ import (
 //
 //   잔액 = 현금 기록 합 + 매도 수령액(수수료 뺌) − 매수 지불액(수수료 포함) + 수령한 배당(세후)
 //
-// 미국 주식은 계좌의 결제 통화(ForeignSettle)를 따른다: USD = 달러 예수금, KRW = 그날 환율로 원화 예수금.
+// 미국 주식은 계좌의 예수금 구성(ForeignSettle)을 따른다:
+//   USD = 외화예수금(달러)에서 · KRW = 그날 환율로 원화예수금에서 · AFX = 달러 먼저, 모자란 만큼 원화에서 자동 환전.
+// 자동으로 바꿀 때(KRW·AFX)는 계좌의 자동 환전 수수료(%)를 환율에 얹는다 (살 때 +, 받을 때 −).
 // 지난 입금 기록이 없으면 계산 잔액이 실제와 다르므로 '잔액 맞추기'로 증권사 잔액을 넣어 차이를 조정 기록으로 남긴다.
 
 // CashInputError 는 입력이 잘못된 경우 (HTTP 400).
@@ -110,7 +112,7 @@ type CashFlow struct {
 // 같은 날에는 들어오는 돈을 먼저, 잔액 맞추기는 그날 마지막에 둔다
 var cashKindOrder = map[string]int{
 	models.CashDeposit: 0, models.CashExchange: 1, models.CashInterest: 2, "dividend": 3, "sell": 4,
-	"buy": 5, models.CashWithdraw: 6, models.CashAdjust: 9,
+	"autofx": 5, "buy": 5, models.CashWithdraw: 6, models.CashAdjust: 9,
 }
 
 func fmtQty(q float64) string {
@@ -168,10 +170,12 @@ func (s *CashService) flows(account *models.Account) ([]CashFlow, error) {
 		return nil, err
 	}
 
-	settleKRW := account.ForeignSettle == "KRW"
+	mode := account.ForeignSettle
+	settleKRW := mode == models.SettleKRW
+	fee := account.FxFeePct / 100
 	var fxAt func(time.Time) float64
 	needFx := false
-	if settleKRW {
+	if settleKRW || mode == models.SettleAutoFX {
 		for _, t := range txs {
 			if tickerCurrency(t.Asset.Ticker) == "USD" {
 				needFx = true
@@ -188,14 +192,14 @@ func (s *CashService) flows(account *models.Account) ([]CashFlow, error) {
 	if needFx {
 		fxAt = s.fxLookup()
 		if fxAt == nil {
-			return nil, errors.New("원화 결제 계좌의 미국 주식을 원화로 바꿀 환율을 가져오지 못했습니다")
+			return nil, errors.New("미국 주식을 원화로 바꿀 환율을 가져오지 못했습니다 (원화 결제·자동 환전 계좌)")
 		}
 	}
 
-	// 원화 결제 계좌면 달러 금액을 그날 환율로 원화로
+	// 원화로 바로(KRW) 계좌면 달러 금액을 그날 환율(+수수료)로 원화로 — 나가는 돈은 비싸게, 들어오는 돈은 싸게
 	settle := func(ccy string, amount float64, d time.Time) (string, float64, float64) {
 		if settleKRW && ccy == "USD" {
-			fx := fxAt(d)
+			fx := withFxFee(fxAt(d), fee, amount < 0)
 			return "KRW", amount * fx, fx
 		}
 		return ccy, amount, 0
@@ -261,12 +265,51 @@ func (s *CashService) flows(account *models.Account) ([]CashFlow, error) {
 		}
 		return out[i].seq < out[j].seq
 	})
+	if mode == models.SettleAutoFX && fxAt != nil {
+		out = autoExchange(out, fxAt, fee)
+	}
 	bal := map[string]float64{}
 	for i := range out {
 		bal[out[i].Currency] += out[i].Amount
 		out[i].Balance = math.Round(bal[out[i].Currency]*1e6) / 1e6
 	}
 	return out, nil
+}
+
+// withFxFee: 자동 환전 수수료를 얹은 환율 (원화가 나갈 때는 비싸게, 들어올 때는 싸게)
+func withFxFee(fx, fee float64, paying bool) float64 {
+	if paying {
+		return fx * (1 + fee)
+	}
+	return fx * (1 - fee)
+}
+
+// autoExchange: 자동 환전(통합증거금) — 달러 매수에 외화예수금이 모자라면 모자란 만큼(센트 올림)을
+// 그날 환율(+수수료)로 원화예수금에서 바꾼다. 바꾼 기록은 그 매수 바로 앞에 '자동 환전' 두 줄(원화 −, 달러 +)로 넣는다.
+// 증권사가 주문 때 임시 환율로 더 잡아 두었다가 다음 날 정산해 돌려주는 차액은 넣지 않는다 (최종 금액만 남긴다).
+func autoExchange(in []CashFlow, fxAt func(time.Time) float64, fee float64) []CashFlow {
+	out := make([]CashFlow, 0, len(in)+4)
+	usd := 0.0
+	for _, f := range in {
+		if f.Currency == "USD" && f.Kind == "buy" && f.Amount < 0 {
+			short := math.Ceil((-f.Amount-math.Max(usd, 0))*100-1e-6) / 100
+			if d, ok := parseDay(f.Date); ok && short > 0 {
+				fx := withFxFee(fxAt(d), fee, true)
+				krw := math.Round(short * fx)
+				detail := fmt.Sprintf("%s 매수에 모자란 %s", f.Label, fmtMoney(short, "USD"))
+				out = append(out,
+					CashFlow{Date: f.Date, Kind: "autofx", Currency: "KRW", Amount: -krw, Label: "원화 → 달러", Detail: detail, Fx: fx, order: f.order, seq: f.seq},
+					CashFlow{Date: f.Date, Kind: "autofx", Currency: "USD", Amount: short, Label: "원화 → 달러", Detail: detail, Fx: fx, order: f.order, seq: f.seq},
+				)
+				usd += short
+			}
+		}
+		if f.Currency == "USD" {
+			usd += f.Amount
+		}
+		out = append(out, f)
+	}
+	return out
 }
 
 // ───────────────────────── 조회 ─────────────────────────

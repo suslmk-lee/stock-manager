@@ -78,7 +78,8 @@ export default function AccountDashboard({ account, actions }: AccountDashboardP
                 {getAccountTypeMeta(account).short}
               </span>
               <span className="chip">{account.currency}</span>
-              {account.market_type === 'International' && account.foreign_settle === 'KRW' && <span className="chip">원화 결제</span>}
+              {account.foreign_settle === 'KRW' && account.market_type === 'International' && <span className="chip">원화 결제</span>}
+              {account.foreign_settle === 'AFX' && <span className="chip">자동 환전</span>}
               {account.account_number && <span className="label-mono">{account.account_number}</span>}
             </div>
           </div>
