@@ -5,6 +5,7 @@ import Switch from '../ui/Switch';
 import DatePicker from '../ui/DatePicker';
 import { apiClient } from '../../api/client';
 import type { Account, AccumulationPlanRequest, AccumulationPlanView, Asset, Holding, PlanCondition, PlanCurrency, PlanSchedule } from '../../types/models';
+import AccountSelect from '../ui/AccountSelect';
 import {
   QTY_STEPS,
   accountLabel,
@@ -254,15 +255,7 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="계좌">
-                  <select className="input-field" value={accountId || ''} onChange={(e) => setAccountId(Number(e.target.value))} aria-label="계좌">
-                    <option value="">계좌 선택</option>
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                        {a.broker ? ` · ${a.broker}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <AccountSelect accounts={accounts} value={accountId} onChange={setAccountId} placeholder="계좌 선택" />
                 </Field>
                 <Field label="종목">
                   <input type="search" className="input-field !py-1.5 text-sm" placeholder="이름·티커로 찾기" value={assetQuery} onChange={(e) => setAssetQuery(e.target.value)} aria-label="종목 찾기" />

@@ -3,13 +3,14 @@ import { PageActions } from './shell/PageSlots';
 import SplitView from './shell/SplitView';
 import { apiClient } from '../api/client';
 import { Account, Asset, Dividend, Transaction } from '../types/models';
-import { accountTypePrefix } from '../utils/accountType';
 import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock, TrendingUp, Wallet } from 'lucide-react';
 import CardIcon from './ui/CardIcon';
 import DividendQuickStats from './DividendQuickStats';
 import Portal from './ui/Portal';
 import DatePicker from './ui/DatePicker';
 import { IconClock, IconCoin, IconTrend } from './ui/appIcons';
+import AccountSelect from './ui/AccountSelect';
+import { assetPrimary, assetSecondary } from '../utils/assetLabel';
 
 interface DividendManagerProps {
   selectedAccountId?: number;
@@ -601,7 +602,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-medium text-white">
-                            {dividend.asset?.name || 'N/A'}
+                            {assetPrimary(dividend.asset, 'N/A')}
                           </h3>
                           <span className={`badge ${
                             dividend.is_received 
@@ -612,7 +613,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                           </span>
                         </div>
                         <p className="text-sm text-zinc-400 mt-1">
-                          {dividend.asset?.ticker || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
+                          {assetSecondary(dividend.asset) || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
                         </p>
                       </div>
                     </div>
@@ -924,24 +925,15 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
     <div>
       <PageActions
         lead={
-          <select
-            aria-label="계좌"
+          <AccountSelect
+            accounts={accounts}
             value={selectedAccount}
-            onChange={(e) => {
-              const accountId = Number(e.target.value);
+            onChange={(accountId) => {
               setSelectedAccount(accountId);
-              if (onAccountChange) {
-                onAccountChange(accountId);
-              }
+              onAccountChange?.(accountId);
             }}
-            className="input-field !w-auto !py-1.5 px-3 text-sm"
-          >
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {accountTypePrefix(account)}{account.broker} ({account.name})
-              </option>
-            ))}
-          </select>
+            size="sm"
+          />
         }
       >
         <button
@@ -1031,19 +1023,12 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="field-label">계좌 *</label>
-                  <select
+                  <AccountSelect
+                    accounts={accounts}
                     value={formData.accountId}
-                    onChange={(e) => setFormData({ ...formData, accountId: Number(e.target.value) })}
-                    className="input-field"
-                    required
-                  >
-                    <option value={0}>계좌를 선택하세요</option>
-                    {accounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        🏦 {accountTypePrefix(account)}{account.name} ({account.broker})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(accountId) => setFormData({ ...formData, accountId })}
+                    placeholder="계좌를 선택하세요"
+                  />
                 </div>
                 <div>
                   <label className="field-label">자산 *</label>
@@ -1258,7 +1243,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold text-white">
-                              {dividend.asset?.name || 'N/A'}
+                              {assetPrimary(dividend.asset, 'N/A')}
                             </h4>
                             <span className={`badge ${
                               dividend.is_received
@@ -1269,7 +1254,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                             </span>
                           </div>
                           <p className="text-sm text-zinc-400 mt-0.5">
-                            {dividend.asset?.ticker || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
+                            {assetSecondary(dividend.asset) || 'N/A'} • {new Date(dividend.date).toLocaleDateString('ko-KR')}
                           </p>
                         </div>
                       </div>

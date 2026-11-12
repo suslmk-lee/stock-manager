@@ -6,6 +6,7 @@ import RingGauge from '../ui/RingGauge';
 import Chip from '../ui/Chip';
 import ProfileChip from './ProfileChip';
 import { getAccountTypeMeta } from '../../utils/accountType';
+import { assetPrimary, assetSecondary } from '../../utils/assetLabel';
 
 export type FilterValue = 'all' | 'SELL' | 'BUY' | 'CONFLICT' | 'HOLD';
 
@@ -382,8 +383,8 @@ export function SignalCard({
       {!detail && (
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold tracking-tight text-white">{item.name}</h3>
-            <p className="label-mono mt-0.5">{item.ticker}</p>
+            <h3 className="truncate text-base font-semibold tracking-tight text-white">{assetPrimary(item)}</h3>
+            <p className="label-mono mt-0.5">{assetSecondary(item)}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
             {item.rule_source === 'asset' && <span className="badge border border-sky-400/25 bg-sky-400/10 text-sky-200">개별 전략</span>}

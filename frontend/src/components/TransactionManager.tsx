@@ -3,7 +3,6 @@ import { PageActions } from './shell/PageSlots';
 import SplitView from './shell/SplitView';
 import { apiClient } from '../api/client';
 import { Account, Asset, Transaction, Holding, RealizedPnL, TickerInfo, PricePoint, PriceHistory } from '../types/models';
-import { accountTypePrefix } from '../utils/accountType';
 import { useThemeColors } from '../appearance/AppearanceContext';
 import { Plus, ArrowUpCircle, ArrowDownCircle, TrendingUp, X, Search, Info, ChevronDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -11,6 +10,8 @@ import { calculateFee, roundFee } from '../utils/fees';
 import Portal from './ui/Portal';
 import DatePicker from './ui/DatePicker';
 import { IconAccumulate, IconBuy, IconHistory, IconLayers, IconSell, IconTrend, IconTrendDown, type AppIcon } from './ui/appIcons';
+import AccountSelect from './ui/AccountSelect';
+import { assetPrimary, assetSecondary } from '../utils/assetLabel';
 
 interface TransactionManagerProps {
   selectedAccountId?: number;
@@ -683,11 +684,11 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               <IconAccumulate className="h-7 w-7 shrink-0 text-zinc-200" />
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base font-semibold text-white truncate">{newest.asset?.name || newest.asset?.ticker || `Asset #${newest.asset_id}`}</h3>
+                  <h3 className="text-base font-semibold text-white truncate">{assetPrimary(newest.asset, `Asset #${newest.asset_id}`)}</h3>
                   <span className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap bg-sky-400/10 text-sky-200">모으기</span>
                 </div>
                 <p className="text-xs text-zinc-400 mt-1">
-                  {newest.asset?.ticker} · {month}월 {g.txs.length}회{g.txs.length > 1 ? ` (${day(oldest.date)}~${day(newest.date)})` : ` (${day(newest.date)})`}
+                  {assetSecondary(newest.asset)} · {month}월 {g.txs.length}회{g.txs.length > 1 ? ` (${day(oldest.date)}~${day(newest.date)})` : ` (${day(newest.date)})`}
                 </p>
                 <p className="text-xs text-zinc-300 mt-0.5">
                   <span className="font-medium">{formatNumber(qty, 6)}주</span>
@@ -725,7 +726,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-base font-semibold text-white truncate">
-                        {tx.asset?.name || tx.asset?.ticker || `Asset #${tx.asset_id}`}
+                        {assetPrimary(tx.asset, `Asset #${tx.asset_id}`)}
                       </h3>
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
@@ -736,7 +737,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       </span>
                     </div>
                     <p className="text-xs text-zinc-400 mt-1">
-                      {tx.asset?.ticker} · {new Date(tx.date).toLocaleDateString('ko-KR')}
+                      {assetSecondary(tx.asset)} ·  {new Date(tx.date).toLocaleDateString('ko-KR')}
                     </p>
                     <p className="text-xs text-zinc-300 mt-0.5">
                       <span className="text-zinc-500">{isBuy ? '매수가' : '매도가'}</span>{' '}
@@ -840,10 +841,10 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     {isProfit ? <IconTrend className="h-7 w-7 shrink-0 text-zinc-200" /> : <IconTrendDown className="h-7 w-7 shrink-0 text-zinc-200" tone="rose" />}
                     <div className="min-w-0">
                       <h3 className="text-base font-semibold text-white truncate">
-                        {p.asset?.name || p.asset?.ticker || `Asset #${p.asset_id}`}
+                        {assetPrimary(p.asset, `Asset #${p.asset_id}`)}
                       </h3>
                       <p className="text-xs text-zinc-400 mt-0.5">
-                        {p.asset?.ticker} · {new Date(p.date).toLocaleDateString('ko-KR')} · {formatNumber(p.quantity, 4)}주
+                        {assetSecondary(p.asset)} ·  {new Date(p.date).toLocaleDateString('ko-KR')} · {formatNumber(p.quantity, 4)}주
                       </p>
                       <p className="text-[11px] text-zinc-500 mt-0.5">
                         평단 {formatMoney(p.buy_avg_price, pnlCurrency)} → 매도 {formatMoney(p.sell_price, pnlCurrency)}
@@ -1031,9 +1032,9 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                             title="차트 및 주식정보 보기"
                           >
                             <p className="text-white font-medium truncate group-hover:text-mint-300 transition-colors">
-                              {h.asset?.name || ticker}
+                              {assetPrimary(h.asset) || ticker}
                             </p>
-                            <p className="text-xs text-zinc-500">{ticker}</p>
+                            <p className="text-xs text-zinc-500">{assetSecondary(h.asset) || ticker}</p>
                           </button>
                         </td>
 
@@ -1266,9 +1267,9 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
             {/* 헤더 */}
             <div className="flex items-start justify-between mb-4">
               <div className="min-w-0">
-                <h3 className="text-xl font-semibold text-white truncate">{h.asset?.name || ticker}</h3>
+                <h3 className="text-xl font-semibold text-white truncate">{assetPrimary(h.asset) || ticker}</h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  {ticker}
+                  {assetSecondary(h.asset) || ticker}
                   {info?.exchange ? ` · ${info.exchange}` : ''}
                   {info?.sector ? ` · ${info.sector}` : ''}
                 </p>
@@ -1449,8 +1450,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
               className={`grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-white/[0.04] px-4 py-2.5 text-left transition-colors ${active ? 'bg-mint-400/[0.08] shadow-[inset_3px_0_0_rgb(var(--c-mint-400))]' : 'hover:bg-white/[0.03]'}`}
             >
               <span className="min-w-0">
-                <span className={`block truncate text-[13px] ${active ? 'font-medium text-white' : 'text-zinc-100'}`}>{h.asset?.name || ticker}</span>
-                <span className="mt-0.5 block truncate font-mono text-[10.5px] text-zinc-500">{ticker} · {h.quantity.toLocaleString()}주</span>
+                <span className={`block truncate text-[13px] ${active ? 'font-medium text-white' : 'text-zinc-100'}`}>{assetPrimary(h.asset) || ticker}</span>
+                <span className="mt-0.5 block truncate font-mono text-[10.5px] text-zinc-500">{assetSecondary(h.asset) || ticker} · {h.quantity.toLocaleString()}주</span>
               </span>
               <span className="text-right">
                 <span className="num block text-[13px] text-zinc-200">{price > 0 ? formatMoney(value, cur) : '—'}</span>
@@ -1468,22 +1469,15 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
       {/* 헤더: 계좌 선택은 제목 옆, 동작 버튼은 상단 바 오른쪽 */}
       <PageActions
         lead={
-          <select
-            aria-label="계좌"
+          <AccountSelect
+            accounts={accounts}
             value={selectedAccount}
-            onChange={(e) => {
-              const id = Number(e.target.value);
+            onChange={(id) => {
               setSelectedAccount(id);
               onAccountChange?.(id);
             }}
-            className="input-field !w-auto !py-1.5 px-3 text-sm"
-          >
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {accountTypePrefix(a)}{a.broker} ({a.name})
-              </option>
-            ))}
-          </select>
+            size="sm"
+          />
         }
       >
         <button
@@ -1544,10 +1538,10 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     {isProfit ? <IconTrend className="h-10 w-10 shrink-0 text-zinc-200" /> : <IconTrendDown className="h-10 w-10 shrink-0 text-zinc-200" tone="rose" />}
                     <div className="min-w-0">
                       <h3 className="text-xl font-semibold text-white truncate">
-                        {p.asset?.name || p.asset?.ticker || `Asset #${p.asset_id}`}
+                        {assetPrimary(p.asset, `Asset #${p.asset_id}`)}
                       </h3>
                       <p className="text-xs text-zinc-400 mt-0.5">
-                        {p.asset?.ticker} · {new Date(p.date).toLocaleDateString('ko-KR')}
+                        {assetSecondary(p.asset)} ·  {new Date(p.date).toLocaleDateString('ko-KR')}
                       </p>
                     </div>
                   </div>
@@ -1651,7 +1645,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-xl font-semibold text-white truncate">
-                          {tx.asset?.name || tx.asset?.ticker || `Asset #${tx.asset_id}`}
+                          {assetPrimary(tx.asset, `Asset #${tx.asset_id}`)}
                         </h3>
                         <span
                           className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
@@ -1662,7 +1656,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                         </span>
                       </div>
                       <p className="text-xs text-zinc-400 mt-0.5">
-                        {tx.asset?.ticker} · {new Date(tx.date).toLocaleDateString('ko-KR')}
+                        {assetSecondary(tx.asset)} ·  {new Date(tx.date).toLocaleDateString('ko-KR')}
                       </p>
                     </div>
                   </div>
@@ -1678,7 +1672,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   /* ===== 수정 폼 ===== */
                   <div className="space-y-4">
                     <p className="text-xs text-zinc-400">
-                      {tx.asset?.ticker} · {tx.account?.name || `#${tx.account_id}`} 거래를 수정합니다. (종목/계좌는 변경할 수 없습니다)
+                      {assetSecondary(tx.asset)} ·  {tx.account?.name || `#${tx.account_id}`} 거래를 수정합니다. (종목/계좌는 변경할 수 없습니다)
                     </p>
 
                     {/* 매수/매도 토글 */}

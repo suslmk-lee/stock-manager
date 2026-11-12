@@ -5,6 +5,7 @@ import PriceChart from './PriceChart';
 import SignalRuleEditor from './SignalRuleEditor';
 import StrategyAdvisor from './StrategyAdvisor';
 import { ACTION_META, SignalCard, actionLabelOf } from './SignalCard';
+import { assetPrimary, assetSecondary } from '../../utils/assetLabel';
 
 export type DetailTab = 'overview' | 'rule' | 'advice' | 'history';
 
@@ -37,9 +38,9 @@ export default function SignalDetail({ item, rule, assetRule, profiles, tab, onT
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-xl font-semibold tracking-tight text-white">{item.name}</h2>
+          <h2 className="truncate text-xl font-semibold tracking-tight text-white">{assetPrimary(item)}</h2>
           <p className="label-mono mt-1">
-            {item.ticker} · {item.currency} · 계좌 {accountCount}개
+            {assetSecondary(item)} · {item.currency} · 계좌 {accountCount}개
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">

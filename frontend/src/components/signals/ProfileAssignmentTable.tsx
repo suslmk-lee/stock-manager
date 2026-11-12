@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, Loader2, Search, Sparkles } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { ProfileCandidate, SignalAction, SignalItem, SignalProfile } from '../../types/models';
+import { assetPrimary, assetSecondary } from '../../utils/assetLabel';
 
 // 대시보드 신호 배지와 같은 색 (SignalsDashboard ACTION_META 와 동일하게 유지)
 const ACTION_BADGE: Record<SignalAction, { label: string; badge: string }> = {
@@ -332,8 +333,8 @@ export default function ProfileAssignmentTable({ items, profiles, profileIdOf, i
                     </td>
                     <td className="px-3 py-1.5">
                       <div className="flex min-w-0 max-w-[12rem] items-baseline gap-2 2xl:max-w-[20rem]" title={`${i.name} (${i.ticker})`}>
-                        <span className="truncate text-zinc-100">{i.name}</span>
-                        <span className="label-mono shrink-0">{i.ticker}</span>
+                        <span className="truncate text-zinc-100">{assetPrimary(i)}</span>
+                        <span className="label-mono shrink-0">{assetSecondary(i)}</span>
                       </div>
                     </td>
                     <td className="px-3 py-1.5">

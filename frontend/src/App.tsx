@@ -8,6 +8,7 @@ import AccountDashboard from './components/AccountDashboard';
 import CardIcon from './components/ui/CardIcon';
 import { ACCOUNT_TYPES, getAccountType, getAccountTypeMeta, isRestrictedAccount } from './utils/accountType';
 import { IconWallet } from './components/ui/appIcons';
+import BrokerLogo from './components/ui/BrokerLogo';
 
 const DOMESTIC_BROKERS = [
   '삼성증권',
@@ -33,18 +34,6 @@ const DOMESTIC_BROKERS = [
   '기타',
 ];
 
-const BROKER_LOGOS: Record<string, string> = {
-  '메리츠증권': '/meritz.png',
-  '토스증권': '/toss.png',
-  '카카오증권': '/kakao.png',
-  '한국투자증권': '/korea.png',
-  '삼성증권': '/samsung.png',
-  '신한투자증권': '/shinhan.png',
-  '대신증권': '/daishin.png',
-  'NH투자증권': '/NH.png',
-  '미래에셋증권': '/miraeasset.png',
-  'KB증권': '/kb.png',
-};
 
 const EMPTY_FORM = {
   name: '',
@@ -56,16 +45,6 @@ const EMPTY_FORM = {
   accountType: 'General' as AccountType,
 };
 
-function BrokerLogo({ broker, className = '' }: { broker: string; className?: string }) {
-  const logo = BROKER_LOGOS[broker];
-  return (
-    <div
-      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 ${logo ? 'bg-paper' : 'surface-inset text-zinc-400'} ${className}`}
-    >
-      {logo ? <img src={logo} alt={broker} className="h-full w-full object-contain px-1.5 py-1" /> : <Wallet className="h-4 w-4" />}
-    </div>
-  );
-}
 
 // 계좌 관리: 왼쪽 계좌 목록(인출 가능 / 인출 제한) + 오른쪽 계좌 상세 또는 추가·수정 폼
 function App() {

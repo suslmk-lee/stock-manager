@@ -5,6 +5,7 @@ import { TrendingDown, Wallet } from 'lucide-react';
 import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
 import CardIcon from './ui/CardIcon';
 import { IconTrend } from './ui/appIcons';
+import { assetPrimary, assetSecondary } from '../utils/assetLabel';
 
 interface TotalReturnByAssetProps {
   accountId?: number;
@@ -272,9 +273,9 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
                       <div className="flex items-center gap-2">
                         <span className="text-xs">{r.currency === 'KRW' ? '🇰🇷' : '🇺🇸'}</span>
                         <div className="min-w-0">
-                          <p className="text-white font-medium truncate">{r.name}</p>
+                          <p className="text-white font-medium truncate">{assetPrimary(r)}</p>
                           <p className="label-mono mt-0.5">
-                            {r.ticker}
+                            {assetSecondary(r)}
                             {r.qty <= 0 && <span className="ml-1 text-zinc-600">· 보유종료</span>}
                           </p>
                         </div>

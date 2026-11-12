@@ -3,9 +3,10 @@ import { PageActions } from './shell/PageSlots';
 import SplitView from './shell/SplitView';
 import { apiClient } from '../api/client';
 import { Asset, Account, TickerInfo, Holding } from '../types/models';
-import { accountTypePrefix } from '../utils/accountType';
 import { Plus, Trash2, TrendingUp, Search, Edit2 } from 'lucide-react';
 import Portal from './ui/Portal';
+import AccountSelect from './ui/AccountSelect';
+import { assetPrimary, assetSecondary } from '../utils/assetLabel';
 
 const SECTORS = [
   'Technology',
@@ -463,18 +464,12 @@ export default function AssetManager() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="field-label">계좌</label>
-                    <select
+                    <AccountSelect
+                      accounts={accounts}
                       value={formData.accountId}
-                      onChange={(e) => setFormData({ ...formData, accountId: Number(e.target.value) })}
-                      className="input-field w-full px-4 py-2"
-                    >
-                      <option value={0}>선택 안함</option>
-                      {accounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {accountTypePrefix(account)}{account.broker} ({account.name})
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(accountId) => setFormData({ ...formData, accountId })}
+                      emptyOption="선택 안함"
+                    />
                   </div>
                   <div>
                     <label className="field-label">보유 수량</label>
@@ -563,11 +558,11 @@ export default function AssetManager() {
                       >
                         <span className="min-w-0">
                           <span className="flex items-center gap-1.5">
-                            <span className={`truncate text-[13px] ${active ? 'font-medium text-white' : 'text-zinc-100'}`}>{asset.name}</span>
+                            <span className={`truncate text-[13px] ${active ? 'font-medium text-white' : 'text-zinc-100'}`}>{assetPrimary(asset)}</span>
                             <span className="shrink-0 rounded-full bg-mint-400/15 px-1.5 text-[10px] text-mint-300">{asset.type}</span>
                           </span>
                           <span className="mt-0.5 block truncate font-mono text-[10.5px] text-zinc-500">
-                            {asset.ticker}
+                            {assetSecondary(asset)}
                             {asset.sector ? ` · ${asset.sector}` : ''}
                           </span>
                         </span>
@@ -602,12 +597,12 @@ export default function AssetManager() {
                     <header className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <h2 className="truncate text-xl font-semibold tracking-tight text-white">{asset.name}</h2>
+                          <h2 className="truncate text-xl font-semibold tracking-tight text-white">{assetPrimary(asset)}</h2>
                           <span className="text-xs px-2 py-0.5 rounded-full bg-mint-400/15 text-mint-300">{asset.type}</span>
                         </div>
                         <p className="label-mono mt-1">
-                          {asset.ticker}
-                          {asset.sector ? ` · ${asset.sector}` : ''}
+                          {assetSecondary(asset)}
+                            {asset.sector ? ` · ${asset.sector}` : ''}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
@@ -669,19 +664,12 @@ export default function AssetManager() {
                         <div className="surface-inset grid gap-3 p-3 sm:grid-cols-3">
                           <div>
                             <label className="field-label">계좌</label>
-                            <select
+                            <AccountSelect
+                              accounts={accounts}
                               value={newHoldingData.accountId}
-                              onChange={(e) => setNewHoldingData({ ...newHoldingData, accountId: Number(e.target.value) })}
-                              className="input-field !py-1.5 text-sm"
-                            >
-                              <option value={0}>선택하세요</option>
-                              {accounts.map((account) => (
-                                <option key={account.id} value={account.id}>
-                                  {accountTypePrefix(account)}
-                                  {account.broker} ({account.name})
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(accountId) => setNewHoldingData({ ...newHoldingData, accountId })}
+                              placeholder="선택하세요"
+                            />
                           </div>
                           <div>
                             <label className="field-label">보유 수량</label>

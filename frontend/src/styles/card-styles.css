@@ -765,3 +765,29 @@
   --hero-shadow: 8px 8px 0 rgb(var(--c-mint-400));
   --hero-grain-opacity: 0;
 }
+
+/* ---------------------------------------------------------------- 라이트 테마 주 버튼
+   위 스타일 대부분은 주 버튼을 "흰색"(= 테마의 가장 진한 글자색)으로 칠한다. 다크 테마에선 흰 버튼이지만
+   라이트 테마에선 검정 버튼이 되어 무겁게 보이므로, 라이트 테마에서는 테마 강조색 버튼으로 바꾼다 (quantum-mate 와 같음).
+   강조색을 이미 쓰는 스타일(네오모피즘·글로우·오로라·브루탈리즘)은 그대로 둔다. */
+[data-theme-mode='light'][data-card='glass'],
+[data-theme-mode='light'] [data-card='glass'],
+[data-theme-mode='light'][data-card='minimal'],
+[data-theme-mode='light'] [data-card='minimal'],
+[data-theme-mode='light'][data-card='flat'],
+[data-theme-mode='light'] [data-card='flat'] {
+  --btn-primary-fg: rgb(var(--c-paper));
+  --btn-primary-bg: rgb(var(--c-mint-400));
+  --btn-primary-hover-bg: rgb(var(--c-mint-300));
+  --btn-primary-border: transparent;
+  --btn-primary-shadow: 0 8px 18px -10px rgb(var(--c-mint-400) / 0.7);
+  --btn-primary-active-shadow: 0 4px 10px -6px rgb(var(--c-mint-400) / 0.7);
+}
+[data-theme-mode='light'][data-card='paper'],
+[data-theme-mode='light'] [data-card='paper'] {
+  --btn-primary-fg: rgb(var(--c-paper));
+  --btn-primary-bg: rgb(var(--c-mint-400));
+  --btn-primary-hover-bg: rgb(var(--c-mint-300));
+  --btn-primary-shadow: 0 3px 0 rgb(var(--c-mint-200)), 0 8px 14px -6px rgb(var(--c-shadow) / calc(0.7 * var(--shadow-k)));
+  --btn-primary-active-shadow: 0 1px 0 rgb(var(--c-mint-200));
+}

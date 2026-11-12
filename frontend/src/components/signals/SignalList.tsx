@@ -2,6 +2,7 @@ import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, Lock, Search, X } from 'lucide-react';
 import type { SignalAction, SignalItem, SignalProfile } from '../../types/models';
 import { ACTION_META, FILTERS, type FilterValue, fmtNum, fmtSignedPct, signTone } from './SignalCard';
+import { assetPrimary, assetSecondary } from '../../utils/assetLabel';
 
 export type SortKey = 'default' | 'name' | 'action' | 'return' | 'weight';
 export interface SortState {
@@ -218,11 +219,11 @@ export default function SignalList({
               >
                 <span className="min-w-0">
                   <span className={`flex items-center gap-1.5 truncate text-[13px] ${active ? 'font-medium text-white' : 'text-zinc-100'}`}>
-                    <span className="truncate">{item.name}</span>
+                    <span className="truncate">{assetPrimary(item)}</span>
                     {item.restricted_only && <Lock className="h-3 w-3 shrink-0 text-amber-300" aria-label="연금·IRP" />}
                   </span>
                   <span className="mt-0.5 flex items-center gap-2">
-                    <span className="truncate font-mono text-[10.5px] text-zinc-500">{item.ticker}</span>
+                    <span className="truncate font-mono text-[10.5px] text-zinc-500">{assetSecondary(item)}</span>
                     <MiniRange item={item} />
                   </span>
                 </span>

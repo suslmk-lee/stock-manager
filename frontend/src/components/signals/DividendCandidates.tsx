@@ -6,6 +6,7 @@ import Chip from '../ui/Chip';
 import ProfileChip from './ProfileChip';
 import { PageActions } from '../shell/PageSlots';
 import { useAlerts } from '../alerts/AlertsProvider';
+import { assetPrimary, assetSecondary } from '../../utils/assetLabel';
 
 interface DividendCandidatesProps {
   /** 알림에서 넘어온 종목: 강조하고 미리 선택한다 */
@@ -204,8 +205,8 @@ export default function DividendCandidates({ highlightAssetId }: DividendCandida
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                            <span className="truncate text-sm font-medium text-white">{c.name}</span>
-                            <span className="label-mono">{c.ticker}</span>
+                            <span className="truncate text-sm font-medium text-white">{assetPrimary(c)}</span>
+                            <span className="label-mono">{assetSecondary(c)}</span>
                             {already ? (
                               <span className="badge border border-white/10 bg-white/[0.05] text-zinc-400">적용 중</span>
                             ) : (
