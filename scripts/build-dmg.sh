@@ -72,5 +72,17 @@ cp -R "$BUILT_APP" "$STAGE/$APP_NAME.app"
 ln -s /Applications "$STAGE/Applications"
 
 rm -f "$DMG"
-hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+# GitHub 의 macOS 러너에서는 hdiutil 이 가끔 'Resource busy' 로 실패한다 → 잠깐 쉬었다가 몇 번 다시 시도
+for attempt in 1 2 3 4 5; do
+  if hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null; then
+    break
+  fi
+  if [[ $attempt -eq 5 ]]; then
+    echo "DMG 를 만들지 못했습니다 (hdiutil create 5번 실패)" >&2
+    exit 1
+  fi
+  echo "hdiutil create 실패 — $((attempt * 10))초 뒤 다시 시도 ($attempt/5)" >&2
+  rm -f "$DMG"
+  sleep $((attempt * 10))
+done
 echo "만들었습니다: $DMG"
