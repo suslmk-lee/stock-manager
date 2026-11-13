@@ -12,11 +12,11 @@ export const BROKER_LOGOS: Record<string, string> = {
   NH투자증권: '/NH.png',
   미래에셋증권: '/miraeasset.png',
   KB증권: '/kb.png',
+  IBK기업은행: '/ibk.png',
 };
 
-// 은행: 로고 그림이 없어 글자 배지로 (은행 고유색)
+// 은행: 로고 그림이 없는 곳은 글자 배지로 (은행 고유색)
 export const BANK_BADGES: Record<string, { label: string; color: string }> = {
-  IBK기업은행: { label: 'IBK', color: '#0057A8' },
   KB국민은행: { label: 'KB', color: '#5E5245' },
   신한은행: { label: '신한', color: '#0046FF' },
   하나은행: { label: '하나', color: '#008485' },
