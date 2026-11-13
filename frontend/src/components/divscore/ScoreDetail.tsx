@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { apiClient } from '../../api/client';
-import type { DivScoreDetail, DivScoreRow, DivScoreWeights, MissingDividend } from '../../types/models';
+import type { DivScoreDetail, DivScoreRow, DivScoreWeights, HoldingWithDetails, MissingDividend } from '../../types/models';
 import { useThemeColors } from '../../appearance/AppearanceContext';
 import { assetPrimary, assetSecondary, tickerFirst } from '../../utils/assetLabel';
 import { dps, PART_KEYS, PART_LABEL, partPoints, partReason, pct, shortMonth, signedPct, STATUS_META } from './scoreText';
 import PaymentHistory from './PaymentHistory';
 import BrokerLogo from '../ui/BrokerLogo';
 import { accountDisplayName } from '../../utils/accountLabel';
+import PriceTrend from './PriceTrend';
+import InvestCash, { type CashContext } from './InvestCash';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '불러오지 못했습니다.');
 const shortDate = (d: string) => `${d.slice(2, 4)}.${d.slice(5, 7)}.${d.slice(8, 10)}`;
@@ -81,6 +83,38 @@ export default function ScoreDetail({
     };
   }, [row.asset_id, weights]);
 
+  // 계좌·예수금·보유는 종목과 상관없이 한 번만 받는다
+  const [cash, setCash] = useState<CashContext | null | 'error'>(null);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([apiClient.GetAllAccounts(), apiClient.GetCashBalances(), apiClient.GetAllHoldings()])
+      .then(([accounts, cb, holdings]) => {
+        if (!cancelled) setCash({ accounts: accounts ?? [], balances: cb?.balances ?? [], usdKrw: cb?.usd_krw ?? 0, holdings: (holdings ?? []) as HoldingWithDetails[] });
+      })
+      .catch(() => !cancelled && setCash('error'));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 현재가: 주가 이력의 마지막 종가 (오기 전에는 점수 계산 때의 가격)
+  const [latest, setLatest] = useState<{ id: number; close: number } | null>(null);
+  const onLatest = useCallback((close: number) => setLatest({ id: row.asset_id, close }), [row.asset_id]);
+  const price = latest?.id === row.asset_id ? latest.close : row.metrics.price ?? null;
+
+  // 내 평단 (보유 계좌 전체의 수량 가중 평균)
+  const avgPrice = useMemo(() => {
+    if (!cash || cash === 'error') return undefined;
+    let q = 0;
+    let cost = 0;
+    for (const h of cash.holdings) {
+      if (h.asset_id !== row.asset_id || h.quantity <= 0) continue;
+      q += h.quantity;
+      cost += h.quantity * h.average_price;
+    }
+    return q > 0 && cost > 0 ? cost / q : undefined;
+  }, [cash, row.asset_id]);
+
   const m = row.metrics;
   const ccy = detail?.currency || (/\.(KS|KQ)$/i.test(row.asset.ticker) ? 'KRW' : 'USD');
   const first = tickerFirst(row.asset);
@@ -147,6 +181,12 @@ export default function ScoreDetail({
         <Metric label="1년 · 3년 연평균 증가" value={m.growth_1y != null ? signedPct(m.growth_1y) : '—'} sub={m.cagr_3y != null ? `3년 ${signedPct(m.cagr_3y)}/년` : '3년 이력 부족'} />
         <Metric label="주기" value={m.cycle || '—'} sub={`최근 12개월 ${m.payments_12m}회`} />
         <Metric label="마지막 · 다음 배당" value={m.last_payment ? shortDate(m.last_payment) : '—'} sub={m.missed_now ? '다음 회차가 늦어지고 있음' : m.next_expected ? `다음 예상 ${shortDate(m.next_expected)}` : undefined} />
+      </div>
+
+      {/* 주가 추이 · 살 수 있는 예수금 */}
+      <div className="space-y-5 border-b border-white/[0.07] p-4 sm:p-5">
+        <PriceTrend ticker={row.asset.ticker} ccy={ccy} payments={detail?.payments ?? []} source={detail?.source} avgPrice={avgPrice} onLatest={onLatest} />
+        <InvestCash asset={row.asset} ccy={ccy} price={price} ctx={cash} />
       </div>
 
       {error && <p className="m-4 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{error}</p>}
