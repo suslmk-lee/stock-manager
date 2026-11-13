@@ -70,9 +70,11 @@ type GoogleSheetsDividendSync struct {
 	credentials   googleServiceAccountCredential
 	httpClient    *http.Client
 
+	apiBase string // 비우면 https://sheets.googleapis.com/v4/spreadsheets (테스트에서 바꾼다)
+
 	mu          sync.Mutex
 	accessToken string
-	tokenExpiry time.Time
+	tokenExpiry time.Time // 벽시계 기준 (단조 시계 값 없음 — 아래 getAccessToken 참고)
 }
 
 func NewGoogleSheetsDividendSyncFromEnv() (*GoogleSheetsDividendSync, error) {
@@ -332,48 +334,70 @@ func (s *GoogleSheetsDividendSync) updateSingleCell(cellRange string, value floa
 }
 
 func (s *GoogleSheetsDividendSync) doSheetsRequest(method, path string, query url.Values, body []byte) ([]byte, error) {
-	accessToken, err := s.getAccessToken()
-	if err != nil {
-		return nil, err
+	base := s.apiBase
+	if base == "" {
+		base = "https://sheets.googleapis.com/v4/spreadsheets"
 	}
-
-	endpoint := fmt.Sprintf("https://sheets.googleapis.com/v4/spreadsheets/%s%s", url.PathEscape(s.spreadsheetID), path)
+	endpoint := fmt.Sprintf("%s/%s%s", base, url.PathEscape(s.spreadsheetID), path)
 	if encoded := query.Encode(); encoded != "" {
 		endpoint += "?" + encoded
 	}
 
-	req, err := http.NewRequest(method, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create sheets request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Accept", "application/json")
-	if len(body) > 0 {
-		req.Header.Set("Content-Type", "application/json")
-	}
+	// 401(토큰 만료·폐기)이면 토큰을 버리고 새로 받아 한 번 더 보낸다
+	for attempt := 0; ; attempt++ {
+		accessToken, err := s.getAccessToken()
+		if err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequest(method, endpoint, bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sheets request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req.Header.Set("Accept", "application/json")
+		if len(body) > 0 {
+			req.Header.Set("Content-Type", "application/json")
+		}
 
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("sheets request failed: %w", err)
+		resp, err := s.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("sheets request failed: %w", err)
+		}
+		resBody, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read sheets response: %w", readErr)
+		}
+		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 {
+			fmt.Printf("[GSYNC] 접근 토큰이 거절됨(401) — 새로 받아 다시 시도\n")
+			s.dropToken(accessToken)
+			continue
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return nil, fmt.Errorf("sheets api error: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(resBody)))
+		}
+		return resBody, nil
 	}
-	defer resp.Body.Close()
-
-	resBody, readErr := io.ReadAll(resp.Body)
-	if readErr != nil {
-		return nil, fmt.Errorf("failed to read sheets response: %w", readErr)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("sheets api error: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(resBody)))
-	}
-	return resBody, nil
 }
 
+// dropToken: 거절된 토큰을 버린다 (그 사이 다른 요청이 새 토큰을 받았으면 그대로 둔다)
+func (s *GoogleSheetsDividendSync) dropToken(token string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.accessToken == token {
+		s.accessToken, s.tokenExpiry = "", time.Time{}
+	}
+}
+
+// getAccessToken: 캐시한 접근 토큰 (만료 1분 전이면 새로).
+// 만료 비교는 벽시계로 한다 — macOS 에서 Go 의 단조 시계는 잠자기 동안 멈춰서, 노트북을 덮었다 열면
+// 실제로는 만료된 토큰을 아직 유효하다고 보고 보내 ACCESS_TOKEN_EXPIRED(401)가 났다. Round(0) 이 단조 시계 값을 뗀다.
 func (s *GoogleSheetsDividendSync) getAccessToken() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.accessToken != "" && time.Now().Before(s.tokenExpiry.Add(-1*time.Minute)) {
+	now := time.Now().Round(0)
+	if s.accessToken != "" && now.Before(s.tokenExpiry.Add(-1*time.Minute)) {
 		return s.accessToken, nil
 	}
 
@@ -387,7 +411,7 @@ func (s *GoogleSheetsDividendSync) getAccessToken() (string, error) {
 	if expiresIn <= 0 {
 		expiresIn = 3600
 	}
-	s.tokenExpiry = time.Now().Add(time.Duration(expiresIn) * time.Second)
+	s.tokenExpiry = time.Now().Round(0).Add(time.Duration(expiresIn) * time.Second)
 	return s.accessToken, nil
 }
 
