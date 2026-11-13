@@ -21,13 +21,15 @@ type CashEntry struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	AccountID uint      `gorm:"not null;index" json:"account_id"`
 	Currency  string    `gorm:"size:3;not null" json:"currency"` // KRW | USD
-	Date      time.Time `gorm:"not null;index" json:"date"`
+	Date      time.Time `gorm:"not null;index;uniqueIndex:idx_cash_contrib" json:"date"`
 	Kind      string    `gorm:"size:12;not null" json:"kind"`
 	// 부호 있는 금액: 계좌로 들어오면 +, 나가면 −
 	Amount float64 `gorm:"not null" json:"amount"`
 	Notes  string  `gorm:"size:500" json:"notes"`
 	// 환전: 상대 통화 쪽 기록 (지우면 같이 지운다)
 	PairID    *uint          `gorm:"index" json:"pair_id,omitempty"`
+	// 부담금 배분이 자동으로 남긴 입금 (같은 계획·같은 날은 한 건만)
+	ContribPlanID *uint `gorm:"uniqueIndex:idx_cash_contrib" json:"contrib_plan_id,omitempty"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

@@ -19,4 +19,5 @@ func RegisterRoutes(api *gin.RouterGroup, s *Services) {
 	registerAccumulationRoutes(api, s)
 	registerCashRoutes(api, s)
 	registerDividendScoreRoutes(api, s)
+	registerContributionRoutes(api, s)
 }

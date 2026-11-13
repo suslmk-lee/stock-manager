@@ -43,6 +43,9 @@ func main() {
 	// 주식 모으기 자동 기록 (데스크톱 앱과 같은 DB — 같은 날은 한 건만 남는다)
 	go svc.Accumulation.RunEvery(context.Background(), 4*time.Hour)
 
+	// 부담금 배분(퇴직연금) 자동 기록 (같은 회차는 한 번만 남는다)
+	go svc.Contribution.RunEvery(context.Background(), 4*time.Hour)
+
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}

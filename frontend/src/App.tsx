@@ -33,6 +33,14 @@ const DOMESTIC_BROKERS = [
   '부국증권',
   '케이프투자증권',
   '하이투자증권',
+  // 은행 (퇴직연금 DC·IRP 등)
+  'IBK기업은행',
+  'KB국민은행',
+  '신한은행',
+  '하나은행',
+  '우리은행',
+  'NH농협은행',
+  'SC제일은행',
   '기타',
 ];
 
@@ -299,9 +307,9 @@ function App() {
       <form onSubmit={handleSubmitAccount} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="field-label">증권사 *</label>
+            <label className="field-label">증권사 · 은행 *</label>
             <select value={formData.broker} onChange={(e) => setFormData({ ...formData, broker: e.target.value })} className="input-field" required>
-              <option value="">증권사를 선택하세요</option>
+              <option value="">증권사 · 은행을 선택하세요</option>
               {DOMESTIC_BROKERS.map((broker) => (
                 <option key={broker} value={broker}>
                   {broker}

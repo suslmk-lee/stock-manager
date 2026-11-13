@@ -24,6 +24,9 @@ type Services struct {
 	Cash         *services.CashService
 	// 배당 점수 · 월별 순위
 	DividendScore *services.DividendScoreService
+	// 펀드(기준가·평가금액 맞추기)와 부담금 배분(퇴직연금 DC 등)
+	Fund         *services.FundService
+	Contribution *services.ContributionService
 }
 
 // NewServices 는 기본 서비스 묶음을 생성한다.
@@ -31,6 +34,9 @@ type Services struct {
 func NewServices() *Services {
 	ticker := services.NewTickerService()
 	exchange := services.NewExchangeRateService()
+	// 펀드 티커(FUND:…)는 시세 대신 앱에 저장된 기준가로
+	fund := services.NewFundService(database.GetDB())
+	ticker.SetLocalPrices(fund)
 
 	signal := services.NewSignalService(database.GetDB(), ticker, exchange)
 	dailySnap := services.NewDailySnapshotService(database.GetDB(), ticker)
@@ -58,5 +64,7 @@ func NewServices() *Services {
 		Accumulation:  services.NewAccumulationService(database.GetDB(), ticker),
 		Cash:          cash,
 		DividendScore: services.NewDividendScoreService(database.GetDB(), ticker),
+		Fund:          fund,
+		Contribution:  services.NewContributionService(database.GetDB(), ticker, fund),
 	}
 }

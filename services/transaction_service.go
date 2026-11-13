@@ -36,6 +36,8 @@ type CreateTransactionRequest struct {
 	Fee       float64
 	Notes     string
 	PlanID    *uint // 주식 모으기 자동 기록일 때만
+	// ContribPlanID: 부담금 배분 자동 기록일 때만
+	ContribPlanID *uint
 }
 
 func (s *TransactionService) CreateTransaction(req CreateTransactionRequest) (*models.Transaction, error) {
@@ -69,6 +71,7 @@ func (s *TransactionService) CreateTransaction(req CreateTransactionRequest) (*m
 		Fee:       req.Fee,
 		Notes:     req.Notes,
 		PlanID:    req.PlanID,
+		ContribPlanID: req.ContribPlanID,
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {

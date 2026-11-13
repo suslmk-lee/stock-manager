@@ -78,6 +78,9 @@ func (s *TickerService) GetDividendEvents(ticker string) ([]DividendEvent, error
 	if ticker == "" {
 		return nil, fmt.Errorf("ticker symbol is required")
 	}
+	if IsFundTicker(ticker) { // 펀드: 분배금 이력 없음 (퇴직연금 펀드는 보통 재투자)
+		return nil, nil
+	}
 	params := url.Values{}
 	params.Add("range", "5y")
 	params.Add("interval", "1d")

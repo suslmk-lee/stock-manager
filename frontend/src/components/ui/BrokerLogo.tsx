@@ -14,14 +14,37 @@ export const BROKER_LOGOS: Record<string, string> = {
   KB증권: '/kb.png',
 };
 
-/** 증권사 이름으로 로고를 찾는다 ("카카오페이증권"처럼 조금 다른 이름도 앞부분으로 맞춘다) */
+// 은행: 로고 그림이 없어 글자 배지로 (은행 고유색)
+export const BANK_BADGES: Record<string, { label: string; color: string }> = {
+  IBK기업은행: { label: 'IBK', color: '#0057A8' },
+  KB국민은행: { label: 'KB', color: '#5E5245' },
+  신한은행: { label: '신한', color: '#0046FF' },
+  하나은행: { label: '하나', color: '#008485' },
+  우리은행: { label: '우리', color: '#0067AC' },
+  NH농협은행: { label: 'NH', color: '#02A54F' },
+  SC제일은행: { label: 'SC', color: '#0473EA' },
+};
+
+/** 증권사 이름으로 로고를 찾는다 ("카카오페이증권"처럼 조금 다른 이름도 앞부분으로 맞춘다, 은행은 빼고) */
 export function brokerLogo(broker: string): string | undefined {
   if (BROKER_LOGOS[broker]) return BROKER_LOGOS[broker];
+  if (broker.endsWith('은행')) return undefined;
   const key = Object.keys(BROKER_LOGOS).find((k) => broker.startsWith(k.replace(/증권$/, '')));
   return key ? BROKER_LOGOS[key] : undefined;
 }
 
 export default function BrokerLogo({ broker, className = '' }: { broker: string; className?: string }) {
+  const bank = BANK_BADGES[broker];
+  if (bank) {
+    return (
+      <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-paper ${className}`} title={broker}>
+        <span className="text-[11px] font-black tracking-tight" style={{ color: bank.color }}>
+          {bank.label}
+          <span className="ml-0.5 text-[9px] font-semibold opacity-80">은행</span>
+        </span>
+      </div>
+    );
+  }
   const logo = brokerLogo(broker);
   return (
     <div

@@ -24,6 +24,9 @@ type dailyHistoryStore struct {
 
 func (s *TickerService) cachedHistory(ticker, rangeStr, interval string) (*PriceHistory, error) {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
+	if IsFundTicker(ticker) { // 펀드: 캐시하지 않고 앱 기준가로
+		return s.localHistory(ticker)
+	}
 	key := ticker + "|" + rangeStr + "|" + interval
 	st := &s.histCache2
 	st.mu.Lock()

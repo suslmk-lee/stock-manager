@@ -62,7 +62,7 @@ export interface Asset {
   id: number;
   ticker: string;
   name: string;
-  type: 'Stock' | 'ETF';
+  type: 'Stock' | 'ETF' | 'Fund';
   sector: string;
   created_at: string;
   updated_at: string;
@@ -885,4 +885,92 @@ export interface DivScorePosition {
   since?: string;
   received: { currency: string; total: number; last_12m: number; count: number }[];
   accounts: { account_id: number; name: string; broker: string; account_type: AccountType; quantity: number; avg_price: number; since?: string }[];
+}
+
+// ── 부담금 배분 (퇴직연금 DC 등) · 펀드 ──
+export interface ContributionItem {
+  id: number;
+  plan_id: number;
+  asset_id: number;
+  /** 비율 (%, 합 100) */
+  weight: number;
+  asset?: Asset;
+}
+
+export interface ContributionItemView extends ContributionItem {
+  is_fund: boolean;
+  /** 이 계좌 보유 수량 (펀드는 앱 좌수) */
+  quantity: number;
+  /** 원금 (수량 × 평균 단가) */
+  cost: number;
+  /** 현재가 · 펀드는 마지막 기준가 */
+  price: number;
+  /** 펀드: 마지막으로 평가금액을 맞춘 날 */
+  price_date: string;
+  value: number;
+}
+
+export interface ContributionPlanView {
+  id: number;
+  account_id: number;
+  /** 매달 부담금 (원) */
+  amount: number;
+  /** 납입일 1~31 (말일보다 크면 말일) */
+  month_day: number;
+  status: PlanStatus;
+  started_on: string;
+  auto_from: string;
+  processed_through: string;
+  notes: string;
+  account?: Account;
+  items: ContributionItemView[];
+  next_date: string;
+  /** 자동 기록한 회차 수 · 부담금 합계 */
+  rounds: number;
+  paid: number;
+}
+
+export interface ContributionItemRequest {
+  asset_id: number;
+  weight: number;
+  /** 시작 잔고 (새로 만들 때만): ETF 는 수량·평균 단가, 펀드는 원금·평가금액 */
+  opening_qty?: number;
+  opening_avg?: number;
+  opening_cost?: number;
+  opening_value?: number;
+}
+
+export interface ContributionPlanRequest {
+  account_id: number;
+  amount: number;
+  month_day: number;
+  status?: PlanStatus;
+  started_on?: string;
+  auto_from?: string;
+  notes?: string;
+  items: ContributionItemRequest[];
+}
+
+export interface ContributionRound {
+  /** 그달 납입일 */
+  date: string;
+  deposit: number;
+  buys: Transaction[];
+}
+
+export interface ContributionRunResult {
+  rounds: number;
+  buys: number;
+  pending: number;
+  errors: string[];
+}
+
+export interface FundPrice {
+  id: number;
+  asset_id: number;
+  date: string;
+  /** 1좌당 원 */
+  nav: number;
+  source: string;
+  created_at: string;
 }

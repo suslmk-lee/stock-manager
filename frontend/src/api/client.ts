@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest, DivScoreRanking, DivScoreDetail, DivScoreWeights } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest, DivScoreRanking, DivScoreDetail, DivScoreWeights, ContributionPlanView, ContributionPlanRequest, ContributionRound, ContributionRunResult, FundPrice } from '../types/models';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -532,6 +532,63 @@ export const apiClient = {
   RunAccumulations: async (): Promise<AccumulationRunResult> => {
     if (isWeb) return fetchApi<AccumulationRunResult>('/accumulations/run', { method: 'POST' });
     return (await WailsApp.RunAccumulations()) as AccumulationRunResult;
+  },
+  // ==========================================
+  // 부담금 배분 (퇴직연금) · 펀드
+  // ==========================================
+  GetContributionPlans: async (): Promise<ContributionPlanView[]> => {
+    if (isWeb) return (await fetchApi<{ plans: ContributionPlanView[] }>('/contribution-plans')).plans ?? [];
+    return ((await WailsApp.GetContributionPlans()) ?? []) as unknown as ContributionPlanView[];
+  },
+
+  CreateContributionPlan: async (req: ContributionPlanRequest) => {
+    if (isWeb) return fetchApi<unknown>('/contribution-plans', { method: 'POST', body: JSON.stringify(req) });
+    return WailsApp.CreateContributionPlan(req as unknown as Parameters<typeof WailsApp.CreateContributionPlan>[0]);
+  },
+
+  UpdateContributionPlan: async (id: number, req: ContributionPlanRequest) => {
+    if (isWeb) return fetchApi<unknown>(`/contribution-plans/${id}`, { method: 'PUT', body: JSON.stringify(req) });
+    return WailsApp.UpdateContributionPlan(id, req as unknown as Parameters<typeof WailsApp.UpdateContributionPlan>[1]);
+  },
+
+  DeleteContributionPlan: async (id: number) => {
+    if (isWeb) return fetchApi<unknown>(`/contribution-plans/${id}`, { method: 'DELETE' });
+    return WailsApp.DeleteContributionPlan(id);
+  },
+
+  GetContributionRounds: async (id: number): Promise<ContributionRound[]> => {
+    if (isWeb) return (await fetchApi<{ rounds: ContributionRound[] }>(`/contribution-plans/${id}/rounds`)).rounds ?? [];
+    return ((await WailsApp.GetContributionRounds(id)) ?? []) as unknown as ContributionRound[];
+  },
+
+  DeleteContributionRound: async (id: number, date: string) => {
+    if (isWeb) return fetchApi<unknown>(`/contribution-plans/${id}/rounds/${date}`, { method: 'DELETE' });
+    return WailsApp.DeleteContributionRound(id, date);
+  },
+
+  RunContributions: async (): Promise<ContributionRunResult> => {
+    if (isWeb) return fetchApi<ContributionRunResult>('/contribution-plans/run', { method: 'POST' });
+    return (await WailsApp.RunContributions()) as unknown as ContributionRunResult;
+  },
+
+  CreateFund: async (name: string, code: string): Promise<Asset> => {
+    if (isWeb) return fetchApi<Asset>('/funds', { method: 'POST', body: JSON.stringify({ name, code }) });
+    return (await WailsApp.CreateFund(name, code)) as unknown as Asset;
+  },
+
+  GetFundPrices: async (assetId: number): Promise<FundPrice[]> => {
+    if (isWeb) return (await fetchApi<{ prices: FundPrice[] }>(`/funds/${assetId}/prices`)).prices ?? [];
+    return ((await WailsApp.GetFundPrices(assetId)) ?? []) as unknown as FundPrice[];
+  },
+
+  ReconcileFund: async (accountId: number, assetId: number, value: number, date: string): Promise<FundPrice> => {
+    if (isWeb) return fetchApi<FundPrice>(`/funds/${assetId}/reconcile`, { method: 'POST', body: JSON.stringify({ account_id: accountId, value, date }) });
+    return (await WailsApp.ReconcileFund(accountId, assetId, value, date)) as unknown as FundPrice;
+  },
+
+  DeleteFundPrice: async (id: number) => {
+    if (isWeb) return fetchApi<unknown>(`/fund-prices/${id}`, { method: 'DELETE' });
+    return WailsApp.DeleteFundPrice(id);
   },
   // ==========================================
   // 예수금

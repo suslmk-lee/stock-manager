@@ -8,6 +8,7 @@ import DividendManager from './components/DividendManager';
 import SignalsDashboard from './pages/SignalsDashboard';
 import AssetTrendPage from './pages/AssetTrendPage';
 import AccumulationPage from './pages/AccumulationPage';
+import PensionPage from './pages/PensionPage';
 import DividendAnalysisPage from './pages/DividendAnalysisPage';
 import DividendScorePage from './pages/DividendScorePage';
 import TransactionManager from './components/TransactionManager';
@@ -191,6 +192,7 @@ export default function Dashboard() {
             {route === 'assets' && <AssetManager />}
             {route === 'trades' && <TransactionManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}
             {route === 'accumulate' && <AccumulationPage />}
+            {route === 'pension' && <PensionPage />}
             {route === 'trend' && <AssetTrendPage />}
             {route === 'dividends' && <DividendManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}
             {route === 'dividend-analysis' && <DividendAnalysisPage />}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { IconAccumulate, IconBars, IconCandidates, IconChart, IconCoin, IconPodium, IconRadar, IconSliders, IconTrades, IconTrend, IconWallet, type AppIcon } from './components/ui/appIcons';
+import { IconAccumulate, IconBars, IconCandidates, IconChart, IconCoin, IconLayers, IconPodium, IconRadar, IconSliders, IconTrades, IconTrend, IconWallet, type AppIcon } from './components/ui/appIcons';
 
-export type RouteId = 'accounts' | 'assets' | 'trades' | 'accumulate' | 'trend' | 'dividends' | 'dividend-analysis' | 'dividend-score' | 'signals' | 'profiles' | 'candidates';
+export type RouteId = 'accounts' | 'assets' | 'trades' | 'accumulate' | 'pension' | 'trend' | 'dividends' | 'dividend-analysis' | 'dividend-score' | 'signals' | 'profiles' | 'candidates';
 export type GroupId = 'assets' | 'dividends' | 'signals';
 
 export interface NavItem {
@@ -33,6 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'assets', label: '주식/ETF', title: '주식/ETF 관리', icon: IconTrend },
       { id: 'trades', label: '매매 기록', title: '매매 관리', icon: IconTrades },
       { id: 'accumulate', label: '모으기', title: '주식 모으기', icon: IconAccumulate, isNew: true },
+      { id: 'pension', label: '퇴직연금', title: '퇴직연금 · 부담금 배분', icon: IconLayers, isNew: true },
       { id: 'trend', label: '자산 추이', title: '자산 추이', icon: IconChart },
     ],
   },

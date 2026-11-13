@@ -10,6 +10,7 @@ type AssetType string
 const (
 	AssetTypeStock AssetType = "Stock"
 	AssetTypeETF   AssetType = "ETF"
+	AssetTypeFund  AssetType = "Fund" // 펀드 (거래소 시세 없음 — 기준가는 평가금액 맞추기로)
 )
 
 type Asset struct {

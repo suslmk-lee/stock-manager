@@ -38,6 +38,9 @@ func fxSymbol(ccy string) (symbol string, mult float64) {
 // tickerCurrencyBySuffix: 시세에 통화가 없을 때 거래소 꼬리표로 짐작한 통화 (모르면 "")
 func tickerCurrencyBySuffix(ticker string) string {
 	u := strings.ToUpper(strings.TrimSpace(ticker))
+	if strings.HasPrefix(u, fundTickerPrefix) { // 국내 펀드
+		return "KRW"
+	}
 	for _, m := range []struct{ suf, ccy string }{
 		{".KS", "KRW"}, {".KQ", "KRW"}, {".T", "JPY"}, {".HK", "HKD"}, {".SS", "CNY"}, {".SZ", "CNY"},
 		{".TWO", "TWD"}, {".TW", "TWD"}, {".L", "GBp"}, {".TO", "CAD"}, {".AX", "AUD"}, {".SI", "SGD"}, {".DE", "EUR"}, {".PA", "EUR"},

@@ -28,6 +28,8 @@ type App struct {
 	cashService          *services.CashService
 	lockService          *services.LockService // 앱 잠금 (이 PC의 설정 폴더)
 	dividendScoreService *services.DividendScoreService
+	fundService          *services.FundService
+	contributionService  *services.ContributionService
 	updater              *updater.Updater
 }
 
@@ -43,6 +45,9 @@ func NewApp() *App {
 	a.holdingService = services.NewHoldingService()
 	a.dividendService = services.NewDividendService()
 	a.tickerService = services.NewTickerService()
+	// 펀드 티커(FUND:…)는 시세 대신 앱에 저장된 기준가로
+	a.fundService = services.NewFundService(database.GetDB())
+	a.tickerService.SetLocalPrices(a.fundService)
 	a.exchangeRateService = services.NewExchangeRateService()
 	a.snapshotService = services.NewPortfolioSnapshotService(database.GetDB(), a.tickerService)
 	a.realizedPnLService = services.NewRealizedPnLService()
@@ -59,6 +64,7 @@ func NewApp() *App {
 	a.snapshotService.SetCash(a.cashService)
 	a.lockService = services.NewLockService(services.DefaultLockDir())
 	a.dividendScoreService = services.NewDividendScoreService(database.GetDB(), a.tickerService)
+	a.contributionService = services.NewContributionService(database.GetDB(), a.tickerService, a.fundService)
 	a.updater = updater.New(appVersion)
 	return a
 }
@@ -81,6 +87,8 @@ func (a *App) apiServices() *httpapi.Services {
 		Accumulation:  a.accumulationService,
 		Cash:          a.cashService,
 		DividendScore: a.dividendScoreService,
+		Fund:          a.fundService,
+		Contribution:  a.contributionService,
 	}
 }
 
@@ -113,6 +121,9 @@ func (a *App) startup(ctx context.Context) {
 
 	// 주식 모으기: 장이 끝난 거래일의 회차를 지금 한 번, 이후 몇 시간마다 채운다
 	go a.accumulationService.RunEvery(ctx, 4*time.Hour)
+
+	// 부담금 배분(퇴직연금): 지난 납입일 회차를 지금 한 번, 이후 몇 시간마다 채운다
+	go a.contributionService.RunEvery(ctx, 4*time.Hour)
 
 	// 신호 백그라운드 점검 (ctx 종료 시 중단)
 	a.startSignalMonitor(ctx)

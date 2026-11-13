@@ -24,6 +24,7 @@ const SUFFIX_CCY: [string, string][] = [
 ];
 export function ccyOfTicker(ticker?: string | null): string {
   const u = (ticker ?? '').trim().toUpperCase();
+  if (u.startsWith('FUND:')) return 'KRW'; // 국내 펀드
   for (const [suf, ccy] of SUFFIX_CCY) if (u.endsWith(suf)) return ccy;
   return 'USD';
 }

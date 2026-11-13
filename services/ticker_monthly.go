@@ -106,6 +106,9 @@ func (s *TickerService) GetMonthlySeries(ticker, rangeStr string) (*MonthlySerie
 	if !MonthlySeriesRanges[rangeStr] {
 		return nil, fmt.Errorf("unsupported range: %s", rangeStr)
 	}
+	if IsFundTicker(ticker) {
+		return nil, fmt.Errorf("%s: 펀드는 월봉 시세가 없습니다", ticker)
+	}
 	params := url.Values{}
 	params.Add("range", rangeStr)
 	params.Add("interval", "1mo")

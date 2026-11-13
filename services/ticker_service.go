@@ -24,6 +24,33 @@ type TickerService struct {
 	histCache2   dailyHistoryStore   // see ticker_history_cache.go (zero value usable)
 	divEvCache   dividendEventsStore // see ticker_dividends.go (zero value usable)
 	monthlyCache monthlySeriesStore  // see ticker_monthly.go (zero value usable)
+
+	local LocalPriceSource // 펀드처럼 거래소 시세가 없는 자산 (nil 이면 없음)
+}
+
+// LocalPriceSource: 거래소 시세가 없는 자산(펀드 FUND:…)의 가격을 앱 데이터(기준가)로 답한다.
+type LocalPriceSource interface {
+	Current(ticker string) *CurrentPrice
+	History(ticker string) *PriceHistory
+}
+
+// SetLocalPrices: 펀드 티커는 Yahoo 대신 이 값으로 답한다.
+func (s *TickerService) SetLocalPrices(src LocalPriceSource) { s.local = src }
+
+func (s *TickerService) localCurrent(ticker string) *CurrentPrice {
+	if s.local == nil {
+		return nil
+	}
+	return s.local.Current(ticker)
+}
+
+func (s *TickerService) localHistory(ticker string) (*PriceHistory, error) {
+	if s.local != nil {
+		if h := s.local.History(ticker); h != nil && len(h.Points) > 0 {
+			return h, nil
+		}
+	}
+	return nil, fmt.Errorf("%s: 펀드 기준가가 아직 없습니다", ticker)
 }
 
 func NewTickerService() *TickerService {
@@ -178,6 +205,14 @@ func (s *TickerService) GetCurrentPrices(tickers []string) map[string]*CurrentPr
 		if ticker == "" {
 			continue
 		}
+		if IsFundTicker(ticker) { // 펀드: 앱에 저장된 기준가
+			if p := s.localCurrent(ticker); p != nil {
+				mu.Lock()
+				result[ticker] = p
+				mu.Unlock()
+			}
+			continue
+		}
 
 		// Check cache first
 		if cached, ok := s.getCached(ticker); ok {
@@ -212,6 +247,12 @@ func (s *TickerService) GetCurrentPrice(ticker string) (*CurrentPrice, error) {
 	ticker = strings.TrimSpace(strings.ToUpper(ticker))
 	if ticker == "" {
 		return nil, fmt.Errorf("ticker symbol is required")
+	}
+	if IsFundTicker(ticker) {
+		if p := s.localCurrent(ticker); p != nil {
+			return p, nil
+		}
+		return nil, fmt.Errorf("%s: 펀드 기준가가 아직 없습니다", ticker)
 	}
 
 	// Check cache
@@ -317,6 +358,9 @@ func (s *TickerService) GetPriceHistory(ticker, rangeStr, interval string) (*Pri
 	ticker = strings.TrimSpace(strings.ToUpper(ticker))
 	if ticker == "" {
 		return nil, fmt.Errorf("ticker symbol is required")
+	}
+	if IsFundTicker(ticker) {
+		return s.localHistory(ticker)
 	}
 	if rangeStr == "" {
 		rangeStr = "6mo"

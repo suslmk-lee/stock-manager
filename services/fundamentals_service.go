@@ -110,6 +110,9 @@ func (s *FundamentalsService) Get(ticker string) (*Fundamentals, error) {
 	if ticker == "" {
 		return nil, fmt.Errorf("ticker symbol is required")
 	}
+	if IsFundTicker(ticker) { // 펀드: 거래소 지표(PER·PBR) 없음 — 조회하지 않는다
+		return nil, fmt.Errorf("%s: 펀드는 펀더멘털이 없습니다", ticker)
+	}
 	s.mu.Lock()
 	if e, ok := s.entries[ticker]; ok && s.clock().Sub(e.fetchedAt) <= fundamentalsTTL {
 		s.mu.Unlock()
