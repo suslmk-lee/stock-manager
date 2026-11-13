@@ -280,21 +280,23 @@ func (s *DividendScoreService) loadAssets(since time.Time, withPrices bool) (map
 // ensureMonths: window 중 기록이 없는 달을 계산해 저장한다 (이번 달이 아니면 '추정').
 // 이번 달은 1일에 보유하던 종목에 더해 지금 보유 중인 종목도 넣는다 — 1일 뒤에 산 종목도 이번 달 순위에 바로 보인다
 // (점수는 같은 1일 기준 데이터로). 배당이 없는 보유 종목은 한 번 확인하면 이번 달 동안 다시 계산하지 않는다.
+// 예전 공식(divScoreFormula 보다 낮은 버전)으로 저장된 기록은 같은 달·종목을 새 공식으로 다시 계산한다 ('추정' 여부는 그대로).
 func (s *DividendScoreService) ensureMonths(window []string) error {
 	current := monthKeyKST(s.clock())
-	var existing []struct {
-		Month   string
-		AssetID uint
-	}
-	if err := s.db.Model(&models.DividendScoreSnapshot{}).Where("month IN ?", window).Select("month, asset_id").Scan(&existing).Error; err != nil {
+	var existing []models.DividendScoreSnapshot
+	if err := s.db.Where("month IN ?", window).Find(&existing).Error; err != nil {
 		return err
 	}
 	have := map[string]map[uint]bool{}
+	var stale []models.DividendScoreSnapshot
 	for _, e := range existing {
 		if have[e.Month] == nil {
 			have[e.Month] = map[uint]bool{}
 		}
 		have[e.Month][e.AssetID] = true
+		if e.Formula < divScoreFormula {
+			stale = append(stale, e)
+		}
 	}
 	var missing []string
 	for _, m := range window {
@@ -318,7 +320,7 @@ func (s *DividendScoreService) ensureMonths(window []string) error {
 			needCurrent = true
 		}
 	}
-	if len(missing) == 0 && !needCurrent {
+	if len(missing) == 0 && !needCurrent && len(stale) == 0 {
 		return nil
 	}
 
@@ -356,14 +358,47 @@ func (s *DividendScoreService) ensureMonths(window []string) error {
 			mj, _ := json.Marshal(m)
 			rows = append(rows, models.DividendScoreSnapshot{
 				Month: month, AssetID: a.asset.ID, Growth: p.Growth, Stability: p.Stability, Yield: p.Yield,
-				Consistency: p.Consistency, Value: p.Value, Metrics: string(mj), Estimated: month != current,
+				Consistency: p.Consistency, Value: p.Value, Metrics: string(mj), Estimated: month != current, Formula: divScoreFormula,
 			})
+		}
+	}
+	if len(stale) > 0 {
+		if err := s.upgradeFormula(stale, assets); err != nil {
+			return err
 		}
 	}
 	if len(rows) == 0 {
 		return nil // 배당주가 없으면 저장할 것도 없다
 	}
 	return s.db.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(rows, 200).Error
+}
+
+// upgradeFormula: 예전 공식으로 저장된 기록을 새 공식으로 다시 계산해 바꾼다 (지우고 한 번에 다시 넣는다 — 원격 DB 왕복을 줄이려고).
+// 그달·종목·'추정' 여부는 그대로 두고 항목 점수·지표만 바뀐다. 지금 계산할 수 없는 기록(배당 이력이 사라짐 등)은 값은 두고 버전만 올린다.
+func (s *DividendScoreService) upgradeFormula(stale []models.DividendScoreSnapshot, assets map[uint]*divScoreAsset) error {
+	ids := make([]uint, 0, len(stale))
+	rows := make([]models.DividendScoreSnapshot, 0, len(stale))
+	for _, old := range stale {
+		ids = append(ids, old.ID)
+		row := old
+		row.ID = 0
+		row.Formula = divScoreFormula
+		if start, ok := monthStartKST(old.Month); ok {
+			if a := assets[old.AssetID]; a != nil {
+				if m, p, ok := computeDivScore(a.events, a.closes, start.Add(-time.Second), a.source); ok {
+					mj, _ := json.Marshal(m)
+					row.Growth, row.Stability, row.Yield, row.Consistency, row.Value, row.Metrics = p.Growth, p.Stability, p.Yield, p.Consistency, p.Value, string(mj)
+				}
+			}
+		}
+		rows = append(rows, row)
+	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id IN ?", ids).Delete(&models.DividendScoreSnapshot{}).Error; err != nil {
+			return err
+		}
+		return tx.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(rows, 200).Error
+	})
 }
 
 // Recompute: 그달 기록을 지우고 다시 계산한다 (거래를 고쳤거나 시세를 못 가져왔던 달). 지난 달은 '추정'이 된다.

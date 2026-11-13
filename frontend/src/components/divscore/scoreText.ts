@@ -21,9 +21,10 @@ export const PART_LABEL: Record<PartKey, string> = {
 export const PART_HELP: Record<PartKey, string> = {
   growth: '3년 연평균 증가율 60% + 최근 1년 증가율 40% · 배당수익률이 2% 아래면 줄인다 (작은 배당의 큰 증가율 보정)',
   stability: '삭감 없이 이어진 해 50% + 최근 3년 삭감 30% + 회차별 금액 변동 20%',
-  yield: '지금 배당수익률 70% + 최근 2년 평균 대비 30% (평균보다 높으면 싼 편, 1년 새 배당이 30% 넘게 바뀐 해는 중간값)',
+  yield:
+    '(지금 배당수익률 70% + 최근 2년 평균 대비 30%) × 주가 보전 — 평균보다 높으면 싼 편이지만 하락 추세이거나 1년 새 배당이 30% 넘게 바뀐 해는 가산 없음. 최근 1년 주가 하락이 받은 배당을 깎아 먹은 만큼 줄인다 (다 깎아 먹으면 절반)',
   consistency: '지급 주기(월·분기…) 50% + 최근 3년 빠진 회차 50%, 이번 회차가 늦으면 절반',
-  value: '52주 범위에서의 위치 60% + 200일 이동평균 대비 40% (낮을수록 높은 점수)',
+  value: '52주 범위에서의 위치 60% (낮을수록 싸다) + 200일선 추세 40% (아래면 하락 추세로 낮게, 조금 위가 가장 높고, 너무 위면 과열) · 하락 추세면 52주 저점 근처여도 \'싸다\'는 중간까지만',
 };
 
 export const DEFAULT_WEIGHTS: DivScoreWeights = { growth: 30, stability: 25, yield: 20, consistency: 10, value: 15 };
@@ -46,14 +47,22 @@ export function partReason(key: PartKey, m: DivScoreMetrics): string {
       ]
         .filter(Boolean)
         .join(' · ');
-    case 'yield':
-      return [`지금 ${pct(m.yield_pct, 2)}`, m.avg_yield_pct != null ? `2년 평균 ${pct(m.avg_yield_pct, 2)}` : '2년 평균 없음'].join(' · ');
+    case 'yield': {
+      // 1년 주가 변화와 그 하락이 받은 배당을 얼마나 깎았는지 (주가 보전)
+      let price = '';
+      if (m.price_chg_1y != null) {
+        const eaten = m.div_eaten ?? 0;
+        price = `1년 주가 ${signedPct(m.price_chg_1y)}${eaten >= 1 ? ' (받은 배당보다 더 빠짐)' : eaten >= 0.05 ? ` (받은 배당의 ${Math.round(eaten * 100)}%를 깎음)` : ''}`;
+      }
+      return [`지금 ${pct(m.yield_pct, 2)}`, m.avg_yield_pct != null ? `2년 평균 ${pct(m.avg_yield_pct, 2)}` : '2년 평균 없음', price].filter(Boolean).join(' · ');
+    }
     case 'consistency':
       return [`${m.cycle ? `${m.cycle} 지급` : '최근 12개월 지급 없음'}`, `최근 3년 빠진 회차 ${m.missed_3y}`, m.missed_now ? '이번 회차 늦음' : ''].filter(Boolean).join(' · ');
     case 'value':
       return [
         m.pos_52 != null ? `52주 범위 ${(m.pos_52 * 100).toFixed(0)}% 위치` : '52주 범위 없음',
         m.ma_gap_pct != null ? `200일선 ${signedPct(m.ma_gap_pct)}` : '',
+        m.downtrend ? '하락 추세' : m.ma_gap_pct != null && m.ma_gap_pct > 15 ? '과열' : '',
       ]
         .filter(Boolean)
         .join(' · ');

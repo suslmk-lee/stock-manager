@@ -787,6 +787,12 @@ export interface DivScoreMetrics {
   avg_yield_pct?: number;
   pos_52?: number;
   ma_gap_pct?: number;
+  /** 최근 1년 주가 변화 (%) */
+  price_chg_1y?: number;
+  /** 최근 1년 주가 하락 ÷ 최근 12개월 주당 배당 (1 = 받은 배당을 다 깎아 먹음) */
+  div_eaten?: number;
+  /** 하락 추세 (200일선 −5% 아래, 또는 200일선 아래 + 1년 −5% 넘게) */
+  downtrend?: boolean;
   history_years: number;
   status: DivStatus;
 }

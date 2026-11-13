@@ -164,3 +164,53 @@ func TestDividendScoreRankingFlow(t *testing.T) {
 		t.Fatal("12개월 밖의 달은 거절해야 한다")
 	}
 }
+
+// 공식이 바뀌면 예전 공식으로 저장된 기록을 같은 달·종목 그대로 다시 계산한다 ('추정' 여부는 유지)
+func TestDividendScoreFormulaUpgrade(t *testing.T) {
+	svc, db := newDivScoreFixture(t)
+	acc := models.Account{Name: "토스", Broker: "토스증권", MarketType: models.MarketTypeInternational, Currency: "USD"}
+	db.Create(&acc)
+	a := models.Asset{Ticker: "GROW", Name: "Grower ETF", Type: models.AssetTypeStock}
+	db.Create(&a)
+	db.Create(&models.Holding{AccountID: acc.ID, AssetID: a.ID, Quantity: 10, AveragePrice: 20})
+	db.Create(&models.Transaction{AccountID: acc.ID, AssetID: a.ID, Type: models.TransactionTypeBuy, Date: dsDay("2023-01-10"), Price: 20, Quantity: 10})
+	ev := quarterly(dsDay("2021-12-15"), 20, 0.5, 0.10)
+	svc.fetchEvents = func([]string) map[string][]DividendEvent {
+		out := make([]DividendEvent, 0, len(ev))
+		for _, e := range ev {
+			out = append(out, DividendEvent{Time: e.Date.Unix(), Amount: e.Amount})
+		}
+		return map[string][]DividendEvent{"GROW": out}
+	}
+	svc.fetchHist = func([]string) map[string]*PriceHistory {
+		return map[string]*PriceHistory{"GROW": {Points: dsFlatCloses(dsDay("2023-01-01"), dsDay("2026-11-12"), 25)}}
+	}
+	if _, err := svc.GetRanking(""); err != nil {
+		t.Fatal(err)
+	}
+	var n int64
+	db.Model(&models.DividendScoreSnapshot{}).Where("formula = ?", divScoreFormula).Count(&n)
+	if n != 12 {
+		t.Fatalf("새 기록은 지금 공식 버전이어야 한다: %d", n)
+	}
+	// 예전 공식으로 저장된 것처럼: 버전 1, 항목 점수 표시값, 10월은 '추정 아님'(그달 1일에 계산했던 기록)
+	db.Model(&models.DividendScoreSnapshot{}).Where("1 = 1").Updates(map[string]any{"formula": 1, "yield": 0.123})
+	db.Model(&models.DividendScoreSnapshot{}).Where("month = ?", "2026-10").Update("estimated", false)
+
+	if _, err := svc.GetRanking(""); err != nil {
+		t.Fatal(err)
+	}
+	var snaps []models.DividendScoreSnapshot
+	db.Find(&snaps)
+	if len(snaps) != 12 {
+		t.Fatalf("다시 계산해도 기록 수는 같아야 한다: %d", len(snaps))
+	}
+	for _, sn := range snaps {
+		if sn.Formula != divScoreFormula || sn.Yield == 0.123 {
+			t.Fatalf("예전 공식 기록이 다시 계산되지 않았다: %+v", sn)
+		}
+		if want := sn.Month != "2026-11" && sn.Month != "2026-10"; sn.Estimated != want {
+			t.Fatalf("'추정' 여부가 바뀌었다: %+v", sn)
+		}
+	}
+}

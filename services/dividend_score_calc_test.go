@@ -152,9 +152,57 @@ func TestDivScoreValue(t *testing.T) {
 		closes = append(closes, PricePoint{Time: d.Unix(), Close: price})
 		d = d.AddDate(0, 0, 1)
 	}
+	// 최근 한 달 새 20% 급락: 52주 최저·200일선 크게 아래 → 하락 추세라 '싸다'를 다 주지 않는다 (떨어지는 칼날)
 	m, p, _ := computeDivScore(events, closes, asOf, "market")
-	if m.Pos52 == nil || *m.Pos52 != 0 || m.MAGapPct == nil || *m.MAGapPct >= 0 || p.Value < 0.8 {
-		t.Fatalf("value metrics = %+v parts %+v", m, p)
+	if m.Pos52 == nil || *m.Pos52 != 0 || m.MAGapPct == nil || *m.MAGapPct >= -5 || !m.Downtrend || p.Value > 0.45 {
+		t.Fatalf("급락 value metrics = %+v parts %+v", m, p)
+	}
+
+	// 오르던 종목이 200일선 근처로 눌림: 하락 추세가 아니므로 급락보다 높다
+	var pull []PricePoint
+	rise, top := dsDay("2025-06-01"), dsDay("2026-09-01")
+	for d := rise; !d.After(asOf); d = d.AddDate(0, 0, 1) {
+		price := 80 + 30*d.Sub(rise).Hours()/top.Sub(rise).Hours() // 80 → 110
+		if d.After(top) {
+			price = 110 - 10*d.Sub(top).Hours()/asOf.Sub(top).Hours() // 110 → 100
+		}
+		pull = append(pull, PricePoint{Time: d.Unix(), Close: price})
+	}
+	m2, p2, _ := computeDivScore(events, pull, asOf, "market")
+	if m2.Downtrend || p2.Value <= p.Value {
+		t.Fatalf("눌림 value = %v (급락 %v) metrics %+v", p2.Value, p.Value, m2)
+	}
+}
+
+// 고배당 함정: 월 100원씩 꾸준히 주지만 1년 새 주가가 12,900 → 11,885 로 천천히 빠짐.
+// 주가 하락이 받은 배당(1,200원)의 85%를 깎아 먹었으므로 수익률 매력이 크게 줄고, 같은 배당에 주가가 버틴 종목보다 낮다.
+func TestDivScoreYieldTrap(t *testing.T) {
+	asOf := dsDay("2026-11-13").Add(12 * time.Hour)
+	var events []DivPerShare
+	for d := dsDay("2023-06-15"); d.Before(asOf); d = d.AddDate(0, 1, 0) {
+		events = append(events, DivPerShare{Date: d, Amount: 100})
+	}
+	yearAgo := asOf.AddDate(-1, 0, 0)
+	falling, flat := []PricePoint{}, []PricePoint{}
+	for d := dsDay("2023-06-01"); !d.After(asOf); d = d.AddDate(0, 0, 1) {
+		price := 12900.0
+		if d.After(yearAgo) {
+			price = 12900 - 1015*d.Sub(yearAgo).Hours()/asOf.Sub(yearAgo).Hours()
+		}
+		falling = append(falling, PricePoint{Time: d.Unix(), Close: price})
+		flat = append(flat, PricePoint{Time: d.Unix(), Close: 12900})
+	}
+	m, p, ok := computeDivScore(events, falling, asOf, "market")
+	if !ok || m.PriceChg1y == nil || math.Abs(*m.PriceChg1y+7.9) > 0.3 || m.DivEaten == nil || math.Abs(*m.DivEaten-0.85) > 0.05 {
+		t.Fatalf("trap metrics = %+v", m)
+	}
+	// 200일선과는 −2% 남짓이지만 1년 −7.9% → 하락 추세
+	if !m.Downtrend || p.Yield > 0.55 || p.Value > 0.6 {
+		t.Fatalf("trap parts = %+v metrics %+v", p, m)
+	}
+	mf, pf, _ := computeDivScore(events, flat, asOf, "market")
+	if mf.Downtrend || mf.DivEaten == nil || *mf.DivEaten != 0 || pf.Yield < 0.8 || pf.Yield <= p.Yield {
+		t.Fatalf("flat parts = %+v metrics %+v (trap %+v)", pf, mf, p)
 	}
 }
 

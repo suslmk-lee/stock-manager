@@ -32,5 +32,6 @@ type DividendScoreSnapshot struct {
 	Value       float64   `json:"value"`
 	Metrics     string    `gorm:"type:text" json:"-"` // 지표 JSON (성장률·수익률·상태 등)
 	Estimated   bool      `json:"estimated"`          // 그달이 지난 뒤 거슬러 계산한 값
+	Formula     int       `gorm:"not null;default:1" json:"-"` // 계산한 점수 공식 버전 — 공식이 바뀌면 다시 계산한다
 	CreatedAt   time.Time `json:"created_at"`
 }

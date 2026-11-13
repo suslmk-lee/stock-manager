@@ -11,9 +11,14 @@ import (
 //
 //   배당 성장(30)   3년 연평균 증가율 60% + 최근 1년 증가율 40% — 배당수익률이 2% 아래면 줄인다 (작은 배당의 큰 증가율 보정)
 //   배당 안정성(25) 삭감 없이 이어진 해 50% + 최근 3년 삭감 횟수 30% + 회차별 금액 변동 20%
-//   수익률 매력(20) 지금 배당수익률 70% + 최근 2년 평균 대비 30% (1년 새 배당이 30% 넘게 바뀌었으면 평균 대비는 중간값)
+//   수익률 매력(20) (지금 배당수익률 70% + 최근 2년 평균 대비 30%) × 주가 보전
+//                   - 평균 대비: 1년 새 배당이 30% 넘게 바뀌었거나 하락 추세면 가산하지 않는다
+//                     (하락 추세 = 200일선보다 5% 넘게 아래, 또는 200일선 아래이면서 1년 주가 −5% 넘게)
+//                     (수익률이 주가 하락 때문에 올라간 것일 수 있다)
+//                   - 주가 보전: 최근 1년 주가 하락이 그 사이 받은 배당을 깎아 먹은 만큼 줄인다 (다 깎아 먹으면 절반)
 //   지급 꾸준함(10) 지급 주기 50% + 최근 3년 빠진 회차 50% (지금 회차가 늦으면 절반)
-//   가격·가치(15)   52주 범위에서의 위치 60% + 200일 이동평균 대비 40% (낮을수록 높은 점수)
+//   가격·가치(15)   52주 범위에서의 위치 60% (낮을수록 싸다) + 200일선 추세 40% (아래면 하락 추세로 낮게, 너무 위면 과열로 낮게)
+//                   하락 추세에서는 52주 저점 근처여도 '싸다'를 중간까지만 준다 (떨어지는 칼날)
 // 특별배당(직전 회차들 중앙값의 2배 초과)은 성장·안정성 계산에서 뺀다.
 
 const (
@@ -27,6 +32,13 @@ const (
 	divCutBand      = 0.03 // 삭감으로 볼 감소 폭
 	divSpecialRatio = 2.0  // 특별배당: 직전 회차 중앙값의 이 배수 초과
 	divHistoryTol   = 45 * 24 * time.Hour
+
+	divDowntrendGap = -5.0 // 200일선보다 이만큼(%) 아래면 하락 추세
+
+	// divScoreFormula: 점수 공식 버전 — 바꾸면 저장된 지난 기록을 새 공식으로 다시 계산한다
+	//   1 처음
+	//   2 수익률 매력에 주가 보전·하락 추세 반영, 가격·가치의 200일선을 추세로
+	divScoreFormula = 2
 )
 
 // DivScoreMetrics 는 화면에 보여 줄 지표다 (금액은 종목 통화, 비율은 %).
@@ -51,6 +63,9 @@ type DivScoreMetrics struct {
 	AvgYieldPct   *float64 `json:"avg_yield_pct,omitempty"` // 최근 24개월 월말 평균
 	Pos52         *float64 `json:"pos_52,omitempty"`        // 52주 범위에서의 위치 (0 = 최저, 1 = 최고)
 	MAGapPct      *float64 `json:"ma_gap_pct,omitempty"`    // 200일 이동평균 대비 (%)
+	PriceChg1y    *float64 `json:"price_chg_1y,omitempty"`  // 최근 1년 주가 변화 (%)
+	DivEaten      *float64 `json:"div_eaten,omitempty"`     // 최근 1년 주가 하락 ÷ 최근 12개월 주당 배당 (1 = 받은 배당을 다 깎아 먹음)
+	Downtrend     bool     `json:"downtrend,omitempty"`     // 하락 추세
 	HistoryYears  float64  `json:"history_years"`           // 배당 이력 길이 (년)
 	Status        string   `json:"status"`
 }
@@ -331,6 +346,21 @@ func computeDivScore(events []DivPerShare, closes []PricePoint, asOf time.Time, 
 			}
 			m.MAGapPct = fptr((price/(sum/200) - 1) * 100)
 		}
+		// 1년 전 종가 (그날 앞 10일 안) — 주가 변화와 그 하락이 배당을 얼마나 깎았는지
+		yearAgo := asOf.AddDate(-1, 0, 0).Unix()
+		for i := n - 1; i >= 0; i-- {
+			if px[i].Time > yearAgo {
+				continue
+			}
+			if yearAgo-px[i].Time <= 10*86400 {
+				start := px[i].Close
+				m.PriceChg1y = fptr((price/start - 1) * 100)
+				if m.TTM > 0 {
+					m.DivEaten = fptr(math.Max(0, start-price) / m.TTM)
+				}
+			}
+			break
+		}
 	}
 
 	// 상태
@@ -377,10 +407,21 @@ func computeDivScore(events []DivPerShare, closes []PricePoint, asOf time.Time, 
 	// 평균 대비는 주가가 싸졌는지를 보려는 것 — 배당 자체가 크게 바뀐 해에는 그 변화가 섞이므로 중간값
 	vsAvg := 0.5
 	bigChange := m.Growth1y != nil && math.Abs(*m.Growth1y) > 30
+	// 하락 추세: 200일선보다 5% 넘게 아래, 또는 200일선 아래이면서 1년 주가가 5% 넘게 빠짐 (천천히 계속 빠지는 종목)
+	downtrend := m.MAGapPct != nil && (*m.MAGapPct < divDowntrendGap || (*m.MAGapPct < 0 && m.PriceChg1y != nil && *m.PriceChg1y < divDowntrendGap))
+	m.Downtrend = downtrend
 	if m.YieldPct != nil && m.AvgYieldPct != nil && *m.AvgYieldPct > 0 && !bigChange {
 		vsAvg = piecewise(*m.YieldPct / *m.AvgYieldPct, [][2]float64{{0.8, 0}, {1, 0.5}, {1.2, 1}})
+		if downtrend {
+			vsAvg = math.Min(vsAvg, 0.5) // 주가가 빠져 올라간 수익률은 가산하지 않는다
+		}
 	}
-	parts.Yield = 0.7*yieldLevel + 0.3*vsAvg
+	// 주가 보전: 1년 동안 받은 배당을 주가 하락이 다 깎아 먹었으면 수익률 매력은 절반 (고배당 함정)
+	keep := 1.0
+	if m.DivEaten != nil {
+		keep = 1 - 0.5*math.Min(*m.DivEaten, 1)
+	}
+	parts.Yield = (0.7*yieldLevel + 0.3*vsAvg) * keep
 
 	missed := map[int]float64{0: 1, 1: 0.5}[m.Missed3y]
 	parts.Consistency = 0.5*divCycleScore[m.Cycle] + 0.5*missed
@@ -388,14 +429,19 @@ func computeDivScore(events []DivPerShare, closes []PricePoint, asOf time.Time, 
 		parts.Consistency *= 0.5
 	}
 
-	pos, ma := 0.5, 0.5
+	// 가격·가치: 52주 저점 근처면 싸다 — 다만 하락 추세(200일선 아래)면 떨어지는 칼날이라 중간까지만.
+	// 200일선은 추세로 본다: 아래로 멀수록 낮고, 조금 위가 가장 좋고, 너무 위면 과열로 낮다.
+	pos, trend := 0.5, 0.5
 	if m.Pos52 != nil {
 		pos = piecewise(*m.Pos52, [][2]float64{{0, 1}, {0.5, 0.6}, {1, 0.2}})
 	}
 	if m.MAGapPct != nil {
-		ma = piecewise(*m.MAGapPct, [][2]float64{{-15, 1}, {0, 0.5}, {15, 0}})
+		trend = piecewise(*m.MAGapPct, [][2]float64{{-15, 0}, {divDowntrendGap, 0.3}, {0, 0.6}, {8, 0.8}, {25, 0.2}})
+		if downtrend {
+			pos = math.Min(pos, 0.6)
+		}
 	}
-	parts.Value = 0.6*pos + 0.4*ma
+	parts.Value = 0.6*pos + 0.4*trend
 	return m, parts, true
 }
 
