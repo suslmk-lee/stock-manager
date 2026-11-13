@@ -97,11 +97,26 @@ func (s *DividendScoreService) GetSettings() (models.DividendScoreSetting, error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return models.DefaultDividendScoreSetting(), nil
 	}
-	return st, err
+	if err != nil {
+		return st, err
+	}
+	if st.Version < models.DividendScoreSettingVersion {
+		// 주가 성장이 생기기 전 처음 배점(30·25·20·10·15)을 그대로 쓰고 있었으면 새 기본 배점으로.
+		// 바꿔 둔 배점은 그대로 두고 주가 성장만 더한다 (열 기본값 15).
+		if st.Growth == 30 && st.Stability == 25 && st.Yield == 20 && st.Consistency == 10 && st.Value == 15 {
+			def := models.DefaultDividendScoreSetting()
+			st.Growth, st.Stability, st.Yield, st.Consistency, st.Value, st.PriceGrowth = def.Growth, def.Stability, def.Yield, def.Consistency, def.Value, def.PriceGrowth
+		}
+		st.Version = models.DividendScoreSettingVersion
+		if err := s.db.Select("*").Save(&st).Error; err != nil {
+			return st, err
+		}
+	}
+	return st, nil
 }
 
 func (s *DividendScoreService) UpdateSettings(in models.DividendScoreSetting) (models.DividendScoreSetting, error) {
-	vals := []int{in.Growth, in.Stability, in.Yield, in.Consistency, in.Value}
+	vals := []int{in.Growth, in.Stability, in.Yield, in.Consistency, in.Value, in.PriceGrowth}
 	sum := 0
 	for _, v := range vals {
 		if v < 0 || v > 100 {
@@ -112,15 +127,20 @@ func (s *DividendScoreService) UpdateSettings(in models.DividendScoreSetting) (m
 	if sum == 0 {
 		return in, &ErrDivScoreInput{"배점을 하나 이상 0보다 크게 넣어 주세요"}
 	}
-	in.ID = 1
-	if err := s.db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&in).Error; err != nil {
+	in.ID, in.Version = 1, models.DividendScoreSettingVersion
+	// 줄을 먼저 만들어 두고 Save(모든 열 UPDATE)로 저장한다 — INSERT 로 넣으면 0 으로 둔 배점이 열 기본값으로 바뀐다
+	var cur models.DividendScoreSetting
+	if err := s.db.Where("id = ?", 1).Attrs(models.DefaultDividendScoreSetting()).FirstOrCreate(&cur).Error; err != nil {
+		return in, err
+	}
+	if err := s.db.Save(&in).Error; err != nil {
 		return in, err
 	}
 	return s.GetSettings()
 }
 
 func weightsOf(st models.DividendScoreSetting) DivScoreWeights {
-	return DivScoreWeights{float64(st.Growth), float64(st.Stability), float64(st.Yield), float64(st.Consistency), float64(st.Value)}
+	return DivScoreWeights{Growth: float64(st.Growth), Stability: float64(st.Stability), Yield: float64(st.Yield), Consistency: float64(st.Consistency), Value: float64(st.Value), PriceGrowth: float64(st.PriceGrowth)}
 }
 
 // ───────────────────────── 입력 모으기 ─────────────────────────
@@ -358,7 +378,7 @@ func (s *DividendScoreService) ensureMonths(window []string) error {
 			mj, _ := json.Marshal(m)
 			rows = append(rows, models.DividendScoreSnapshot{
 				Month: month, AssetID: a.asset.ID, Growth: p.Growth, Stability: p.Stability, Yield: p.Yield,
-				Consistency: p.Consistency, Value: p.Value, Metrics: string(mj), Estimated: month != current, Formula: divScoreFormula,
+				Consistency: p.Consistency, Value: p.Value, PriceGrowth: p.PriceGrowth, Metrics: string(mj), Estimated: month != current, Formula: divScoreFormula,
 			})
 		}
 	}
@@ -387,7 +407,7 @@ func (s *DividendScoreService) upgradeFormula(stale []models.DividendScoreSnapsh
 			if a := assets[old.AssetID]; a != nil {
 				if m, p, ok := computeDivScore(a.events, a.closes, start.Add(-time.Second), a.source); ok {
 					mj, _ := json.Marshal(m)
-					row.Growth, row.Stability, row.Yield, row.Consistency, row.Value, row.Metrics = p.Growth, p.Stability, p.Yield, p.Consistency, p.Value, string(mj)
+					row.Growth, row.Stability, row.Yield, row.Consistency, row.Value, row.PriceGrowth, row.Metrics = p.Growth, p.Stability, p.Yield, p.Consistency, p.Value, p.PriceGrowth, string(mj)
 				}
 			}
 		}
@@ -466,6 +486,16 @@ type DivScoreRanking struct {
 	Rows       []DivScoreRow               `json:"rows"`
 	NoDividend []models.Asset              `json:"no_dividend"` // 보유 중이지만 배당이 없는 종목 (이번 달만)
 	Missing    []MissingDividend           `json:"missing"`     // 이번 달만
+	Prev       []DivScorePrevRow           `json:"prev"`        // 지난달 순위 (화면에서 한국/미국만·항목별로 지난달 순위를 다시 매길 때)
+}
+
+// DivScorePrevRow 는 지난달 한 종목의 순위·점수 (지난달 종목 전체, 종합 순위대로)
+type DivScorePrevRow struct {
+	AssetID uint          `json:"asset_id"`
+	Ticker  string        `json:"ticker"`
+	Rank    int           `json:"rank"`
+	Score   float64       `json:"score"`
+	Parts   DivScoreParts `json:"parts"`
 }
 
 // rankMonth: 그달 기록에 지금 배점으로 총점·순위를 매긴다
@@ -474,7 +504,7 @@ func rankMonth(snaps []models.DividendScoreSnapshot, w DivScoreWeights) []DivSco
 	for _, sn := range snaps {
 		var m DivScoreMetrics
 		_ = json.Unmarshal([]byte(sn.Metrics), &m)
-		p := DivScoreParts{sn.Growth, sn.Stability, sn.Yield, sn.Consistency, sn.Value}
+		p := DivScoreParts{Growth: sn.Growth, Stability: sn.Stability, Yield: sn.Yield, Consistency: sn.Consistency, Value: sn.Value, PriceGrowth: sn.PriceGrowth}
 		rows = append(rows, DivScoreRow{AssetID: sn.AssetID, Score: math.Round(w.total(p)*10) / 10, Parts: p, Metrics: m, Estimated: sn.Estimated})
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
@@ -491,7 +521,7 @@ func rankMonth(snaps []models.DividendScoreSnapshot, w DivScoreWeights) []DivSco
 }
 
 // divPartKeys: 항목 이름 (화면의 growth·stability·yield·consistency·value 와 같다)
-var divPartKeys = []string{"growth", "stability", "yield", "consistency", "value"}
+var divPartKeys = []string{"growth", "stability", "yield", "consistency", "value", "price_growth"}
 
 func partValue(p DivScoreParts, key string) float64 {
 	switch key {
@@ -503,6 +533,8 @@ func partValue(p DivScoreParts, key string) float64 {
 		return p.Yield
 	case "consistency":
 		return p.Consistency
+	case "price_growth":
+		return p.PriceGrowth
 	default:
 		return p.Value
 	}
@@ -575,13 +607,17 @@ func (s *DividendScoreService) GetRanking(month string) (*DivScoreRanking, error
 		}
 	}
 	rows := rankMonth(cur, w)
+	prevList := rankMonth(before, w)
 	prevRows := map[uint]DivScoreRow{}
-	for _, r := range rankMonth(before, w) {
+	for _, r := range prevList {
 		prevRows[r.AssetID] = r
 	}
 
-	ids := make([]uint, 0, len(rows))
+	ids := make([]uint, 0, len(rows)+len(prevList))
 	for _, r := range rows {
+		ids = append(ids, r.AssetID)
+	}
+	for _, r := range prevList {
 		ids = append(ids, r.AssetID)
 	}
 	assetByID := map[uint]models.Asset{}
@@ -603,7 +639,11 @@ func (s *DividendScoreService) GetRanking(month string) (*DivScoreRanking, error
 		}
 	}
 
-	out := &DivScoreRanking{Month: month, Months: window, Current: month == window[0], Weights: st, Rows: rows, NoDividend: []models.Asset{}, Missing: []MissingDividend{}}
+	prevOut := make([]DivScorePrevRow, 0, len(prevList))
+	for _, r := range prevList {
+		prevOut = append(prevOut, DivScorePrevRow{AssetID: r.AssetID, Ticker: assetByID[r.AssetID].Ticker, Rank: r.Rank, Score: r.Score, Parts: r.Parts})
+	}
+	out := &DivScoreRanking{Month: month, Months: window, Current: month == window[0], Weights: st, Rows: rows, NoDividend: []models.Asset{}, Missing: []MissingDividend{}, Prev: prevOut}
 	if out.Current {
 		if err := s.addCurrentExtras(out); err != nil {
 			log.Printf("[DividendScore] 이번 달 부가 정보 실패: %v", err)

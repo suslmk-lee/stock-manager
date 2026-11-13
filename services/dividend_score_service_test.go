@@ -190,6 +190,33 @@ func TestDividendScoreRankingFlow(t *testing.T) {
 	}
 }
 
+// 배점: 처음 배점을 그대로 쓰던 경우만 주가 성장이 들어간 새 기본 배점으로, 바꿔 둔 배점은 그대로 + 주가 성장 15.
+// 0 으로 둔 배점은 0 으로 저장된다 (열 기본값으로 바뀌지 않는다).
+func TestDividendScoreSettingsMigration(t *testing.T) {
+	svc, db := newDivScoreFixture(t)
+	if st, _ := svc.GetSettings(); st.Growth != 25 || st.Value != 10 || st.PriceGrowth != 15 {
+		t.Fatalf("기록이 없으면 새 기본 배점 = %+v", st)
+	}
+	// 예전 앱이 저장한 처음 배점 (버전 1, 주가 성장 열은 기본값 15)
+	db.Exec("INSERT INTO dividend_score_settings (id, growth, stability, yield, consistency, value, price_growth, version, updated_at) VALUES (1, 30, 25, 20, 10, 15, 15, 1, CURRENT_TIMESTAMP)")
+	st, err := svc.GetSettings()
+	if err != nil || st.Growth != 25 || st.Stability != 20 || st.Yield != 20 || st.Consistency != 10 || st.Value != 10 || st.PriceGrowth != 15 || st.Version != 2 {
+		t.Fatalf("처음 배점 → 새 기본 배점 = %+v err %v", st, err)
+	}
+	// 바꿔 둔 배점은 그대로
+	db.Exec("UPDATE dividend_score_settings SET growth = 40, stability = 20, yield = 30, consistency = 5, value = 5, price_growth = 15, version = 1 WHERE id = 1")
+	if st, _ := svc.GetSettings(); st.Growth != 40 || st.Yield != 30 || st.Value != 5 || st.PriceGrowth != 15 || st.Version != 2 {
+		t.Fatalf("바꿔 둔 배점은 그대로 + 주가 성장 15 = %+v", st)
+	}
+	// 0 으로 둔 배점
+	if st, err := svc.UpdateSettings(models.DividendScoreSetting{Growth: 50, Stability: 0, Yield: 50, Consistency: 0, Value: 0, PriceGrowth: 0}); err != nil || st.Stability != 0 || st.Value != 0 || st.PriceGrowth != 0 || st.Growth != 50 {
+		t.Fatalf("0 배점 저장 = %+v err %v", st, err)
+	}
+	if _, err := svc.UpdateSettings(models.DividendScoreSetting{PriceGrowth: 101, Growth: 1}); err == nil {
+		t.Fatal("주가 성장도 100 넘으면 거절해야 한다")
+	}
+}
+
 // 내 보유: 계좌별 수량·평단, 다 팔았다가 다시 산 계좌는 다시 산 날부터, 그 뒤 받은 배당만 (세후, 받은 것만)
 func TestDividendScorePosition(t *testing.T) {
 	svc, db := newDivScoreFixture(t)

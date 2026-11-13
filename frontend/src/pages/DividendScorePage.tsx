@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Info, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { Info, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react';
 import { PageActions } from '../components/shell/PageSlots';
 import SplitView from '../components/shell/SplitView';
 import { apiClient } from '../api/client';
-import type { DivScoreRanking, DivScoreRow, DivStatus, MissingDividend } from '../types/models';
+import type { DivScoreParts, DivScoreRanking, DivScoreRow, DivStatus, MissingDividend } from '../types/models';
 import { assetPrimary, assetSecondary, tickerFirst } from '../utils/assetLabel';
 import CardIcon from '../components/ui/CardIcon';
 import { IconPodium } from '../components/ui/appIcons';
@@ -19,6 +19,26 @@ const STATUS_ORDER: DivStatus[] = ['up', 'flat', 'down', 'missed', 'new'];
 /** 목록 정렬: 종합 점수 또는 항목 하나 */
 type SortKey = 'total' | PartKey;
 const SORTS: { key: SortKey; label: string }[] = [{ key: 'total', label: '종합' }, ...PART_KEYS.map((k) => ({ key: k as SortKey, label: PART_SHORT[k] }))];
+
+/** 시장 필터: 한국(.KS·.KQ) / 미국(그 밖) — 고르면 그 안에서 순위를 다시 매긴다 */
+type Market = 'all' | 'kr' | 'us';
+const MARKETS: { key: Market; label: string }[] = [
+  { key: 'all', label: '전체' },
+  { key: 'kr', label: '한국' },
+  { key: 'us', label: '미국' },
+];
+const MARKET_KEY = 'divscore-market';
+const isKR = (ticker: string) => /\.(KS|KQ)$/i.test(ticker);
+const inMarket = (ticker: string, m: Market) => m === 'all' || (m === 'kr') === isKR(ticker);
+const norm = (v: string) => v.toLowerCase().replace(/\s+/g, '');
+const savedMarket = (): Market => {
+  try {
+    const v = localStorage.getItem(MARKET_KEY);
+    return v === 'kr' || v === 'us' ? v : 'all';
+  } catch {
+    return 'all';
+  }
+};
 
 /** 지난달 대비 순위 변화 칩 — 오름은 강조색, 내림은 파랑 (밝은 테마에서 오름·내림 색이 비슷해 보이지 않게) */
 function RankChange({ rank, prev }: { rank: number; prev?: number }) {
@@ -99,18 +119,46 @@ export default function DividendScorePage() {
   const rows = useMemo(() => data?.rows ?? [], [data]);
   // 항목 기준 정렬: 그 항목 점수가 높은 순 (같으면 종합 순위 순) — 서버의 항목별 순위와 같은 순서
   const [sortKey, setSortKey] = useState<SortKey>('total');
-  const sorted = useMemo(() => {
-    if (sortKey === 'total') return rows;
-    return [...rows].sort((a, b) => b.parts[sortKey] - a.parts[sortKey] || a.rank - b.rank);
-  }, [rows, sortKey]);
+  // 시장 필터(이 PC에 기억)와 검색어
+  const [market, setMarket] = useState<Market>(savedMarket);
+  useEffect(() => {
+    try {
+      localStorage.setItem(MARKET_KEY, market);
+    } catch {
+      /* 저장 못 해도 이번에는 쓴다 */
+    }
+  }, [market]);
+  const [query, setQuery] = useState('');
+
+  // 고른 시장 안에서 고른 기준으로 순위를 매기고, 지난달도 같은 시장·같은 기준으로 다시 매겨 비교한다
+  const ranked = useMemo(() => {
+    type Ranked = { rank: number; parts: DivScoreParts };
+    const order = (a: Ranked, b: Ranked) => (sortKey === 'total' ? a.rank - b.rank : b.parts[sortKey] - a.parts[sortKey] || a.rank - b.rank);
+    const cur = rows.filter((r) => inMarket(r.asset.ticker, market)).sort(order);
+    const prevRank = new Map((data?.prev ?? []).filter((p) => inMarket(p.ticker, market)).sort(order).map((p, i) => [p.asset_id, i + 1]));
+    return cur.map((r, i) => ({
+      row: r,
+      rank: i + 1,
+      // 지난달 전체 목록을 안 주는 예전 서버면 전체 보기에서만 서버가 매긴 지난달 순위를 쓴다
+      prev: data?.prev ? prevRank.get(r.asset_id) : market === 'all' ? (sortKey === 'total' ? r.prev_rank : r.prev_part_rank?.[sortKey]) : undefined,
+    }));
+  }, [rows, data, market, sortKey]);
+  // 검색은 순위를 그대로 두고 맞는 종목만 보여 준다 (한글·영문 이름, 티커 — 대소문자·띄어쓰기 무시)
+  const shown = useMemo(() => {
+    const q = norm(query);
+    if (!q) return ranked;
+    return ranked.filter(({ row }) => [row.asset.name, row.asset.ticker, assetPrimary(row.asset), assetSecondary(row.asset)].some((v) => norm(v ?? '').includes(q)));
+  }, [ranked, query]);
+  const marketLabel = MARKETS.find((m) => m.key === market)?.label ?? '';
+  const missingShown = (data?.missing ?? []).filter((m) => m.status === 'missing' && inMarket(m.ticker, market)).length;
+
   const counts = useMemo(() => {
     const c: Record<DivStatus, number> = { up: 0, flat: 0, down: 0, missed: 0, new: 0 };
-    for (const r of rows) c[r.metrics.status] += 1;
+    for (const { row } of ranked) c[row.metrics.status] += 1;
     return c;
-  }, [rows]);
+  }, [ranked]);
   const changes = useMemo(() => changesOf(rows), [rows]);
   const missingAll = data?.missing ?? [];
-  const missingPast = missingAll.filter((m) => m.status === 'missing');
   const selectedRow = rows.find((r) => r.asset_id === selected) ?? null;
 
   const recompute = async () => {
@@ -131,7 +179,7 @@ export default function DividendScorePage() {
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if ((e.key !== 'ArrowDown' && e.key !== 'ArrowUp') || rows.length === 0) return;
     e.preventDefault();
-    const ids = [SUMMARY, ...sorted.map((r) => r.asset_id)];
+    const ids = [SUMMARY, ...shown.map(({ row }) => row.asset_id)];
     const i = Math.max(0, ids.indexOf(selected ?? SUMMARY));
     const next = ids[e.key === 'ArrowDown' ? Math.min(ids.length - 1, i + 1) : Math.max(0, i - 1)];
     setSelected(next);
@@ -157,12 +205,48 @@ export default function DividendScorePage() {
               {STATUS_META[s].label} <span className="num ml-0.5 font-semibold">{counts[s]}</span>
             </span>
           ))}
-          {missingPast.length > 0 && <span className="badge !py-0.5 text-[11px] bg-amber-500/10 text-amber-200">기록 누락 {missingPast.length}</span>}
+          {missingShown > 0 && <span className="badge !py-0.5 text-[11px] bg-amber-500/10 text-amber-200">기록 누락 {missingShown}</span>}
         </div>
         {data && (
           <p className="label-mono">
-            {monthLabel(data.month)} 1일 기준 · 배당주 {rows.length}종목{data.no_dividend.length > 0 ? ` · 배당 없음 ${data.no_dividend.length}` : ''}
+            {monthLabel(data.month)} 1일 기준 · 배당주 {rows.length}종목{market !== 'all' ? ` 중 ${marketLabel} ${ranked.length}` : ''}
+            {data.no_dividend.length > 0 ? ` · 배당 없음 ${data.no_dividend.length}` : ''}
           </p>
+        )}
+        {rows.length > 1 && (
+          <div className="flex items-center gap-2">
+            <div className="glass-pill inline-flex shrink-0 p-0.5" role="radiogroup" aria-label="시장">
+              {MARKETS.map((o) => (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={market === o.key}
+                  onClick={() => setMarket(o.key)}
+                  title={o.key === 'all' ? '모든 종목' : `${o.label} 종목만 — 그 안에서 순위를 다시 매긴다`}
+                  className={`pill-item !px-2.5 !py-0.5 !text-[11px] ${market === o.key ? 'pill-item-active' : ''}`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="종목명·티커 검색"
+                aria-label="종목 검색"
+                className="input-field !py-1 !pl-8 !pr-7 !text-xs"
+              />
+              {query && (
+                <button type="button" onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white" aria-label="검색어 지우기">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
         )}
         {rows.length > 1 && (
           <div className="flex items-center gap-2">
@@ -205,7 +289,7 @@ export default function DividendScorePage() {
           </span>
           {changes.length > 0 && <span className="num shrink-0 text-xs text-amber-300">{changes.length}</span>}
         </button>
-        {rows.length > 0 && (
+        {shown.length > 0 && (
           <div aria-hidden className="label-mono sticky top-0 z-10 flex items-center gap-3 border-b border-white/[0.06] bg-ink-900/95 px-4 py-1.5 backdrop-blur">
             <span className="w-9 shrink-0 text-center">순위</span>
             <span className="min-w-0 flex-1">종목 · 배당</span>
@@ -215,13 +299,11 @@ export default function DividendScorePage() {
             </span>
           </div>
         )}
-        {sorted.map((r, i) => {
+        {shown.map(({ row: r, rank, prev }) => {
           const active = r.asset_id === selected;
           const first = tickerFirst(r.asset);
           const st = STATUS_META[r.metrics.status];
           const byPart = sortKey !== 'total';
-          const rank = byPart ? i + 1 : r.rank;
-          const prev = byPart ? r.prev_part_rank?.[sortKey] : r.prev_rank;
           const fill = byPart ? r.parts[sortKey] * 100 : r.score;
           const value = byPart ? partPoints(sortKey, r.parts, data!.weights).got : r.score;
           return (
@@ -266,6 +348,9 @@ export default function DividendScorePage() {
           );
         })}
         {rows.length === 0 && !loading && <p className="px-4 py-10 text-center text-sm text-zinc-400">배당을 주는 보유 종목이 없습니다.</p>}
+        {rows.length > 0 && shown.length === 0 && (
+          <p className="px-4 py-10 text-center text-sm text-zinc-400">{query ? `"${query}" 검색 결과가 없습니다${market !== 'all' ? ` (${marketLabel} 종목 중)` : ''}.` : `${marketLabel} 종목이 없습니다.`}</p>
+        )}
       </div>
     </>
   );

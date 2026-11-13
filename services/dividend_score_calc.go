@@ -9,16 +9,18 @@ import (
 // 배당 점수 — 보유 종목의 주당 배당 이력(시장, 없으면 내 기록)과 일별 종가로 asOf 시점의 지표와 항목 점수(0~1)를 계산한다.
 // 순수 함수 모음이다 (네트워크·DB 없음).
 //
-//   배당 성장(30)   3년 연평균 증가율 60% + 최근 1년 증가율 40% — 배당수익률이 2% 아래면 줄인다 (작은 배당의 큰 증가율 보정)
-//   배당 안정성(25) 삭감 없이 이어진 해 50% + 최근 3년 삭감 횟수 30% + 회차별 금액 변동 20%
+//   배당 성장(25)   3년 연평균 증가율 60% + 최근 1년 증가율 40% — 배당수익률이 2% 아래면 줄인다 (작은 배당의 큰 증가율 보정)
+//   배당 안정성(20) 삭감 없이 이어진 해 50% + 최근 3년 삭감 횟수 30% + 회차별 금액 변동 20%
 //   수익률 매력(20) (지금 배당수익률 70% + 최근 2년 평균 대비 30%) × 주가 보전
 //                   - 평균 대비: 1년 새 배당이 30% 넘게 바뀌었거나 하락 추세면 가산하지 않는다
 //                     (하락 추세 = 200일선보다 5% 넘게 아래, 또는 200일선 아래이면서 1년 주가 −5% 넘게)
 //                     (수익률이 주가 하락 때문에 올라간 것일 수 있다)
 //                   - 주가 보전: 최근 1년 주가 하락이 그 사이 받은 배당을 깎아 먹은 만큼 줄인다 (다 깎아 먹으면 절반)
 //   지급 꾸준함(10) 지급 주기 50% + 최근 3년 빠진 회차 50% (지금 회차가 늦으면 절반)
-//   가격·가치(15)   52주 범위에서의 위치 60% (낮을수록 싸다) + 200일선 추세 40% (아래면 하락 추세로 낮게, 너무 위면 과열로 낮게)
+//   가격·가치(10)   52주 범위에서의 위치 60% (낮을수록 싸다) + 200일선 추세 40% (아래면 하락 추세로 낮게, 너무 위면 과열로 낮게)
 //                   하락 추세에서는 52주 저점 근처여도 '싸다'를 중간까지만 준다 (떨어지는 칼날)
+//   주가 성장(15)   주가만(배당 제외) 최근 3년: 연평균 상승률 40% + 최근 1년 변화 20% + 1년 전보다 올라 있던 달의 비율 25% + 최대 낙폭 15%
+//                   — 주가가 꾸준히 오른 종목이 높다 (시세가 1년이 안 되면 중간 아래)
 // 특별배당(직전 회차들 중앙값의 2배 초과)은 성장·안정성 계산에서 뺀다.
 
 const (
@@ -38,7 +40,8 @@ const (
 	// divScoreFormula: 점수 공식 버전 — 바꾸면 저장된 지난 기록을 새 공식으로 다시 계산한다
 	//   1 처음
 	//   2 수익률 매력에 주가 보전·하락 추세 반영, 가격·가치의 200일선을 추세로
-	divScoreFormula = 2
+	//   3 주가 성장 항목 추가
+	divScoreFormula = 3
 )
 
 // DivScoreMetrics 는 화면에 보여 줄 지표다 (금액은 종목 통화, 비율은 %).
@@ -66,6 +69,11 @@ type DivScoreMetrics struct {
 	PriceChg1y    *float64 `json:"price_chg_1y,omitempty"`  // 최근 1년 주가 변화 (%)
 	DivEaten      *float64 `json:"div_eaten,omitempty"`     // 최근 1년 주가 하락 ÷ 최근 12개월 주당 배당 (1 = 받은 배당을 다 깎아 먹음)
 	Downtrend     bool     `json:"downtrend,omitempty"`     // 하락 추세
+	PriceCagr3y   *float64 `json:"price_cagr_3y,omitempty"` // 최근 3년(없으면 1년 이상 있는 만큼) 연평균 주가 상승률 (%)
+	PriceYears    float64  `json:"price_years,omitempty"`   // 그 계산에 쓴 기간 (년)
+	UpMonths      *float64 `json:"up_months,omitempty"`     // 그 기간 월말 종가가 1년 전 같은 달보다 높았던 비율 (0~1)
+	UpMonthsN     int      `json:"up_months_n,omitempty"`   // 그 비교에 쓴 달 수
+	MaxDrawdown   *float64 `json:"max_drawdown,omitempty"`  // 그 기간 최대 낙폭 (%, 0 이하)
 	HistoryYears  float64  `json:"history_years"`           // 배당 이력 길이 (년)
 	Status        string   `json:"status"`
 }
@@ -77,6 +85,7 @@ type DivScoreParts struct {
 	Yield       float64 `json:"yield"`
 	Consistency float64 `json:"consistency"`
 	Value       float64 `json:"value"`
+	PriceGrowth float64 `json:"price_growth"`
 }
 
 // piecewise: 점 (x, y) 를 잇는 꺾은선. 범위 밖은 끝 값.
@@ -361,6 +370,40 @@ func computeDivScore(events []DivPerShare, closes []PricePoint, asOf time.Time, 
 			}
 			break
 		}
+		// 주가 성장: 최근 3년(없으면 1년 이상 있는 만큼) 연평균 상승률·1년 전보다 올라 있던 달의 비율·최대 낙폭
+		from := asOf.AddDate(-3, 0, 0).Unix()
+		win := px[sort.Search(n, func(i int) bool { return px[i].Time >= from }):]
+		if len(win) > 1 {
+			if years := float64(win[len(win)-1].Time-win[0].Time) / (365.25 * 86400); years >= 1 {
+				m.PriceYears = math.Round(years*10) / 10
+				m.PriceCagr3y = fptr((math.Pow(price/win[0].Close, 1/years) - 1) * 100)
+				var months []float64 // 월말 종가
+				last := ""
+				for _, p := range win {
+					if k := time.Unix(p.Time, 0).In(kst).Format("2006-01"); k != last {
+						months, last = append(months, p.Close), k
+					} else {
+						months[len(months)-1] = p.Close
+					}
+				}
+				up, cnt := 0, 0
+				for i := 12; i < len(months); i++ {
+					cnt++
+					if months[i] > months[i-12] {
+						up++
+					}
+				}
+				if cnt > 0 {
+					m.UpMonths, m.UpMonthsN = fptr(float64(up)/float64(cnt)), cnt
+				}
+				peak, mdd := 0.0, 0.0
+				for _, p := range win {
+					peak = math.Max(peak, p.Close)
+					mdd = math.Min(mdd, (p.Close/peak-1)*100)
+				}
+				m.MaxDrawdown = fptr(mdd)
+			}
+		}
 	}
 
 	// 상태
@@ -442,19 +485,35 @@ func computeDivScore(events []DivPerShare, closes []PricePoint, asOf time.Time, 
 		}
 	}
 	parts.Value = 0.6*pos + 0.4*trend
+
+	// 주가 성장: 3년 연평균 40% + 최근 1년 20% + 올라 있던 달 비율 25% + 최대 낙폭 15% (시세 1년 미만이면 중간 아래)
+	parts.PriceGrowth = 0.3
+	if m.PriceCagr3y != nil {
+		chg, up, dd := 0.3, 0.5, 0.5
+		if m.PriceChg1y != nil {
+			chg = piecewise(*m.PriceChg1y, [][2]float64{{-10, 0}, {0, 0.3}, {10, 0.8}, {20, 1}})
+		}
+		if m.UpMonths != nil {
+			up = *m.UpMonths
+		}
+		if m.MaxDrawdown != nil {
+			dd = piecewise(*m.MaxDrawdown, [][2]float64{{-50, 0}, {-35, 0.2}, {-20, 0.6}, {-10, 1}})
+		}
+		parts.PriceGrowth = 0.4*piecewise(*m.PriceCagr3y, growthCurve) + 0.2*chg + 0.25*up + 0.15*dd
+	}
 	return m, parts, true
 }
 
 // DivScoreWeights 는 배점 (합이 100 이 아니어도 비율로 쓴다)
 type DivScoreWeights struct {
-	Growth, Stability, Yield, Consistency, Value float64
+	Growth, Stability, Yield, Consistency, Value, PriceGrowth float64
 }
 
 // total: 항목 점수 × 배점 ÷ 배점 합 × 100 (0~100)
 func (w DivScoreWeights) total(p DivScoreParts) float64 {
-	sum := w.Growth + w.Stability + w.Yield + w.Consistency + w.Value
+	sum := w.Growth + w.Stability + w.Yield + w.Consistency + w.Value + w.PriceGrowth
 	if sum <= 0 {
 		return 0
 	}
-	return (p.Growth*w.Growth + p.Stability*w.Stability + p.Yield*w.Yield + p.Consistency*w.Consistency + p.Value*w.Value) / sum * 100
+	return (p.Growth*w.Growth + p.Stability*w.Stability + p.Yield*w.Yield + p.Consistency*w.Consistency + p.Value*w.Value + p.PriceGrowth*w.PriceGrowth) / sum * 100
 }

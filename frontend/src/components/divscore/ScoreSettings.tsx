@@ -71,7 +71,7 @@ export default function ScoreSettings({ initial, onClose, onSaved }: { initial: 
           <div className="flex items-center justify-between gap-2 border-t border-white/[0.07] px-5 py-3.5">
             <button type="button" className="btn-ghost !px-3 !text-xs" onClick={() => setW({ ...DEFAULT_WEIGHTS })}>
               <RotateCcw className="h-3.5 w-3.5" />
-              기본값 30·25·20·10·15
+              기본값 {PART_KEYS.map((k) => DEFAULT_WEIGHTS[k]).join('·')}
             </button>
             <div className="flex gap-2">
               <button type="button" className="btn-ghost" onClick={onClose}>

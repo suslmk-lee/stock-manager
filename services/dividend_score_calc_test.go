@@ -53,7 +53,7 @@ func TestDivScoreGrowingQuarterly(t *testing.T) {
 	if p.Growth < 0.8 || p.Stability < 0.8 {
 		t.Fatalf("parts = %+v", p)
 	}
-	w := DivScoreWeights{30, 25, 20, 10, 15}
+	w := DivScoreWeights{30, 25, 20, 10, 15, 0}
 	if s := w.total(p); s <= 0 || s > 100 {
 		t.Fatalf("total = %v", s)
 	}
@@ -127,10 +127,10 @@ func TestDivScoreNewHistory(t *testing.T) {
 // 배점은 비율로 쓴다 (합이 100 이 아니어도)
 func TestDivScoreWeights(t *testing.T) {
 	p := DivScoreParts{Growth: 1, Stability: 0, Yield: 0, Consistency: 0, Value: 0}
-	if s := (DivScoreWeights{30, 25, 20, 10, 15}).total(p); math.Abs(s-30) > 1e-9 {
+	if s := (DivScoreWeights{30, 25, 20, 10, 15, 0}).total(p); math.Abs(s-30) > 1e-9 {
 		t.Fatalf("total = %v", s)
 	}
-	if s := (DivScoreWeights{60, 50, 40, 20, 30}).total(p); math.Abs(s-30) > 1e-9 {
+	if s := (DivScoreWeights{60, 50, 40, 20, 30, 0}).total(p); math.Abs(s-30) > 1e-9 {
 		t.Fatalf("scaled = %v", s)
 	}
 	if s := (DivScoreWeights{}).total(p); s != 0 {

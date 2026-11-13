@@ -10,12 +10,13 @@ export const STATUS_META: Record<DivStatus, { label: string; cls: string; hint: 
 };
 
 export type PartKey = keyof DivScoreParts;
-export const PART_KEYS: PartKey[] = ['growth', 'stability', 'yield', 'consistency', 'value'];
+export const PART_KEYS: PartKey[] = ['growth', 'stability', 'yield', 'consistency', 'price_growth', 'value'];
 export const PART_LABEL: Record<PartKey, string> = {
   growth: '배당 성장',
   stability: '배당 안정성',
   yield: '지금 수익률 매력',
   consistency: '지급 꾸준함',
+  price_growth: '주가 성장',
   value: '가격·가치',
 };
 /** 정렬 칩 등 좁은 곳의 짧은 이름 */
@@ -24,6 +25,7 @@ export const PART_SHORT: Record<PartKey, string> = {
   stability: '안정성',
   yield: '수익률',
   consistency: '꾸준함',
+  price_growth: '주가',
   value: '가격',
 };
 export const PART_HELP: Record<PartKey, string> = {
@@ -32,10 +34,11 @@ export const PART_HELP: Record<PartKey, string> = {
   yield:
     '(지금 배당수익률 70% + 최근 2년 평균 대비 30%) × 주가 보전 — 평균보다 높으면 싼 편이지만 하락 추세이거나 1년 새 배당이 30% 넘게 바뀐 해는 가산 없음. 최근 1년 주가 하락이 받은 배당을 깎아 먹은 만큼 줄인다 (다 깎아 먹으면 절반)',
   consistency: '지급 주기(월·분기…) 50% + 최근 3년 빠진 회차 50%, 이번 회차가 늦으면 절반',
+  price_growth: '주가만(배당 제외) 최근 3년 — 연평균 상승률 40% + 최근 1년 변화 20% + 1년 전보다 올라 있던 달의 비율 25% + 최대 낙폭 15% · 꾸준히 오른 종목이 높다 (시세 1년 미만이면 중간 아래)',
   value: '52주 범위에서의 위치 60% (낮을수록 싸다) + 200일선 추세 40% (아래면 하락 추세로 낮게, 조금 위가 가장 높고, 너무 위면 과열) · 하락 추세면 52주 저점 근처여도 \'싸다\'는 중간까지만',
 };
 
-export const DEFAULT_WEIGHTS: DivScoreWeights = { growth: 30, stability: 25, yield: 20, consistency: 10, value: 15 };
+export const DEFAULT_WEIGHTS: DivScoreWeights = { growth: 25, stability: 20, yield: 20, consistency: 10, price_growth: 15, value: 10 };
 
 const signedPct = (v: number, d = 1) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}%`;
 export const pct = (v: number | undefined, d = 1) => (v == null ? '—' : `${v.toFixed(d)}%`);
@@ -66,6 +69,16 @@ export function partReason(key: PartKey, m: DivScoreMetrics): string {
     }
     case 'consistency':
       return [`${m.cycle ? `${m.cycle} 지급` : '최근 12개월 지급 없음'}`, `최근 3년 빠진 회차 ${m.missed_3y}`, m.missed_now ? '이번 회차 늦음' : ''].filter(Boolean).join(' · ');
+    case 'price_growth':
+      if (m.price_cagr_3y == null) return '주가 이력이 1년이 안 되어 중간 아래 점수';
+      return [
+        `${m.price_years != null && m.price_years < 2.95 ? `${m.price_years}년` : '3년'} 연평균 ${signedPct(m.price_cagr_3y)}`,
+        m.price_chg_1y != null ? `최근 1년 ${signedPct(m.price_chg_1y)}` : '',
+        m.up_months != null ? `1년 전보다 오른 달 ${Math.round(m.up_months * 100)}%` : '',
+        m.max_drawdown != null ? `최대 낙폭 ${signedPct(m.max_drawdown)}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
     case 'value':
       return [
         m.pos_52 != null ? `52주 범위 ${(m.pos_52 * 100).toFixed(0)}% 위치` : '52주 범위 없음',

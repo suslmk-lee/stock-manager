@@ -763,6 +763,7 @@ export interface DivScoreParts {
   stability: number;
   yield: number;
   consistency: number;
+  price_growth: number;
   value: number;
 }
 
@@ -793,6 +794,15 @@ export interface DivScoreMetrics {
   div_eaten?: number;
   /** 하락 추세 (200일선 −5% 아래, 또는 200일선 아래 + 1년 −5% 넘게) */
   downtrend?: boolean;
+  /** 최근 3년(없으면 1년 이상 있는 만큼) 연평균 주가 상승률 (%) */
+  price_cagr_3y?: number;
+  /** 그 계산에 쓴 기간 (년) */
+  price_years?: number;
+  /** 월말 종가가 1년 전 같은 달보다 높았던 비율 (0~1) */
+  up_months?: number;
+  up_months_n?: number;
+  /** 최대 낙폭 (%, 0 이하) */
+  max_drawdown?: number;
   history_years: number;
   status: DivStatus;
 }
@@ -821,6 +831,7 @@ export interface DivScoreWeights {
   stability: number;
   yield: number;
   consistency: number;
+  price_growth: number;
   value: number;
   updated_at?: string;
 }
@@ -849,6 +860,8 @@ export interface DivScoreRanking {
   rows: DivScoreRow[];
   no_dividend: Asset[];
   missing: MissingDividend[];
+  /** 지난달 종목 전체의 순위·점수 (한국/미국만·항목별로 지난달 순위를 다시 매길 때) */
+  prev?: { asset_id: number; ticker: string; rank: number; score: number; parts: DivScoreParts }[];
 }
 
 export interface DivScoreDetail {
