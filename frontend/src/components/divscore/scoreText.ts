@@ -18,6 +18,14 @@ export const PART_LABEL: Record<PartKey, string> = {
   consistency: '지급 꾸준함',
   value: '가격·가치',
 };
+/** 정렬 칩 등 좁은 곳의 짧은 이름 */
+export const PART_SHORT: Record<PartKey, string> = {
+  growth: '성장',
+  stability: '안정성',
+  yield: '수익률',
+  consistency: '꾸준함',
+  value: '가격',
+};
 export const PART_HELP: Record<PartKey, string> = {
   growth: '3년 연평균 증가율 60% + 최근 1년 증가율 40% · 배당수익률이 2% 아래면 줄인다 (작은 배당의 큰 증가율 보정)',
   stability: '삭감 없이 이어진 해 50% + 최근 3년 삭감 30% + 회차별 금액 변동 20%',

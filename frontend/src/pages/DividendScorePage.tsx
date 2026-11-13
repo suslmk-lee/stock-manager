@@ -10,29 +10,33 @@ import { IconPodium } from '../components/ui/appIcons';
 import ScoreDetail, { MissingList } from '../components/divscore/ScoreDetail';
 import ScoreSettings from '../components/divscore/ScoreSettings';
 import RecordMissingModal from '../components/divscore/RecordMissingModal';
-import { monthLabel, PART_KEYS, PART_LABEL, STATUS_META } from '../components/divscore/scoreText';
+import { monthLabel, PART_KEYS, PART_LABEL, PART_SHORT, partPoints, STATUS_META, type PartKey } from '../components/divscore/scoreText';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '불러오지 못했습니다.');
 const SUMMARY = -1;
 const STATUS_ORDER: DivStatus[] = ['up', 'flat', 'down', 'missed', 'new'];
 
+/** 목록 정렬: 종합 점수 또는 항목 하나 */
+type SortKey = 'total' | PartKey;
+const SORTS: { key: SortKey; label: string }[] = [{ key: 'total', label: '종합' }, ...PART_KEYS.map((k) => ({ key: k as SortKey, label: PART_SHORT[k] }))];
+
 /** 지난달 대비 순위 변화 칩 — 오름은 강조색, 내림은 파랑 (밝은 테마에서 오름·내림 색이 비슷해 보이지 않게) */
-function RankChange({ row }: { row: DivScoreRow }) {
-  if (row.prev_rank == null)
+function RankChange({ rank, prev }: { rank: number; prev?: number }) {
+  if (prev == null)
     return (
       <span className="rounded-full border border-white/15 px-1.5 text-[10px] font-semibold leading-4 tracking-wide text-zinc-300" title="지난달 순위에 없던 종목">
         NEW
       </span>
     );
-  const d = row.prev_rank - row.rank;
+  const d = prev - rank;
   if (d === 0)
     return (
-      <span className="num text-[11px] text-zinc-600" title={`지난달도 ${row.rank}위`}>
+      <span className="num text-[11px] text-zinc-600" title={`지난달도 ${rank}위`}>
         –
       </span>
     );
   return (
-    <span className={`num rounded-full px-1.5 text-[11px] font-semibold leading-[18px] ${d > 0 ? 'bg-mint-400/15 text-mint-300' : 'bg-sky-400/15 text-sky-300'}`} title={`지난달 ${row.prev_rank}위`}>
+    <span className={`num rounded-full px-1.5 text-[11px] font-semibold leading-[18px] ${d > 0 ? 'bg-mint-400/15 text-mint-300' : 'bg-sky-400/15 text-sky-300'}`} title={`지난달 ${prev}위`}>
       {d > 0 ? `▲${d}` : `▼${-d}`}
     </span>
   );
@@ -93,6 +97,12 @@ export default function DividendScorePage() {
   }, [split, selected, data]);
 
   const rows = useMemo(() => data?.rows ?? [], [data]);
+  // 항목 기준 정렬: 그 항목 점수가 높은 순 (같으면 종합 순위 순) — 서버의 항목별 순위와 같은 순서
+  const [sortKey, setSortKey] = useState<SortKey>('total');
+  const sorted = useMemo(() => {
+    if (sortKey === 'total') return rows;
+    return [...rows].sort((a, b) => b.parts[sortKey] - a.parts[sortKey] || a.rank - b.rank);
+  }, [rows, sortKey]);
   const counts = useMemo(() => {
     const c: Record<DivStatus, number> = { up: 0, flat: 0, down: 0, missed: 0, new: 0 };
     for (const r of rows) c[r.metrics.status] += 1;
@@ -121,7 +131,7 @@ export default function DividendScorePage() {
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if ((e.key !== 'ArrowDown' && e.key !== 'ArrowUp') || rows.length === 0) return;
     e.preventDefault();
-    const ids = [SUMMARY, ...rows.map((r) => r.asset_id)];
+    const ids = [SUMMARY, ...sorted.map((r) => r.asset_id)];
     const i = Math.max(0, ids.indexOf(selected ?? SUMMARY));
     const next = ids[e.key === 'ArrowDown' ? Math.min(ids.length - 1, i + 1) : Math.max(0, i - 1)];
     setSelected(next);
@@ -154,6 +164,26 @@ export default function DividendScorePage() {
             {monthLabel(data.month)} 1일 기준 · 배당주 {rows.length}종목{data.no_dividend.length > 0 ? ` · 배당 없음 ${data.no_dividend.length}` : ''}
           </p>
         )}
+        {rows.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="label-mono shrink-0">정렬</span>
+            <div className="glass-pill inline-flex min-w-0 flex-wrap p-0.5" role="radiogroup" aria-label="순위 정렬 기준">
+              {SORTS.map((o) => (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={sortKey === o.key}
+                  onClick={() => setSortKey(o.key)}
+                  title={o.key === 'total' ? '종합 점수 순' : `${PART_LABEL[o.key]} 점수 순`}
+                  className={`pill-item !px-2.5 !py-0.5 !text-[11px] ${sortKey === o.key ? 'pill-item-active' : ''}`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto" onKeyDown={onKeyDown} role="listbox" aria-label="배당 점수 순위">
         <button
@@ -180,13 +210,20 @@ export default function DividendScorePage() {
             <span className="w-9 shrink-0 text-center">순위</span>
             <span className="min-w-0 flex-1">종목 · 배당</span>
             <span className="w-10 shrink-0 text-center">지난달</span>
-            <span className="w-12 shrink-0 text-right">점수</span>
+            <span className="w-12 shrink-0 text-right" title={sortKey === 'total' ? undefined : `${PART_LABEL[sortKey]} 점수 (배점 ${partPoints(sortKey, rows[0].parts, data!.weights).max.toFixed(0)}점 만점)`}>
+              {sortKey === 'total' ? '점수' : `${PART_SHORT[sortKey]}/${partPoints(sortKey, rows[0].parts, data!.weights).max.toFixed(0)}`}
+            </span>
           </div>
         )}
-        {rows.map((r) => {
+        {sorted.map((r, i) => {
           const active = r.asset_id === selected;
           const first = tickerFirst(r.asset);
           const st = STATUS_META[r.metrics.status];
+          const byPart = sortKey !== 'total';
+          const rank = byPart ? i + 1 : r.rank;
+          const prev = byPart ? r.prev_part_rank?.[sortKey] : r.prev_rank;
+          const fill = byPart ? r.parts[sortKey] * 100 : r.score;
+          const value = byPart ? partPoints(sortKey, r.parts, data!.weights).got : r.score;
           return (
             <button
               key={r.asset_id}
@@ -204,7 +241,7 @@ export default function DividendScorePage() {
               }`}
             >
               <span className="flex w-9 shrink-0 justify-center">
-                <span className={`num inline-flex h-6 min-w-[30px] items-center justify-center rounded-full px-2 text-[13px] font-semibold ${r.rank <= 3 ? 'bg-mint-400 text-ink-950' : 'bg-white/[0.07] text-zinc-200'}`}>{r.rank}</span>
+                <span className={`num inline-flex h-6 min-w-[30px] items-center justify-center rounded-full px-2 text-[13px] font-semibold ${rank <= 3 ? 'bg-mint-400 text-ink-950' : 'bg-white/[0.07] text-zinc-200'}`}>{rank}</span>
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline gap-1.5">
@@ -215,14 +252,16 @@ export default function DividendScorePage() {
                   <span className={`badge !px-1.5 !py-0 text-[10px] ${st.cls}`}>{st.label}</span>
                   {r.missing_count > 0 && <span className="text-[10px] text-amber-300">기록 누락 {r.missing_count}</span>}
                   <span className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-                    <span className="block h-full rounded-full bg-mint-400/70" style={{ width: `${r.score}%` }} />
+                    <span className="block h-full rounded-full bg-mint-400/70" style={{ width: `${fill}%` }} />
                   </span>
                 </span>
               </span>
               <span className="flex w-10 shrink-0 justify-center">
-                <RankChange row={r} />
+                <RankChange rank={rank} prev={prev} />
               </span>
-              <span className="num w-12 shrink-0 text-right text-[15px] text-white">{r.score.toFixed(1)}</span>
+              <span className="num w-12 shrink-0 text-right text-[15px] text-white" title={byPart ? `종합 ${r.score.toFixed(1)}점 · ${r.rank}위` : undefined}>
+                {value.toFixed(1)}
+              </span>
             </button>
           );
         })}

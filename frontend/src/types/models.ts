@@ -808,6 +808,10 @@ export interface DivScoreRow {
   parts: DivScoreParts;
   metrics: DivScoreMetrics;
   estimated: boolean;
+  /** 항목별 순위 (그 항목 점수 순, 같으면 총점 순) */
+  part_rank: Record<keyof DivScoreParts, number>;
+  /** 지난달 항목별 순위 (지난달 순위가 있을 때만) */
+  prev_part_rank?: Record<keyof DivScoreParts, number>;
   yoc_pct?: number;
   missing_count: number;
 }
@@ -855,4 +859,17 @@ export interface DivScoreDetail {
   history: { month: string; score: number; rank: number; of: number; status: DivStatus; estimated: boolean }[];
   years: { year: number; regular: number; special: number; count: number; partial: boolean }[];
   payments: { date: string; amount: number; special: boolean }[];
+  /** 지금 보유 (없으면 보유하지 않는 종목) */
+  position?: DivScorePosition;
+}
+
+/** 이 종목의 지금 보유 — 금액은 종목 통화, 받은 배당은 기록 통화별 (세후) */
+export interface DivScorePosition {
+  quantity: number;
+  avg_price: number;
+  cost: number;
+  /** 지금 보유를 시작한 날 (계좌 중 가장 이른) */
+  since?: string;
+  received: { currency: string; total: number; last_12m: number; count: number }[];
+  accounts: { account_id: number; name: string; broker: string; account_type: AccountType; quantity: number; avg_price: number; since?: string }[];
 }

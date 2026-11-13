@@ -10,6 +10,7 @@ import BrokerLogo from '../ui/BrokerLogo';
 import { accountDisplayName } from '../../utils/accountLabel';
 import PriceTrend from './PriceTrend';
 import InvestCash, { type CashContext } from './InvestCash';
+import MyPosition from './MyPosition';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '불러오지 못했습니다.');
 const shortDate = (d: string) => `${d.slice(2, 4)}.${d.slice(5, 7)}.${d.slice(8, 10)}`;
@@ -152,6 +153,15 @@ export default function ScoreDetail({
         </div>
       </div>
 
+      {/* 내 보유 (지금 기준) */}
+      {detail?.position ? (
+        <div className="border-b border-white/[0.07] p-4 sm:p-5">
+          <MyPosition position={detail.position} price={price} ccy={ccy} ttm={m.ttm} usdKrw={cash && cash !== 'error' ? cash.usdKrw : 0} />
+        </div>
+      ) : detail ? (
+        <p className="border-b border-white/[0.07] px-4 py-2.5 text-[12px] text-zinc-500 sm:px-5">지금은 보유하지 않은 종목입니다.</p>
+      ) : null}
+
       {/* 항목별 점수 */}
       <div className="space-y-3 border-b border-white/[0.07] p-4 sm:p-5">
         {PART_KEYS.map((k) => {
@@ -177,7 +187,7 @@ export default function ScoreDetail({
       <div className="grid grid-cols-2 gap-x-4 gap-y-4 border-b border-white/[0.07] p-4 sm:grid-cols-3 sm:p-5">
         <Metric label="최근 12개월 주당 배당" value={dps(m.ttm, ccy)} sub={m.specials_12m > 0 ? `특별배당 ${m.specials_12m}회 제외` : m.source === 'records' ? '내 배당 기록으로 계산' : '시장 배당 이력'} />
         <Metric label="배당수익률" value={pct(m.yield_pct, 2)} sub={m.avg_yield_pct != null ? `2년 평균 ${pct(m.avg_yield_pct, 2)}` : undefined} />
-        <Metric label="내 평단 대비 배당률" value={pct(row.yoc_pct, 2)} sub="최근 12개월 ÷ 평균 매수가" />
+        <Metric label="배당 연속 증가" value={`${m.increase_years}년`} sub={`삭감 없이 ${m.no_cut_years}년${m.no_cut_years >= 4 ? ' 이상' : ''}`} />
         <Metric label="1년 · 3년 연평균 증가" value={m.growth_1y != null ? signedPct(m.growth_1y) : '—'} sub={m.cagr_3y != null ? `3년 ${signedPct(m.cagr_3y)}/년` : '3년 이력 부족'} />
         <Metric label="주기" value={m.cycle || '—'} sub={`최근 12개월 ${m.payments_12m}회`} />
         <Metric label="마지막 · 다음 배당" value={m.last_payment ? shortDate(m.last_payment) : '—'} sub={m.missed_now ? '다음 회차가 늦어지고 있음' : m.next_expected ? `다음 예상 ${shortDate(m.next_expected)}` : undefined} />

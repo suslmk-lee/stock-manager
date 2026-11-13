@@ -433,6 +433,9 @@ type DivScoreRow struct {
 	Parts      DivScoreParts   `json:"parts"`
 	Metrics    DivScoreMetrics `json:"metrics"`
 	Estimated  bool            `json:"estimated"`
+	// 항목별 순위 (그 항목 점수 순, 같으면 총점 순) — 목록을 항목 기준으로 정렬할 때. 지난달은 그달 종목들 사이의 순위
+	PartRank     map[string]int `json:"part_rank"`
+	PrevPartRank map[string]int `json:"prev_part_rank,omitempty"`
 	// 이번 달만: 내 평균 단가 대비 배당률, 기록 누락 회차 수
 	YOCPct       *float64 `json:"yoc_pct,omitempty"`
 	MissingCount int      `json:"missing_count"`
@@ -483,7 +486,49 @@ func rankMonth(snaps []models.DividendScoreSnapshot, w DivScoreWeights) []DivSco
 	for i := range rows {
 		rows[i].Rank = i + 1
 	}
+	assignPartRanks(rows)
 	return rows
+}
+
+// divPartKeys: 항목 이름 (화면의 growth·stability·yield·consistency·value 와 같다)
+var divPartKeys = []string{"growth", "stability", "yield", "consistency", "value"}
+
+func partValue(p DivScoreParts, key string) float64 {
+	switch key {
+	case "growth":
+		return p.Growth
+	case "stability":
+		return p.Stability
+	case "yield":
+		return p.Yield
+	case "consistency":
+		return p.Consistency
+	default:
+		return p.Value
+	}
+}
+
+// assignPartRanks: 항목마다 그 항목 점수가 높은 순서로 순위를 매긴다 (같으면 총점 순위 순). rows 는 총점 순위대로 정렬돼 있어야 한다.
+func assignPartRanks(rows []DivScoreRow) {
+	for i := range rows {
+		rows[i].PartRank = make(map[string]int, len(divPartKeys))
+	}
+	idx := make([]int, len(rows))
+	for _, k := range divPartKeys {
+		for i := range idx {
+			idx[i] = i
+		}
+		sort.SliceStable(idx, func(a, b int) bool {
+			va, vb := partValue(rows[idx[a]].Parts, k), partValue(rows[idx[b]].Parts, k)
+			if math.Abs(va-vb) > 1e-9 {
+				return va > vb
+			}
+			return rows[idx[a]].Rank < rows[idx[b]].Rank
+		})
+		for pos, i := range idx {
+			rows[i].PartRank[k] = pos + 1
+		}
+	}
 }
 
 func prevMonthKey(key string) string {
@@ -554,6 +599,7 @@ func (s *DividendScoreService) GetRanking(month string) (*DivScoreRanking, error
 		if p, ok := prevRows[rows[i].AssetID]; ok {
 			rank, score := p.Rank, p.Score
 			rows[i].PrevRank, rows[i].PrevScore, rows[i].PrevStatus = &rank, &score, p.Metrics.Status
+			rows[i].PrevPartRank = p.PartRank
 		}
 	}
 
@@ -704,6 +750,142 @@ type DivScoreDetail struct {
 	History  []DivScoreHistoryPoint `json:"history"` // 오래된 달부터
 	Years    []DivYearDPS           `json:"years"`
 	Payments []DivPayment           `json:"payments"` // 최근 3년, 최근 것부터
+	Position *DivScorePosition      `json:"position,omitempty"` // 지금 보유 (없으면 보유하지 않는 종목)
+}
+
+// DivScorePosition 은 이 종목의 지금 보유 — 계좌별 수량·평단과 지금 보유 기간에 받은 배당 (금액은 종목 통화, 배당은 기록 통화별)
+type DivScorePosition struct {
+	Quantity float64                   `json:"quantity"`
+	AvgPrice float64                   `json:"avg_price"`       // 수량 가중 평균 매수가
+	Cost     float64                   `json:"cost"`            // 원금 = Σ 수량 × 평단
+	Since    string                    `json:"since,omitempty"` // 지금 보유를 시작한 날 (계좌 중 가장 이른, YYYY-MM-DD)
+	Received []DivReceived             `json:"received"`        // 지금 보유 기간에 받은 배당 (세후)
+	Accounts []DivScorePositionAccount `json:"accounts"`        // 평가 원금이 큰 계좌부터
+}
+
+// DivReceived 는 받은 배당 합계 (세후 = 금액 − 세금), 기록 통화별
+type DivReceived struct {
+	Currency string  `json:"currency"`
+	Total    float64 `json:"total"`
+	Last12m  float64 `json:"last_12m"`
+	Count    int     `json:"count"`
+}
+
+type DivScorePositionAccount struct {
+	AccountID   uint    `json:"account_id"`
+	Name        string  `json:"name"`
+	Broker      string  `json:"broker"`
+	AccountType string  `json:"account_type"`
+	Quantity    float64 `json:"quantity"`
+	AvgPrice    float64 `json:"avg_price"`
+	Since       string  `json:"since,omitempty"`
+}
+
+// position: 지금 보유 계좌별 수량·평단, 보유를 시작한 날(수량이 0 에서 늘어난 마지막 날), 그 뒤 그 계좌에서 받은 배당
+func (s *DividendScoreService) position(assetID uint, now time.Time) (*DivScorePosition, error) {
+	var holdings []models.Holding
+	if err := s.db.Where("asset_id = ? AND quantity > 0", assetID).Find(&holdings).Error; err != nil {
+		return nil, err
+	}
+	if len(holdings) == 0 {
+		return nil, nil
+	}
+	byAcc := map[uint]*DivScorePositionAccount{}
+	ids := []uint{}
+	for _, h := range holdings {
+		r := byAcc[h.AccountID]
+		if r == nil {
+			r = &DivScorePositionAccount{AccountID: h.AccountID}
+			byAcc[h.AccountID] = r
+			ids = append(ids, h.AccountID)
+		}
+		// 같은 계좌에 줄이 둘이면 수량 가중으로 합친다
+		cost := r.Quantity*r.AvgPrice + h.Quantity*h.AveragePrice
+		r.Quantity += h.Quantity
+		if r.Quantity > 0 {
+			r.AvgPrice = cost / r.Quantity
+		}
+	}
+	var accounts []models.Account
+	if err := s.db.Unscoped().Where("id IN ?", ids).Find(&accounts).Error; err != nil {
+		return nil, err
+	}
+	for _, a := range accounts {
+		if r := byAcc[a.ID]; r != nil {
+			r.Name, r.Broker, r.AccountType = a.Name, a.Broker, string(a.AccountType)
+		}
+	}
+	// 보유 시작: 매매를 날짜순으로 따라가며 수량이 0 에서 늘어난 마지막 날
+	var txs []models.Transaction
+	if err := s.db.Where("asset_id = ? AND account_id IN ?", assetID, ids).Order("date ASC, id ASC").Find(&txs).Error; err != nil {
+		return nil, err
+	}
+	qty := map[uint]float64{}
+	since := map[uint]time.Time{}
+	for _, t := range txs {
+		before := qty[t.AccountID]
+		switch t.Type {
+		case models.TransactionTypeBuy:
+			qty[t.AccountID] += t.Quantity
+		case models.TransactionTypeSell:
+			qty[t.AccountID] -= t.Quantity
+		}
+		if before <= 1e-9 && qty[t.AccountID] > 1e-9 {
+			since[t.AccountID] = t.Date
+		}
+	}
+	var divs []models.Dividend
+	if err := s.db.Where("asset_id = ? AND account_id IN ? AND is_received = ?", assetID, ids, true).Find(&divs).Error; err != nil {
+		return nil, err
+	}
+	got := map[string]*DivReceived{}
+	yearAgo := now.AddDate(-1, 0, 0)
+	for _, d := range divs {
+		if st, ok := since[d.AccountID]; ok && d.Date.Before(st) {
+			continue // 지금 보유 전(예전에 팔기 전)에 받은 배당
+		}
+		c := strings.ToUpper(d.Currency)
+		r := got[c]
+		if r == nil {
+			r = &DivReceived{Currency: c}
+			got[c] = r
+		}
+		net := d.Amount - d.Tax
+		r.Total += net
+		r.Count++
+		if d.Date.After(yearAgo) {
+			r.Last12m += net
+		}
+	}
+
+	out := &DivScorePosition{Received: []DivReceived{}, Accounts: []DivScorePositionAccount{}}
+	var first time.Time
+	for _, id := range ids {
+		r := byAcc[id]
+		if st, ok := since[id]; ok {
+			r.Since = st.In(kst).Format(dateLayout)
+			if first.IsZero() || st.Before(first) {
+				first = st
+			}
+		}
+		out.Quantity += r.Quantity
+		out.Cost += r.Quantity * r.AvgPrice
+		out.Accounts = append(out.Accounts, *r)
+	}
+	if out.Quantity > 0 {
+		out.AvgPrice = out.Cost / out.Quantity
+	}
+	if !first.IsZero() {
+		out.Since = first.In(kst).Format(dateLayout)
+	}
+	sort.SliceStable(out.Accounts, func(i, j int) bool {
+		return out.Accounts[i].Quantity*out.Accounts[i].AvgPrice > out.Accounts[j].Quantity*out.Accounts[j].AvgPrice
+	})
+	for _, r := range got {
+		out.Received = append(out.Received, *r)
+	}
+	sort.Slice(out.Received, func(i, j int) bool { return out.Received[i].Currency < out.Received[j].Currency })
+	return out, nil
 }
 
 // GetDetail: 한 종목의 월별 점수·순위 흐름, 연도별 주당 배당, 최근 3년 회차
@@ -734,6 +916,10 @@ func (s *DividendScoreService) GetDetail(assetID uint) (*DivScoreDetail, error) 
 				out.History = append(out.History, DivScoreHistoryPoint{Month: window[i], Score: r.Score, Rank: r.Rank, Of: len(rows), Status: r.Metrics.Status, Estimated: r.Estimated})
 			}
 		}
+	}
+
+	if out.Position, err = s.position(assetID, now); err != nil {
+		return nil, err
 	}
 
 	assets, err := s.loadAssets(now, false)

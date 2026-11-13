@@ -1,6 +1,7 @@
 package services
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -150,6 +151,30 @@ func TestDividendScoreRankingFlow(t *testing.T) {
 	if err != nil || len(d.History) != 12 || len(d.Years) == 0 || len(d.Payments) == 0 || d.Source != "market" {
 		t.Fatalf("detail = %+v err %v", d, err)
 	}
+	if d.Position == nil || d.Position.Quantity != 10 || d.Position.AvgPrice != 20 || d.Position.Since != "2023-01-10" || len(d.Position.Received) != 1 || d.Position.Received[0].Total != 6 {
+		t.Fatalf("내 보유 = %+v", d.Position)
+	}
+
+	// 항목별 순위: 항목마다 1..n 이 하나씩, 지난달 항목 순위는 지난달에 있던 종목만
+	for _, k := range divPartKeys {
+		seen := map[int]bool{}
+		for _, row := range r2.Rows {
+			pr := row.PartRank[k]
+			if pr < 1 || pr > len(r2.Rows) || seen[pr] {
+				t.Fatalf("%s 순위가 겹치거나 빠졌다: %+v", k, r2.Rows)
+			}
+			seen[pr] = true
+			if (row.PrevRank == nil) != (row.PrevPartRank == nil) {
+				t.Fatalf("지난달 항목 순위는 지난달 순위와 함께 있어야 한다: %+v", row)
+			}
+		}
+	}
+	// 배점을 수익률 100 으로 바꿨으므로 수익률 순위 = 총점 순위
+	for _, row := range r2.Rows {
+		if row.PartRank["yield"] != row.Rank {
+			t.Fatalf("수익률만 볼 때 수익률 순위와 총점 순위가 달라야 할 이유가 없다: %+v", row)
+		}
+	}
 
 	// 다시 계산: 이번 달 기록을 지우고 새로
 	if err := svc.Recompute("2026-11"); err != nil {
@@ -162,6 +187,49 @@ func TestDividendScoreRankingFlow(t *testing.T) {
 	}
 	if _, err := svc.GetRanking("2020-01"); err == nil {
 		t.Fatal("12개월 밖의 달은 거절해야 한다")
+	}
+}
+
+// 내 보유: 계좌별 수량·평단, 다 팔았다가 다시 산 계좌는 다시 산 날부터, 그 뒤 받은 배당만 (세후, 받은 것만)
+func TestDividendScorePosition(t *testing.T) {
+	svc, db := newDivScoreFixture(t)
+	svc.fetchEvents = func([]string) map[string][]DividendEvent { return map[string][]DividendEvent{} }
+	svc.fetchHist = func([]string) map[string]*PriceHistory { return map[string]*PriceHistory{} }
+	a := models.Account{Name: "종합계좌", Broker: "NH투자증권", MarketType: models.MarketTypeInternational, Currency: "USD"}
+	b := models.Account{Name: "ISA", Broker: "한국투자증권", MarketType: models.MarketTypeDomestic, Currency: "KRW", AccountType: models.AccountTypeISA}
+	db.Create(&a)
+	db.Create(&b)
+	x := models.Asset{Ticker: "XDIV", Name: "X Dividend", Type: models.AssetTypeETF}
+	db.Create(&x)
+	db.Create(&models.Transaction{AccountID: a.ID, AssetID: x.ID, Type: models.TransactionTypeBuy, Date: dsDay("2022-03-02"), Price: 25, Quantity: 10})
+	db.Create(&models.Transaction{AccountID: a.ID, AssetID: x.ID, Type: models.TransactionTypeSell, Date: dsDay("2023-05-02"), Price: 28, Quantity: 10})
+	db.Create(&models.Transaction{AccountID: a.ID, AssetID: x.ID, Type: models.TransactionTypeBuy, Date: dsDay("2024-02-15"), Price: 30, Quantity: 5})
+	db.Create(&models.Transaction{AccountID: b.ID, AssetID: x.ID, Type: models.TransactionTypeBuy, Date: dsDay("2025-07-01"), Price: 40, Quantity: 2})
+	db.Create(&models.Holding{AccountID: a.ID, AssetID: x.ID, Quantity: 5, AveragePrice: 30})
+	db.Create(&models.Holding{AccountID: b.ID, AssetID: x.ID, Quantity: 2, AveragePrice: 40})
+	db.Create(&models.Dividend{AccountID: a.ID, AssetID: x.ID, Date: dsDay("2022-12-20"), Amount: 9, Currency: "USD", IsReceived: true})          // 다 팔기 전 — 뺀다
+	db.Create(&models.Dividend{AccountID: a.ID, AssetID: x.ID, Date: dsDay("2025-06-20"), Amount: 5, Tax: 1, Currency: "USD", IsReceived: true}) // 세후 4
+	db.Create(&models.Dividend{AccountID: b.ID, AssetID: x.ID, Date: dsDay("2026-06-20"), Amount: 2, Currency: "usd", IsReceived: true})         // 최근 12개월
+	db.Create(&models.Dividend{AccountID: b.ID, AssetID: x.ID, Date: dsDay("2026-10-20"), Amount: 3, Currency: "USD", IsReceived: false})        // 아직 안 받음 — 뺀다
+
+	p, err := svc.position(x.ID, svc.clock())
+	if err != nil || p == nil {
+		t.Fatalf("position = %+v err %v", p, err)
+	}
+	if p.Quantity != 7 || p.Cost != 230 || math.Abs(p.AvgPrice-230.0/7) > 1e-9 || p.Since != "2024-02-15" {
+		t.Fatalf("합계 = %+v", p)
+	}
+	if len(p.Accounts) != 2 || p.Accounts[0].AccountID != a.ID || p.Accounts[0].Since != "2024-02-15" || p.Accounts[1].Name != "ISA" || p.Accounts[1].AccountType != "ISA" || p.Accounts[1].Since != "2025-07-01" {
+		t.Fatalf("계좌별 = %+v", p.Accounts)
+	}
+	if len(p.Received) != 1 || p.Received[0].Currency != "USD" || p.Received[0].Total != 6 || p.Received[0].Count != 2 || p.Received[0].Last12m != 2 {
+		t.Fatalf("받은 배당 = %+v", p.Received)
+	}
+	// 보유하지 않은 종목은 nil
+	y := models.Asset{Ticker: "NONE", Name: "Not Held", Type: models.AssetTypeStock}
+	db.Create(&y)
+	if p, err := svc.position(y.ID, svc.clock()); err != nil || p != nil {
+		t.Fatalf("보유 안 함 = %+v err %v", p, err)
 	}
 }
 
