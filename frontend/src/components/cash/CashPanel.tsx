@@ -11,10 +11,10 @@ import { IconWallet } from '../ui/appIcons';
  * 계좌 예수금 — 원화·달러 잔액, 계좌 총액(주식 평가금 + 예수금), 현금 흐름(입출금·매매·배당).
  * 입금·출금·이자, 환전, 잔액 맞추기(증권사 앱의 예수금에 맞춤)를 여기서 기록한다.
  */
-type Ccy = 'KRW' | 'USD';
+export type Ccy = 'KRW' | 'USD';
 type Mode = 'flow' | 'exchange' | 'reconcile';
 
-const money = (v: number, ccy: Ccy | string) => {
+export const money = (v: number, ccy: Ccy | string) => {
   const neg = ccy === 'KRW' ? Math.round(v) < 0 : v <= -0.005;
   const a = Math.abs(v);
   const body = ccy === 'KRW' ? `₩${Math.round(a).toLocaleString('ko-KR')}` : `$${a.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -65,9 +65,23 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
   );
 }
 
+/**
+ * 계좌 화면에 보여 줄 예수금 통화 — 원화·외화가 따로인 계좌(달러 따로·자동 환전)는 둘 다 늘,
+ * 아니면 쓰고 있는 통화만 (기록이 없으면 원화)
+ */
+export function cashCurrencies(account: Account, s: Pick<CashSummary, 'krw' | 'usd'> & { flows?: CashFlow[] }, hasUSDFlows?: boolean, hasKRWFlows?: boolean): Ccy[] {
+  const settle = account.foreign_settle ?? 'USD';
+  const split = settle === 'AFX' || (settle === 'USD' && account.market_type === 'International');
+  const usdFlows = hasUSDFlows ?? !!s.flows?.some((f) => f.currency === 'USD');
+  const krwFlows = hasKRWFlows ?? !!s.flows?.some((f) => f.currency === 'KRW');
+  const showUSD = split || s.usd !== 0 || usdFlows;
+  const showKRW = split || s.krw !== 0 || !showUSD || krwFlows;
+  return [...(showKRW ? (['KRW'] as Ccy[]) : []), ...(showUSD ? (['USD'] as Ccy[]) : [])];
+}
+
 // ───────────────────────── 입력 창 ─────────────────────────
 
-function CashForm({
+export function CashForm({
   mode,
   account,
   summary,
@@ -282,11 +296,9 @@ export default function CashPanel({ account }: { account: Account }) {
 
   // 원화·달러 중 보여 줄 통화: 쓰고 있거나 계좌 성격상 쓰는 통화
   // 원화·외화가 따로인 계좌(달러 따로·자동 환전)는 두 칸을 늘 보여 준다 — 증권사 앱의 원화예수금·외화예수금과 같게
-  const settle = account.foreign_settle ?? 'USD';
-  const split = settle === 'AFX' || (settle === 'USD' && account.market_type === 'International');
-  const showUSD = !!summary && (split || summary.usd !== 0 || summary.flows.some((f) => f.currency === 'USD'));
-  const showKRW = !!summary && (split || summary.krw !== 0 || !showUSD || summary.flows.some((f) => f.currency === 'KRW'));
-  const shownCcys: Ccy[] = [...(showKRW ? (['KRW'] as Ccy[]) : []), ...(showUSD ? (['USD'] as Ccy[]) : [])];
+  const shownCcys: Ccy[] = summary ? cashCurrencies(account, summary) : [];
+  const showUSD = shownCcys.includes('USD');
+  const showKRW = shownCcys.includes('KRW');
   const negative = !!summary && (summary.krw < -0.5 || summary.usd < -0.005);
   const neverAdjusted = !!summary && !summary.last_adjusted && summary.flows.some((f) => f.kind === 'buy' || f.kind === 'sell');
   const flows = useMemo(() => summary?.flows ?? [], [summary]);
@@ -303,6 +315,11 @@ export default function CashPanel({ account }: { account: Account }) {
         <div className="flex items-center gap-3">
           <CardIcon icon={IconWallet} size="sm" />
           <p className="section-title">예수금</p>
+          {summary && showKRW && showUSD && summary.usd_krw > 0 && (
+            <span className="num text-sm text-zinc-300" title="원화예수금 + 외화예수금(현재 환율로 환산)">
+              합계 ≈ {money(summary.total_krw, 'KRW')}
+            </span>
+          )}
           {summary?.last_adjusted && <span className="label-mono">{shortDay(summary.last_adjusted)} 잔액 맞춤</span>}
         </div>
         <div className="flex flex-wrap gap-1.5">

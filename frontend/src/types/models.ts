@@ -706,6 +706,11 @@ export interface CashBalance {
   usd: number;
   total_krw: number;
   last_adjusted?: string;
+  /** 예수금 − 결제 전 매도 대금 (0 아래로 내려가지 않음) */
+  withdrawable_krw: number;
+  withdrawable_usd: number;
+  /** 현금 흐름 건수 (0 이면 기록 없음) */
+  flow_count: number;
 }
 
 export interface PendingSettle {
@@ -724,9 +729,6 @@ export interface CashSummary extends CashBalance {
   usd_krw: number;
   stock_value_krw?: number;
   account_total_krw?: number;
-  /** 예수금 − 결제 전 매도 대금 (0 아래로 내려가지 않음) */
-  withdrawable_krw: number;
-  withdrawable_usd: number;
   pending?: PendingSettle[];
   flows: CashFlow[];
 }

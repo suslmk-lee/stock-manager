@@ -404,3 +404,29 @@ func TestValidSettle(t *testing.T) {
 		t.Error("수수료는 0~5%")
 	}
 }
+
+// 모든 계좌 예수금(예수금 한눈에): 출금 가능 금액과 기록 건수도 함께
+func TestCashBalancesOverview(t *testing.T) {
+	f := newCashFixture(t) // 오늘 11/12 (목) KST
+	acc := f.account(t, "달러", "USD")
+	empty := f.account(t, "기록 없음", "USD")
+	schd := f.asset(t, "SCHD")
+	f.svc.CreateEntry(acc.ID, CashEntryRequest{Currency: "USD", Date: "2026-11-01", Kind: "deposit", Amount: 100})
+	f.tx(t, acc.ID, schd.ID, models.TransactionTypeSell, "2026-11-12", 30, 2, 0) // 11/13 결제 — 대기
+
+	bs, fx, err := f.svc.GetBalances()
+	if err != nil || fx != 1450 {
+		t.Fatalf("balances err %v fx %v", err, fx)
+	}
+	byID := map[uint]CashBalance{}
+	for _, b := range bs {
+		byID[b.AccountID] = b
+	}
+	a := byID[acc.ID]
+	if !cashNear(a.USD, 160) || !cashNear(a.WithdrawableUSD, 100) || a.FlowCount != 2 || !cashNear(a.TotalKRW, 160*1450) {
+		t.Fatalf("account = %+v", a)
+	}
+	if e := byID[empty.ID]; e.FlowCount != 0 || e.USD != 0 || e.KRW != 0 {
+		t.Fatalf("empty = %+v", e)
+	}
+}

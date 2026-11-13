@@ -5,6 +5,8 @@ import { apiClient } from './api/client';
 import { Account, AccountType, type ForeignSettle } from './types/models';
 import { Plus, Trash2, Wallet, Pencil, Lock } from 'lucide-react';
 import AccountDashboard from './components/AccountDashboard';
+import CashOverview from './components/cash/CashOverview';
+import { money } from './components/cash/CashPanel';
 import CardIcon from './components/ui/CardIcon';
 import { ACCOUNT_TYPES, getAccountType, getAccountTypeMeta, isRestrictedAccount } from './utils/accountType';
 import { IconWallet } from './components/ui/appIcons';
@@ -54,6 +56,9 @@ const SETTLE_HINT: Record<ForeignSettle, string> = {
 };
 
 
+// 목록 맨 위 '예수금 한눈에'를 고른 상태 (계좌 id 대신)
+const CASH_VIEW = -1;
+
 // 계좌 관리: 왼쪽 계좌 목록(인출 가능 / 인출 제한) + 오른쪽 계좌 상세 또는 추가·수정 폼
 function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -62,6 +67,8 @@ function App() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // 목록의 '예수금 한눈에' 줄에 보이는 합계 (원화 환산)
+  const [cashTotal, setCashTotal] = useState<number | null>(null);
   const [split, setSplit] = useState<boolean | null>(null);
   const [formData, setFormData] = useState({ ...EMPTY_FORM });
 
@@ -86,8 +93,17 @@ function App() {
   // 넓은 화면은 항상 계좌 하나를 보여 준다 (폼을 열었을 때는 제외)
   useEffect(() => {
     if (split !== true || showForm || accounts.length === 0) return;
-    if (selectedId == null || !accounts.some((a) => a.id === selectedId)) setSelectedId(accounts[0].id);
+    if (selectedId == null || (selectedId !== CASH_VIEW && !accounts.some((a) => a.id === selectedId))) setSelectedId(accounts[0].id);
   }, [split, showForm, accounts, selectedId]);
+
+  // 계좌를 옮겨 다닐 때마다 합계를 새로 (계좌 화면에서 입금·잔액 맞추기를 했을 수 있다)
+  useEffect(() => {
+    if (accounts.length === 0) return;
+    apiClient
+      .GetCashBalances()
+      .then((r) => setCashTotal(r.balances.reduce((s, b) => s + b.total_krw, 0)))
+      .catch(() => setCashTotal(null));
+  }, [accounts, selectedId]);
 
   const closeForm = () => {
     setShowForm(false);
@@ -241,8 +257,27 @@ function App() {
     </div>
   );
 
+  const cashActive = !showForm && selectedId === CASH_VIEW;
   const list = (
     <div className="min-h-0 flex-1 overflow-y-auto">
+      <button
+        type="button"
+        onClick={() => {
+          closeForm();
+          setSelectedId(CASH_VIEW);
+        }}
+        aria-current={cashActive ? 'true' : undefined}
+        className={`flex w-full items-center gap-3 border-b border-white/[0.06] px-4 py-3 text-left transition-colors ${
+          cashActive ? 'bg-mint-400/[0.08] shadow-[inset_3px_0_0_rgb(var(--c-mint-400))]' : 'hover:bg-white/[0.03]'
+        }`}
+      >
+        <CardIcon icon={IconWallet} size="sm" />
+        <span className="min-w-0 flex-1">
+          <span className={`block truncate text-sm ${cashActive ? 'font-medium text-white' : 'text-zinc-100'}`}>예수금 한눈에</span>
+          <span className="label-mono mt-0.5 block truncate">모든 계좌 원화·외화 예수금</span>
+        </span>
+        {cashTotal != null && <span className="num shrink-0 text-sm text-mint-300">{money(cashTotal, 'KRW')}</span>}
+      </button>
       {liquidAccounts.length > 0 && (
         <section>
           {groupLabel('인출 가능 계좌', liquidAccounts.length)}
@@ -366,6 +401,8 @@ function App() {
 
   const detail = showForm ? (
     form
+  ) : selectedId === CASH_VIEW ? (
+    <CashOverview accounts={accounts} onOpenAccount={(id) => setSelectedId(id)} />
   ) : selected ? (
     <AccountDashboard
       key={selected.id}
@@ -406,7 +443,7 @@ function App() {
         <SplitView
           listWidth={400}
           onSplitChange={setSplit}
-          showDetail={showForm || selected != null}
+          showDetail={showForm || selected != null || selectedId === CASH_VIEW}
           onBack={() => {
             closeForm();
             setSelectedId(null);

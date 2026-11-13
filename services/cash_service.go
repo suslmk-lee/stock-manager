@@ -321,19 +321,20 @@ type CashBalance struct {
 	TotalKRW  float64 `json:"total_krw"` // 달러는 현재 환율로
 	// 마지막 잔액 맞추기 날짜 (없으면 빈칸 — 계산 잔액이 실제와 다를 수 있음)
 	LastAdjusted string `json:"last_adjusted,omitempty"`
+	// 출금 가능 금액: 예수금에서 아직 결제되지 않은 매도 대금을 뺀 것 (0 아래로는 내려가지 않음)
+	WithdrawableKRW float64 `json:"withdrawable_krw"`
+	WithdrawableUSD float64 `json:"withdrawable_usd"`
+	FlowCount       int     `json:"flow_count"` // 현금 흐름 건수 (0 이면 기록 없음)
 }
 
 type CashSummary struct {
 	Account models.Account `json:"account"`
 	CashBalance
-	UsdKrw        float64  `json:"usd_krw"`
-	StockValueKRW *float64 `json:"stock_value_krw,omitempty"` // 보유 주식 평가금 (시세 실패 시 없음)
-	TotalKRW      *float64 `json:"account_total_krw,omitempty"`
-	// 출금 가능 금액: 예수금에서 아직 결제되지 않은 매도 대금을 뺀 것 (0 아래로는 내려가지 않음)
-	WithdrawableKRW float64         `json:"withdrawable_krw"`
-	WithdrawableUSD float64         `json:"withdrawable_usd"`
-	Pending         []PendingSettle `json:"pending,omitempty"` // 결제 전 매도 대금 (결제일 순)
-	Flows           []CashFlow      `json:"flows"`             // 최근 것부터
+	UsdKrw        float64         `json:"usd_krw"`
+	StockValueKRW *float64        `json:"stock_value_krw,omitempty"` // 보유 주식 평가금 (시세 실패 시 없음)
+	TotalKRW      *float64        `json:"account_total_krw,omitempty"`
+	Pending       []PendingSettle `json:"pending,omitempty"` // 결제 전 매도 대금 (결제일 순)
+	Flows         []CashFlow      `json:"flows"`             // 최근 것부터
 }
 
 // PendingSettle 은 아직 결제되지 않은 매도 대금 한 건
@@ -398,8 +399,9 @@ func (s *CashService) currentFx() float64 {
 	return 0
 }
 
-func balanceOf(accountID uint, flows []CashFlow, fx float64) CashBalance {
-	b := CashBalance{AccountID: accountID}
+// balanceOf: 잔액·마지막 맞춤일·출금 가능 금액 (today 는 KST 날짜 — 결제 전 매도 대금을 가린다)
+func balanceOf(accountID uint, flows []CashFlow, fx float64, today string) CashBalance {
+	b := CashBalance{AccountID: accountID, FlowCount: len(flows)}
 	for _, f := range flows {
 		switch f.Currency {
 		case "KRW":
@@ -414,6 +416,9 @@ func balanceOf(accountID uint, flows []CashFlow, fx float64) CashBalance {
 	b.KRW = math.Round(b.KRW*100) / 100
 	b.USD = math.Round(b.USD*100) / 100
 	b.TotalKRW = b.KRW + b.USD*fx
+	pending := pendingSells(flows, today)
+	b.WithdrawableKRW = withdrawable(b.KRW, pending, "KRW")
+	b.WithdrawableUSD = withdrawable(b.USD, pending, "USD")
 	return b
 }
 
@@ -436,10 +441,9 @@ func (s *CashService) GetSummary(accountID uint) (*CashSummary, error) {
 		return nil, err
 	}
 	fx := s.currentFx()
-	sum := &CashSummary{Account: *acc, CashBalance: balanceOf(acc.ID, flows, fx), UsdKrw: fx}
-	sum.Pending = pendingSells(flows, todayKST(s.clock()))
-	sum.WithdrawableKRW = withdrawable(sum.KRW, sum.Pending, "KRW")
-	sum.WithdrawableUSD = withdrawable(sum.USD, sum.Pending, "USD")
+	today := todayKST(s.clock())
+	sum := &CashSummary{Account: *acc, CashBalance: balanceOf(acc.ID, flows, fx, today), UsdKrw: fx}
+	sum.Pending = pendingSells(flows, today)
 
 	// 보유 주식 평가금 (종목 통화 → 원화)
 	var hs []models.Holding
@@ -487,13 +491,14 @@ func (s *CashService) GetBalances() ([]CashBalance, float64, error) {
 		return nil, 0, err
 	}
 	fx := s.currentFx()
+	today := todayKST(s.clock())
 	out := make([]CashBalance, 0, len(accounts))
 	for i := range accounts {
 		flows, err := s.flows(&accounts[i])
 		if err != nil {
 			return nil, 0, err
 		}
-		out = append(out, balanceOf(accounts[i].ID, flows, fx))
+		out = append(out, balanceOf(accounts[i].ID, flows, fx, today))
 	}
 	return out, fx, nil
 }
