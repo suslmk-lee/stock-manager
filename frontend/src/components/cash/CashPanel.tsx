@@ -6,6 +6,7 @@ import CardIcon from '../ui/CardIcon';
 import DatePicker from '../ui/DatePicker';
 import Portal from '../ui/Portal';
 import { IconWallet } from '../ui/appIcons';
+import { fmtCcy } from '../../utils/fx';
 
 /**
  * 계좌 예수금 — 원화·달러 잔액, 계좌 총액(주식 평가금 + 예수금), 현금 흐름(입출금·매매·배당).
@@ -15,6 +16,7 @@ export type Ccy = 'KRW' | 'USD';
 type Mode = 'flow' | 'exchange' | 'reconcile';
 
 export const money = (v: number, ccy: Ccy | string) => {
+  if (ccy !== 'KRW' && ccy !== 'USD') return fmtCcy(v, ccy); // 엔화 등 (종목 통화)
   const neg = ccy === 'KRW' ? Math.round(v) < 0 : v <= -0.005;
   const a = Math.abs(v);
   const body = ccy === 'KRW' ? `₩${Math.round(a).toLocaleString('ko-KR')}` : `$${a.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

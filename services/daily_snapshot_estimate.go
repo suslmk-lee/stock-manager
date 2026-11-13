@@ -3,7 +3,6 @@ package services
 import (
 	"math"
 	"sort"
-	"strings"
 	"time"
 
 	"stock-manager/models"
@@ -115,7 +114,7 @@ func fxOrNow(fxAt func(time.Time) float64, fxNow float64, t time.Time) float64 {
 	return fxNow
 }
 
-func buildPairTimeline(txns []dsTxn, currency string, fxAt func(time.Time) float64, fxNow float64) *dsPairTimeline {
+func buildPairTimeline(txns []dsTxn, currency string, fx *fxBook) *dsPairTimeline {
 	sorted := append([]dsTxn(nil), txns...)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Date.Before(sorted[j].Date) })
 	tl := &dsPairTimeline{cumNet: []float64{0}, fwdQty: []float64{0}, fwdCost: []float64{0}}
@@ -126,11 +125,7 @@ func buildPairTimeline(txns []dsTxn, currency string, fxAt func(time.Time) float
 		}
 		switch tx.Type {
 		case models.TransactionTypeBuy:
-			fx := 1.0
-			if currency != "KRW" {
-				fx = fxOrNow(fxAt, fxNow, tx.Date)
-			}
-			c := (tx.Qty*tx.Price + tx.Fee) * fx
+			c := (tx.Qty*tx.Price + tx.Fee) * fx.at(currency, tx.Date)
 			if finite(c) {
 				qty += tx.Qty
 				cost += c
@@ -163,7 +158,7 @@ func buildPairTimeline(txns []dsTxn, currency string, fxAt func(time.Time) float
 // 평가: 일봉 종가(휴일은 직전 종가) × 환율. 원가: 정방향 평균단가 KRW 재생 + 모자란 수량은 현재 평단×당일 환율.
 // 가격이 없는 종목은 그날 제외. 보유 종목이 하나도 없는 날짜는 결과에서 빠진다.
 func estimateDailySnapshots(dates []string, positions []dsPos, txns []dsTxn, divs []dsDiv,
-	prices map[string]*dailyPrices, fxAt func(time.Time) float64, fxNow float64,
+	prices map[string]*dailyPrices, fx *fxBook,
 ) ([]models.DailyAssetSnapshot, []models.DailyPositionSnapshot) {
 
 	txByPair := map[dsPairKey][]dsTxn{}
@@ -177,7 +172,7 @@ func estimateDailySnapshots(dates []string, positions []dsPos, txns []dsTxn, div
 		if dp := prices[p.Ticker]; dp != nil {
 			cur = dp.Currency
 		}
-		timelines[i] = buildPairTimeline(txByPair[dsPairKey{p.AccountID, p.AssetID}], cur, fxAt, fxNow)
+		timelines[i] = buildPairTimeline(txByPair[dsPairKey{p.AccountID, p.AssetID}], cur, fx)
 	}
 
 	// 누적 배당 (KRW, 지급일 환율)
@@ -190,10 +185,7 @@ func estimateDailySnapshots(dates []string, positions []dsPos, txns []dsTxn, div
 	divCum := make([]divPt, 0, len(sortedDivs))
 	var run float64
 	for _, d := range sortedDivs {
-		v := d.Net
-		if strings.ToUpper(strings.TrimSpace(d.Currency)) != "KRW" {
-			v *= fxOrNow(fxAt, fxNow, d.Date)
-		}
+		v := d.Net * fx.at(d.Currency, d.Date)
 		if finite(v) {
 			run += v
 		}
@@ -208,8 +200,7 @@ func estimateDailySnapshots(dates []string, positions []dsPos, txns []dsTxn, div
 			continue
 		}
 		day := kstDay(dt)
-		fxD := fxOrNow(fxAt, fxNow, dt)
-		row := models.DailyAssetSnapshot{Date: ds, UsdKrw: fxD, Estimated: true, Source: "estimate"}
+		row := models.DailyAssetSnapshot{Date: ds, UsdKrw: fx.at("USD", dt), Estimated: true, Source: "estimate"}
 		n := 0
 		for i, p := range positions {
 			dp := prices[p.Ticker]
@@ -223,17 +214,17 @@ func estimateDailySnapshots(dates []string, positions []dsPos, txns []dsTxn, div
 			if qty < 1e-9 {
 				continue
 			}
-			fx := 1.0
-			if dp.Currency != "KRW" {
-				fx = fxD
+			rate := fx.at(dp.Currency, dt) // 그날 그 통화 환율 (원화 1)
+			if rate <= 0 {
+				continue // 환율을 모르면 그날 그 종목은 뺀다 (달러 환율로 잘못 평가하지 않게)
 			}
-			value := qty * price * fx
+			value := qty * price * rate
 			var cost float64
 			if fq := tl.fwdQty[idx]; fq > 1e-9 {
 				covered := math.Min(qty, fq)
-				cost = tl.fwdCost[idx]*covered/fq + (qty-covered)*p.AvgPrice*fx
+				cost = tl.fwdCost[idx]*covered/fq + (qty-covered)*p.AvgPrice*rate
 			} else {
-				cost = qty * p.AvgPrice * fx
+				cost = qty * p.AvgPrice * rate
 			}
 			if !finite(value) || !finite(cost) {
 				continue
@@ -248,7 +239,7 @@ func estimateDailySnapshots(dates []string, positions []dsPos, txns []dsTxn, div
 			n++
 			posRows = append(posRows, models.DailyPositionSnapshot{
 				Date: ds, AccountID: p.AccountID, AssetID: p.AssetID, Quantity: qty, Price: price,
-				Currency: dp.Currency, FxRate: fx, ValueKRW: value, CostKRW: cost, Estimated: true,
+				Currency: dp.Currency, FxRate: rate, ValueKRW: value, CostKRW: cost, Estimated: true,
 			})
 		}
 		if n == 0 {

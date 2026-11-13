@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ type PortfolioSnapshotService struct {
 	cash          *CashService // 월별 요약에 예수금 행을 더한다 (nil 이면 주식만)
 	histCache     historyCache
 	fetchHistory  func(ticker string) (*PriceHistory, error)
+	// 엔화 등 원화·달러가 아닌 통화의 날짜별 원화 환율 (테스트에서 바꾼다, nil 이면 tickerService 로)
+	fxLookup func(ccy string) func(time.Time) float64
 }
 
 func NewPortfolioSnapshotService(db *gorm.DB, tickerService *TickerService) *PortfolioSnapshotService {
@@ -124,6 +127,7 @@ func (s *PortfolioSnapshotService) GetSnapshotsByAccount(accountID uint) ([]mode
 		Where("account_id = ?", accountID).
 		Order("year DESC, month DESC").
 		Find(&snapshots).Error
+	s.rowsToKRW(snapshots)
 	return snapshots, err
 }
 
@@ -133,6 +137,7 @@ func (s *PortfolioSnapshotService) GetSnapshotsByAccountAndAsset(accountID, asse
 	err := s.db.Where("account_id = ? AND asset_id = ?", accountID, assetID).
 		Order("year DESC, month DESC").
 		Find(&snapshots).Error
+	s.rowsToKRW(snapshots)
 	return snapshots, err
 }
 
@@ -143,7 +148,49 @@ func (s *PortfolioSnapshotService) GetSnapshotsByAsset(assetID uint) ([]models.P
 		Where("asset_id = ?", assetID).
 		Order("year DESC, month DESC").
 		Find(&snapshots).Error
+	s.rowsToKRW(snapshots)
 	return snapshots, err
+}
+
+// needsKRW: 화면이 직접 환산하지 못하는 통화 (원화·달러가 아닌 엔화 등)
+func needsKRW(ccy string) bool {
+	c := strings.TrimSpace(ccy)
+	return c != "" && !isKRW(c) && !isUSD(c)
+}
+
+// monthFx: 통화별 그달 1일 원화 환율 (못 구하면 0). 한 번 받은 환율 히스토리는 이 조회 동안 다시 쓴다.
+func (s *PortfolioSnapshotService) monthFx() func(ccy string, year, month int) float64 {
+	cache := map[string]func(time.Time) float64{}
+	return func(ccy string, year, month int) float64 {
+		if s.tickerService == nil && s.fxLookup == nil {
+			return 0
+		}
+		f, ok := cache[ccy]
+		if !ok {
+			if s.fxLookup != nil {
+				f = s.fxLookup(ccy)
+			} else {
+				f = s.tickerService.FxLookupFor(ccy, s.tickerService.FxRateNow(ccy))
+			}
+			cache[ccy] = f
+		}
+		return f(time.Date(year, time.Month(month), 1, 0, 0, 0, 0, kst))
+	}
+}
+
+// rowsToKRW: 엔화 등 원화·달러가 아닌 스냅샷 행을 그달 환율로 원화로 바꾼다 (화면은 원화·달러만 환산한다).
+func (s *PortfolioSnapshotService) rowsToKRW(rows []models.PortfolioSnapshot) {
+	rate := s.monthFx()
+	for i := range rows {
+		if !needsKRW(rows[i].Currency) {
+			continue
+		}
+		if r := rate(rows[i].Currency, rows[i].Year, rows[i].Month); r > 0 {
+			rows[i].Price *= r
+			rows[i].MarketValue *= r
+			rows[i].Currency = "KRW"
+		}
+	}
 }
 
 // GetMonthlyTotalByAccount returns monthly total market value per account
@@ -235,6 +282,17 @@ ORDER BY year ASC, month ASC, account_id ASC`, first.index()+1, window[len(windo
 			log.Printf("[Snapshot] estimate failed: %v", err)
 		} else {
 			out = append(out, est...)
+		}
+	}
+	// 엔화 등은 그달 환율로 원화로 (화면은 원화·달러만 환산한다)
+	rate := s.monthFx()
+	for i := range out {
+		if !needsKRW(out[i].Currency) {
+			continue
+		}
+		if r := rate(out[i].Currency, out[i].Year, out[i].Month); r > 0 {
+			out[i].TotalValue *= r
+			out[i].Currency = "KRW"
 		}
 	}
 	if s.cash != nil {

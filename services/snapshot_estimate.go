@@ -74,9 +74,9 @@ func currencyFor(ticker, reported string) string {
 	if reported != "" {
 		return reported
 	}
-	u := strings.ToUpper(ticker)
-	if strings.HasSuffix(u, ".KS") || strings.HasSuffix(u, ".KQ") {
-		return "KRW"
+	// 거래소 꼬리표로 짐작 (.KS·.KQ 원화, .T 엔화 …), 모르면 달러
+	if c := tickerCurrencyBySuffix(ticker); c != "" {
+		return c
 	}
 	return "USD"
 }

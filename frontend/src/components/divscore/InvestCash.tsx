@@ -56,11 +56,12 @@ function blockReason(account: Account, asset: Asset, krAccounts: Set<number>, he
   return null;
 }
 
-export default function InvestCash({ asset, ccy, price, ctx }: { asset: Asset; ccy: string; price: number | null; ctx: CashContext | null | 'error' }) {
+export default function InvestCash({ asset, ccy, price, ctx, rate = 0 }: { asset: Asset; ccy: string; price: number | null; ctx: CashContext | null | 'error'; /** 원화·달러가 아닌 종목 통화(엔화 등) 1단위의 원화 값 */ rate?: number }) {
   const data = useMemo(() => {
     if (!ctx || ctx === 'error') return null;
     const fx = ctx.usdKrw;
     const usd = ccy === 'USD';
+    const other = ccy !== 'USD' && ccy !== 'KRW'; // 엔화 등 — 그 통화 예수금은 따로 기록하지 않는다
     const bal = new Map(ctx.balances.map((b) => [b.account_id, b]));
     const heldBy = new Map<number, number>();
     const krAccounts = new Set<number>();
@@ -85,14 +86,19 @@ export default function InvestCash({ asset, ccy, price, ctx }: { asset: Asset; c
       if (b && (b.flow_count > 0 || b.last_adjusted)) recorded++;
       const why = blockReason(account, asset, krAccounts, held > 0);
       if (why) {
-        const relevant = usd ? krw + cashUSD * fx : krw;
+        const relevant = usd || other ? krw + cashUSD * fx : krw;
         if (relevant >= 1) blocked.set(why, (blocked.get(why) ?? 0) + relevant);
         continue;
       }
       let now = 0;
       let parts = '';
       let exchangeable = 0;
-      if (!usd) {
+      if (other) {
+        // 원화(·달러)를 그 통화로 환전하면 살 수 있는 금액 (지금 환율)
+        const krwValue = krw + (fx > 0 ? cashUSD * fx : 0);
+        if (krwValue > 0 && rate > 0) exchangeable = krwValue / rate;
+        parts = krwValue > 0 ? `${cashUSD > 0 ? '원화·달러' : '원화'} ${money(krwValue, 'KRW')} · ${ccy} 환전 필요` : '예수금 없음';
+      } else if (!usd) {
         now = krw;
         parts = '원화예수금';
       } else {
@@ -127,7 +133,7 @@ export default function InvestCash({ asset, ccy, price, ctx }: { asset: Asset; c
     const shares = price && price > 0 ? rows.reduce((s, r) => s + (r.shares ?? 0), 0) : null;
     const frac = rows.some((r) => r.now > 0 && r.frac);
     return { rows, total, totalExchange, shares, frac, blocked: [...blocked.entries()], converted, recorded, unreconciled: rows.filter((r) => r.now > 0 && !r.reconciled).length };
-  }, [ctx, asset, ccy, price]);
+  }, [ctx, asset, ccy, price, rate]);
 
   return (
     <div>
@@ -141,7 +147,7 @@ export default function InvestCash({ asset, ccy, price, ctx }: { asset: Asset; c
                 {data.shares != null && ` · 현재가로 ${shareText(Math.round(data.shares * 100) / 100, data.frac)}`}
               </>
             )}
-            {data.totalExchange > 0 && `${data.total > 0 ? ' · ' : ''}환전하면 +${money(data.totalExchange, 'USD')}`}
+            {data.totalExchange > 0 && `${data.total > 0 ? ' · ' : ''}환전하면 +${money(data.totalExchange, ccy)}`}
           </p>
         )}
       </div>
@@ -177,7 +183,7 @@ export default function InvestCash({ asset, ccy, price, ctx }: { asset: Asset; c
                     </>
                   ) : onlyFx ? (
                     <>
-                      <span className="num block text-[13px] text-zinc-400">+{money(r.exchangeable, 'USD')}</span>
+                      <span className="num block text-[13px] text-zinc-400">+{money(r.exchangeable, ccy)}</span>
                       <span className="block text-[11px] text-zinc-500">{['환전하면', shareText(r.sharesX, r.frac)].filter(Boolean).join(' · ')}</span>
                     </>
                   ) : (

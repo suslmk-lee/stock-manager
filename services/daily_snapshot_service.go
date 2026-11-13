@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -56,6 +57,9 @@ type DailySnapshotService struct {
 	fetchFxNow    func() float64
 	fetchFxHist   func() *PriceHistory
 	fetchHistorys func(tickers []string, rangeStr string) map[string]*PriceHistory
+	// 달러·원화가 아닌 통화(엔화 등)의 원화 환율 — 지금 · 날짜별 (nil 이면 그런 종목은 평가에서 뺀다)
+	fxNowFor func(ccy string) float64
+	fxAtFor  func(ccy string, fallback float64) func(time.Time) float64
 
 	running atomic.Bool // 백필 중복 실행 방지
 	capMu   sync.Mutex  // 캡처 직렬화
@@ -80,8 +84,24 @@ func NewDailySnapshotService(db *gorm.DB, ticker *TickerService) *DailySnapshotS
 			return h
 		}
 		s.fetchHistorys = ticker.GetDailyHistoriesRangeCached
+		s.fxNowFor = ticker.FxRateNow
+		s.fxAtFor = ticker.FxLookupFor
 	}
 	return s
+}
+
+// fxBook: 이번 계산에 쓸 통화별 환율 (달러는 지금까지처럼 currentFx·환율 히스토리, withHist 면 날짜별도)
+func (s *DailySnapshotService) fxBook(withHist bool) *fxBook {
+	usdNow := s.currentFx()
+	var usdAt func(time.Time) float64
+	if withHist && s.fetchFxHist != nil {
+		usdAt = NewFxLookup(s.fetchFxHist(), usdNow)
+	}
+	var atFor func(string, float64) func(time.Time) float64
+	if withHist {
+		atFor = s.fxAtFor
+	}
+	return newFxBook(usdNow, usdAt, s.fxNowFor, atFor)
 }
 
 // SetCash: 시계열 조회에 예수금을 더한다.
@@ -128,17 +148,14 @@ func (s *DailySnapshotService) loadDividends() ([]dsDiv, error) {
 	return out, nil
 }
 
-// dividendsCumKRW 는 upTo(KST 일) 이하 누적 세후 배당 (지급일 환율).
-func dividendsCumKRW(divs []dsDiv, fxAt func(time.Time) float64, fxNow float64, upTo int64) float64 {
+// dividendsCumKRW 는 upTo(KST 일) 이하 누적 세후 배당 (지급일 그 통화 환율).
+func dividendsCumKRW(divs []dsDiv, fx *fxBook, upTo int64) float64 {
 	var sum float64
 	for _, d := range divs {
 		if kstDay(d.Date) > upTo {
 			continue
 		}
-		v := d.Net
-		if strings.ToUpper(strings.TrimSpace(d.Currency)) != "KRW" {
-			v *= fxOrNow(fxAt, fxNow, d.Date)
-		}
+		v := d.Net * fx.at(d.Currency, d.Date)
 		if finite(v) {
 			sum += v
 		}
@@ -174,7 +191,8 @@ func (s *DailySnapshotService) CaptureToday(source string) (*models.DailyAssetSn
 	if len(tickers) > 0 && s.fetchPrices != nil {
 		priceMap = s.fetchPrices(tickers)
 	}
-	fxNow := s.currentFx()
+	book := s.fxBook(false) // 오늘 평가는 지금 환율
+	fxNow := book.usdNow
 
 	row := models.DailyAssetSnapshot{Date: date, UsdKrw: fxNow, Source: source, CapturedAt: now}
 	var posRows []models.DailyPositionSnapshot
@@ -192,9 +210,9 @@ func (s *DailySnapshotService) CaptureToday(source string) (*models.DailyAssetSn
 			log.Printf("[DailySnapshot] 시세 조회 실패 %s: 이월 가격 %.4f 사용", tk, price)
 		}
 		currency = currencyFor(tk, currency)
-		fx := 1.0
-		if currency != "KRW" {
-			fx = fxNow
+		fx := book.now(currency) // 그 통화의 지금 환율 (원화 1, 엔화면 엔/원)
+		if fx <= 0 {
+			log.Printf("[DailySnapshot] %s 환율(%s)을 몰라 평가에서 뺍니다", tk, currency)
 		}
 		value := h.Quantity * price * fx
 		cost := h.Quantity * h.AveragePrice * fx
@@ -221,11 +239,7 @@ func (s *DailySnapshotService) CaptureToday(source string) (*models.DailyAssetSn
 	if divs, err := s.loadDividends(); err != nil {
 		log.Printf("[DailySnapshot] 배당 조회 실패: %v", err)
 	} else if len(divs) > 0 {
-		var fxAt func(time.Time) float64
-		if s.fetchFxHist != nil {
-			fxAt = NewFxLookup(s.fetchFxHist(), fxNow)
-		}
-		row.DividendsCumKRW = dividendsCumKRW(divs, fxAt, fxNow, kstDay(now))
+		row.DividendsCumKRW = dividendsCumKRW(divs, s.fxBook(true), kstDay(now))
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -298,6 +312,9 @@ func (s *DailySnapshotService) Backfill(days int) (int, error) {
 		return 0, nil
 	}
 	defer s.running.Store(false)
+	if err := s.repairForeignFx(); err != nil {
+		log.Printf("[DailySnapshot] 외화 환율 바로잡기 실패: %v", err)
+	}
 
 	if days <= 0 {
 		days = DefaultBackfillDays
@@ -352,13 +369,7 @@ func (s *DailySnapshotService) Backfill(days int) (int, error) {
 			prices[strings.ToUpper(tk)] = buildDailyPrices(tk, h)
 		}
 	}
-	fxNow := s.currentFx()
-	var fxAt func(time.Time) float64
-	if s.fetchFxHist != nil {
-		fxAt = NewFxLookup(s.fetchFxHist(), fxNow)
-	}
-
-	assets, posRows := estimateDailySnapshots(missing, positions, txns, divs, prices, fxAt, fxNow)
+	assets, posRows := estimateDailySnapshots(missing, positions, txns, divs, prices, s.fxBook(true))
 	if len(assets) == 0 {
 		return 0, nil
 	}
@@ -621,4 +632,81 @@ func buildSeries(rows []models.DailyAssetSnapshot, rangeStr, interval string) *D
 		out.FirstDate = out.Points[0].Date
 	}
 	return out
+}
+
+// repairForeignFx: 원화·달러가 아닌 종목(엔화 등)을 예전에 달러 환율로 평가해 저장한 일별 기록을 바로잡는다.
+// 그날 그 통화 환율과 저장된 환율이 5% 넘게 다른 포지션만 고친다 — 평가·원가를 환율 비율만큼 바꾸고 그날 합계도 차이만큼 고친다.
+// 한 번 고치면 저장 환율이 맞아 다시 건드리지 않는다 (백필 때마다 불러도 된다).
+func (s *DailySnapshotService) repairForeignFx() error {
+	var rows []models.DailyPositionSnapshot
+	if err := s.db.Where("currency NOT IN ? AND currency <> ? AND fx_rate > 0", []string{"KRW", "USD"}, "").Find(&rows).Error; err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	book := s.fxBook(true)
+	type fix struct {
+		pos  models.DailyPositionSnapshot
+		rate float64
+	}
+	byDate := map[string][]fix{}
+	for _, r := range rows {
+		t, err := parseKSTDate(r.Date)
+		if err != nil {
+			continue
+		}
+		want := book.at(r.Currency, t)
+		if want <= 0 || math.Abs(r.FxRate-want)/want <= 0.05 {
+			continue
+		}
+		byDate[r.Date] = append(byDate[r.Date], fix{r, want})
+	}
+	if len(byDate) == 0 {
+		return nil
+	}
+	var accounts []models.Account
+	if err := s.db.Find(&accounts).Error; err != nil {
+		return err
+	}
+	restricted := map[uint]bool{}
+	for _, a := range accounts {
+		restricted[a.ID] = a.AccountType.IsWithdrawalRestricted()
+	}
+	fixed := 0
+	for date, list := range byDate {
+		err := s.db.Transaction(func(tx *gorm.DB) error {
+			var dv, dc, dRestricted, dLiquid float64
+			for _, f := range list {
+				ratio := f.rate / f.pos.FxRate
+				value, cost := f.pos.ValueKRW*ratio, f.pos.CostKRW*ratio
+				if !finite(value) || !finite(cost) {
+					continue
+				}
+				if err := tx.Model(&models.DailyPositionSnapshot{}).Where("id = ?", f.pos.ID).
+					Updates(map[string]interface{}{"fx_rate": f.rate, "value_krw": value, "cost_krw": cost}).Error; err != nil {
+					return err
+				}
+				dv += value - f.pos.ValueKRW
+				dc += cost - f.pos.CostKRW
+				if restricted[f.pos.AccountID] {
+					dRestricted += value - f.pos.ValueKRW
+				} else {
+					dLiquid += value - f.pos.ValueKRW
+				}
+			}
+			return tx.Model(&models.DailyAssetSnapshot{}).Where("date = ?", date).Updates(map[string]interface{}{
+				"total_krw":      gorm.Expr("total_krw + ?", dv),
+				"cost_krw":       gorm.Expr("cost_krw + ?", dc),
+				"restricted_krw": gorm.Expr("restricted_krw + ?", dRestricted),
+				"liquid_krw":     gorm.Expr("liquid_krw + ?", dLiquid),
+			}).Error
+		})
+		if err != nil {
+			return err
+		}
+		fixed++
+	}
+	log.Printf("[DailySnapshot] 외화 종목 환율을 바로잡은 날 %d일", fixed)
+	return nil
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { MissingDividend } from '../../types/models';
@@ -6,6 +6,7 @@ import DatePicker from '../ui/DatePicker';
 import Portal from '../ui/Portal';
 import { dps } from './scoreText';
 import { accountDisplayName } from '../../utils/accountLabel';
+import { fmtCcy, loadFxRates, normCcy } from '../../utils/fx';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '저장하지 못했습니다.');
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -18,9 +19,29 @@ export default function RecordMissingModal({ item, onClose, onSaved }: { item: M
   guess.setDate(guess.getDate() + 14);
   const today = new Date();
   const [date, setDate] = useState(ymd(guess > today ? today : guess));
-  const [amount, setAmount] = useState(String(item.currency === 'KRW' ? Math.round(item.expected_net) : item.expected_net.toFixed(2)));
+  // 원화·달러가 아닌 배당(엔화 등)은 원화로 바꿔 기록한다 — 앱의 배당 집계는 원화·달러만 환산한다
+  const ccy = normCcy(item.currency) || 'USD';
+  const foreign = ccy !== 'KRW' && ccy !== 'USD';
+  const recCcy = foreign ? 'KRW' : ccy;
+  const [amount, setAmount] = useState(foreign ? '' : String(ccy === 'KRW' ? Math.round(item.expected_net) : item.expected_net.toFixed(2)));
+  const [rate, setRate] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 엔화 등: 지금 환율로 원화 예상 금액을 채워 둔다 (받은 날 실제 원화 금액으로 고치도록 안내)
+  useEffect(() => {
+    if (!foreign) return;
+    let cancelled = false;
+    loadFxRates([ccy], 0).then((r) => {
+      const v = r[ccy] ?? 0;
+      if (cancelled || !(v > 0)) return;
+      setRate(v);
+      setAmount((cur) => cur || String(Math.round(item.expected_net * v)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [foreign, ccy, item.expected_net]);
 
   const save = async () => {
     const v = Number(amount.replace(/,/g, ''));
@@ -28,7 +49,8 @@ export default function RecordMissingModal({ item, onClose, onSaved }: { item: M
     setBusy(true);
     setError(null);
     try {
-      const saved = await apiClient.CreateDividend(item.account_id, item.asset_id, date, v, 0, item.currency, true, `배당락 ${item.ex_date} · 주당 ${dps(item.per_share, item.currency)} × ${item.quantity}주`);
+      const note = `배당락 ${item.ex_date} · 주당 ${dps(item.per_share, ccy)} × ${item.quantity}주${foreign ? ` · ${ccy}→원화` : ''}`;
+      const saved = await apiClient.CreateDividend(item.account_id, item.asset_id, date, v, 0, recCcy, true, note);
       const sheetNote = (saved as { sheet_note?: string } | null | undefined)?.sheet_note;
       onSaved(`${item.ticker} ${item.ex_date} 회차를 기록했습니다.${sheetNote ? ` ${sheetNote}` : ''}`);
     } catch (e) {
@@ -55,11 +77,17 @@ export default function RecordMissingModal({ item, onClose, onSaved }: { item: M
           </div>
           <div className="space-y-4 overflow-y-auto px-5 py-4">
             <div className="space-y-1.5">
-              <p className="text-xs font-medium text-zinc-300">받은 금액 (세후, {item.currency === 'KRW' ? '원' : '$'})</p>
+              <p className="text-xs font-medium text-zinc-300">받은 금액 (세후, {recCcy === 'KRW' ? '원' : '$'})</p>
               <input inputMode="decimal" className="input-field num" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
               <p className="num text-[11px] leading-relaxed text-zinc-500">
-                예상: 주당 {dps(item.per_share, item.currency)} × {item.quantity.toLocaleString('ko-KR', { maximumFractionDigits: 6 })}주 × (1 − 세금 {item.currency === 'KRW' ? '15.4' : '15'}%) — 증권사 앱의 실제 금액으로 고쳐 주세요.
+                예상: 주당 {dps(item.per_share, ccy)} × {item.quantity.toLocaleString('ko-KR', { maximumFractionDigits: 6 })}주 × (1 − 세금 {ccy === 'KRW' || ccy === 'JPY' ? '15.4' : '15'}%)
+                {foreign ? ` = ${fmtCcy(item.expected_net, ccy)}` : ''} — 증권사 앱의 실제 금액으로 고쳐 주세요.
               </p>
+              {foreign && (
+                <p className="text-[11px] leading-relaxed text-amber-200/90">
+                  {ccy} 배당은 원화로 바꿔 기록합니다. {rate > 0 ? `지금 환율(${fmtCcy(1, ccy)} = ₩${rate.toLocaleString('ko-KR', { maximumFractionDigits: 3 })})로 채워 둔 값이니` : '환율을 불러오지 못했습니다 —'} 받은 날 실제로 들어온 원화 금액으로 넣어 주세요.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <p className="text-xs font-medium text-zinc-300">받은 날</p>

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChevronRight, Search, X } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { Transaction } from '../../types/models';
-import { assetPrimary, assetSecondary, isKRTicker } from '../../utils/assetLabel';
+import { assetPrimary, assetSecondary } from '../../utils/assetLabel';
+import { ccyOfTicker, fmtCcy, loadFxRates, toKRW, type FxRates } from '../../utils/fx';
 
 /**
  * 매매 기록 — 거래 내역.
@@ -19,9 +20,9 @@ type View = 'asset' | 'date';
 const VIEW_KEY = 'sm-trade-history-view';
 const SHOW_STEP = 20; // 펼친 종목에서 한 번에 보여 줄 거래 수
 
-const cur = (tx: Transaction) => (isKRTicker(tx.asset?.ticker) ? 'KRW' : 'USD');
-const money = (v: number, ccy: string) =>
-  ccy === 'KRW' ? `₩${Math.round(v).toLocaleString('ko-KR')}` : `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// 종목 통화 (.KS·.KQ 원화, .T 엔화 … 그 밖은 달러)
+const cur = (tx: Transaction) => ccyOfTicker(tx.asset?.ticker);
+const money = (v: number, ccy: string) => fmtCcy(v, ccy);
 const qtyText = (q: number) => `${q.toLocaleString('ko-KR', { maximumFractionDigits: 6 })}주`;
 /** 거래 금액 (매수는 수수료 포함 지불액, 매도는 수수료 뺀 수령액) */
 const amountOf = (tx: Transaction) => tx.price * tx.quantity + (tx.type === 'Buy' ? tx.fee : -tx.fee);
@@ -42,7 +43,7 @@ function SidePill({ buy, children }: { buy: boolean; children?: ReactNode }) {
 
 // ───────────────────────── 월별 막대 ─────────────────────────
 
-function MonthlyBars({ txs, fx, month, onMonth }: { txs: Transaction[]; fx: number; month: string | null; onMonth: (m: string | null) => void }) {
+function MonthlyBars({ txs, rates, month, onMonth }: { txs: Transaction[]; rates: FxRates; month: string | null; onMonth: (m: string | null) => void }) {
   const months = useMemo(() => {
     const now = new Date();
     return Array.from({ length: 12 }, (_, i) => {
@@ -55,13 +56,13 @@ function MonthlyBars({ txs, fx, month, onMonth }: { txs: Transaction[]; fx: numb
     for (const tx of txs) {
       const row = m.get(monthKey(tx.date));
       if (!row) continue;
-      const krw = cur(tx) === 'KRW' ? amountOf(tx) : amountOf(tx) * fx;
+      const krw = toKRW(amountOf(tx), cur(tx), rates);
       if (tx.type === 'Buy') row.buy += krw;
       else row.sell += krw;
       row.n += 1;
     }
     return months.map((k) => ({ key: k, ...m.get(k)! }));
-  }, [txs, months, fx]);
+  }, [txs, months, rates]);
   const max = Math.max(1, ...data.map((d) => Math.max(d.buy, d.sell)));
   const sel = data.find((d) => d.key === month);
 
@@ -251,15 +252,22 @@ export default function TradeHistory({ transactions, onOpen }: TradeHistoryProps
   const [query, setQuery] = useState('');
   const [month, setMonth] = useState<string | null>(null);
   const [open, setOpen] = useState<Set<number>>(() => new Set());
-  const [fx, setFx] = useState(1400);
+  // 거래 통화별 원화 환율 (달러는 앱 환율, 엔화 등은 그 통화 환율)
+  const [rates, setRates] = useState<FxRates>({ KRW: 1, USD: 1400 });
   const [showPlan, setShowPlan] = useState(false);
+  const ccyKey = useMemo(() => Array.from(new Set(transactions.map(cur))).sort().join(','), [transactions]);
 
   useEffect(() => {
+    let cancelled = false;
     apiClient
       .GetUSDToKRW()
-      .then((v: unknown) => typeof v === 'number' && v > 0 && setFx(v))
+      .then((v: unknown) => loadFxRates(ccyKey.split(','), typeof v === 'number' && v > 0 ? v : 1400))
+      .then((r) => !cancelled && setRates(r))
       .catch(() => undefined);
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [ccyKey]);
 
   const changeView = (v: View) => {
     setView(v);
@@ -313,7 +321,7 @@ export default function TradeHistory({ transactions, onOpen }: TradeHistoryProps
   let lastMonth = '';
   return (
     <div className="space-y-4">
-      <MonthlyBars txs={sorted} fx={fx} month={month} onMonth={setMonth} />
+      <MonthlyBars txs={sorted} rates={rates} month={month} onMonth={setMonth} />
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="glass-pill inline-flex p-1" role="group" aria-label="보기">

@@ -5,6 +5,7 @@ import BrokerLogo from '../ui/BrokerLogo';
 import { accountDisplayName } from '../../utils/accountLabel';
 import { isRestrictedAccount } from '../../utils/accountType';
 import { money } from '../cash/CashPanel';
+import { convertCcy, toKRW, type FxRates } from '../../utils/fx';
 
 /**
  * 배당 점수 종목 상세의 '내 보유' — 수량·평단·원금 → 지금 평가·손익, 지금 보유 기간에 받은 배당과 그것까지 더한 손익,
@@ -39,9 +40,9 @@ function Tile({ label, children, sub }: { label: string; children: ReactNode; su
   );
 }
 
-export default function MyPosition({ position: p, price, ccy, ttm, usdKrw }: { position: DivScorePosition; price: number | null; ccy: string; ttm: number; usdKrw: number }) {
+export default function MyPosition({ position: p, price, ccy, ttm, rates }: { position: DivScorePosition; price: number | null; ccy: string; ttm: number; rates: FxRates }) {
   // 받은 배당을 종목 통화로 (기록 통화가 다르면 지금 환율로 — 그때는 ≈)
-  const conv = (v: number, from: string) => (from === ccy ? v : usdKrw > 0 ? (from === 'KRW' ? v / usdKrw : v * usdKrw) : 0);
+  const conv = (v: number, from: string) => convertCcy(v, from, ccy, rates);
   const approx = p.received.some((r) => r.currency !== ccy);
   const received = p.received.reduce((s, r) => s + conv(r.total, r.currency), 0);
   const received12 = p.received.reduce((s, r) => s + conv(r.last_12m, r.currency), 0);
@@ -53,7 +54,7 @@ export default function MyPosition({ position: p, price, ccy, ttm, usdKrw }: { p
   const withDiv = pnl != null ? pnl + received : null;
   const expected = p.quantity * ttm;
   // 미국 종목이면 원화 환산 (지금 환율)
-  const approxKRW = (v: number) => (ccy === 'USD' && usdKrw > 0 ? `≈ ${money(v * usdKrw, 'KRW')}` : '');
+  const approxKRW = (v: number) => (ccy !== 'KRW' && toKRW(1, ccy, rates) > 0 ? `≈ ${money(toKRW(v, ccy, rates), 'KRW')}` : '');
   const krw = (v: number) => (approxKRW(v) ? ` · ${approxKRW(v)}` : '');
   const one = p.accounts.length === 1 ? p.accounts[0] : null;
 

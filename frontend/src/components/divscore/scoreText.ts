@@ -1,4 +1,5 @@
 import type { DivScoreMetrics, DivScoreParts, DivScoreWeights, DivStatus } from '../../types/models';
+import { ccySymbol, normCcy } from '../../utils/fx';
 
 /** 배당 상태 이름·색 */
 export const STATUS_META: Record<DivStatus, { label: string; cls: string; hint: string }> = {
@@ -101,4 +102,10 @@ export const monthLabel = (m: string) => `${m.slice(0, 4)}년 ${Number(m.slice(5
 export const shortMonth = (m: string) => `${m.slice(2, 4)}.${m.slice(5, 7)}`;
 
 /** 주당 배당 금액 (종목 통화) */
-export const dps = (v: number, ccy: string) => (ccy === 'KRW' ? `₩${Math.round(v).toLocaleString('ko-KR')}` : `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`);
+/** 주당 배당 (₩375 · $0.2650 · ¥8.5) */
+export const dps = (v: number, ccy: string) => {
+  const c = normCcy(ccy);
+  if (c === 'KRW') return `₩${Math.round(v).toLocaleString('ko-KR')}`;
+  if (c === 'USD' || !c) return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+  return `${ccySymbol(c)}${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+};

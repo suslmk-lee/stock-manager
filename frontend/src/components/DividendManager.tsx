@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { PageActions } from './shell/PageSlots';
 import SplitView from './shell/SplitView';
 import { apiClient } from '../api/client';
+import { ccyOfTicker } from '../utils/fx';
 import { Account, Asset, Dividend, Transaction } from '../types/models';
 import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock, TrendingUp, Wallet } from 'lucide-react';
 import CardIcon from './ui/CardIcon';
@@ -1139,11 +1140,11 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                               type="button"
                               onClick={() => {
                                 // 한국 ETF 판별 (티커에 .KS 또는 .KQ 포함)
-                                const isKoreanAsset = asset.ticker.includes('.KS') || asset.ticker.includes('.KQ');
-                                setFormData({ 
-                                  ...formData, 
+                                // 배당 통화: 달러 종목만 달러, 나머지(한국·엔화 등)는 원화 — 엔화 배당은 원화로 바꿔 기록한다
+                                setFormData({
+                                  ...formData,
                                   assetId: asset.id,
-                                  currency: isKoreanAsset ? 'KRW' : 'USD'
+                                  currency: ccyOfTicker(asset.ticker) === 'USD' ? 'USD' : 'KRW'
                                 });
                                 setAssetSearchQuery(`${asset.ticker} - ${asset.name}`);
                                 setShowAssetDropdown(false);

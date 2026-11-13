@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
+import { ccyOfTicker, loadFxRates, toKRW } from '../utils/fx';
 import { Asset, Account } from '../types/models';
 import { Wallet, Globe, Home, ChevronDown, ChevronUp, LineChart } from 'lucide-react';
 import TotalAssetTrendModal from './TotalAssetTrendModal';
@@ -77,11 +78,12 @@ export default function AssetStatistics({ accountId, marketType = 'all', liquidi
         ? (await apiClient.GetCurrentPrices(tickers)) as Record<string, any>
         : {};
 
+      // 시세 통화별 원화 환율 (달러는 앱 환율, 엔화 등은 그 통화 환율)
+      const rates = await loadFxRates(Object.values(batchPrices).map((p) => p?.currency), exchangeRate);
       const priceInKRWOf = (ticker: string) => {
         const pd = batchPrices[ticker.toUpperCase()] || batchPrices[ticker];
         const price = Number(pd?.price || 0);
-        const currency = String(pd?.currency || '');
-        return currency === 'USD' ? price * exchangeRate : price;
+        return toKRW(price, pd?.currency || ccyOfTicker(ticker), rates);
       };
 
       for (const asset of assetsWithHoldings) {

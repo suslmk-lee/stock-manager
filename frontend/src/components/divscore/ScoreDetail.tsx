@@ -8,6 +8,7 @@ import { dps, PART_KEYS, PART_LABEL, partPoints, partReason, pct, shortMonth, si
 import PaymentHistory from './PaymentHistory';
 import BrokerLogo from '../ui/BrokerLogo';
 import { accountDisplayName } from '../../utils/accountLabel';
+import { ccyOfTicker, loadFxRates, normCcy, type FxRates } from '../../utils/fx';
 import PriceTrend from './PriceTrend';
 import InvestCash, { type CashContext } from './InvestCash';
 import MyPosition from './MyPosition';
@@ -117,7 +118,17 @@ export default function ScoreDetail({
   }, [cash, row.asset_id]);
 
   const m = row.metrics;
-  const ccy = detail?.currency || (/\.(KS|KQ)$/i.test(row.asset.ticker) ? 'KRW' : 'USD');
+  const ccy = normCcy(detail?.currency) || ccyOfTicker(row.asset.ticker);
+  // 종목 통화의 원화 환율 (달러는 예수금의 환율, 엔화 등은 그 통화 시세)
+  const usdKrw = cash && cash !== 'error' ? cash.usdKrw : 0;
+  const [rates, setRates] = useState<FxRates>({ KRW: 1 });
+  useEffect(() => {
+    let cancelled = false;
+    loadFxRates([ccy], usdKrw).then((r) => !cancelled && setRates(r));
+    return () => {
+      cancelled = true;
+    };
+  }, [ccy, usdKrw]);
   const first = tickerFirst(row.asset);
   const st = STATUS_META[m.status];
   const delta = row.prev_rank != null ? row.prev_rank - row.rank : null;
@@ -156,7 +167,7 @@ export default function ScoreDetail({
       {/* 내 보유 (지금 기준) */}
       {detail?.position ? (
         <div className="border-b border-white/[0.07] p-4 sm:p-5">
-          <MyPosition position={detail.position} price={price} ccy={ccy} ttm={m.ttm} usdKrw={cash && cash !== 'error' ? cash.usdKrw : 0} />
+          <MyPosition position={detail.position} price={price} ccy={ccy} ttm={m.ttm} rates={rates} />
         </div>
       ) : detail ? (
         <p className="border-b border-white/[0.07] px-4 py-2.5 text-[12px] text-zinc-500 sm:px-5">지금은 보유하지 않은 종목입니다.</p>
@@ -196,7 +207,7 @@ export default function ScoreDetail({
       {/* 주가 추이 · 살 수 있는 예수금 */}
       <div className="space-y-5 border-b border-white/[0.07] p-4 sm:p-5">
         <PriceTrend ticker={row.asset.ticker} ccy={ccy} payments={detail?.payments ?? []} source={detail?.source} avgPrice={avgPrice} onLatest={onLatest} />
-        <InvestCash asset={row.asset} ccy={ccy} price={price} ctx={cash} />
+        <InvestCash asset={row.asset} ccy={ccy} price={price} ctx={cash} rate={rates[ccy] ?? 0} />
       </div>
 
       {error && <p className="m-4 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{error}</p>}

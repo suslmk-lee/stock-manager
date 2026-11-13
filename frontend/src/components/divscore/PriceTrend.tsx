@@ -4,7 +4,7 @@ import { apiClient } from '../../api/client';
 import type { PriceHistory } from '../../types/models';
 import { useThemeColors } from '../../appearance/AppearanceContext';
 import { niceTicks } from '../signals/PriceChart';
-import { formatPrice } from '../signals/SignalCard';
+import { fmtCcy } from '../../utils/fx';
 import { dps, signedPct } from './scoreText';
 
 /**
@@ -163,7 +163,7 @@ export default function PriceTrend({
     return { pts, start, end, priceChg, totalChg, divSum, divCount, hi, lo, pos, ticks, hasMa: pts.some((p) => p.ma200) };
   }, [all, range, payments, avgPrice]);
 
-  const fmt = (v: number) => formatPrice(v, ccy);
+  const fmt = (v: number) => fmtCcy(v, ccy);
   const axisTick = { fontSize: 10, fill: tc.axis, fontFamily: 'JetBrains Mono, monospace' };
   const rangeLabel = RANGES.find((r) => r.key === range)?.label ?? '';
 

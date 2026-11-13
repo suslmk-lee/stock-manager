@@ -707,9 +707,11 @@ func missingRecords(a *divScoreAsset, accounts map[uint]models.Account, now time
 		return nil
 	}
 	kr := isKRTicker(a.asset.Ticker)
-	window, tax, ccy := divRecordWindowUS, divTaxUS, "USD"
+	window, tax, ccy := divRecordWindowUS, divTaxUS, tickerCurrency(a.asset.Ticker) // 해외: 종목 통화 (달러·엔화 …)
 	if kr {
 		window, tax, ccy = divRecordWindowKR, divTaxKR, "KRW"
+	} else if ccy == "JPY" {
+		tax = divTaxKR // 일본 원천 15.315% — 국내 추가분까지 보통 15.4%
 	}
 	from := now.AddDate(0, -divMissingLookback, 0)
 	var out []MissingDividend

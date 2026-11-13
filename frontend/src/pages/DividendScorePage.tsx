@@ -3,6 +3,7 @@ import { Info, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react';
 import { PageActions } from '../components/shell/PageSlots';
 import SplitView from '../components/shell/SplitView';
 import { apiClient } from '../api/client';
+import { ccyOfTicker } from '../utils/fx';
 import type { DivScoreParts, DivScoreRanking, DivScoreRow, DivStatus, MissingDividend } from '../types/models';
 import { assetPrimary, assetSecondary, tickerFirst } from '../utils/assetLabel';
 import CardIcon from '../components/ui/CardIcon';
@@ -28,8 +29,8 @@ const MARKETS: { key: Market; label: string }[] = [
   { key: 'us', label: '미국' },
 ];
 const MARKET_KEY = 'divscore-market';
-const isKR = (ticker: string) => /\.(KS|KQ)$/i.test(ticker);
-const inMarket = (ticker: string, m: Market) => m === 'all' || (m === 'kr') === isKR(ticker);
+// 한국 = 원화 종목, 미국 = 달러 종목 (엔화 등 그 밖의 시장은 전체에서만)
+const inMarket = (ticker: string, m: Market) => m === 'all' || ccyOfTicker(ticker) === (m === 'kr' ? 'KRW' : 'USD');
 const norm = (v: string) => v.toLowerCase().replace(/\s+/g, '');
 const savedMarket = (): Market => {
   try {

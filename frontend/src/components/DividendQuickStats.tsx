@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
+import { ccyOfTicker, loadFxRates, toKRW } from '../utils/fx';
 import { Account, Dividend, Holding, Transaction } from '../types/models';
 import { useThemeColors } from '../appearance/AppearanceContext';
 import CardIcon from './ui/CardIcon';
@@ -28,7 +29,7 @@ interface AssetDividendStats {
 }
 
 // 보유 단가의 통화: 국내 상장(.KS/.KQ)은 원화, 그 밖은 달러 (다른 화면과 같은 기준)
-const currencyOfTicker = (ticker: string): 'KRW' | 'USD' => (/\.(KS|KQ)$/i.test(ticker) ? 'KRW' : 'USD');
+// 종목 통화는 거래소 꼬리표로 (.KS·.KQ 원화, .T 엔화 …) — utils/fx
 
 export default function DividendQuickStats({ accountId, children, refreshTrigger = 0 }: DividendQuickStatsProps) {
   const tc = useThemeColors();
@@ -129,27 +130,20 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
       const annualizedDividend = yearlyTotal > 0 ? (yearlyTotal / elapsedDays) * daysInYear : 0;
       setExpectedAnnualDividend(annualizedDividend);
 
-      // 총 투자금 계산 (해당 계좌 보유수량 * 평단 합계)
-      const rawInvestmentTotal = holdings.reduce((sum, holding: any) => {
-        if (typeof holding.total_cost === 'number') {
-          return sum + holding.total_cost;
-        }
-        return sum + ((holding.quantity || 0) * (holding.average_price || 0));
+      // 총 투자금 (보유수량 × 평단) — 종목마다 그 통화 환율로 원화 환산 (원화 계좌에 미국·일본 종목이 있어도 맞게)
+      const tickerOfHolding = (h: any): string | undefined => h.ticker || h.asset?.ticker;
+      const ccyOfHolding = (h: any) => (tickerOfHolding(h) ? ccyOfTicker(tickerOfHolding(h)) : account.currency);
+      const ccyOfTx = (tx: Transaction) => (tx.asset?.ticker ? ccyOfTicker(tx.asset.ticker) : account.currency);
+      const rates = await loadFxRates([...holdings.map(ccyOfHolding), ...transactions.map(ccyOfTx)], exchangeRateValue);
+      const investmentInKRW = holdings.reduce((sum, holding: any) => {
+        const cost = typeof holding.total_cost === 'number' ? holding.total_cost : (holding.quantity || 0) * (holding.average_price || 0);
+        return sum + toKRW(cost, ccyOfHolding(holding), rates);
       }, 0);
 
-      // 계좌 통화가 USD면 KRW로 환산해 배당금과 동일 기준으로 계산
-      const investmentInKRW = account.currency === 'USD'
-        ? rawInvestmentTotal * exchangeRateValue
-        : rawInvestmentTotal;
-
       // 보유원가가 0일 경우 누적 매수금(거래내역 기준)으로 대체
-      const buyInvestmentRaw = transactions
+      const buyInvestmentInKRW = transactions
         .filter(tx => tx.type === 'Buy')
-        .reduce((sum, tx) => sum + (tx.price * tx.quantity) + (tx.fee || 0), 0);
-
-      const buyInvestmentInKRW = account.currency === 'USD'
-        ? buyInvestmentRaw * exchangeRateValue
-        : buyInvestmentRaw;
+        .reduce((sum, tx) => sum + toKRW((tx.price * tx.quantity) + (tx.fee || 0), ccyOfTx(tx), rates), 0);
 
       // 자산별 배당금 Top10 (배당률은 시세 도착 후 갱신)
       const assetMap = new Map<number, { name: string; ticker: string; total: number; count: number }>();
@@ -180,7 +174,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
       const topWithInvested: AssetDividendStats[] = sortedAssets.map(asset => {
         const holding = holdings.find(h => h.asset?.ticker === asset.ticker);
         const cost = (holding?.quantity || 0) * (holding?.average_price || 0);
-        const invested = currencyOfTicker(asset.ticker) === 'USD' ? cost * exchangeRateValue : cost;
+        const invested = toKRW(cost, ccyOfTicker(asset.ticker), rates);
         return {
           assetName: asset.name,
           ticker: asset.ticker,
@@ -219,8 +213,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
             tickers.map(ticker => {
               const priceData = prices[ticker.toUpperCase()] || prices[ticker];
               const rawPrice = Number(priceData?.price || 0);
-              const currency = String(priceData?.currency || '');
-              const priceInKRW = currency === 'USD' ? rawPrice * exchangeRateValue : rawPrice;
+              const priceInKRW = toKRW(rawPrice, priceData?.currency || ccyOfTicker(ticker), rates);
               return [ticker, priceInKRW] as const;
             })
           );

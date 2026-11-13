@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
+import { ccyFlag, ccyOfTicker, convertCcy, fmtCcy, loadFxRates, toKRW as fxToKRW, type FxRates } from '../utils/fx';
 import { Account, Holding, RealizedPnL, Dividend } from '../types/models';
 import { TrendingDown, Wallet } from 'lucide-react';
 import { LiquidityFilter, matchesLiquidity } from '../utils/accountType';
@@ -18,7 +19,7 @@ interface AssetRow {
   assetId: number;
   name: string;
   ticker: string;
-  currency: 'KRW' | 'USD';
+  currency: string; // 종목 통화 (KRW · USD · JPY …)
   qty: number;          // 현재 보유 수량
   costHolding: number;  // 현재 보유 원가 (Σ qty×평단)
   realized: number;     // 실현 손익
@@ -26,17 +27,10 @@ interface AssetRow {
   dividend: number;     // 배당(세후 실수령)
 }
 
-const currencyOf = (ticker?: string): 'KRW' | 'USD' => {
-  const t = (ticker || '').toUpperCase();
-  return t.endsWith('.KS') || t.endsWith('.KQ') ? 'KRW' : 'USD';
-};
+// 종목 통화는 거래소 꼬리표로 (.KS·.KQ 원화, .T 엔화 …)
+const currencyOf = (ticker?: string) => ccyOfTicker(ticker);
 
-const formatMoney = (value: number, currency: string) => {
-  const symbol = currency === 'USD' ? '$' : '₩';
-  if (currency === 'USD')
-    return `${symbol}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  return `${symbol}${Math.round(value).toLocaleString('ko-KR')}`;
-};
+const formatMoney = (value: number, currency: string) => fmtCcy(value, currency);
 
 const signed = (value: number, currency: string) => `${value >= 0 ? '+' : ''}${formatMoney(value, currency)}`;
 
@@ -48,6 +42,7 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
   const [rows, setRows] = useState<AssetRow[]>([]);
   const [priceMap, setPriceMap] = useState<Record<string, number>>({});
   const [exchangeRate, setExchangeRate] = useState(1300);
+  const [rates, setRates] = useState<FxRates>({ KRW: 1 });
 
   useEffect(() => {
     loadData();
@@ -70,6 +65,12 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
       const dividends = (dividendsData as Dividend[]) || [];
       const accounts = (accountsData as Account[]) || [];
       setExchangeRate(rate as number);
+      // 종목·배당 기록 통화별 원화 환율 (엔화 등)
+      const fx = await loadFxRates(
+        [...holdings.map((h) => currencyOf(h.asset?.ticker)), ...pnls.map((p) => currencyOf(p.asset?.ticker)), ...dividends.map((d) => d.currency)],
+        rate as number,
+      );
+      setRates(fx);
 
       const accountMap = new Map(accounts.map((a) => [a.id, a]));
       const inScope = (accId: number) => {
@@ -121,7 +122,8 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
       dividends.forEach((d) => {
         if (!inScope(d.account_id)) return;
         const row = ensure(d.asset_id, d.asset?.name || '', d.asset?.ticker || '');
-        row.dividend += (d.amount || 0) - (d.tax || 0);
+        // 배당 기록 통화(원화로 적은 엔화 배당 등)를 종목 통화로 맞춘다
+        row.dividend += convertCcy((d.amount || 0) - (d.tax || 0), d.currency || 'KRW', row.currency, fx);
       });
 
       const list = Array.from(map.values()).filter(
@@ -155,7 +157,7 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
     }
   };
 
-  const toKRW = (value: number, currency: string) => (currency === 'USD' ? value * exchangeRate : value);
+  const toKRW = (value: number, currency: string) => fxToKRW(value, currency, { ...rates, USD: exchangeRate });
 
   // 행별 계산
   const computed = rows.map((r) => {
@@ -271,7 +273,7 @@ export default function TotalReturnByAsset({ accountId, marketType = 'all', liqu
                   >
                     <td className="px-3 py-3 min-w-[170px]">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs">{r.currency === 'KRW' ? '🇰🇷' : '🇺🇸'}</span>
+                        <span className="text-xs">{ccyFlag(r.currency)}</span>
                         <div className="min-w-0">
                           <p className="text-white font-medium truncate">{assetPrimary(r)}</p>
                           <p className="label-mono mt-0.5">
