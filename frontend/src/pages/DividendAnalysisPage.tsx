@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PageActions } from '../components/shell/PageSlots';
-import DividendStatistics from '../components/DividendStatistics';
+import DividendAnalysis from '../components/dividends/DividendAnalysis';
 import DividendChart from '../components/DividendChart';
 import DividendYearlyOverview from '../components/DividendYearlyOverview';
 import { currentHashId } from '../navigation';
@@ -18,7 +18,7 @@ function Stats() {
     <>
       <PageActions>{f.controls}</PageActions>
       {f.panel}
-      <DividendStatistics accountId={f.account} marketType={f.market} liquidity={f.liquidity} months={f.period} />
+      <DividendAnalysis accountId={f.account} marketType={f.market} liquidity={f.liquidity} months={f.period} />
       <div className="mt-6">
         <DividendChart accountId={f.account || undefined} months={f.period} />
       </div>
@@ -26,7 +26,7 @@ function Stats() {
   );
 }
 
-// 배당 분석: 예전 '통계'의 배당 부분(배당 통계·월별 배당 차트) + '연간 현황'
+// 배당 분석: 받은 배당 분석(최근 12개월·예상·성장·종목별·계좌별) + 월별 배당 차트 + '연간 현황'
 export default function DividendAnalysisPage() {
   const [tab, setTab] = useState<Tab>(() => (currentHashId() === 'yearly' ? 'yearly' : 'stats'));
   return (
