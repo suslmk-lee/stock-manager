@@ -46,6 +46,11 @@ func registerDividendRoutes(api *gin.RouterGroup, s *Services) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
+			if s.DividendScore != nil {
+				if hc, err := s.DividendScore.CheckDividend(res.ID); err == nil {
+					res.HoldingCheck = hc // 이 배당으로 본 보유 수량이 앱과 다를 때
+				}
+			}
 			c.JSON(http.StatusOK, res)
 		})
 
@@ -83,6 +88,11 @@ func registerDividendRoutes(api *gin.RouterGroup, s *Services) {
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
+			}
+			if s.DividendScore != nil {
+				if hc, err := s.DividendScore.CheckDividend(res.ID); err == nil {
+					res.HoldingCheck = hc // 이 배당으로 본 보유 수량이 앱과 다를 때
+				}
 			}
 			c.JSON(http.StatusOK, res)
 		})

@@ -64,6 +64,7 @@ func NewApp() *App {
 	a.snapshotService.SetCash(a.cashService)
 	a.lockService = services.NewLockService(services.DefaultLockDir())
 	a.dividendScoreService = services.NewDividendScoreService(database.GetDB(), a.tickerService)
+	a.signalService.SetExtraAlerts(a.dividendScoreService.HoldingAlerts)
 	a.contributionService = services.NewContributionService(database.GetDB(), a.tickerService, a.fundService)
 	a.updater = updater.New(appVersion)
 	return a
@@ -265,7 +266,7 @@ func (a *App) CreateDividend(accountID, assetID uint, date string, amount, tax f
 		return nil, err
 	}
 
-	return a.dividendService.CreateDividend(services.CreateDividendRequest{
+	d, err := a.dividendService.CreateDividend(services.CreateDividendRequest{
 		AccountID:  accountID,
 		AssetID:    assetID,
 		Date:       parsedDate,
@@ -275,6 +276,21 @@ func (a *App) CreateDividend(accountID, assetID uint, date string, amount, tax f
 		IsReceived: isReceived,
 		Notes:      notes,
 	})
+	if err != nil {
+		return nil, err
+	}
+	a.attachHoldingCheck(d)
+	return d, nil
+}
+
+// attachHoldingCheck: 저장한 배당 기록으로 본 보유 수량이 앱과 다르면 함께 돌려준다 (확인에 실패해도 기록은 그대로)
+func (a *App) attachHoldingCheck(d *models.Dividend) {
+	if d == nil || a.dividendScoreService == nil {
+		return
+	}
+	if c, err := a.dividendScoreService.CheckDividend(d.ID); err == nil {
+		d.HoldingCheck = c
+	}
 }
 
 func (a *App) GetDividendsByAccount(accountID uint) (interface{}, error) {
@@ -331,7 +347,12 @@ func (a *App) UpdateDividend(id uint, accountID uint, assetID uint, date string,
 		IsReceived: isReceived,
 		Notes:      notes,
 	}
-	return a.dividendService.UpdateDividend(id, req)
+	d, err := a.dividendService.UpdateDividend(id, req)
+	if err != nil {
+		return nil, err
+	}
+	a.attachHoldingCheck(d)
+	return d, nil
 }
 
 func (a *App) DeleteDividend(id uint) error {

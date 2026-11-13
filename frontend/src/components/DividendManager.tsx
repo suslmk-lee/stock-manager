@@ -3,7 +3,8 @@ import { PageActions } from './shell/PageSlots';
 import SplitView from './shell/SplitView';
 import { apiClient } from '../api/client';
 import { ccyOfTicker } from '../utils/fx';
-import { Account, Asset, Dividend, Transaction } from '../types/models';
+import { Account, Asset, Dividend, HoldingCheck, Transaction } from '../types/models';
+import HoldingFixModal from './holding/HoldingFixModal';
 import { Plus, DollarSign, Calendar, Edit2, Trash2, ChevronRight, LayoutList, Clock, TrendingUp, Wallet } from 'lucide-react';
 import CardIcon from './ui/CardIcon';
 import DividendQuickStats from './DividendQuickStats';
@@ -30,6 +31,9 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
   const [formError, setFormError] = useState<string | null>(null);
   // 기록은 됐지만 알려 줄 것 (예: 구글 시트에 그 종목 줄이 없어 시트에는 넣지 않음)
   const [notice, setNotice] = useState<string | null>(null);
+  // 방금 저장한 배당으로 본 보유 수량이 앱과 다를 때 (안내 + 고치기 창)
+  const [holdingCheck, setHoldingCheck] = useState<HoldingCheck | null>(null);
+  const [holdingFix, setHoldingFix] = useState<HoldingCheck | null>(null);
   useEffect(() => {
     setFormError(null);
   }, [showForm]);
@@ -320,6 +324,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
       setAssetSearchQuery(''); // 자산 검색 필드 초기화
       const sheetNote = (saved as { sheet_note?: string } | null | undefined)?.sheet_note;
       setNotice(sheetNote ? `${editingDividend ? '수정했습니다' : '기록했습니다'} — ${sheetNote}` : null);
+      setHoldingCheck((saved as { holding_check?: HoldingCheck | null } | null | undefined)?.holding_check ?? null);
       setEditingDividend(null);
       setShowForm(false);
     } catch (err) {
@@ -1004,6 +1009,39 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
           </div>
           <button onClick={() => setError(null)} className="text-current opacity-60 hover:opacity-100 shrink-0">✕</button>
         </div>
+      )}
+      {holdingCheck && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-orange-400/30 bg-orange-500/10 px-4 py-3 text-orange-100">
+          <div className="min-w-0 text-[13px] leading-relaxed">
+            <b className="font-semibold">보유 수량 확인</b> ·{' '}
+            {holdingCheck.status === 'gross'
+              ? `이 배당은 세전 금액 같아요 — ${holdingCheck.app_qty.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}주 × 주당 배당과 맞아요.`
+              : `이 배당으로 보면 그때 약 ${holdingCheck.implied.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}주인데 앱은 ${holdingCheck.app_qty.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}주예요.${
+                  holdingCheck.status === 'short' ? ' 소수점 매수 기록이 빠진 것 같아요.' : ' 매수 날짜가 실제보다 이르거나 매도 기록이 빠졌을 수 있어요.'
+                }`}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" className="btn-primary !px-3 !py-1.5 !text-xs" onClick={() => setHoldingFix(holdingCheck)}>
+              {holdingCheck.status === 'short' ? '빠진 매수 추가' : holdingCheck.status === 'gross' ? '세후로 고치기' : '자세히'}
+            </button>
+            <button onClick={() => setHoldingCheck(null)} className="text-current opacity-60 hover:opacity-100" aria-label="닫기">
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+      {holdingFix && (
+        <HoldingFixModal
+          check={holdingFix}
+          onClose={() => setHoldingFix(null)}
+          onDone={(msg) => {
+            setHoldingFix(null);
+            setHoldingCheck(null);
+            setNotice(msg);
+            loadDividends(selectedAccount);
+            setStatsKey((prev) => prev + 1);
+          }}
+        />
       )}
       {notice && (
         <div className="mb-6 flex items-start justify-between gap-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-amber-200">

@@ -277,6 +277,15 @@ func (s *SignalService) CheckSignals() ([]models.SignalEvent, int64, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	if fn := s.extraAlerts; fn != nil {
+		enabled := true
+		if set, err := s.GetNotificationSettings(); err == nil {
+			enabled = set.Enabled
+		}
+		extra, err := fn(enabled, time.Now())
+		logRecordErr(err)
+		events = append(events, extra...)
+	}
 	newEvents := []models.SignalEvent{}
 	for _, e := range events {
 		if e.ReadAt == nil {

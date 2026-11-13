@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { apiClient } from '../../api/client';
-import type { DivScoreDetail, DivScoreRow, DivScoreWeights, HoldingWithDetails, MissingDividend } from '../../types/models';
+import type { DivScoreDetail, DivScoreRow, DivScoreWeights, HoldingCheck, HoldingWithDetails, MissingDividend } from '../../types/models';
 import { useThemeColors } from '../../appearance/AppearanceContext';
 import { assetPrimary, assetSecondary, tickerFirst } from '../../utils/assetLabel';
 import { dps, PART_KEYS, PART_LABEL, partPoints, partReason, pct, shortMonth, signedPct, STATUS_META } from './scoreText';
@@ -12,6 +12,7 @@ import { ccyOfTicker, loadFxRates, normCcy, type FxRates } from '../../utils/fx'
 import PriceTrend from './PriceTrend';
 import InvestCash, { type CashContext } from './InvestCash';
 import MyPosition from './MyPosition';
+import HoldingCheckList from './HoldingCheckList';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '불러오지 못했습니다.');
 const shortDate = (d: string) => `${d.slice(2, 4)}.${d.slice(5, 7)}.${d.slice(8, 10)}`;
@@ -62,12 +63,18 @@ export default function ScoreDetail({
   weights,
   missing,
   onRecord,
+  onFixHolding,
+  reloadKey = 0,
 }: {
   row: DivScoreRow;
   total: number;
   weights: DivScoreWeights;
   missing: MissingDividend[];
   onRecord?: (m: MissingDividend) => void;
+  /** 배당으로 본 수량이 앱과 다른 계좌의 '확인' */
+  onFixHolding?: (c: HoldingCheck) => void;
+  /** 바뀌면 상세를 다시 불러온다 (매수 추가·배당 고침 뒤) */
+  reloadKey?: number;
 }) {
   const tc = useThemeColors();
   const [detail, setDetail] = useState<DivScoreDetail | null>(null);
@@ -83,7 +90,7 @@ export default function ScoreDetail({
     return () => {
       cancelled = true;
     };
-  }, [row.asset_id, weights]);
+  }, [row.asset_id, weights, reloadKey]);
 
   // 계좌·예수금·보유는 종목과 상관없이 한 번만 받는다
   const [cash, setCash] = useState<CashContext | null | 'error'>(null);
@@ -168,6 +175,12 @@ export default function ScoreDetail({
       {detail?.position ? (
         <div className="border-b border-white/[0.07] p-4 sm:p-5">
           <MyPosition position={detail.position} price={price} ccy={ccy} ttm={m.ttm} rates={rates} />
+          {(detail.holding ?? []).length > 0 && onFixHolding && (
+            <div className="mt-3">
+              <p className="label-mono mb-1.5">배당으로 본 보유 수량 · 계좌마다 최근 배당 기록 (배당락일 기준)</p>
+              <HoldingCheckList items={detail.holding ?? []} onFix={onFixHolding} />
+            </div>
+          )}
         </div>
       ) : detail ? (
         <p className="border-b border-white/[0.07] px-4 py-2.5 text-[12px] text-zinc-500 sm:px-5">지금은 보유하지 않은 종목입니다.</p>

@@ -4,7 +4,7 @@ import { onSignalsNew } from '../../api/events';
 import type { SignalEvent } from '../../types/models';
 import NotificationSettings from './NotificationSettings';
 import ToastStack from './ToastStack';
-import { isSuggestion } from './alertMeta';
+import { isHoldingCheck, isSuggestion } from './alertMeta';
 
 const isWeb = !(window as any).go;
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;
@@ -37,6 +37,8 @@ interface AlertsContextValue {
   openCandidates: (assetId?: number) => void;
   /** 마지막 배당 후보 이동 요청 — 페이지가 강조할 종목과 다시 그릴 기준(nonce) */
   candidatesRequest: CandidatesRequest | null;
+  /** 배당 점수 화면에서 열 종목 (보유 확인 알림을 눌렀을 때) */
+  divScoreRequest: FocusRequest | null;
   /** 프로필 지정/변경이 일어날 때마다 올라가는 값 — 신호 화면이 다시 불러오는 데 쓴다 */
   profilesVersion: number;
   /** 프로필 관리·배당 후보 페이지에서 지정이 바뀌었음을 알린다 */
@@ -62,6 +64,7 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [candidatesRequest, setCandidatesRequest] = useState<CandidatesRequest | null>(null);
+  const [divScoreRequest, setDivScoreRequest] = useState<FocusRequest | null>(null);
   const [profilesVersion, setProfilesVersion] = useState(0);
   const lastCheckRef = useRef(0);
   const nonceRef = useRef(0);
@@ -180,14 +183,22 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
     window.location.hash = 'candidates';
   }, []);
 
+  // 보유 확인 알림: 배당 점수 화면(#dividend-score)에서 그 종목을 연다 (내 보유 아래에서 바로 고친다)
+  const openDivScore = useCallback((assetId: number) => {
+    nonceRef.current += 1;
+    setDivScoreRequest({ assetId, nonce: nonceRef.current });
+    window.location.hash = 'dividend-score';
+  }, []);
+
   const openEvent = useCallback(
     (e: SignalEvent) => {
       if (!e.read_at) markRead([e.id]);
       dismissToast(e.id);
       if (isSuggestion(e)) openCandidates(e.asset_id);
+      else if (isHoldingCheck(e)) openDivScore(e.asset_id);
       else focusAsset(e.asset_id);
     },
-    [markRead, dismissToast, focusAsset, openCandidates],
+    [markRead, dismissToast, focusAsset, openCandidates, openDivScore],
   );
 
   const notifyProfilesChanged = useCallback(() => setProfilesVersion((v) => v + 1), []);
@@ -227,8 +238,8 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
   const openSettings = useCallback(() => setSettingsOpen(true), []);
 
   const value = useMemo<AlertsContextValue>(
-    () => ({ unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings, openCandidates, candidatesRequest, profilesVersion, notifyProfilesChanged, acceptSuggestion, dismissSuggestion }),
-    [unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings, openCandidates, candidatesRequest, profilesVersion, notifyProfilesChanged, acceptSuggestion, dismissSuggestion],
+    () => ({ unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings, openCandidates, candidatesRequest, divScoreRequest, profilesVersion, notifyProfilesChanged, acceptSuggestion, dismissSuggestion }),
+    [unreadCount, events, toasts, focusRequest, refresh, markRead, dismissToast, focusAsset, openEvent, openSettings, openCandidates, candidatesRequest, divScoreRequest, profilesVersion, notifyProfilesChanged, acceptSuggestion, dismissSuggestion],
   );
 
   return (

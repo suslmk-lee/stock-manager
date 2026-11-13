@@ -48,6 +48,8 @@ func NewServices() *Services {
 	dailySnap.SetCash(cash)
 	snapshot := services.NewPortfolioSnapshotService(database.GetDB(), ticker)
 	snapshot.SetCash(cash)
+	divScore := services.NewDividendScoreService(database.GetDB(), ticker)
+	signal.SetExtraAlerts(divScore.HoldingAlerts)
 
 	return &Services{
 		Account:       services.NewAccountService(),
@@ -63,7 +65,7 @@ func NewServices() *Services {
 		DailySnap:     dailySnap,
 		Accumulation:  services.NewAccumulationService(database.GetDB(), ticker),
 		Cash:          cash,
-		DividendScore: services.NewDividendScoreService(database.GetDB(), ticker),
+		DividendScore: divScore,
 		Fund:          fund,
 		Contribution:  services.NewContributionService(database.GetDB(), ticker, fund),
 	}

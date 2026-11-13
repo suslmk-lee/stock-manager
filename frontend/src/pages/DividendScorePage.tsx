@@ -4,7 +4,7 @@ import { PageActions } from '../components/shell/PageSlots';
 import SplitView from '../components/shell/SplitView';
 import { apiClient } from '../api/client';
 import { ccyOfTicker } from '../utils/fx';
-import type { DivScoreParts, DivScoreRanking, DivScoreRow, DivStatus, MissingDividend } from '../types/models';
+import type { DivScoreParts, DivScoreRanking, DivScoreRow, DivStatus, HoldingCheck, MissingDividend } from '../types/models';
 import { assetPrimary, assetSecondary, tickerFirst } from '../utils/assetLabel';
 import CardIcon from '../components/ui/CardIcon';
 import { IconPodium } from '../components/ui/appIcons';
@@ -13,6 +13,9 @@ import ScoreSettings from '../components/divscore/ScoreSettings';
 import RecordMissingModal from '../components/divscore/RecordMissingModal';
 import { monthLabel, PART_KEYS, PART_LABEL, PART_SHORT, partPoints, STATUS_META, type PartKey } from '../components/divscore/scoreText';
 import { askConfirm } from '../components/ui/confirmDialog';
+import HoldingCheckList from '../components/divscore/HoldingCheckList';
+import HoldingFixModal from '../components/holding/HoldingFixModal';
+import { useAlerts } from '../components/alerts/AlertsProvider';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '불러오지 못했습니다.');
 const SUMMARY = -1;
@@ -90,6 +93,11 @@ export default function DividendScorePage() {
   const [settings, setSettings] = useState(false);
   const [busy, setBusy] = useState(false);
   const [record, setRecord] = useState<MissingDividend | null>(null);
+  // 배당으로 본 보유 수량 고치기 (고친 뒤 상세를 다시 불러오려고 reloadKey 를 올린다)
+  const [fix, setFix] = useState<HoldingCheck | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const { divScoreRequest } = useAlerts();
+  const handledRequest = useRef(0);
   const rowRefs = useRef(new Map<number, HTMLButtonElement>());
 
   const load = useCallback(async (m: string) => {
@@ -117,6 +125,17 @@ export default function DividendScorePage() {
   useEffect(() => {
     if (split && selected == null && data) setSelected(SUMMARY);
   }, [split, selected, data]);
+
+  // 보유 확인 알림을 누르면 이번 달 순위에서 그 종목을 연다
+  useEffect(() => {
+    if (!divScoreRequest || handledRequest.current === divScoreRequest.nonce || !data) return;
+    if (!data.current) {
+      setMonth('');
+      return;
+    }
+    handledRequest.current = divScoreRequest.nonce;
+    if (data.rows.some((r) => r.asset_id === divScoreRequest.assetId)) setSelected(divScoreRequest.assetId);
+  }, [divScoreRequest, data]);
 
   const rows = useMemo(() => data?.rows ?? [], [data]);
   // 항목 기준 정렬: 그 항목 점수가 높은 순 (같으면 종합 순위 순) — 서버의 항목별 순위와 같은 순서
@@ -153,6 +172,8 @@ export default function DividendScorePage() {
   }, [ranked, query]);
   const marketLabel = MARKETS.find((m) => m.key === market)?.label ?? '';
   const missingShown = (data?.missing ?? []).filter((m) => m.status === 'missing' && inMarket(m.ticker, market)).length;
+  const holdingAll = data?.holding ?? [];
+  const holdingShown = holdingAll.filter((c) => inMarket(c.ticker, market)).length;
 
   const counts = useMemo(() => {
     const c: Record<DivStatus, number> = { up: 0, flat: 0, down: 0, missed: 0, new: 0 };
@@ -208,6 +229,11 @@ export default function DividendScorePage() {
             </span>
           ))}
           {missingShown > 0 && <span className="badge !py-0.5 text-[11px] bg-amber-500/10 text-amber-200">기록 누락 {missingShown}</span>}
+          {holdingShown > 0 && (
+            <span className="badge !py-0.5 text-[11px] bg-orange-500/10 text-orange-200" title="배당 기록으로 본 보유 수량이 앱과 다른 계좌 — 소수점 매수·매도 기록이 빠졌거나 세전 금액으로 기록한 것">
+              보유 확인 {holdingShown}
+            </span>
+          )}
         </div>
         {data && (
           <p className="label-mono">
@@ -335,6 +361,7 @@ export default function DividendScorePage() {
                 <span className="mt-1 flex items-center gap-2">
                   <span className={`badge !px-1.5 !py-0 text-[10px] ${st.cls}`}>{st.label}</span>
                   {r.missing_count > 0 && <span className="text-[10px] text-amber-300">기록 누락 {r.missing_count}</span>}
+                  {r.holding_count > 0 && <span className="text-[10px] text-orange-300">보유 확인</span>}
                   <span className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
                     <span className="block h-full rounded-full bg-mint-400/70" style={{ width: `${fill}%` }} />
                   </span>
@@ -382,6 +409,12 @@ export default function DividendScorePage() {
           </div>
         )}
       </div>
+      {data.current && holdingAll.length > 0 && (
+        <div className="border-b border-white/[0.07] p-4 sm:p-5">
+          <p className="label-mono mb-1.5">배당으로 본 보유 수량이 앱과 다른 계좌 · 계좌마다 최근 배당 기록 (받은 배당 ÷ 주당 배당)</p>
+          <HoldingCheckList items={holdingAll} withTicker onFix={setFix} />
+        </div>
+      )}
       {data.current && (
         <div className="border-b border-white/[0.07] p-4 sm:p-5">
           <p className="label-mono mb-1.5">내 배당 기록에 없는 회차 · 최근 12개월 (시장 배당락일에 보유 중이었던 회차)</p>
@@ -456,6 +489,8 @@ export default function DividendScorePage() {
                 weights={data.weights}
                 missing={data.current ? missingAll.filter((m) => m.asset_id === selectedRow.asset_id) : []}
                 onRecord={setRecord}
+                onFixHolding={setFix}
+                reloadKey={reloadKey}
               />
             ) : (
               <p className="py-16 text-center text-sm text-zinc-400">왼쪽에서 종목을 고르세요.</p>
@@ -472,6 +507,18 @@ export default function DividendScorePage() {
             setSettings(false);
             setNotice('배점을 바꿨습니다. 지난 달 순위도 같은 기준으로 다시 매겼습니다.');
             load(data.month);
+          }}
+        />
+      )}
+      {fix && (
+        <HoldingFixModal
+          check={fix}
+          onClose={() => setFix(null)}
+          onDone={(msg) => {
+            setFix(null);
+            setNotice(msg);
+            setReloadKey((k) => k + 1);
+            if (data) load(data.month);
           }}
         />
       )}

@@ -21,6 +21,8 @@ type Dividend struct {
 
 	// 저장하지 않음: 기록·수정 뒤 구글 시트에 반영하지 못한 이유 (시트에 그 종목 줄이 없을 때)
 	SheetNote string `gorm:"-" json:"sheet_note,omitempty"`
+	// 저장하지 않음: 기록·수정 뒤 이 배당으로 본 보유 수량 확인 (앱 수량과 맞지 않을 때만)
+	HoldingCheck *HoldingCheck `gorm:"-" json:"holding_check,omitempty"`
 	
 	Account Account `gorm:"foreignKey:AccountID" json:"account,omitempty"`
 	Asset   Asset   `gorm:"foreignKey:AssetID" json:"asset,omitempty"`

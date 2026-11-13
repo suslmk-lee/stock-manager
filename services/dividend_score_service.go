@@ -187,6 +187,11 @@ func (a *divScoreAsset) qty(t time.Time) float64 {
 
 // loadAssets: 지금 보유 중이거나 since 이후 거래가 있던 종목의 수량 추적기·배당 이력·종가
 func (s *DividendScoreService) loadAssets(since time.Time, withPrices bool) (map[uint]*divScoreAsset, error) {
+	return s.loadAssetsOf(since, withPrices, 0)
+}
+
+// loadAssetsOf: only 가 0 이 아니면 그 종목만 (보유·거래와 상관없이)
+func (s *DividendScoreService) loadAssetsOf(since time.Time, withPrices bool, only uint) (map[uint]*divScoreAsset, error) {
 	var holdings []models.Holding
 	if err := s.db.Where("quantity > 0").Find(&holdings).Error; err != nil {
 		return nil, err
@@ -203,6 +208,9 @@ func (s *DividendScoreService) loadAssets(since time.Time, withPrices bool) (map
 		if !t.Date.Before(since) {
 			ids[t.AssetID] = true
 		}
+	}
+	if only != 0 {
+		ids = map[uint]bool{only: true}
 	}
 	if len(ids) == 0 {
 		return map[uint]*divScoreAsset{}, nil
@@ -464,6 +472,7 @@ type DivScoreRow struct {
 	// 이번 달만: 내 평균 단가 대비 배당률, 기록 누락 회차 수
 	YOCPct       *float64 `json:"yoc_pct,omitempty"`
 	MissingCount int      `json:"missing_count"`
+	HoldingCount int      `json:"holding_count"` // 배당 기록으로 본 수량이 앱과 다른 계좌 수
 }
 
 // MissingDividend 는 내 배당 기록에 없는 회차 (시장 배당락일 기준)
@@ -491,6 +500,7 @@ type DivScoreRanking struct {
 	Rows       []DivScoreRow               `json:"rows"`
 	NoDividend []models.Asset              `json:"no_dividend"` // 보유 중이지만 배당이 없는 종목 (이번 달만)
 	Missing    []MissingDividend           `json:"missing"`     // 이번 달만
+	Holding    []models.HoldingCheck        `json:"holding"`     // 배당 기록으로 본 수량이 앱과 다른 계좌 (계좌·종목마다 최근 기록, 이번 달만)
 	Prev       []DivScorePrevRow           `json:"prev"`        // 지난달 순위 (화면에서 한국/미국만·항목별로 지난달 순위를 다시 매길 때)
 }
 
@@ -695,6 +705,12 @@ func (s *DividendScoreService) addCurrentExtras(out *DivScoreRanking) error {
 				out.Rows[i].MissingCount++
 			}
 		}
+		for _, c := range latestHoldingChecks(a, accByID, now) {
+			if c.Status != models.HoldingCheckOK {
+				out.Holding = append(out.Holding, c)
+				out.Rows[i].HoldingCount++
+			}
+		}
 	}
 	sort.Slice(out.NoDividend, func(i, j int) bool { return out.NoDividend[i].Ticker < out.NoDividend[j].Ticker })
 	sort.Slice(out.Missing, func(i, j int) bool {
@@ -832,6 +848,7 @@ type DivScoreDetail struct {
 	Years    []DivYearDPS           `json:"years"`
 	Payments []DivPayment           `json:"payments"` // 최근 3년, 최근 것부터
 	Position *DivScorePosition      `json:"position,omitempty"` // 지금 보유 (없으면 보유하지 않는 종목)
+	Holding  []models.HoldingCheck  `json:"holding"`            // 계좌마다 최근 배당 기록으로 본 수량 (앱과 맞는 것도)
 }
 
 // DivScorePosition 은 이 종목의 지금 보유 — 계좌별 수량·평단과 지금 보유 기간에 받은 배당 (금액은 종목 통화, 배당은 기록 통화별)
@@ -989,7 +1006,7 @@ func (s *DividendScoreService) GetDetail(assetID uint) (*DivScoreDetail, error) 
 	for _, sn := range snaps {
 		byMonth[sn.Month] = append(byMonth[sn.Month], sn)
 	}
-	out := &DivScoreDetail{AssetID: assetID, History: []DivScoreHistoryPoint{}, Years: []DivYearDPS{}, Payments: []DivPayment{}}
+	out := &DivScoreDetail{AssetID: assetID, History: []DivScoreHistoryPoint{}, Years: []DivYearDPS{}, Payments: []DivPayment{}, Holding: []models.HoldingCheck{}}
 	for i := len(window) - 1; i >= 0; i-- {
 		rows := rankMonth(byMonth[window[i]], w)
 		for _, r := range rows {
@@ -1017,6 +1034,11 @@ func (s *DividendScoreService) GetDetail(assetID uint) (*DivScoreDetail, error) 
 		return out, nil
 	}
 	out.Asset, out.Source, out.Currency = a.asset, a.source, tickerCurrency(a.asset.Ticker)
+	if accounts, err := s.accountMap(); err == nil {
+		if hc := latestHoldingChecks(a, accounts, now); len(hc) > 0 {
+			out.Holding = hc
+		}
+	}
 	special := markSpecials(a.events)
 	years := map[int]*DivYearDPS{}
 	cur := now.In(kst).Year()

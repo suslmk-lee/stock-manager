@@ -12,6 +12,7 @@ const TONES: Record<string, AlertTone> = {
   BUY: { label: '매수 검토', dot: 'bg-mint-400', text: 'text-mint-300', badge: 'border border-mint-400/30 bg-mint-400/10 text-mint-300' },
   CONFLICT: { label: '신호 충돌', dot: 'bg-amber-400', text: 'text-amber-300', badge: 'border border-amber-400/30 bg-amber-400/10 text-amber-200' },
   SUGGEST: { label: '제안', dot: 'bg-sky-400', text: 'text-sky-300', badge: 'border border-sky-400/30 bg-sky-400/10 text-sky-200' },
+  HOLDING: { label: '보유 확인', dot: 'bg-orange-400', text: 'text-orange-300', badge: 'border border-orange-400/30 bg-orange-400/10 text-orange-200' },
   CLEARED: { label: '해제', dot: 'bg-zinc-500', text: 'text-zinc-400', badge: 'border border-white/10 bg-white/[0.04] text-zinc-400' },
 };
 
@@ -20,22 +21,28 @@ export function isSuggestion(e: Pick<SignalEvent, 'to_action' | 'kind'>): boolea
   return e.kind === 'suggestion' || e.to_action === 'SUGGEST';
 }
 
+/** 배당 기록으로 본 보유 수량이 앱과 다르다는 알림인지 */
+export function isHoldingCheck(e: Pick<SignalEvent, 'to_action' | 'kind'>): boolean {
+  return e.kind === 'holding' || e.to_action === 'HOLDING';
+}
+
 export function isCleared(e: Pick<SignalEvent, 'to_action' | 'kind'>): boolean {
-  if (isSuggestion(e)) return false;
+  if (isSuggestion(e) || isHoldingCheck(e)) return false;
   return e.to_action !== 'SELL' && e.to_action !== 'BUY' && e.to_action !== 'CONFLICT';
 }
 
-export function toneOf(action: SignalAction | 'SUGGEST' | ''): AlertTone {
+export function toneOf(action: SignalAction | 'SUGGEST' | 'HOLDING' | ''): AlertTone {
   return TONES[action as string] ?? TONES.CLEARED;
 }
 
 export function eventTone(e: SignalEvent): AlertTone {
   if (isSuggestion(e)) return TONES.SUGGEST;
+  if (isHoldingCheck(e)) return TONES.HOLDING;
   return isCleared(e) ? TONES.CLEARED : TONES[e.to_action];
 }
 
-const SHORT: Record<string, string> = { SELL: '매도', BUY: '매수', CONFLICT: '충돌', HOLD: '관망', NO_PRICE: '시세 없음', '': '신규', SUGGEST: '제안' };
-export function shortLabel(a: SignalAction | 'SUGGEST' | ''): string {
+const SHORT: Record<string, string> = { SELL: '매도', BUY: '매수', CONFLICT: '충돌', HOLD: '관망', NO_PRICE: '시세 없음', '': '신규', SUGGEST: '제안', HOLDING: '보유 확인' };
+export function shortLabel(a: SignalAction | 'SUGGEST' | 'HOLDING' | ''): string {
   return SHORT[a] ?? a;
 }
 

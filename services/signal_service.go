@@ -35,6 +35,13 @@ type SignalService struct {
 	seedMu          sync.Mutex // 기본 프로필 시딩 직렬화
 	seeded          bool
 	onSettingsSaved func()
+	// 신호 점검 때 함께 돌리는 다른 알림 (배당 기록으로 본 보유 수량 확인)
+	extraAlerts func(enabled bool, now time.Time) ([]models.SignalEvent, error)
+}
+
+// SetExtraAlerts 는 신호 점검 때 함께 돌릴 알림을 등록한다 (enabled: 알림 설정이 켜져 있는지).
+func (s *SignalService) SetExtraAlerts(fn func(enabled bool, now time.Time) ([]models.SignalEvent, error)) {
+	s.extraAlerts = fn
 }
 
 func NewSignalService(db *gorm.DB, ticker *TickerService, exchange *ExchangeRateService) *SignalService {

@@ -544,8 +544,8 @@ export interface SignalEvent {
   ticker: string;
   name: string;
   from_action: SignalAction | '';
-  to_action: SignalAction | 'SUGGEST';
-  kind?: 'signal' | 'suggestion';
+  to_action: SignalAction | 'SUGGEST' | 'HOLDING';
+  kind?: 'signal' | 'suggestion' | 'holding';
   suggested_profile_id?: number;
   met_codes: string; // 쉼표로 구분
   message: string;
@@ -824,6 +824,8 @@ export interface DivScoreRow {
   prev_part_rank?: Record<keyof DivScoreParts, number>;
   yoc_pct?: number;
   missing_count: number;
+  /** 배당 기록으로 본 수량이 앱과 다른 계좌 수 */
+  holding_count: number;
 }
 
 export interface DivScoreWeights {
@@ -852,6 +854,41 @@ export interface MissingDividend {
   status: 'missing' | 'upcoming';
 }
 
+/** 배당 기록 하나로 본 보유 수량 확인 — 받은 배당(세후) ÷ (주당 배당 × 세후 비율) = 그 회차 배당락일에 들고 있던 수량 */
+export interface HoldingCheck {
+  dividend_id: number;
+  account_id: number;
+  account_name: string;
+  account_broker: string;
+  asset_id: number;
+  ticker: string;
+  asset_name: string;
+  /** 배당 기록 날짜 */
+  paid_on: string;
+  /** 짝지은 회차의 배당락일 */
+  ex_date: string;
+  /** 그 회차 주당 배당 (세전, 종목 통화) */
+  per_share: number;
+  /** 기록한 세후 금액 */
+  amount: number;
+  currency: string;
+  /** 계산에 쓴 원천징수율 (범위면 가장 높은 값) */
+  tax_rate: number;
+  /** 배당으로 본 그때 수량 (short: 적어도, over: 많아야) */
+  implied: number;
+  /** 앱이 아는 그때(배당락 전날) 수량 */
+  app_qty: number;
+  /** ok 맞음 · short 매수가 빠진 듯 · over 매도가 빠진 듯 · gross 세전으로 기록한 듯 */
+  status: 'ok' | 'short' | 'over' | 'gross';
+  /** gross: 세후로 고친 금액 */
+  fixed_amount?: number;
+  /** 최근 회차마다 배당으로 본 수량이 늘었다 (정기 소액 매수로 보임) */
+  recurring: boolean;
+  /** 빠진 매수를 넣을 기본 날짜 (배당락 전날) */
+  buy_date: string;
+  notes: string;
+}
+
 export interface DivScoreRanking {
   month: string;
   months: string[];
@@ -860,6 +897,8 @@ export interface DivScoreRanking {
   rows: DivScoreRow[];
   no_dividend: Asset[];
   missing: MissingDividend[];
+  /** 배당 기록으로 본 수량이 앱과 다른 계좌 (계좌·종목마다 최근 기록) */
+  holding?: HoldingCheck[] | null;
   /** 지난달 종목 전체의 순위·점수 (한국/미국만·항목별로 지난달 순위를 다시 매길 때) */
   prev?: { asset_id: number; ticker: string; rank: number; score: number; parts: DivScoreParts }[];
 }
@@ -874,6 +913,8 @@ export interface DivScoreDetail {
   payments: { date: string; amount: number; special: boolean }[];
   /** 지금 보유 (없으면 보유하지 않는 종목) */
   position?: DivScorePosition;
+  /** 계좌마다 최근 배당 기록으로 본 보유 수량 (앱과 맞는 것도) */
+  holding?: HoldingCheck[] | null;
 }
 
 /** 이 종목의 지금 보유 — 금액은 종목 통화, 받은 배당은 기록 통화별 (세후) */
