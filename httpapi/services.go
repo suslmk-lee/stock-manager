@@ -22,6 +22,8 @@ type Services struct {
 	DailySnap    *services.DailySnapshotService
 	Accumulation *services.AccumulationService
 	Cash         *services.CashService
+	// 배당 점수 · 월별 순위
+	DividendScore *services.DividendScoreService
 }
 
 // NewServices 는 기본 서비스 묶음을 생성한다.
@@ -42,18 +44,19 @@ func NewServices() *Services {
 	snapshot.SetCash(cash)
 
 	return &Services{
-		Account:      services.NewAccountService(),
-		Asset:        services.NewAssetService(),
-		Transaction:  services.NewTransactionService(),
-		Holding:      services.NewHoldingService(),
-		Dividend:     services.NewDividendService(),
-		Ticker:       ticker,
-		ExchangeRate: exchange,
-		Snapshot:     snapshot,
-		RealizedPnL:  services.NewRealizedPnLService(),
-		Signal:       signal,
-		DailySnap:    dailySnap,
-		Accumulation: services.NewAccumulationService(database.GetDB(), ticker),
-		Cash:         cash,
+		Account:       services.NewAccountService(),
+		Asset:         services.NewAssetService(),
+		Transaction:   services.NewTransactionService(),
+		Holding:       services.NewHoldingService(),
+		Dividend:      services.NewDividendService(),
+		Ticker:        ticker,
+		ExchangeRate:  exchange,
+		Snapshot:      snapshot,
+		RealizedPnL:   services.NewRealizedPnLService(),
+		Signal:        signal,
+		DailySnap:     dailySnap,
+		Accumulation:  services.NewAccumulationService(database.GetDB(), ticker),
+		Cash:          cash,
+		DividendScore: services.NewDividendScoreService(database.GetDB(), ticker),
 	}
 }

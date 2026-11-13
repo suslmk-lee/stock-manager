@@ -241,6 +241,8 @@ func runMigrations() error {
 		&models.FundamentalSnapshot{},
 		&models.AccumulationPlan{},
 		&models.CashEntry{},
+		&models.DividendScoreSetting{},
+		&models.DividendScoreSnapshot{},
 	); err != nil {
 		return err
 	}

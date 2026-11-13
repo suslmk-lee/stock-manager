@@ -9,6 +9,7 @@ import SignalsDashboard from './pages/SignalsDashboard';
 import AssetTrendPage from './pages/AssetTrendPage';
 import AccumulationPage from './pages/AccumulationPage';
 import DividendAnalysisPage from './pages/DividendAnalysisPage';
+import DividendScorePage from './pages/DividendScorePage';
 import TransactionManager from './components/TransactionManager';
 import MobileTabBar from './components/shell/MobileTabBar';
 import ProfileManager from './components/signals/ProfileManager';
@@ -193,6 +194,7 @@ export default function Dashboard() {
             {route === 'trend' && <AssetTrendPage />}
             {route === 'dividends' && <DividendManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}
             {route === 'dividend-analysis' && <DividendAnalysisPage />}
+            {route === 'dividend-score' && <DividendScorePage />}
             {route === 'signals' && <SignalsDashboard focusAssetId={focusRequest?.assetId} focusNonce={focusRequest?.nonce} />}
             {route === 'profiles' && <ProfileManager />}
             {/* 알림에서 다른 종목으로 다시 열면 nonce 가 바뀌어 새로 그린다 */}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { IconAccumulate, IconBars, IconCandidates, IconChart, IconCoin, IconRadar, IconSliders, IconTrades, IconTrend, IconWallet, type AppIcon } from './components/ui/appIcons';
+import { IconAccumulate, IconBars, IconCandidates, IconChart, IconCoin, IconPodium, IconRadar, IconSliders, IconTrades, IconTrend, IconWallet, type AppIcon } from './components/ui/appIcons';
 
-export type RouteId = 'accounts' | 'assets' | 'trades' | 'accumulate' | 'trend' | 'dividends' | 'dividend-analysis' | 'signals' | 'profiles' | 'candidates';
+export type RouteId = 'accounts' | 'assets' | 'trades' | 'accumulate' | 'trend' | 'dividends' | 'dividend-analysis' | 'dividend-score' | 'signals' | 'profiles' | 'candidates';
 export type GroupId = 'assets' | 'dividends' | 'signals';
 
 export interface NavItem {
@@ -43,6 +43,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'dividends', label: '배당 기록', title: '배당금 관리', icon: IconCoin },
       { id: 'dividend-analysis', label: '배당 분석', title: '배당 분석', icon: IconBars },
+      { id: 'dividend-score', label: '배당 점수', title: '배당 점수 · 월별 순위', icon: IconPodium, isNew: true },
     ],
   },
   {

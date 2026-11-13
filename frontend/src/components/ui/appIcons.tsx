@@ -156,6 +156,11 @@ export const ICON_PATHS = {
     '<path d="M12 4l8.5 4.5L12 13 3.5 8.5z"/><path d="M3.5 12.5 12 17l8.5-4.5M3.5 16.5 12 21l8.5-4.5"/>',
     '<path d="M12 4l8.5 4.5L12 13 3.5 8.5z"/>',
   ],
+  // 배당 점수: 시상대 (면 = 1등 단)
+  podium: [
+    '<path d="M9 9.5h6v11H9zM3.5 13.5H9v7H3.5zM15 15.5h5.5v5H15z"/><path d="M12 3.2l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2L9.1 5.3l2-.3z"/>',
+    '<path d="M9 9.5h6v11H9z"/>',
+  ],
   // 잠금 설정: 자물쇠 (면 = 몸통)
   lock: [
     '<rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.5v2.5"/>',
@@ -207,3 +212,4 @@ export const IconContrast = make(ICON_PATHS.contrast);
 export const IconHistory = make(ICON_PATHS.history);
 export const IconLayers = make(ICON_PATHS.layers);
 export const IconLock = make(ICON_PATHS.lock);
+export const IconPodium = make(ICON_PATHS.podium);

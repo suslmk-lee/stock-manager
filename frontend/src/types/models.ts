@@ -754,3 +754,98 @@ export interface CashReconcileRequest {
   balance: number;
   date: string;
 }
+
+// ── 배당 점수 · 월별 순위 ──
+export type DivStatus = 'up' | 'flat' | 'down' | 'missed' | 'new';
+
+export interface DivScoreParts {
+  growth: number;
+  stability: number;
+  yield: number;
+  consistency: number;
+  value: number;
+}
+
+export interface DivScoreMetrics {
+  source: 'market' | 'records';
+  ttm: number;
+  growth_1y?: number;
+  cagr_3y?: number;
+  no_cut_years: number;
+  increase_years: number;
+  cuts_3y: number;
+  missed_3y: number;
+  missed_now: boolean;
+  cv?: number;
+  cycle?: string;
+  payments_12m: number;
+  specials_12m: number;
+  last_payment?: string;
+  next_expected?: string;
+  price?: number;
+  yield_pct?: number;
+  avg_yield_pct?: number;
+  pos_52?: number;
+  ma_gap_pct?: number;
+  history_years: number;
+  status: DivStatus;
+}
+
+export interface DivScoreRow {
+  asset_id: number;
+  asset: Asset;
+  score: number;
+  rank: number;
+  prev_rank?: number;
+  prev_score?: number;
+  prev_status?: DivStatus;
+  parts: DivScoreParts;
+  metrics: DivScoreMetrics;
+  estimated: boolean;
+  yoc_pct?: number;
+  missing_count: number;
+}
+
+export interface DivScoreWeights {
+  growth: number;
+  stability: number;
+  yield: number;
+  consistency: number;
+  value: number;
+  updated_at?: string;
+}
+
+export interface MissingDividend {
+  asset_id: number;
+  ticker: string;
+  asset_name: string;
+  account_id: number;
+  account_name: string;
+  ex_date: string;
+  per_share: number;
+  quantity: number;
+  currency: 'KRW' | 'USD';
+  expected_net: number;
+  pay_by: string;
+  status: 'missing' | 'upcoming';
+}
+
+export interface DivScoreRanking {
+  month: string;
+  months: string[];
+  current: boolean;
+  weights: DivScoreWeights;
+  rows: DivScoreRow[];
+  no_dividend: Asset[];
+  missing: MissingDividend[];
+}
+
+export interface DivScoreDetail {
+  asset_id: number;
+  asset: Asset;
+  source: string;
+  currency: string;
+  history: { month: string; score: number; rank: number; of: number; status: DivStatus; estimated: boolean }[];
+  years: { year: number; regular: number; special: number; count: number; partial: boolean }[];
+  payments: { date: string; amount: number; special: boolean }[];
+}

@@ -12,22 +12,23 @@ import (
 )
 
 type App struct {
-	ctx                 context.Context
-	accountService      *services.AccountService
-	assetService        *services.AssetService
-	transactionService  *services.TransactionService
-	holdingService      *services.HoldingService
-	dividendService     *services.DividendService
-	tickerService       *services.TickerService
-	exchangeRateService *services.ExchangeRateService
-	snapshotService     *services.PortfolioSnapshotService
-	realizedPnLService  *services.RealizedPnLService
-	signalService       *services.SignalService
-	dailySnapService    *services.DailySnapshotService
-	accumulationService *services.AccumulationService
-	cashService         *services.CashService
-	lockService         *services.LockService // 앱 잠금 (이 PC의 설정 폴더)
-	updater             *updater.Updater
+	ctx                  context.Context
+	accountService       *services.AccountService
+	assetService         *services.AssetService
+	transactionService   *services.TransactionService
+	holdingService       *services.HoldingService
+	dividendService      *services.DividendService
+	tickerService        *services.TickerService
+	exchangeRateService  *services.ExchangeRateService
+	snapshotService      *services.PortfolioSnapshotService
+	realizedPnLService   *services.RealizedPnLService
+	signalService        *services.SignalService
+	dailySnapService     *services.DailySnapshotService
+	accumulationService  *services.AccumulationService
+	cashService          *services.CashService
+	lockService          *services.LockService // 앱 잠금 (이 PC의 설정 폴더)
+	dividendScoreService *services.DividendScoreService
+	updater              *updater.Updater
 }
 
 // NewApp 은 서비스 인스턴스를 모두 구성한 App 을 반환한다.
@@ -57,6 +58,7 @@ func NewApp() *App {
 	a.dailySnapService.SetCash(a.cashService)
 	a.snapshotService.SetCash(a.cashService)
 	a.lockService = services.NewLockService(services.DefaultLockDir())
+	a.dividendScoreService = services.NewDividendScoreService(database.GetDB(), a.tickerService)
 	a.updater = updater.New(appVersion)
 	return a
 }
@@ -65,19 +67,20 @@ func NewApp() *App {
 // (시세 캐시 등 상태를 두 경로가 공유하던 기존 동작을 유지)
 func (a *App) apiServices() *httpapi.Services {
 	return &httpapi.Services{
-		Account:      a.accountService,
-		Asset:        a.assetService,
-		Transaction:  a.transactionService,
-		Holding:      a.holdingService,
-		Dividend:     a.dividendService,
-		Ticker:       a.tickerService,
-		ExchangeRate: a.exchangeRateService,
-		Snapshot:     a.snapshotService,
-		RealizedPnL:  a.realizedPnLService,
-		Signal:       a.signalService,
-		DailySnap:    a.dailySnapService,
-		Accumulation: a.accumulationService,
-		Cash:         a.cashService,
+		Account:       a.accountService,
+		Asset:         a.assetService,
+		Transaction:   a.transactionService,
+		Holding:       a.holdingService,
+		Dividend:      a.dividendService,
+		Ticker:        a.tickerService,
+		ExchangeRate:  a.exchangeRateService,
+		Snapshot:      a.snapshotService,
+		RealizedPnL:   a.realizedPnLService,
+		Signal:        a.signalService,
+		DailySnap:     a.dailySnapService,
+		Accumulation:  a.accumulationService,
+		Cash:          a.cashService,
+		DividendScore: a.dividendScoreService,
 	}
 }
 

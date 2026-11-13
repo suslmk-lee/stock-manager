@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest, DivScoreRanking, DivScoreDetail, DivScoreWeights } from '../types/models';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -573,5 +573,35 @@ export const apiClient = {
       return;
     }
     return WailsApp.DeleteCashEntry(id);
+  },
+  // ==========================================
+  // 배당 점수 · 월별 순위
+  // ==========================================
+  GetDividendScore: async (month = ''): Promise<DivScoreRanking> => {
+    if (isWeb) return fetchApi<DivScoreRanking>(`/dividend-score${month ? `?month=${encodeURIComponent(month)}` : ''}`);
+    return (await WailsApp.GetDividendScore(month)) as unknown as DivScoreRanking;
+  },
+
+  GetDividendScoreDetail: async (assetId: number): Promise<DivScoreDetail> => {
+    if (isWeb) return fetchApi<DivScoreDetail>(`/dividend-score/assets/${assetId}`);
+    return (await WailsApp.GetDividendScoreDetail(assetId)) as unknown as DivScoreDetail;
+  },
+
+  RecomputeDividendScore: async (month: string): Promise<void> => {
+    if (isWeb) {
+      await fetchApi(`/dividend-score/recompute`, { method: 'POST', body: JSON.stringify({ month }) });
+      return;
+    }
+    await WailsApp.RecomputeDividendScore(month);
+  },
+
+  GetDividendScoreSettings: async (): Promise<DivScoreWeights> => {
+    if (isWeb) return fetchApi<DivScoreWeights>('/dividend-score/settings');
+    return (await WailsApp.GetDividendScoreSettings()) as unknown as DivScoreWeights;
+  },
+
+  UpdateDividendScoreSettings: async (w: DivScoreWeights): Promise<DivScoreWeights> => {
+    if (isWeb) return fetchApi<DivScoreWeights>('/dividend-score/settings', { method: 'PUT', body: JSON.stringify(w) });
+    return (await WailsApp.UpdateDividendScoreSettings(w as unknown as Parameters<typeof WailsApp.UpdateDividendScoreSettings>[0])) as unknown as DivScoreWeights;
   },
 };
