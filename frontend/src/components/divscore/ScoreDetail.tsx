@@ -138,7 +138,7 @@ export default function ScoreDetail({
             </div>
             <p className="mt-0.5 truncate text-[12px] text-zinc-500">
               {assetSecondary(row.asset)} · {total}종목 중 {row.rank}위
-              {delta != null && delta !== 0 && <span className={delta > 0 ? 'text-mint-300' : 'text-rose-300'}> · 지난달 {row.prev_rank}위 ({delta > 0 ? `▲${delta}` : `▼${-delta}`})</span>}
+              {delta != null && delta !== 0 && <span className={delta > 0 ? 'text-mint-300' : 'text-sky-300'}> · 지난달 {row.prev_rank}위 ({delta > 0 ? `▲${delta}` : `▼${-delta}`})</span>}
               {row.prev_rank == null && ' · 지난달 순위 없음'}
             </p>
           </div>

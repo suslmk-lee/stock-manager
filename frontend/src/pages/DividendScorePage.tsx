@@ -16,11 +16,26 @@ const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === '
 const SUMMARY = -1;
 const STATUS_ORDER: DivStatus[] = ['up', 'flat', 'down', 'missed', 'new'];
 
+/** 지난달 대비 순위 변화 칩 — 오름은 강조색, 내림은 파랑 (밝은 테마에서 오름·내림 색이 비슷해 보이지 않게) */
 function RankChange({ row }: { row: DivScoreRow }) {
-  if (row.prev_rank == null) return <span className="label-mono !text-sky-300">NEW</span>;
+  if (row.prev_rank == null)
+    return (
+      <span className="rounded-full border border-white/15 px-1.5 text-[10px] font-semibold leading-4 tracking-wide text-zinc-300" title="지난달 순위에 없던 종목">
+        NEW
+      </span>
+    );
   const d = row.prev_rank - row.rank;
-  if (d === 0) return <span className="num text-[11px] text-zinc-600">–</span>;
-  return <span className={`num text-[11px] ${d > 0 ? 'text-mint-300' : 'text-rose-300'}`}>{d > 0 ? `▲${d}` : `▼${-d}`}</span>;
+  if (d === 0)
+    return (
+      <span className="num text-[11px] text-zinc-600" title={`지난달도 ${row.rank}위`}>
+        –
+      </span>
+    );
+  return (
+    <span className={`num rounded-full px-1.5 text-[11px] font-semibold leading-[18px] ${d > 0 ? 'bg-mint-400/15 text-mint-300' : 'bg-sky-400/15 text-sky-300'}`} title={`지난달 ${row.prev_rank}위`}>
+      {d > 0 ? `▲${d}` : `▼${-d}`}
+    </span>
+  );
 }
 
 /** 이번 달 눈여겨볼 변화: 새로 감소·누락, 순위가 3계단 넘게 오르내림, 새로 순위에 든 종목 */
@@ -32,7 +47,7 @@ function changesOf(rows: DivScoreRow[]) {
     else if (s === 'up' && r.prev_status && r.prev_status !== 'up') out.push({ row: r, text: `증가로 바뀜 (지난달 ${STATUS_META[r.prev_status].label})`, tone: 'text-mint-300' });
     if (r.prev_rank != null && Math.abs(r.prev_rank - r.rank) >= 3) {
       const d = r.prev_rank - r.rank;
-      out.push({ row: r, text: `순위 ${d > 0 ? `${d}계단 오름` : `${-d}계단 내림`} (${r.prev_rank}위 → ${r.rank}위)`, tone: d > 0 ? 'text-mint-300' : 'text-rose-300' });
+      out.push({ row: r, text: `순위 ${d > 0 ? `${d}계단 오름` : `${-d}계단 내림`} (${r.prev_rank}위 → ${r.rank}위)`, tone: d > 0 ? 'text-mint-300' : 'text-sky-300' });
     }
   }
   return out;
@@ -160,6 +175,14 @@ export default function DividendScorePage() {
           </span>
           {changes.length > 0 && <span className="num shrink-0 text-xs text-amber-300">{changes.length}</span>}
         </button>
+        {rows.length > 0 && (
+          <div aria-hidden className="label-mono sticky top-0 z-10 flex items-center gap-3 border-b border-white/[0.06] bg-ink-900/95 px-4 py-1.5 backdrop-blur">
+            <span className="w-9 shrink-0 text-center">순위</span>
+            <span className="min-w-0 flex-1">종목 · 배당</span>
+            <span className="w-10 shrink-0 text-center">지난달</span>
+            <span className="w-12 shrink-0 text-right">점수</span>
+          </div>
+        )}
         {rows.map((r) => {
           const active = r.asset_id === selected;
           const first = tickerFirst(r.asset);
@@ -176,13 +199,12 @@ export default function DividendScorePage() {
               aria-selected={active}
               tabIndex={active ? 0 : -1}
               onClick={() => setSelected(r.asset_id)}
-              className={`flex w-full items-center gap-3 border-b border-white/[0.04] px-4 py-2.5 text-left transition-colors ${
+              className={`flex w-full scroll-mt-8 items-center gap-3 border-b border-white/[0.04] px-4 py-2.5 text-left transition-colors ${
                 active ? 'bg-mint-400/[0.08] shadow-[inset_3px_0_0_rgb(var(--c-mint-400))]' : 'hover:bg-white/[0.03]'
               }`}
             >
-              <span className="w-8 shrink-0 text-center">
-                <span className={`num block text-lg font-light leading-tight ${r.rank <= 3 ? 'text-mint-300' : 'text-zinc-300'}`}>{r.rank}</span>
-                <RankChange row={r} />
+              <span className="flex w-9 shrink-0 justify-center">
+                <span className={`num inline-flex h-6 min-w-[30px] items-center justify-center rounded-full px-2 text-[13px] font-semibold ${r.rank <= 3 ? 'bg-mint-400 text-ink-950' : 'bg-white/[0.07] text-zinc-200'}`}>{r.rank}</span>
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline gap-1.5">
@@ -196,6 +218,9 @@ export default function DividendScorePage() {
                     <span className="block h-full rounded-full bg-mint-400/70" style={{ width: `${r.score}%` }} />
                   </span>
                 </span>
+              </span>
+              <span className="flex w-10 shrink-0 justify-center">
+                <RankChange row={r} />
               </span>
               <span className="num w-12 shrink-0 text-right text-[15px] text-white">{r.score.toFixed(1)}</span>
             </button>
