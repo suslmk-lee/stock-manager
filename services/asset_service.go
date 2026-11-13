@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"fmt"
 	"stock-manager/database"
 	"stock-manager/models"
@@ -47,17 +48,12 @@ func (s *AssetService) CreateAsset(req CreateAssetRequest) (*models.Asset, error
 		return nil, errors.New("asset name is required")
 	}
 
-	req.Ticker = strings.ToUpper(req.Ticker)
+	req.Ticker = strings.ToUpper(strings.TrimSpace(req.Ticker))
 	req.LogoURL = strings.TrimSpace(req.LogoURL)
 
-	// 한국 티커 자동 감지 (숫자 6자리이고 .KS/.KQ가 없는 경우)
-	if len(req.Ticker) == 6 && strings.IndexFunc(req.Ticker, func(r rune) bool {
-		return r < '0' || r > '9'
-	}) == -1 {
-		// 숫자 6자리인 경우 .KS 추가
-		if !strings.HasSuffix(req.Ticker, ".KS") && !strings.HasSuffix(req.Ticker, ".KQ") {
-			req.Ticker = req.Ticker + ".KS"
-		}
+	// 한국 종목 코드 6자리(2024년부터는 0091P0 처럼 영문이 섞인 코드도 있다)에 거래소 꼬리표가 없으면 .KS
+	if isKRCode(req.Ticker) {
+		req.Ticker = req.Ticker + ".KS"
 	}
 
 	if req.LogoURL == "" {
@@ -67,6 +63,19 @@ func (s *AssetService) CreateAsset(req CreateAssetRequest) (*models.Asset, error
 	var existing models.Asset
 	// Unscoped: 소프트삭제된 레코드도 포함해서 검색
 	err := s.db.Unscoped().Where("ticker = ?", req.Ticker).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// 한국 종목은 같은 코드면 같은 종목 (.KS·.KQ·꼬리표 없음 — 꼬리표만 다른 중복을 만들지 않는다)
+		if alts := sameKRCodeTickers(req.Ticker); len(alts) > 0 {
+			err = s.db.Unscoped().Where("ticker IN ?", alts).Order("id").First(&existing).Error
+			// 꼬리표 없이 저장된 옛 기록은 시세를 못 받으므로 꼬리표를 붙여 둔다 (같은 표기가 없음을 위에서 확인)
+			if err == nil && isKRCode(existing.Ticker) {
+				if uerr := s.db.Unscoped().Model(&models.Asset{}).Where("id = ?", existing.ID).Update("ticker", req.Ticker).Error; uerr == nil {
+					log.Printf("[Asset] %s → %s (거래소 꼬리표를 붙임)", existing.Ticker, req.Ticker)
+					existing.Ticker = req.Ticker
+				}
+			}
+		}
+	}
 
 	// 소프트삭제된 자산이면 복구
 	if err == nil && existing.DeletedAt.Valid {
@@ -316,4 +325,35 @@ func (s *AssetService) DeleteAsset(id uint) error {
 		}
 		return nil
 	})
+}
+
+// isKRCode: 거래소 꼬리표 없는 한국 종목 코드 6자리 (숫자로 시작, 영문 대문자·숫자)
+func isKRCode(t string) bool {
+	if len(t) != 6 || t[0] < '0' || t[0] > '9' {
+		return false
+	}
+	for _, r := range t {
+		if !(r >= '0' && r <= '9') && !(r >= 'A' && r <= 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
+// sameKRCodeTickers: 한국 종목이면 같은 코드의 다른 표기 (그 티커 자신은 빼고) — 아니면 nil
+func sameKRCodeTickers(t string) []string {
+	code := strings.TrimSuffix(strings.TrimSuffix(t, ".KS"), ".KQ")
+	if code == t && !isKRCode(t) {
+		return nil
+	}
+	if !isKRCode(code) {
+		return nil
+	}
+	var out []string
+	for _, c := range []string{code + ".KS", code + ".KQ", code} {
+		if c != t {
+			out = append(out, c)
+		}
+	}
+	return out
 }

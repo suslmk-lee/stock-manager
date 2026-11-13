@@ -50,6 +50,8 @@ export default function PensionForm({ plan, accounts, onClose, onSaved }: { plan
   const [notes, setNotes] = useState(plan?.notes ?? '');
   const [rows, setRows] = useState<Row[]>(() => (plan ? plan.items.map((it) => emptyRow(it.asset_id, String(it.weight))) : [emptyRow()]));
   const [assets, setAssets] = useState<Asset[]>([]);
+  // 같은 코드 찾기용 전체 목록 (꼬리표가 다르거나 없는 옛 기록까지)
+  const [allAssets, setAllAssets] = useState<Asset[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // 새 상품 추가
@@ -61,7 +63,11 @@ export default function PensionForm({ plan, accounts, onClose, onSaved }: { plan
   useEffect(() => {
     apiClient
       .GetAllAssets()
-      .then((list) => setAssets(((list ?? []) as Asset[]).filter(usable)))
+      .then((list) => {
+        const all = (list ?? []) as Asset[];
+        setAllAssets(all);
+        setAssets(all.filter(usable));
+      })
       .catch(() => setAssets([]));
   }, []);
 
@@ -101,15 +107,24 @@ export default function PensionForm({ plan, accounts, onClose, onSaved }: { plan
     setAdding(true);
     setError(null);
     try {
-      const ticker = `${code}.KS`;
-      const existing = assets.find((a) => a.ticker.toUpperCase() === ticker);
+      // 이미 있는 종목이면 그것을 (꼬리표 .KS·.KQ·없음과 상관없이 같은 코드면 같은 종목)
+      const codeOf = (t: string) => t.trim().toUpperCase().replace(/\.(KS|KQ)$/, '');
+      const existing = [...assets, ...allAssets].find((a) => codeOf(a.ticker) === code);
       if (existing) {
-        putAsset(existing);
+        // 꼬리표 없는 옛 기록이면 서버가 꼬리표를 붙여 돌려준다 (시세를 받을 수 있게)
+        putAsset(/\.(KS|KQ)$/i.test(existing.ticker) ? existing : ((await apiClient.CreateAsset(`${code}.KS`, existing.name, existing.type, existing.sector ?? '', 0, 0, 0)) as Asset));
       } else {
-        const info = (await apiClient.GetTickerInfo(ticker)) as { name?: string; type?: string } | null;
-        if (!info?.name) throw new Error(`${code} 종목을 찾지 못했습니다.`);
-        const created = (await apiClient.CreateAsset(ticker, info.name, 'ETF', '', 0, 0, 0)) as Asset;
-        putAsset(created);
+        // 코스피(.KS)에서 먼저, 없으면 코스닥(.KQ)
+        let found: { ticker: string; name: string } | null = null;
+        for (const t of [`${code}.KS`, `${code}.KQ`]) {
+          const info = (await apiClient.GetTickerInfo(t).catch(() => null)) as { name?: string } | null;
+          if (info?.name) {
+            found = { ticker: t, name: info.name };
+            break;
+          }
+        }
+        if (!found) throw new Error(`${code} 종목을 찾지 못했습니다.`);
+        putAsset((await apiClient.CreateAsset(found.ticker, found.name, 'ETF', '', 0, 0, 0)) as Asset);
       }
       setEtfCode('');
     } catch (e) {
