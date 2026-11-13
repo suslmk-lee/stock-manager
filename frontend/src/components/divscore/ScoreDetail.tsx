@@ -5,6 +5,7 @@ import type { DivScoreDetail, DivScoreRow, DivScoreWeights, MissingDividend } fr
 import { useThemeColors } from '../../appearance/AppearanceContext';
 import { assetPrimary, assetSecondary, tickerFirst } from '../../utils/assetLabel';
 import { dps, PART_KEYS, PART_LABEL, partPoints, partReason, pct, shortMonth, signedPct, STATUS_META } from './scoreText';
+import PaymentHistory from './PaymentHistory';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '불러오지 못했습니다.');
 const shortDate = (d: string) => `${d.slice(2, 4)}.${d.slice(5, 7)}.${d.slice(8, 10)}`;
@@ -196,22 +197,7 @@ export default function ScoreDetail({
           )}
 
           <div className="p-4 sm:p-5">
-            <p className="label-mono mb-1.5">최근 3년 배당 회차 · {detail.source === 'records' ? '내 기록 (주당 환산)' : '시장 이력 (배당락일, 세전 주당)'}</p>
-            {detail.payments.length === 0 ? (
-              <p className="py-4 text-center text-xs text-zinc-500">배당 회차가 없습니다.</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-x-6 sm:grid-cols-3">
-                {detail.payments.map((p) => (
-                  <div key={p.date} className="num flex items-center justify-between gap-2 border-b border-white/[0.04] py-1.5 text-[12px]">
-                    <span className="text-zinc-500">{shortDate(p.date)}</span>
-                    <span className={p.special ? 'text-amber-300' : 'text-zinc-200'}>
-                      {dps(p.amount, ccy)}
-                      {p.special && <span className="ml-1 text-[10px]">특별</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <PaymentHistory payments={detail.payments} ccy={ccy} metrics={m} source={detail.source} />
           </div>
         </>
       )}
