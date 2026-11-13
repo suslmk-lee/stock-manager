@@ -493,7 +493,11 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                       
                       const largeArc = angle > 180 ? 1 : 0;
                       
-                      const path = `M 100 100 L ${x1} ${y1} A 80 80 0 ${largeArc} 1 ${x2} ${y2} Z`;
+                      // 한 종목이 전부(100%)면 호의 시작·끝이 같아 그려지지 않으므로 원 두 반쪽으로 그린다
+                      const path =
+                        angle >= 359.99
+                          ? 'M 100 20 A 80 80 0 1 1 100 180 A 80 80 0 1 1 100 20 Z'
+                          : `M 100 100 L ${x1} ${y1} A 80 80 0 ${largeArc} 1 ${x2} ${y2} Z`;
                       
                       currentAngle = endAngle;
                       
