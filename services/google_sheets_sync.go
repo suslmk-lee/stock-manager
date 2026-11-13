@@ -241,7 +241,7 @@ func (s *sheetSnapshot) findRowCandidate(account models.Account, asset models.As
 
 	if len(candidates) == 0 {
 		fmt.Printf("[GSYNC][DEBUG] row not found: ticker=%s aliases=%v\n", targetTickers[0], aliases)
-		return nil, fmt.Errorf("row not found for ticker=%s", targetTickers[0])
+		return nil, fmt.Errorf("%w (ticker=%s)", ErrSheetRowNotFound, targetTickers[0])
 	}
 	if len(candidates) == 1 {
 		return &candidates[0], nil
@@ -651,20 +651,25 @@ func normalizeTickerText(value string) string {
 	return replacer.Replace(value)
 }
 
+// ErrSheetRowNotFound: 시트에 이 종목 줄이 없다 — 배당 기록은 하고 시트에만 넣지 않는다 (시트에 줄을 추가하면 다음부터 반영)
+var ErrSheetRowNotFound = errors.New("row not found")
+
+// tickerExchangeSuffixes: 떼고 비교할 거래소 꼬리표 (시트에는 꼬리표 없이 적기도 한다)
+// .KS 코스피 · .KQ 코스닥 · .T 도쿄 · .HK 홍콩 · .SS 상하이 · .SZ 선전 · .TW/.TWO 대만 · .L 런던 · .TO 토론토 · .AX 호주 · .SI 싱가포르 · .DE 독일 · .PA 파리
+// (BRK.B 같은 미국 종류주 꼬리표는 떼지 않는다)
+var tickerExchangeSuffixes = []string{".KS", ".KQ", ".TWO", ".TW", ".T", ".HK", ".SS", ".SZ", ".L", ".TO", ".AX", ".SI", ".DE", ".PA"}
+
 func stripTickerSuffix(ticker string) string {
 	ticker = normalizeTickerText(ticker)
 	if ticker == "" {
 		return ""
 	}
-
-	switch {
-	case strings.HasSuffix(ticker, ".KS"):
-		return strings.TrimSuffix(ticker, ".KS")
-	case strings.HasSuffix(ticker, ".KQ"):
-		return strings.TrimSuffix(ticker, ".KQ")
-	default:
-		return ticker
+	for _, suf := range tickerExchangeSuffixes {
+		if len(ticker) > len(suf) && strings.HasSuffix(ticker, suf) {
+			return strings.TrimSuffix(ticker, suf)
+		}
 	}
+	return ticker
 }
 
 func buildTickerMatchValues(ticker string) []string {

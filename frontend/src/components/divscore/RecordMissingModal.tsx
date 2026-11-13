@@ -28,8 +28,9 @@ export default function RecordMissingModal({ item, onClose, onSaved }: { item: M
     setBusy(true);
     setError(null);
     try {
-      await apiClient.CreateDividend(item.account_id, item.asset_id, date, v, 0, item.currency, true, `배당락 ${item.ex_date} · 주당 ${dps(item.per_share, item.currency)} × ${item.quantity}주`);
-      onSaved(`${item.ticker} ${item.ex_date} 회차를 기록했습니다.`);
+      const saved = await apiClient.CreateDividend(item.account_id, item.asset_id, date, v, 0, item.currency, true, `배당락 ${item.ex_date} · 주당 ${dps(item.per_share, item.currency)} × ${item.quantity}주`);
+      const sheetNote = (saved as { sheet_note?: string } | null | undefined)?.sheet_note;
+      onSaved(`${item.ticker} ${item.ex_date} 회차를 기록했습니다.${sheetNote ? ` ${sheetNote}` : ''}`);
     } catch (e) {
       setError(errText(e));
     } finally {

@@ -130,12 +130,14 @@ func (s *DividendService) CreateDividend(req CreateDividendRequest) (*models.Div
 		return nil, fmt.Errorf("failed to create dividend: %w", err)
 	}
 
-	if err := s.syncDividendDelta(account, asset, req.Date, req.Amount, "create"); err != nil {
+	note, err := s.syncDividendDelta(account, asset, req.Date, req.Amount, "create")
+	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("[GSYNC] %w", err)
 	}
 
 	tx.Commit()
+	dividend.SheetNote = note
 	return dividend, nil
 }
 
@@ -322,17 +324,19 @@ func (s *DividendService) UpdateDividend(id uint, req CreateDividendRequest) (*m
 
 	// 기존 반영분 차감 후, 신규 반영분 가산
 	if oldAccountFound && oldAssetFound {
-		if err := s.syncDividendDelta(oldAccount, oldAsset, oldDividend.Date, -oldDividend.Amount, "update-revert"); err != nil {
+		if _, err := s.syncDividendDelta(oldAccount, oldAsset, oldDividend.Date, -oldDividend.Amount, "update-revert"); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("[GSYNC] %w", err)
 		}
 	}
-	if err := s.syncDividendDelta(account, asset, req.Date, req.Amount, "update-apply"); err != nil {
+	note, err := s.syncDividendDelta(account, asset, req.Date, req.Amount, "update-apply")
+	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("[GSYNC] %w", err)
 	}
 
 	tx.Commit()
+	dividend.SheetNote = note
 	return &dividend, nil
 }
 
@@ -362,7 +366,7 @@ func (s *DividendService) DeleteDividend(id uint) error {
 	}
 
 	if accountFound && assetFound {
-		if err := s.syncDividendDelta(account, asset, dividend.Date, -dividend.Amount, "delete"); err != nil {
+		if _, err := s.syncDividendDelta(account, asset, dividend.Date, -dividend.Amount, "delete"); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("[GSYNC] %w", err)
 		}
@@ -372,9 +376,11 @@ func (s *DividendService) DeleteDividend(id uint) error {
 	return nil
 }
 
-func (s *DividendService) syncDividendDelta(account models.Account, asset models.Asset, date time.Time, delta float64, action string) error {
+// syncDividendDelta: 배당 금액 변화를 구글 시트에 반영한다. 시트에 그 종목 줄이 없으면 막지 않고 안내 문구만 돌려준다
+// (배당 기록은 하고 시트에만 넣지 않음). 그 밖의 실패(연결·권한·여러 줄 중 못 고름)는 오류 — 기록도 되돌린다.
+func (s *DividendService) syncDividendDelta(account models.Account, asset models.Asset, date time.Time, delta float64, action string) (string, error) {
 	if delta == 0 {
-		return nil
+		return "", nil
 	}
 
 	if s.sheetsSync == nil {
@@ -382,17 +388,21 @@ func (s *DividendService) syncDividendDelta(account models.Account, asset models
 		if err != nil {
 			if envBool("GOOGLE_SHEETS_ENABLED") {
 				fmt.Printf("[GSYNC][INIT][FAIL] action=%s err=%v\n", action, err)
-				return fmt.Errorf("Google Sheets 연동 초기화 실패: %v", err)
+				return "", fmt.Errorf("Google Sheets 연동 초기화 실패: %v", err)
 			}
-			return nil
+			return "", nil
 		}
 		if sync == nil {
-			return nil
+			return "", nil
 		}
 		s.sheetsSync = sync
 	}
 
 	if err := s.sheetsSync.ApplyDelta(account, asset, date, delta); err != nil {
+		if errors.Is(err, ErrSheetRowNotFound) {
+			fmt.Printf("[GSYNC][SKIP] action=%s account=%s ticker=%s — 시트에 줄 없음\n", action, account.Name, asset.Ticker)
+			return fmt.Sprintf("구글 시트에 %s 줄이 없어 시트에는 반영하지 않았습니다. 시트에 이 종목 줄을 추가하면 다음 기록부터 반영됩니다.", asset.Ticker), nil
+		}
 		fmt.Printf("[GSYNC][FAIL] action=%s account=%s ticker=%s amount=%.4f date=%s err=%v\n",
 			action,
 			account.Name,
@@ -401,7 +411,7 @@ func (s *DividendService) syncDividendDelta(account models.Account, asset models
 			date.Format("2006-01-02"),
 			err,
 		)
-		return fmt.Errorf("Google Sheets 동기화 실패 (%s/%s): %v", account.Name, asset.Ticker, err)
+		return "", fmt.Errorf("Google Sheets 동기화 실패 (%s/%s): %v", account.Name, asset.Ticker, err)
 	}
 
 	if envBool("GOOGLE_SHEETS_DEBUG") {
@@ -413,5 +423,5 @@ func (s *DividendService) syncDividendDelta(account models.Account, asset models
 			date.Format("2006-01-02"),
 		)
 	}
-	return nil
+	return "", nil
 }

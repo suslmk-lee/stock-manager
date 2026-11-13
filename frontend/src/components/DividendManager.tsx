@@ -25,6 +25,13 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  // 기록 창 안에 보여 줄 오류 (페이지 위쪽 오류 띠는 창에 가려 보이지 않는다)
+  const [formError, setFormError] = useState<string | null>(null);
+  // 기록은 됐지만 알려 줄 것 (예: 구글 시트에 그 종목 줄이 없어 시트에는 넣지 않음)
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    setFormError(null);
+  }, [showForm]);
   const [editingDividend, setEditingDividend] = useState<Dividend | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<number>(selectedAccountId);
   const [exchangeRate, setExchangeRate] = useState(1300);
@@ -249,13 +256,27 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
     e.preventDefault();
     // 배당금은 세금을 뺀 실제 받은 금액으로 입력한다 (세금 칸 없음)
     const net = parseFloat(formData.amount);
+    if (!formData.accountId) {
+      setFormError('계좌를 골라 주세요.');
+      return;
+    }
+    if (!formData.assetId) {
+      setFormError('자산을 목록에서 골라 주세요.');
+      return;
+    }
+    if (!(net > 0)) {
+      setFormError('받은 배당금을 0보다 크게 넣어 주세요.');
+      return;
+    }
+    setFormError(null);
     const original = editingDividend ? editingDividend.amount - (editingDividend.tax || 0) : NaN;
     const keepOriginal = !!editingDividend && Math.abs(net - original) < 0.005;
     const amount = keepOriginal ? editingDividend!.amount : net;
     const tax = keepOriginal ? editingDividend!.tax || 0 : 0;
     try {
+      let saved: unknown;
       if (editingDividend) {
-        await apiClient.UpdateDividend(
+        saved = await apiClient.UpdateDividend(
           editingDividend.id,
           formData.accountId,
           formData.assetId,
@@ -267,7 +288,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
           formData.notes
         );
       } else {
-        await apiClient.CreateDividend(
+        saved = await apiClient.CreateDividend(
           formData.accountId,
           formData.assetId,
           formData.date,
@@ -296,10 +317,18 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
         notes: '',
       });
       setAssetSearchQuery(''); // 자산 검색 필드 초기화
+      const sheetNote = (saved as { sheet_note?: string } | null | undefined)?.sheet_note;
+      setNotice(sheetNote ? `${editingDividend ? '수정했습니다' : '기록했습니다'} — ${sheetNote}` : null);
       setEditingDividend(null);
       setShowForm(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : (editingDividend ? '배당금 수정에 실패했습니다.' : '배당금 기록에 실패했습니다.'));
+      const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+      // 창 안에 보여 준다 — 시트 반영에 실패하면 기록도 되돌리므로 그 사실을 함께
+      setFormError(
+        msg.includes('GSYNC')
+          ? `구글 시트 반영에 실패해 ${editingDividend ? '수정하지' : '기록하지'} 않았습니다 — ${msg.replace('[GSYNC] ', '')}`
+          : msg || (editingDividend ? '배당금 수정에 실패했습니다.' : '배당금 기록에 실패했습니다.'),
+      );
       console.error('Failed to save dividend:', err);
     }
   };
@@ -975,6 +1004,14 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
           <button onClick={() => setError(null)} className="text-current opacity-60 hover:opacity-100 shrink-0">✕</button>
         </div>
       )}
+      {notice && (
+        <div className="mb-6 flex items-start justify-between gap-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-amber-200">
+          <div>{notice}</div>
+          <button onClick={() => setNotice(null)} className="shrink-0 text-current opacity-60 hover:opacity-100" aria-label="닫기">
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* 왼쪽 배당 목록(계좌 요약 + 종목별) / 오른쪽 상세 */}
       {selectedAccount > 0 && (
@@ -1012,8 +1049,10 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                   </svg>
                 </button>
               </div>
-              <form 
-                onSubmit={handleCreateDividend} 
+              {/* noValidate: 브라우저 기본 검사 말풍선은 앱(WebView)에서 안 보일 수 있어, 확인은 handleCreateDividend 가 창 안에 보여 준다 */}
+              <form
+                noValidate
+                onSubmit={handleCreateDividend}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
                     e.preventDefault();
@@ -1189,6 +1228,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                   rows={2}
                 />
               </div>
+              {formError && <p className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs leading-relaxed text-rose-200">{formError}</p>}
               <div className="flex gap-3">
                 <button
                   type="submit"
