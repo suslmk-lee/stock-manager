@@ -405,18 +405,19 @@ type DivScoreRow struct {
 
 // MissingDividend 는 내 배당 기록에 없는 회차 (시장 배당락일 기준)
 type MissingDividend struct {
-	AssetID     uint    `json:"asset_id"`
-	Ticker      string  `json:"ticker"`
-	AssetName   string  `json:"asset_name"`
-	AccountID   uint    `json:"account_id"`
-	AccountName string  `json:"account_name"`
-	ExDate      string  `json:"ex_date"`
-	PerShare    float64 `json:"per_share"`
-	Quantity    float64 `json:"quantity"`
-	Currency    string  `json:"currency"`
-	ExpectedNet float64 `json:"expected_net"` // 주당 배당 × 수량 × (1 − 세율)
-	PayBy       string  `json:"pay_by"`       // 이 날까지는 들어왔어야 함
-	Status      string  `json:"status"`       // missing (기간이 지남) | upcoming (아직 들어올 수 있음)
+	AssetID       uint    `json:"asset_id"`
+	Ticker        string  `json:"ticker"`
+	AssetName     string  `json:"asset_name"`
+	AccountID     uint    `json:"account_id"`
+	AccountName   string  `json:"account_name"`
+	AccountBroker string  `json:"account_broker"`
+	ExDate        string  `json:"ex_date"`
+	PerShare      float64 `json:"per_share"`
+	Quantity      float64 `json:"quantity"`
+	Currency      string  `json:"currency"`
+	ExpectedNet   float64 `json:"expected_net"` // 주당 배당 × 수량 × (1 − 세율)
+	PayBy         string  `json:"pay_by"`       // 이 날까지는 들어왔어야 함
+	Status        string  `json:"status"`       // missing (기간이 지남) | upcoming (아직 들어올 수 있음)
 }
 
 type DivScoreRanking struct {
@@ -545,9 +546,9 @@ func (s *DividendScoreService) addCurrentExtras(out *DivScoreRanking) error {
 	if err := s.db.Find(&accounts).Error; err != nil {
 		return err
 	}
-	accName := map[uint]string{}
+	accByID := map[uint]models.Account{}
 	for _, a := range accounts {
-		accName[a.ID] = a.Name
+		accByID[a.ID] = a
 	}
 	for id, a := range assets {
 		if a.heldNow <= 0 {
@@ -561,7 +562,7 @@ func (s *DividendScoreService) addCurrentExtras(out *DivScoreRanking) error {
 		if a.avgCost > 0 && out.Rows[i].Metrics.TTM > 0 {
 			out.Rows[i].YOCPct = fptr(out.Rows[i].Metrics.TTM / a.avgCost * 100)
 		}
-		miss := missingRecords(a, accName, now)
+		miss := missingRecords(a, accByID, now)
 		out.Missing = append(out.Missing, miss...)
 		for _, m := range miss {
 			if m.Status == "missing" {
@@ -580,7 +581,7 @@ func (s *DividendScoreService) addCurrentExtras(out *DivScoreRanking) error {
 }
 
 // missingRecords: 최근 12개월 시장 배당락일마다, 그 전날 보유하던 계좌에 지급 기간 안의 내 배당 기록이 있는지 (한 기록은 한 회차에만)
-func missingRecords(a *divScoreAsset, accName map[uint]string, now time.Time) []MissingDividend {
+func missingRecords(a *divScoreAsset, accounts map[uint]models.Account, now time.Time) []MissingDividend {
 	if len(a.market) == 0 {
 		return nil
 	}
@@ -625,7 +626,8 @@ func missingRecords(a *divScoreAsset, accName map[uint]string, now time.Time) []
 				status = "upcoming"
 			}
 			out = append(out, MissingDividend{
-				AssetID: a.asset.ID, Ticker: a.asset.Ticker, AssetName: a.asset.Name, AccountID: acc, AccountName: accName[acc],
+				AssetID: a.asset.ID, Ticker: a.asset.Ticker, AssetName: a.asset.Name, AccountID: acc,
+				AccountName: accounts[acc].Name, AccountBroker: accounts[acc].Broker,
 				ExDate: ex.In(kst).Format(dateLayout), PerShare: e.Amount, Quantity: qty, Currency: ccy,
 				ExpectedNet: math.Round(e.Amount*qty*(1-tax)*100) / 100, PayBy: hi.In(kst).Format(dateLayout), Status: status,
 			})

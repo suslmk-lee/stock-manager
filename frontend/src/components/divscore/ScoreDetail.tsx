@@ -6,6 +6,8 @@ import { useThemeColors } from '../../appearance/AppearanceContext';
 import { assetPrimary, assetSecondary, tickerFirst } from '../../utils/assetLabel';
 import { dps, PART_KEYS, PART_LABEL, partPoints, partReason, pct, shortMonth, signedPct, STATUS_META } from './scoreText';
 import PaymentHistory from './PaymentHistory';
+import BrokerLogo from '../ui/BrokerLogo';
+import { accountDisplayName } from '../../utils/accountLabel';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '불러오지 못했습니다.');
 const shortDate = (d: string) => `${d.slice(2, 4)}.${d.slice(5, 7)}.${d.slice(8, 10)}`;
@@ -25,10 +27,11 @@ export function MissingList({ items, onRecord }: { items: MissingDividend[]; onR
     <div className="divide-y divide-white/[0.05] overflow-hidden rounded-xl border border-white/[0.06]">
       {items.map((m) => (
         <div key={`${m.account_id}-${m.asset_id}-${m.ex_date}`} className="flex items-center gap-3 px-3 py-2">
+          <BrokerLogo broker={m.account_broker} className="h-7 w-16 shrink-0" />
           <span className="min-w-0 flex-1">
             <span className="flex items-baseline gap-2 text-[13px] text-zinc-100">
-              <span className="font-medium">{/\.(KS|KQ)$/i.test(m.ticker) ? m.asset_name : m.ticker}</span>
-              <span className="truncate text-[11px] text-zinc-500">{m.account_name}</span>
+              <span className="shrink-0 font-medium">{/\.(KS|KQ)$/i.test(m.ticker) ? m.asset_name : m.ticker}</span>
+              <span className="truncate text-[11.5px] text-zinc-400">{accountDisplayName({ name: m.account_name, broker: m.account_broker })}</span>
             </span>
             <span className="num block text-[11px] text-zinc-500">
               배당락 {shortDate(m.ex_date)} · 주당 {dps(m.per_share, m.currency)} × {m.quantity.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}주

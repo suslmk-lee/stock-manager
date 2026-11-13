@@ -96,6 +96,9 @@ func TestDividendScoreRankingFlow(t *testing.T) {
 		if m.Ticker == "GROW" && m.Status == "missing" {
 			missing++
 		}
+		if m.AccountBroker != "토스증권" || m.AccountName != "토스" {
+			t.Fatalf("기록 누락에 계좌·증권사 이름이 있어야 한다: %+v", m)
+		}
 		if m.Ticker == "SOLD" {
 			t.Fatalf("판 종목은 기록 누락에 넣지 않는다: %+v", m)
 		}

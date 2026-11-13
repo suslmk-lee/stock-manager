@@ -7,6 +7,7 @@ import { Plus, Trash2, TrendingUp, Search, Edit2 } from 'lucide-react';
 import Portal from './ui/Portal';
 import AccountSelect from './ui/AccountSelect';
 import { assetPrimary, assetSecondary } from '../utils/assetLabel';
+import { accountDisplayName } from '../utils/accountLabel';
 
 const SECTORS = [
   'Technology',
@@ -442,7 +443,7 @@ export default function AssetManager() {
                         return (
                           <div key={holding.id} className="bg-white/[0.04] rounded p-2 flex justify-between items-center">
                             <span className="text-sm text-zinc-300">
-                              {account?.name || '알 수 없음'}
+                              {accountDisplayName(account, '알 수 없음')}
                             </span>
                             <span className="text-sm text-white font-medium">
                               {holding.quantity.toLocaleString()} 주

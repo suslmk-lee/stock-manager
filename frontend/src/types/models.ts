@@ -821,6 +821,7 @@ export interface MissingDividend {
   asset_name: string;
   account_id: number;
   account_name: string;
+  account_broker: string;
   ex_date: string;
   per_share: number;
   quantity: number;

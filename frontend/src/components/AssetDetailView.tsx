@@ -7,6 +7,7 @@ import Portal from './ui/Portal';
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { accountDisplayName } from '../utils/accountLabel';
 
 interface AssetDetailViewProps {
   assetId: number;
@@ -287,7 +288,7 @@ export default function AssetDetailView({ assetId, ticker, name, accountId, acco
                           {isBuy ? '매수' : '매도'}
                         </span>
                         <span className="text-zinc-400 text-xs">{new Date(tx.date).toLocaleDateString('ko-KR')}</span>
-                        {!accountId && <span className="text-zinc-500 text-xs truncate">· {tx.account?.name || `#${tx.account_id}`}</span>}
+                        {!accountId && <span className="text-zinc-500 text-xs truncate">· {accountDisplayName(tx.account, `#${tx.account_id}`)}</span>}
                       </div>
                       <div className="num text-right whitespace-nowrap text-zinc-300 text-xs">
                         {formatMoney(tx.price, cur)} × {formatNumber(tx.quantity, 4)}주

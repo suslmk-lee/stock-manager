@@ -5,6 +5,7 @@ import type { MissingDividend } from '../../types/models';
 import DatePicker from '../ui/DatePicker';
 import Portal from '../ui/Portal';
 import { dps } from './scoreText';
+import { accountDisplayName } from '../../utils/accountLabel';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '저장하지 못했습니다.');
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -44,7 +45,7 @@ export default function RecordMissingModal({ item, onClose, onSaved }: { item: M
             <div>
               <h3 className="section-title">빠진 배당 기록</h3>
               <p className="mt-0.5 text-xs text-zinc-500">
-                {item.ticker} · {item.account_name} · 배당락 {item.ex_date}
+                {item.ticker} · {accountDisplayName({ name: item.account_name, broker: item.account_broker })} · 배당락 {item.ex_date}
               </p>
             </div>
             <button type="button" onClick={onClose} className="text-zinc-400 hover:text-white" aria-label="닫기">

@@ -2,6 +2,7 @@ import { useEffect, useRef, type KeyboardEvent } from 'react';
 import type { AccumulationPlanView, PlanCurrency, PlanStatus } from '../../types/models';
 import { assetTitle, belowMinimum, fmtAmount, fmtSignedPct, ruleText, signTone } from './planText';
 import { cashText, daysText, daysTone, LOW_DAYS, type AccountCashNeed } from './cashNeed';
+import { accountDisplayName } from '../../utils/accountLabel';
 
 interface PlanListProps {
   plans: AccumulationPlanView[];
@@ -122,7 +123,7 @@ export default function PlanList({ plans, status, onStatus, counts, selectedId, 
                     {belowMinimum(p) && <span className="ml-1.5 text-amber-300">· 금액 부족</span>}
                   </span>
                   <span className="mt-0.5 block truncate font-mono text-[10.5px] text-zinc-600">
-                    {p.account?.name} · {p.rounds}회
+                    {accountDisplayName(p.account)} · {p.rounds}회
                   </span>
                 </span>
                 <span className="shrink-0 text-right">

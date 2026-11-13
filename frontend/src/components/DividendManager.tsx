@@ -11,6 +11,7 @@ import DatePicker from './ui/DatePicker';
 import { IconClock, IconCoin, IconTrend } from './ui/appIcons';
 import AccountSelect from './ui/AccountSelect';
 import { assetPrimary, assetSecondary } from '../utils/assetLabel';
+import { accountDisplayName } from '../utils/accountLabel';
 
 interface DividendManagerProps {
   selectedAccountId?: number;
@@ -216,7 +217,7 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
         const quantity = h.quantity || 0;
         const avgPrice = h.average_price || 0;
         return {
-          accountName: acct?.name || `계좌 #${h.account_id}`,
+          accountName: accountDisplayName(acct, `계좌 #${h.account_id}`),
           quantity,
           marketValue: quantity * toKRW(currentPrice),
           avgPrice,

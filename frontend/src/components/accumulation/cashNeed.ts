@@ -1,5 +1,6 @@
 import type { AccumulationPlanView, CashBalance, PlanCurrency } from '../../types/models';
 import { fmtAmount } from './planText';
+import { accountDisplayName } from '../../utils/accountLabel';
 
 /** 거래일 기준 한 달 (monthly_max 와 같은 기준) */
 const TRADING_DAYS = 21;
@@ -37,7 +38,7 @@ export function cashNeeds(plans: AccumulationPlanView[], balances: CashBalance[]
       const b = bal.get(p.account_id);
       r = {
         accountId: p.account_id,
-        name: p.account?.name ?? `계좌 ${p.account_id}`,
+        name: accountDisplayName(p.account, `계좌 ${p.account_id}`),
         needKRW: 0,
         needUSD: 0,
         cashKRW: b?.krw ?? 0,
