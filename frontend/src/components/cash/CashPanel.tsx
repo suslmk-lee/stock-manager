@@ -7,6 +7,7 @@ import DatePicker from '../ui/DatePicker';
 import Portal from '../ui/Portal';
 import { IconWallet } from '../ui/appIcons';
 import { fmtCcy } from '../../utils/fx';
+import { askConfirm } from '../ui/confirmDialog';
 
 /**
  * 계좌 예수금 — 원화·달러 잔액, 계좌 총액(주식 평가금 + 예수금), 현금 흐름(입출금·매매·배당).
@@ -287,7 +288,7 @@ export default function CashPanel({ account }: { account: Account }) {
   const remove = async (f: CashFlow) => {
     if (f.entry_id == null) return;
     const what = f.kind === 'exchange' ? '이 환전(원화·달러 두 줄 모두)' : `이 ${KIND[f.kind].label} 기록`;
-    if (!window.confirm(`${what}을 지울까요?`)) return;
+    if (!(await askConfirm(`${what}을 지울까요?`))) return;
     try {
       await apiClient.DeleteCashEntry(f.entry_id);
       await load();

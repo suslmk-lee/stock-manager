@@ -8,6 +8,7 @@ import Portal from './ui/Portal';
 import AccountSelect from './ui/AccountSelect';
 import { assetPrimary, assetSecondary } from '../utils/assetLabel';
 import { accountDisplayName } from '../utils/accountLabel';
+import { askConfirm } from './ui/confirmDialog';
 
 const SECTORS = [
   'Technology',
@@ -221,7 +222,7 @@ export default function AssetManager() {
   };
 
   const handleDeleteAsset = async (id: number) => {
-    if (!confirm('이 종목을 목록에서 삭제(숨김)하시겠습니까?\n과거 배당금·거래·실현손익 이력은 그대로 보존되며, 같은 티커를 다시 추가하면 복구됩니다.\n(보유 수량이 남아있으면 삭제할 수 없습니다)')) return;
+    if (!(await askConfirm('이 종목을 목록에서 삭제(숨김)하시겠습니까?\n과거 배당금·거래·실현손익 이력은 그대로 보존되며, 같은 티커를 다시 추가하면 복구됩니다.\n(보유 수량이 남아있으면 삭제할 수 없습니다)'))) return;
     
     try {
       await apiClient.DeleteAsset(id);
@@ -252,7 +253,7 @@ export default function AssetManager() {
   };
 
   const handleDeleteHolding = async (holdingId: number) => {
-    if (!confirm('정말로 이 보유 내역을 삭제하시겠습니까?')) return;
+    if (!(await askConfirm('정말로 이 보유 내역을 삭제하시겠습니까?'))) return;
     
     try {
       await apiClient.DeleteHolding(holdingId);

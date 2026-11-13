@@ -11,6 +11,7 @@ import CardIcon from './components/ui/CardIcon';
 import { ACCOUNT_TYPES, getAccountType, getAccountTypeMeta, isRestrictedAccount } from './utils/accountType';
 import { IconWallet } from './components/ui/appIcons';
 import BrokerLogo from './components/ui/BrokerLogo';
+import { askConfirm } from './components/ui/confirmDialog';
 
 const DOMESTIC_BROKERS = [
   '삼성증권',
@@ -189,7 +190,7 @@ function App() {
   };
 
   const handleDeleteAccount = async (id: number) => {
-    if (!confirm('정말로 이 계좌를 삭제하시겠습니까?')) return;
+    if (!(await askConfirm('정말로 이 계좌를 삭제하시겠습니까?'))) return;
 
     try {
       await apiClient.DeleteAccount(id);

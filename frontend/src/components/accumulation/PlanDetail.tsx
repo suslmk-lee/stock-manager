@@ -4,6 +4,7 @@ import { apiClient } from '../../api/client';
 import type { AccumulationFill, AccumulationPlanRequest, AccumulationPlanView, PlanCurrency, PlanStatus } from '../../types/models';
 import { accountLabel, assetTitle, belowMinimum, fmtAmount, fmtDay, fmtPrice, fmtQty, fmtSignedAmount, fmtSignedPct, nextText, ruleText, signTone, stepLabel } from './planText';
 import { cashText, LOW_DAYS, type AccountCashNeed } from './cashNeed';
+import { askConfirm } from '../ui/confirmDialog';
 
 interface PlanDetailProps {
   plan: AccumulationPlanView;
@@ -93,8 +94,8 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
     act(() => apiClient.UpdateAccumulationPlan(plan.id, { ...toRequest(plan), status: nextStatus }), nextStatus);
   };
 
-  const remove = () => {
-    if (!window.confirm(`${title.primary || '이'} 모으기를 지울까요?\n이미 기록한 매수는 실제로 산 것이라 매매 기록에 그대로 남습니다.`)) return;
+  const remove = async () => {
+    if (!(await askConfirm(`${title.primary || '이'} 모으기를 지울까요?\n이미 기록한 매수는 실제로 산 것이라 매매 기록에 그대로 남습니다.`))) return;
     setBusy(true);
     apiClient
       .DeleteAccumulationPlan(plan.id)
@@ -121,8 +122,8 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
     });
   };
 
-  const skipFill = (f: AccumulationFill) => {
-    if (!window.confirm(`${fmtDay(f.date)} 회차를 지울까요?\n증권사에서 실제로 사지 않은 날만 지우세요. 지운 날은 다시 채우지 않습니다.`)) return;
+  const skipFill = async (f: AccumulationFill) => {
+    if (!(await askConfirm(`${fmtDay(f.date)} 회차를 지울까요?\n증권사에서 실제로 사지 않은 날만 지우세요. 지운 날은 다시 채우지 않습니다.`))) return;
     act(async () => {
       await apiClient.DeleteAccumulationFill(f.transaction_id);
       await loadFills();

@@ -6,6 +6,7 @@ import Portal from '../ui/Portal';
 import DatePicker from '../ui/DatePicker';
 import { assetPrimary } from '../../utils/assetLabel';
 import { fmtCcy } from '../../utils/fx';
+import { askConfirm } from '../ui/confirmDialog';
 
 /**
  * 펀드 평가금액 맞추기 — 은행 앱에 보이는 이 펀드의 평가금액을 넣으면 그날 기준가(= 평가금액 ÷ 앱 좌수)를 정한다.
@@ -54,7 +55,7 @@ export default function FundReconcileModal({ accountId, item, onClose, onSaved }
   };
 
   const remove = async (p: FundPrice) => {
-    if (!window.confirm(`${shortDate(p.date)} 기준가 ${won(p.nav)} 기록을 지울까요?`)) return;
+    if (!(await askConfirm(`${shortDate(p.date)} 기준가 ${won(p.nav)} 기록을 지울까요?`))) return;
     try {
       await apiClient.DeleteFundPrice(p.id);
       loadPrices();

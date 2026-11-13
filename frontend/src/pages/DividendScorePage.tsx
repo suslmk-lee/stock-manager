@@ -12,6 +12,7 @@ import ScoreDetail, { MissingList } from '../components/divscore/ScoreDetail';
 import ScoreSettings from '../components/divscore/ScoreSettings';
 import RecordMissingModal from '../components/divscore/RecordMissingModal';
 import { monthLabel, PART_KEYS, PART_LABEL, PART_SHORT, partPoints, STATUS_META, type PartKey } from '../components/divscore/scoreText';
+import { askConfirm } from '../components/ui/confirmDialog';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '불러오지 못했습니다.');
 const SUMMARY = -1;
@@ -164,7 +165,7 @@ export default function DividendScorePage() {
 
   const recompute = async () => {
     if (!data) return;
-    if (!window.confirm(`${monthLabel(data.month)} 점수를 지우고 지금 데이터로 다시 계산할까요?${data.current ? '' : '\n지난 달은 다시 계산하면 추정으로 표시됩니다.'}`)) return;
+    if (!(await askConfirm(`${monthLabel(data.month)} 점수를 지우고 지금 데이터로 다시 계산할까요?${data.current ? '' : '\n지난 달은 다시 계산하면 추정으로 표시됩니다.'}`, { confirmText: '다시 계산', danger: false }))) return;
     setBusy(true);
     try {
       await apiClient.RecomputeDividendScore(data.month);

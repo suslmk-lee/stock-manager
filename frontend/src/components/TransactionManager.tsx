@@ -14,6 +14,7 @@ import AccountSelect from './ui/AccountSelect';
 import TradeHistory from './trades/TradeHistory';
 import { assetPrimary, assetSecondary } from '../utils/assetLabel';
 import { accountDisplayName } from '../utils/accountLabel';
+import { askConfirm } from './ui/confirmDialog';
 
 interface TransactionManagerProps {
   selectedAccountId?: number;
@@ -393,7 +394,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
 
   const handleDeleteTransaction = async () => {
     if (!selectedTx) return;
-    if (!confirm('이 거래를 삭제하시겠습니까?\n삭제 후 보유 수량과 실현 손익이 자동으로 재계산됩니다.')) return;
+    if (!(await askConfirm('이 거래를 삭제하시겠습니까?\n삭제 후 보유 수량과 실현 손익이 자동으로 재계산됩니다.'))) return;
     setTxActionLoading(true);
     setError(null);
     try {
@@ -1457,7 +1458,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   </div>
                   <div>
                     <p className="label-mono mb-0.5">계좌</p>
-                    <p className="text-white font-medium truncate">{accountDisplayName(p.account, `#${p.account_id}`)}</p>
+                    <p className="text-white font-medium truncate">{accountDisplayName(p.account ?? accounts.find((a) => a.id === p.account_id), `#${p.account_id}`)}</p>
                   </div>
                   <div className="col-span-2">
                     <p className="label-mono mb-0.5">등록 시각 (KST)</p>
@@ -1527,7 +1528,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                   /* ===== 수정 폼 ===== */
                   <div className="space-y-4">
                     <p className="text-xs text-zinc-400">
-                      {assetSecondary(tx.asset)} · {accountDisplayName(tx.account, `#${tx.account_id}`)} 거래를 수정합니다. (종목/계좌는 변경할 수 없습니다)
+                      {assetSecondary(tx.asset)} · {accountDisplayName(tx.account ?? accounts.find((a) => a.id === tx.account_id), `#${tx.account_id}`)} 거래를 수정합니다. (종목/계좌는 변경할 수 없습니다)
                     </p>
 
                     {/* 매수/매도 토글 */}
@@ -1659,7 +1660,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       </div>
                       <div>
                         <p className="label-mono mb-0.5">계좌</p>
-                        <p className="text-white font-medium truncate">{accountDisplayName(tx.account, `#${tx.account_id}`)}</p>
+                        <p className="text-white font-medium truncate">{accountDisplayName(tx.account ?? accounts.find((a) => a.id === tx.account_id), `#${tx.account_id}`)}</p>
                       </div>
                       <div className="col-span-2">
                         <p className="label-mono mb-0.5">등록 시각 (KST)</p>

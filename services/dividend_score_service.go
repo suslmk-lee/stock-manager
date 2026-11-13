@@ -173,6 +173,7 @@ type divScoreAsset struct {
 	records []models.Dividend
 	avgCost float64 // 지금 보유 평균 단가 (종목 통화)
 	heldNow float64
+	firstTx map[uint]time.Time // 계좌별 이 종목 첫 거래일 — 언제부터 들고 있었는지 아는지 보려고
 }
 
 // qty: 그 시각 모든 계좌 보유 수량
@@ -240,13 +241,17 @@ func (s *DividendScoreService) loadAssets(since time.Time, withPrices bool) (map
 		for id := range cur {
 			accts[id] = true
 		}
+		firstTx := map[uint]time.Time{}
 		for _, t := range txs {
 			if t.AssetID == a.ID {
 				at = append(at, AcctTxn{AccountID: t.AccountID, Type: t.Type, Date: t.Date, Quantity: t.Quantity})
 				accts[t.AccountID] = true
+				if f, ok := firstTx[t.AccountID]; !ok || t.Date.Before(f) {
+					firstTx[t.AccountID] = t.Date
+				}
 			}
 		}
-		d := &divScoreAsset{asset: a, qtyAt: QuantityAtFunc(cur, at), heldNow: qty}
+		d := &divScoreAsset{asset: a, qtyAt: QuantityAtFunc(cur, at), heldNow: qty, firstTx: firstTx}
 		if qty > 0 {
 			d.avgCost = cost / qty
 		}
@@ -702,6 +707,9 @@ func (s *DividendScoreService) addCurrentExtras(out *DivScoreRanking) error {
 }
 
 // missingRecords: 최근 12개월 시장 배당락일마다, 그 전날 보유하던 계좌에 지급 기간 안의 내 배당 기록이 있는지 (한 기록은 한 회차에만)
+//   - 최근 회차부터 거꾸로, 회차마다 기간 안의 가장 늦은 기록을 짝으로 — 오래된 회차 하나가 비어도 뒤 회차들이 한 칸씩 밀리지 않는다
+//     (예전처럼 이른 회차부터 가장 이른 기록을 가져가면, 빈 회차가 다음 회차의 기록을 가져가 결국 마지막 회차가 누락으로 보였다)
+//   - 언제 샀는지 모르는 계좌(매수 기록 없이 보유)는 그 계좌의 첫 배당 기록이 받은 회차부터만 본다 — 기록을 시작하기 전 회차를 누락이라 하지 않게
 func missingRecords(a *divScoreAsset, accounts map[uint]models.Account, now time.Time) []MissingDividend {
 	if len(a.market) == 0 {
 		return nil
@@ -714,6 +722,8 @@ func missingRecords(a *divScoreAsset, accounts map[uint]models.Account, now time
 		tax = divTaxKR // 일본 원천 15.315% — 국내 추가분까지 보통 15.4%
 	}
 	from := now.AddDate(0, -divMissingLookback, 0)
+	market := append([]DividendEvent(nil), a.market...)
+	sort.Slice(market, func(i, j int) bool { return market[i].Time < market[j].Time })
 	var out []MissingDividend
 	for _, acc := range a.acctIDs {
 		var recs []time.Time
@@ -723,10 +733,16 @@ func missingRecords(a *divScoreAsset, accounts map[uint]models.Account, now time
 			}
 		}
 		sort.Slice(recs, func(i, j int) bool { return recs[i].Before(recs[j]) })
+		start := from
+		if s := a.recordStart(acc, recs); s.After(start) {
+			start = s
+		}
 		used := make([]bool, len(recs))
-		for _, e := range a.market {
+		var accOut []MissingDividend
+		for k := len(market) - 1; k >= 0; k-- {
+			e := market[k]
 			ex := time.Unix(e.Time, 0)
-			if ex.Before(from) || ex.After(now) {
+			if ex.Before(start) || ex.After(now) {
 				continue
 			}
 			qty := a.qtyAt(acc, ex.AddDate(0, 0, -1))
@@ -735,8 +751,8 @@ func missingRecords(a *divScoreAsset, accounts map[uint]models.Account, now time
 			}
 			lo, hi := ex.AddDate(0, 0, -divRecordLeadDays), ex.AddDate(0, 0, window)
 			matched := false
-			for i, r := range recs {
-				if !used[i] && !r.Before(lo) && !r.After(hi) {
+			for i := len(recs) - 1; i >= 0; i-- {
+				if r := recs[i]; !used[i] && !r.Before(lo) && !r.After(hi) {
 					used[i], matched = true, true
 					break
 				}
@@ -748,15 +764,38 @@ func missingRecords(a *divScoreAsset, accounts map[uint]models.Account, now time
 			if now.Before(hi) {
 				status = "upcoming"
 			}
-			out = append(out, MissingDividend{
+			accOut = append(accOut, MissingDividend{
 				AssetID: a.asset.ID, Ticker: a.asset.Ticker, AssetName: a.asset.Name, AccountID: acc,
 				AccountName: accounts[acc].Name, AccountBroker: accounts[acc].Broker,
 				ExDate: ex.In(kst).Format(dateLayout), PerShare: e.Amount, Quantity: qty, Currency: ccy,
 				ExpectedNet: math.Round(e.Amount*qty*(1-tax)*100) / 100, PayBy: hi.In(kst).Format(dateLayout), Status: status,
 			})
 		}
+		for k := len(accOut) - 1; k >= 0; k-- { // 회차 순서대로
+			out = append(out, accOut[k])
+		}
 	}
 	return out
+}
+
+// recordStart: 매수 기록 없이 보유한 계좌(언제 샀는지 모름)면 그 계좌의 첫 배당 기록이 받은 회차의 배당락일 — 그 앞 회차는 따지지 않는다.
+// 언제부터 들고 있었는지 알거나(첫 거래 전날 보유 0), 그 계좌에 배당 기록이 아직 없으면 zero.
+func (a *divScoreAsset) recordStart(acc uint, recs []time.Time) time.Time {
+	if len(recs) == 0 {
+		return time.Time{}
+	}
+	if f, ok := a.firstTx[acc]; ok && a.qtyAt(acc, f.AddDate(0, 0, -1)) <= 1e-9 {
+		return time.Time{}
+	}
+	// 첫 기록이 받은 회차 = 그 기록 날짜(+앞선 기록 허용 일수)까지의 마지막 배당락일
+	limit := recs[0].AddDate(0, 0, divRecordLeadDays)
+	var start time.Time
+	for _, e := range a.market {
+		if ex := time.Unix(e.Time, 0); !ex.After(limit) && ex.After(start) {
+			start = ex
+		}
+	}
+	return start
 }
 
 // ───────────────────────── 종목 상세 ─────────────────────────

@@ -7,6 +7,7 @@ import { assetPrimary, assetSecondary } from '../../utils/assetLabel';
 import { accountDisplayName } from '../../utils/accountLabel';
 import { fmtCcy } from '../../utils/fx';
 import FundReconcileModal from './FundReconcileModal';
+import { askConfirm } from '../ui/confirmDialog';
 
 /** 부담금 배분 상세 — 요약, 상품별 보유·원금·평가(펀드는 평가금액 맞추기), 회차 기록 */
 
@@ -68,7 +69,7 @@ export default function PensionDetail({ plan, onEdit, onChanged, onNotice }: { p
   };
 
   const remove = async () => {
-    if (!window.confirm('이 부담금 배분을 지울까요?\n이미 기록된 입금·매수는 실제 내역이라 그대로 남습니다.')) return;
+    if (!(await askConfirm('이 부담금 배분을 지울까요?\n이미 기록된 입금·매수는 실제 내역이라 그대로 남습니다.'))) return;
     try {
       await apiClient.DeleteContributionPlan(plan.id);
       onChanged(true);
@@ -78,7 +79,7 @@ export default function PensionDetail({ plan, onEdit, onChanged, onNotice }: { p
   };
 
   const removeRound = async (r: ContributionRound) => {
-    if (!window.confirm(`${shortDate(r.date)} 회차(입금 ${won(r.deposit)}와 매수 ${r.buys.length}건)를 지울까요?\n그달 부담금이 없었거나 금액이 달랐을 때 씁니다. 다시 자동으로 채우지 않습니다.`)) return;
+    if (!(await askConfirm(`${shortDate(r.date)} 회차(입금 ${won(r.deposit)}와 매수 ${r.buys.length}건)를 지울까요?\n그달 부담금이 없었거나 금액이 달랐을 때 씁니다. 다시 자동으로 채우지 않습니다.`))) return;
     try {
       await apiClient.DeleteContributionRound(plan.id, r.date);
       onNotice(`${shortDate(r.date)} 회차를 지웠습니다.`);
