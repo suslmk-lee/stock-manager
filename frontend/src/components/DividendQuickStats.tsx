@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { ccyOfTicker, loadFxRates, toKRW } from '../utils/fx';
-import { Account, Dividend, Holding, Transaction } from '../types/models';
+import { costAtFor, costTimeline, type CostState } from '../utils/costBasis';
+import { Account, Dividend, Holding, RealizedPnL, Transaction } from '../types/models';
 import { useThemeColors } from '../appearance/AppearanceContext';
 import CardIcon from './ui/CardIcon';
 import RingGauge from './ui/RingGauge';
@@ -24,8 +25,9 @@ interface AssetDividendStats {
   ticker: string;
   total: number; // 이 계좌에서 받은 누적 배당금 (원화)
   count: number;
-  invested: number; // 투자금 = 지금 보유분의 매입 원가 (원화, 외화는 현재 환율). 0 = 보유 없음
-  yield: number; // 누적 배당금 ÷ 투자금 (%)
+  invested: number; // 지금 보유분의 매입 원가 (원화, 외화는 현재 환율). 0 = 보유 없음
+  avgInvested: number; // 배당을 받던 때마다 들고 있던 원금의 평균 (배당 가중) — 0 이면 알 수 없음
+  yield: number; // 회차마다 (받은 배당 ÷ 그때 원금)을 더한 값 (%) — 중간 매수·매도 반영
 }
 
 // 보유 단가의 통화: 국내 상장(.KS/.KQ)은 원화, 그 밖은 달러 (다른 화면과 같은 기준)
@@ -53,12 +55,13 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
   const loadStats = async () => {
     try {
       setLoading(true);
-      const [dividendsData, rate, holdingsData, accountData, transactionsData] = await Promise.all([
+      const [dividendsData, rate, holdingsData, accountData, transactionsData, pnlData] = await Promise.all([
         apiClient.GetDividendsByAccount(accountId),
         apiClient.GetUSDToKRW(),
         apiClient.GetHoldingsByAccount(accountId),
         apiClient.GetAccount(accountId),
         apiClient.GetTransactionsByAccount(accountId),
+        apiClient.GetRealizedPnLByAccount(accountId).catch(() => []),
       ]);
 
       const dividends = dividendsData as Dividend[];
@@ -66,6 +69,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
       const holdings = holdingsData as Holding[];
       const account = accountData as Account;
       const transactions = transactionsData as Transaction[];
+      const pnls = ((pnlData ?? []) as RealizedPnL[]) || [];
 
       // 총 배당금 계산
       const total = dividends.reduce((sum, div) => {
@@ -170,20 +174,77 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
         .sort((a, b) => b.total - a.total)
         .slice(0, 10);
 
-      // 종목별 투자금(보유 수량 × 평균 매입가)과 그 대비 누적 배당률 — 시세 없이 바로 계산된다
+      // 배당을 받던 때의 원금: 종목마다 지금 보유에서 거래를 되돌려 그날 수량 × 평단 (중간 매수·매도 반영)
+      const sellAvg = new Map<number, number>(pnls.filter((p) => p.transaction_id && p.buy_avg_price > 0).map((p) => [p.transaction_id, p.buy_avg_price]));
+      const tickerOf = new Map<number, string>();
+      holdings.forEach((h) => h.asset?.ticker && tickerOf.set(h.asset_id, h.asset.ticker));
+      transactions.forEach((t) => t.asset?.ticker && !tickerOf.has(t.asset_id) && tickerOf.set(t.asset_id, t.asset.ticker));
+      const timelines = new Map<number, (at: number) => CostState>();
+      for (const assetId of new Set([...holdings.map((h) => h.asset_id), ...transactions.map((t) => t.asset_id)])) {
+        const h = holdings.find((x) => x.asset_id === assetId);
+        timelines.set(assetId, costTimeline(h?.quantity || 0, h?.average_price || 0, transactions.filter((t) => t.asset_id === assetId), sellAvg));
+      }
+      const costKRW = (assetId: number, at: number) => {
+        const tl = timelines.get(assetId);
+        const tk = tickerOf.get(assetId);
+        if (!tl || !tk) return 0;
+        const st = tl(at);
+        return toKRW(st.qty * st.avg, ccyOfTicker(tk), rates);
+      };
+      const divKRW = (div: Dividend) => (div.currency === 'USD' ? div.amount * exchangeRateValue : div.amount);
+
+      // 종목별: 회차마다 (배당 ÷ 그때 원금)을 더한 배당률, 그 평균 원금 — 시세 없이 바로 계산된다
       const topWithInvested: AssetDividendStats[] = sortedAssets.map(asset => {
         const holding = holdings.find(h => h.asset?.ticker === asset.ticker);
         const cost = (holding?.quantity || 0) * (holding?.average_price || 0);
         const invested = toKRW(cost, ccyOfTicker(asset.ticker), rates);
+        let ratio = 0;
+        let counted = 0;
+        dividends
+          .filter((d) => d.asset?.ticker === asset.ticker)
+          .forEach((d) => {
+            const c = costKRW(d.asset_id, costAtFor(d.date));
+            if (c > 0) {
+              ratio += divKRW(d) / c;
+              counted += divKRW(d);
+            }
+          });
         return {
           assetName: asset.name,
           ticker: asset.ticker,
           total: asset.total,
           count: asset.count,
           invested,
-          yield: invested > 0 ? (asset.total / invested) * 100 : 0,
+          avgInvested: ratio > 0 ? counted / ratio : 0,
+          yield: ratio > 0 ? ratio * 100 : invested > 0 ? (asset.total / invested) * 100 : 0,
         };
       });
+
+      // 계좌: 올해 배당마다 (배당 ÷ 그때 계좌 전체 원금)을 더한 값 — 중간에 팔아 원금이 줄어도 부풀지 않는다
+      const assetIds = [...timelines.keys()];
+      let yearRatio = 0;
+      let yearCounted = 0;
+      dividends
+        .filter((d) => new Date(d.date).getFullYear() === currentYear)
+        .forEach((d) => {
+          const at = costAtFor(d.date);
+          const c = assetIds.reduce((sum, id) => sum + costKRW(id, at), 0);
+          if (c > 0) {
+            yearRatio += divKRW(d) / c;
+            yearCounted += divKRW(d);
+          }
+        });
+
+      setTopAssets(topWithInvested);
+      if (yearRatio > 0) {
+        // 그때 원금 기준 (시세와 상관없어 바로 확정)
+        setInvestmentBasisLabel('올해 평균 원금');
+        setTotalInvestment(yearCounted / yearRatio);
+        setAnnualYield(yearRatio * 100);
+        setExpectedAnnualYield(yearRatio * (daysInYear / elapsedDays) * 100); // 지금까지를 일할로 연환산 (예상 연배당금과 같은 방식)
+        setLoading(false);
+        return;
+      }
 
       // 1) 시세 비의존 값 + 원가 기반 잠정 배당률을 먼저 표시 (패널 즉시 렌더)
       const fallbackBase = Math.max(investmentInKRW, buyInvestmentInKRW);
@@ -192,7 +253,6 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
       setTotalInvestment(fallbackBase);
       setAnnualYield(fallbackBase > 0 ? (yearlyTotal / fallbackBase) * 100 : 0);
       setExpectedAnnualYield(fallbackBase > 0 ? (annualizedDividend / fallbackBase) * 100 : 0);
-      setTopAssets(topWithInvested);
       setLoading(false);
 
       // 2) 시세는 비차단으로 받아 계좌 전체의 평가금액 기반 값(총 투자금/연배당률)만 갱신
@@ -405,7 +465,7 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                 <div key={asset.ticker} className="surface-inset p-4 hover:bg-white/[0.04] transition-colors">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3 flex-1">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-sm ${
+                      <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-mono text-sm ${
                         index === 0 ? 'bg-amber-400/15 text-amber-300' :
                         index === 1 ? 'bg-white/[0.1] text-zinc-200' :
                         index === 2 ? 'bg-orange-400/15 text-orange-300' :
@@ -413,13 +473,13 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                       }`}>
                         {index + 1}
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-white">
-                          {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ') 
-                            ? asset.assetName 
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-sm font-medium leading-snug text-white" title={asset.assetName}>
+                          {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ')
+                            ? asset.assetName
                             : asset.ticker}
                         </p>
-                        <p className="text-xs text-zinc-400">
+                        <p className="truncate text-xs text-zinc-400">
                           {asset.ticker.includes('.KS') || asset.ticker.includes('.KQ')
                             ? `${asset.ticker} · ${asset.count}건`
                             : `${asset.assetName} · ${asset.count}건`}
@@ -428,16 +488,24 @@ export default function DividendQuickStats({ accountId, children, refreshTrigger
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="num text-lg font-medium text-mint-300">{formatCurrency(asset.total)}</p>
-                      {/* 받은 배당금이 얼마의 투자금에서 나왔는지: 보유분 매입 원가 */}
+                      {/* 받은 배당금이 얼마의 투자금에서 나왔는지: 배당을 받던 때마다 들고 있던 원금 (중간 매수·매도 반영) */}
                       <p
                         className="num text-xs text-zinc-300"
-                        title="투자금 = 지금 보유한 수량 × 평균 매입가 (외화는 현재 환율로 원화 환산)"
+                        title="평균 투자금 = 배당을 받던 때마다 들고 있던 원금(수량 × 그때 평단)의 평균 · 지금 = 지금 보유한 수량 × 평균 매입가 (외화는 현재 환율로 원화 환산)"
                       >
-                        {asset.invested > 0 ? `투자금 ${formatCurrency(asset.invested)}` : '보유 없음'}
+                        {asset.avgInvested > 0
+                          ? `평균 투자금 ${formatCurrency(asset.avgInvested)}`
+                          : asset.invested > 0
+                            ? `투자금 ${formatCurrency(asset.invested)}`
+                            : '보유 없음'}
                       </p>
+                      {/* 중간에 사고팔아 지금 원금이 평균과 다르면 함께 */}
+                      {asset.avgInvested > 0 && Math.abs(asset.avgInvested - asset.invested) > Math.max(1, asset.avgInvested * 0.02) && (
+                        <p className="num text-[11px] text-zinc-500">지금 {asset.invested > 0 ? formatCurrency(asset.invested) : '보유 없음'}</p>
+                      )}
                       <div className="mt-0.5 flex items-center gap-2 justify-end">
                         {asset.yield > 0 && (
-                          <span className="text-xs font-medium text-amber-300" title="누적 배당금 ÷ 투자금">
+                          <span className="text-xs font-medium text-amber-300" title="회차마다 받은 배당 ÷ 그때 들고 있던 원금을 더한 값 (중간에 사고판 것까지 반영)">
                             배당률 {asset.yield.toFixed(2)}%
                           </span>
                         )}
