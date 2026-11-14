@@ -73,6 +73,14 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
     isReceived: true,
     notes: '',
   });
+  // 폼: 같은 계좌·종목에 며칠 안의 기록이 이미 있으면 (온주·소수점처럼 나눠 받은 것 / 두 번 넣는 것)
+  const sameRound = useMemo(() => {
+    if (!formData.accountId || !formData.assetId || !formData.date) return [];
+    const at = new Date(`${formData.date}T00:00:00`).getTime();
+    return dividends.filter(
+      (d) => d.account_id === formData.accountId && d.asset_id === formData.assetId && d.id !== editingDividend?.id && Math.abs(new Date(d.date).getTime() - at) <= 5.5 * 86400000,
+    );
+  }, [dividends, formData.accountId, formData.assetId, formData.date, editingDividend]);
 
   useEffect(() => {
     loadData();
@@ -1017,7 +1025,11 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
             {holdingCheck.status === 'gross'
               ? `이 배당은 세전 금액 같아요 — ${holdingCheck.app_qty.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}주 × 주당 배당과 맞아요.`
               : `이 배당으로 보면 그때 약 ${holdingCheck.implied.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}주인데 앱은 ${holdingCheck.app_qty.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}주예요.${
-                  holdingCheck.status === 'short' ? ' 소수점 매수 기록이 빠진 것 같아요.' : ' 매수 날짜가 실제보다 이르거나 매도 기록이 빠졌을 수 있어요.'
+                  holdingCheck.status === 'short'
+                    ? ' 소수점 매수 기록이 빠진 것 같아요.'
+                    : holdingCheck.fractional
+                      ? ' 온주·소수점 배당을 따로 받는다면 나머지 배당도 기록하면 맞아요.'
+                      : ' 매수 날짜가 실제보다 이르거나 매도 기록이 빠졌을 수 있어요.'
                 }`}
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -1233,6 +1245,19 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                   <p className="mt-1 text-[11px] text-zinc-500">세금을 뺀, 계좌에 실제로 들어온 금액</p>
                 </div>
               </div>
+              {sameRound.length > 0 && (
+                <p className="rounded-xl border border-sky-400/25 bg-sky-500/[0.07] px-3.5 py-2.5 text-[12px] leading-relaxed text-sky-100">
+                  같은 회차로 보이는 배당이 이미 있어요:{' '}
+                  {sameRound
+                    .map((d) => {
+                      const net = d.amount - (d.tax || 0);
+                      const day = new Date(d.date);
+                      return `${day.getMonth() + 1}/${day.getDate()} ${d.currency === 'KRW' ? `₩${Math.round(net).toLocaleString('ko-KR')}` : `$${net.toFixed(2)}`}${d.notes ? ` (${d.notes})` : ''}`;
+                    })
+                    .join(', ')}
+                  . 온주·소수점처럼 나눠 받은 거면 그대로 기록하세요 — 보유 수량 확인은 합쳐서 봅니다 (메모에 '온주'·'소수점'을 적어 두면 구분하기 좋아요). 같은 배당을 두 번 넣는 거라면 기록하지 마세요.
+                </p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="field-label">통화</label>

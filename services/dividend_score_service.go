@@ -742,13 +742,17 @@ func missingRecords(a *divScoreAsset, accounts map[uint]models.Account, now time
 	sort.Slice(market, func(i, j int) bool { return market[i].Time < market[j].Time })
 	var out []MissingDividend
 	for _, acc := range a.acctIDs {
-		var recs []time.Time
+		var accRecs []models.Dividend
 		for _, r := range a.records {
 			if r.AccountID == acc {
-				recs = append(recs, r.Date)
+				accRecs = append(accRecs, r)
 			}
 		}
-		sort.Slice(recs, func(i, j int) bool { return recs[i].Before(recs[j]) })
+		// 한 회차를 나눠 받은 배당(온주·소수점 등)은 한 건으로 — 아니면 남는 기록이 앞 회차를 채워 정말 빠진 회차가 가려진다
+		var recs []time.Time
+		for _, g := range groupPayments(accRecs) {
+			recs = append(recs, g.last().Date)
+		}
 		start := from
 		if s := a.recordStart(acc, recs); s.After(start) {
 			start = s

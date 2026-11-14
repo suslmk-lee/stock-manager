@@ -512,3 +512,14 @@ body {
     --beam-angle: 300deg;
   }
 }
+
+/* 브랜드 마크: 밝은 테마에서는 밝은 타일 버전 */
+.brand-mark-light {
+  display: none;
+}
+:root[data-theme-mode='light'] .brand-mark-dark {
+  display: none;
+}
+:root[data-theme-mode='light'] .brand-mark-light {
+  display: block;
+}

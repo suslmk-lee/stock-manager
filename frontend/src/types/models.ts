@@ -887,6 +887,11 @@ export interface HoldingCheck {
   /** 빠진 매수를 넣을 기본 날짜 (배당락 전날) */
   buy_date: string;
   notes: string;
+  /** 한 회차를 나눠 받은 배당(온주·소수점 등)을 합친 기록 수 */
+  records: number;
+  dividend_ids: number[];
+  /** 앱 수량에 소수점이 있다 (온주·소수점 배당을 나눠 받을 수 있는 계좌) */
+  fractional: boolean;
 }
 
 export interface DivScoreRanking {

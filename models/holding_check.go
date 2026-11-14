@@ -36,6 +36,10 @@ type HoldingCheck struct {
 	Recurring     bool    `json:"recurring"`              // 최근 회차마다 배당으로 본 수량이 늘었다 (정기 소액 매수로 보임)
 	BuyDate       string  `json:"buy_date"`               // 빠진 매수를 넣을 기본 날짜 (배당락 전날)
 	Notes         string  `json:"notes"`                  // 기록 메모 (세후로 고칠 때 그대로 둔다)
+	// 한 회차를 나눠 받은 배당(온주·소수점 등)은 합쳐서 본다: 합친 기록 수와 그 기록들 (DividendID 는 가장 늦은 것)
+	Records     int    `json:"records"`
+	DividendIDs []uint `json:"dividend_ids"`
+	Fractional  bool   `json:"fractional"` // 앱 수량에 소수점이 있다 (소수점 모으기 등 — 배당을 온주·소수점으로 나눠 받을 수 있다)
 
 	RecordedAt time.Time `json:"-"` // 기록을 저장한 시각 (알림을 조금 늦게 보내려고)
 }

@@ -31,7 +31,7 @@ export default function HoldingCheckList({ items, withTicker, onFix }: { items: 
               <span className="num block truncate text-[11px] text-zinc-500">
                 {c.status === 'gross'
                   ? `${shortDate(c.paid_on)} 배당 ${dps(c.amount, c.currency)} → 세후 ≈ ${dps(c.fixed_amount ?? 0, c.currency)}`
-                  : `${shortDate(c.paid_on)} 배당으로 약 ${qty(c.implied)}주 · 앱 ${qty(c.app_qty)}주`}
+                  : `${shortDate(c.paid_on)} 배당${c.records > 1 ? ` ${c.records}건` : ''}으로 약 ${qty(c.implied)}주 · 앱 ${qty(c.app_qty)}주`}
               </span>
             </span>
             <span className={`shrink-0 text-right text-[11.5px] ${st.cls}`}>

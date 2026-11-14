@@ -132,7 +132,7 @@ export default function HoldingFixModal({ check: c, onClose, onDone }: { check: 
               <p className="num border-t border-white/[0.06] pt-1.5 text-[11px] leading-relaxed text-zinc-500">
                 {c.status === 'gross'
                   ? `기록 ${money(c.amount)} = ${qty(c.app_qty, 4)}주 × 주당 ${money(c.per_share)} (세금 떼기 전)`
-                  : `받은 배당 ${money(c.amount)} ÷ (주당 ${money(c.per_share)} × (1 − ${taxText(c)}))`}{' '}
+                  : `받은 배당 ${money(c.amount)}${c.records > 1 ? ` (${c.records}건 합계)` : ''} ÷ (주당 ${money(c.per_share)} × (1 − ${taxText(c)}))`}{' '}
                 · {shortDate(c.ex_date)} 배당락 회차
               </p>
             </div>
@@ -181,7 +181,11 @@ export default function HoldingFixModal({ check: c, onClose, onDone }: { check: 
 
             {c.status === 'over' && (
               <p className="text-[12.5px] leading-relaxed text-zinc-300">
-                배당으로 보면 그때 {account}에는 {c.currency === 'USD' ? '약' : '많아야'} {qty(c.implied)}주가 있었어요. 여러 번에 걸쳐 산 것을 실제보다 이른 날짜로 한 번에 넣었거나, 매도 기록이 빠졌거나, 이 회차 배당을 일부만 기록한 것 같아요. 매매 기록과 배당 금액을 증권사 앱과 맞춰 보세요.
+                배당으로 보면 그때 {account}에는 {c.currency === 'USD' ? '약' : '많아야'} {qty(c.implied)}주가 있었어요.{' '}
+                {c.fractional
+                  ? '온주·소수점 배당을 따로 받는다면 한쪽이 아직 기록되지 않은 것 같아요 — 나머지 배당을 기록하면 맞아요. 그게 아니면 매수를 실제보다 이른 날짜로 넣었거나 매도 기록이 빠진 것 같아요.'
+                  : '여러 번에 걸쳐 산 것을 실제보다 이른 날짜로 한 번에 넣었거나, 매도 기록이 빠졌거나, 이 회차 배당을 일부만 기록한 것 같아요.'}{' '}
+                매매 기록과 배당 금액을 증권사 앱과 맞춰 보세요.
               </p>
             )}
 

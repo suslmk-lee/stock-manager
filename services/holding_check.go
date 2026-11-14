@@ -19,7 +19,17 @@ import (
 const (
 	holdingRecentDays = 120              // 화면·알림은 계좌마다 이 기간 안의 최근 기록 하나만 본다
 	holdingAlertGrace = 20 * time.Minute // 기록하자마자 화면에서 바로 안내하므로, 그 사이 고칠 시간을 두고 알린다
+	holdingSplitGrace = 48 * time.Hour   // 소수점이 있는 계좌에서 배당이 모자라 보이면 (온주·소수점 중 한쪽만 기록) 이틀 기다린다
 )
+
+func containsUint(xs []uint, v uint) bool {
+	for _, x := range xs {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
 
 // holdingTax: 그 계좌·통화 배당의 원천징수율 범위 (lo~hi) 와 정확한 값인지
 //   - ISA·연금저축·IRP·DC: 떼지 않는다
@@ -58,9 +68,10 @@ func roundMinor(v float64, ccy string) float64 {
 }
 
 // judgeHolding: 세후 금액 net·주당 배당 dps 로 본 수량을 앱 수량 app 과 비교한다.
+// parts: 합친 기록 수 (온주·소수점 배당처럼 세금을 따로 떼면 반올림 차이도 그만큼).
 // canGross 면 세전 금액으로 기록했는지도 본다 (세율이 정해진 계좌에서 세금 칸 없이 기록한 것).
-func judgeHolding(net, dps, app, lo, hi float64, canGross bool, ccy string) (status string, implied, fixed float64) {
-	tol := holdingAmountTol(ccy)
+func judgeHolding(net, dps, app, lo, hi float64, canGross bool, ccy string, parts int) (status string, implied, fixed float64) {
+	tol := holdingAmountTol(ccy) * float64(max(parts, 1))
 	qLo, qHi := net/(dps*(1-lo)), net/(dps*(1-hi))
 	tolQ := tol/(dps*(1-hi)) + 0.005*app
 	if app >= qLo-tolQ && app <= qHi+tolQ {
@@ -78,6 +89,57 @@ func judgeHolding(net, dps, app, lo, hi float64, canGross bool, ccy string) (sta
 		return models.HoldingCheckShort, qLo, 0
 	}
 	return models.HoldingCheckOver, qHi, 0
+}
+
+// holdingSplitDays: 이 날짜 차이 안의 같은 계좌 배당은 한 회차를 나눠 받은 것으로 본다 (온주·소수점 배당 등).
+// 매주 주는 ETF 도 회차 사이가 7일이라 섞이지 않는다.
+const holdingSplitDays = 5
+
+// paymentGroup: 한 회차로 묶은 배당 기록 (날짜순)
+type paymentGroup []models.Dividend
+
+func (g paymentGroup) last() models.Dividend { return g[len(g)-1] }
+
+func (g paymentGroup) net() float64 {
+	sum := 0.0
+	for _, r := range g {
+		sum += r.Amount - r.Tax
+	}
+	return sum
+}
+
+func (g paymentGroup) ids() []uint {
+	out := make([]uint, len(g))
+	for i, r := range g {
+		out[i] = r.ID
+	}
+	return out
+}
+
+// recordedAt: 묶음 중 가장 늦게 저장한 시각
+func (g paymentGroup) recordedAt() time.Time {
+	var t time.Time
+	for _, r := range g {
+		if r.CreatedAt.After(t) {
+			t = r.CreatedAt
+		}
+	}
+	return t
+}
+
+// groupPayments: 한 계좌의 기록을 날짜순으로 묶는다 — 묶음의 첫 기록에서 holdingSplitDays 안이면 같은 회차
+func groupPayments(recs []models.Dividend) []paymentGroup {
+	sorted := append([]models.Dividend(nil), recs...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Date.Before(sorted[j].Date) })
+	var out []paymentGroup
+	for _, r := range sorted {
+		if n := len(out); n > 0 && r.Date.Sub(out[n-1][0].Date) <= holdingSplitDays*24*time.Hour {
+			out[n-1] = append(out[n-1], r)
+			continue
+		}
+		out = append(out, paymentGroup{r})
+	}
+	return out
 }
 
 // pairRecordsByRound: 회차(배당락일, 오래된 것부터)와 기록 날짜(오래된 것부터)를 짝짓는다 — 최근 회차부터 거꾸로, 회차마다 기간 안의 가장 늦은 기록.
@@ -121,11 +183,18 @@ func holdingChecks(a *divScoreAsset, accounts map[uint]models.Account) map[uint]
 		}
 	}
 	out := map[uint][]models.HoldingCheck{}
-	for accID, recs := range byAcc {
-		sort.SliceStable(recs, func(i, j int) bool { return recs[i].Date.Before(recs[j].Date) })
-		dates := make([]time.Time, len(recs))
-		for i, r := range recs {
-			dates[i] = r.Date
+	for accID, all := range byAcc {
+		var recs []models.Dividend
+		for _, r := range all {
+			if r.Amount-r.Tax > 0 && strings.EqualFold(strings.TrimSpace(r.Currency), ccy) {
+				recs = append(recs, r)
+			}
+		}
+		// 같은 회차를 나눠 받은 배당(온주·소수점 등)은 하나로 합친 뒤 회차와 짝짓는다
+		groups := groupPayments(recs)
+		dates := make([]time.Time, len(groups))
+		for i, g := range groups {
+			dates[i] = g.last().Date
 		}
 		pair := pairRecordsByRound(market, dates, window)
 		paired := map[int]bool{}
@@ -139,22 +208,25 @@ func holdingChecks(a *divScoreAsset, accounts map[uint]models.Account) map[uint]
 
 		var list []models.HoldingCheck
 		var raw []float64 // 회차마다 배당으로 본 수량 (가장 높은 세율 기준) — 정기 소액 매수 판단용
-		for i, r := range recs {
-			net := r.Amount - r.Tax
-			if pair[i] < 0 || net <= 0 || !strings.EqualFold(strings.TrimSpace(r.Currency), ccy) {
+		for i, g := range groups {
+			if pair[i] < 0 {
 				continue
 			}
+			net, last := g.net(), g.last()
+			parts := len(g)
 			judge := func(k int) models.HoldingCheck {
 				e := market[k]
 				ex := time.Unix(e.Time, 0)
 				app := a.qtyAt(accID, ex.AddDate(0, 0, -1))
-				st, implied, fixed := judgeHolding(net, e.Amount, app, lo, hi, exact && r.Tax == 0, ccy)
+				// 세전으로 기록했는지는 기록이 하나일 때만 (나눠 받은 것 중 어느 것인지 알 수 없다)
+				st, implied, fixed := judgeHolding(net, e.Amount, app, lo, hi, exact && parts == 1 && last.Tax == 0, ccy, parts)
 				return models.HoldingCheck{
-					DividendID: r.ID, AccountID: accID, AccountName: acc.Name, AccountBroker: acc.Broker,
+					DividendID: last.ID, AccountID: accID, AccountName: acc.Name, AccountBroker: acc.Broker,
 					AssetID: a.asset.ID, Ticker: a.asset.Ticker, AssetName: a.asset.Name,
-					PaidOn: r.Date.In(kst).Format(dateLayout), ExDate: ex.In(kst).Format(dateLayout), PerShare: e.Amount,
+					PaidOn: last.Date.In(kst).Format(dateLayout), ExDate: ex.In(kst).Format(dateLayout), PerShare: e.Amount,
 					Amount: net, Currency: ccy, TaxRate: hi, Implied: implied, AppQty: app, Status: st, FixedAmount: fixed,
-					BuyDate: ex.AddDate(0, 0, -1).In(kst).Format(dateLayout), Notes: r.Notes, RecordedAt: r.CreatedAt,
+					BuyDate: ex.AddDate(0, 0, -1).In(kst).Format(dateLayout), Notes: last.Notes, RecordedAt: g.recordedAt(),
+					Records: parts, DividendIDs: g.ids(), Fractional: math.Abs(app-math.Round(app)) > 1e-6,
 				}
 			}
 			if market[pair[i]].Amount <= 0 {
@@ -168,7 +240,7 @@ func holdingChecks(a *divScoreAsset, accounts map[uint]models.Account) map[uint]
 						continue
 					}
 					ex := time.Unix(market[k].Time, 0)
-					if r.Date.Before(ex.AddDate(0, 0, -divRecordLeadDays)) || r.Date.After(ex.AddDate(0, 0, window)) {
+					if last.Date.Before(ex.AddDate(0, 0, -divRecordLeadDays)) || last.Date.After(ex.AddDate(0, 0, window)) {
 						continue
 					}
 					if alt := judge(k); alt.Status == models.HoldingCheckOK {
@@ -236,7 +308,7 @@ func (s *DividendScoreService) CheckDividend(id uint) (*models.HoldingCheck, err
 		return nil, err
 	}
 	list := holdingChecks(a, accounts)[d.AccountID]
-	if n := len(list); n > 0 && list[n-1].DividendID == id && list[n-1].Status != models.HoldingCheckOK {
+	if n := len(list); n > 0 && containsUint(list[n-1].DividendIDs, id) && list[n-1].Status != models.HoldingCheckOK {
 		c := list[n-1]
 		return &c, nil
 	}
@@ -262,7 +334,11 @@ func (s *DividendScoreService) HoldingAlerts(enabled bool, now time.Time) ([]mod
 	var created []models.SignalEvent
 	for _, id := range ids {
 		for _, c := range latestHoldingChecks(assets[id], accounts, now) {
-			if c.Status == models.HoldingCheckOK || now.Sub(c.RecordedAt) < holdingAlertGrace {
+			grace := holdingAlertGrace
+			if c.Status == models.HoldingCheckOver && c.Fractional {
+				grace = holdingSplitGrace // 온주·소수점 배당 중 한쪽만 기록했을 수 있다 — 나머지를 기록할 시간을 둔다
+			}
+			if c.Status == models.HoldingCheckOK || now.Sub(c.RecordedAt) < grace {
 				continue
 			}
 			ev := models.SignalEvent{
@@ -328,6 +404,9 @@ func HoldingCheckMessage(c models.HoldingCheck) string {
 		}
 		return msg
 	case models.HoldingCheckOver:
+		if c.Fractional {
+			return fmt.Sprintf("%s · %s 배당으로 보면 약 %s주인데 앱은 %s주 — 온주·소수점 배당을 따로 받는다면 한쪽이 빠졌을 수 있어요. 아니면 매수를 실제보다 이른 날짜로 넣었거나 매도 기록이 빠진 것 같아요", acc, paid, holdingQty(c.Implied), holdingQty(c.AppQty))
+		}
 		return fmt.Sprintf("%s · %s 배당으로 보면 약 %s주인데 앱은 %s주 — 매수를 실제보다 이른 날짜로 넣었거나, 매도 기록이 빠졌거나, 배당을 일부만 기록한 것 같아요", acc, paid, holdingQty(c.Implied), holdingQty(c.AppQty))
 	case models.HoldingCheckGross:
 		return fmt.Sprintf("%s · %s 배당 %s은 세전 금액 같아요 — 세후 약 %s", acc, paid, holdingMoney(c.Amount, c.Currency), holdingMoney(c.FixedAmount, c.Currency))
