@@ -146,6 +146,9 @@ func commaInt(v float64) string {
 }
 
 func assetLabel(a models.Asset) string {
+	if a.Name != "" && IsFundTicker(a.Ticker) {
+		return a.Name // 펀드는 티커(FUND:…)가 아니라 이름
+	}
 	if a.Name != "" && !isKRTicker(a.Ticker) {
 		return a.Ticker
 	}
@@ -232,7 +235,11 @@ func (s *CashService) flows(account *models.Account) ([]CashFlow, error) {
 		}
 		assetCcy := tickerCurrency(t.Asset.Ticker)
 		ccy, amt, fx := settle(assetCcy, amount, t.Date)
-		detail := fmt.Sprintf("%s × %s", fmtQty(t.Quantity), fmtMoney(t.Price, assetCcy))
+		qty := fmtQty(t.Quantity)
+		if IsFundTicker(t.Asset.Ticker) {
+			qty = strings.TrimSuffix(fmtQty(math.Round(t.Quantity*100)/100), "주") + "좌"
+		}
+		detail := fmt.Sprintf("%s × %s", qty, fmtMoney(t.Price, assetCcy))
 		if t.Fee > 0 {
 			detail += " · 수수료 " + fmtMoney(t.Fee, assetCcy)
 		}
@@ -409,7 +416,7 @@ func balanceOf(accountID uint, flows []CashFlow, fx float64, today string) CashB
 		case "USD":
 			b.USD += f.Amount
 		}
-		if f.Kind == models.CashAdjust && f.Date > b.LastAdjusted {
+		if (f.Kind == models.CashAdjust || (f.Kind == models.CashInterest && strings.Contains(f.Notes, cashSyncMark))) && f.Date > b.LastAdjusted {
 			b.LastAdjusted = f.Date
 		}
 	}
@@ -714,8 +721,34 @@ type CashReconcileRequest struct {
 	Date     string  `json:"date"`    // 이 날 장 마감 기준 (기본 오늘)
 }
 
+// cashSyncMark: 잔액을 맞춘 기록의 메모 끝말 (맞춰서 남긴 이자도 '잔액을 맞춘 날'로 본다)
+const cashSyncMark = "에 맞춤"
+
 // Reconcile: 증권사 잔액과 계산 잔액의 차이를 '잔액 맞추기' 기록으로 남긴다. 차이가 없으면 nil.
 func (s *CashService) Reconcile(accountID uint, req CashReconcileRequest) (*models.CashEntry, error) {
+	return s.reconcile(accountID, req, "")
+}
+
+// ReconcileInterest: 잔액 맞추기와 같되 늘어난 차이는 '이자'로 남긴다 (퇴직연금 현금성자산처럼 설명 안 되는 차이가 이자뿐일 때).
+// label: 메모 앞말 (예: 현금성자산)
+func (s *CashService) ReconcileInterest(accountID uint, req CashReconcileRequest, label string) (*models.CashEntry, error) {
+	return s.reconcile(accountID, req, label)
+}
+
+// BalanceKRW: 한 계좌의 지금 원화 예수금 (계산 잔액)
+func (s *CashService) BalanceKRW(accountID uint) (float64, error) {
+	acc, err := s.account(accountID)
+	if err != nil {
+		return 0, err
+	}
+	flows, err := s.flows(acc)
+	if err != nil {
+		return 0, err
+	}
+	return balanceOf(acc.ID, flows, 0, todayKST(s.clock())).KRW, nil
+}
+
+func (s *CashService) reconcile(accountID uint, req CashReconcileRequest, interestLabel string) (*models.CashEntry, error) {
 	acc, err := s.account(accountID)
 	if err != nil {
 		return nil, err
@@ -748,7 +781,15 @@ func (s *CashService) Reconcile(accountID uint, req CashReconcileRequest) (*mode
 	}
 	e := models.CashEntry{
 		AccountID: accountID, Currency: req.Currency, Date: d, Kind: models.CashAdjust, Amount: diff,
-		Notes: fmt.Sprintf("증권사 잔액 %s 에 맞춤", fmtMoney(req.Balance, req.Currency)),
+		Notes: fmt.Sprintf("증권사 잔액 %s %s", fmtMoney(req.Balance, req.Currency), cashSyncMark),
+	}
+	if interestLabel != "" {
+		if diff > 0 {
+			e.Kind = models.CashInterest
+			e.Notes = fmt.Sprintf("%s 이자 (은행 앱 %s %s)", interestLabel, fmtMoney(req.Balance, req.Currency), cashSyncMark)
+		} else {
+			e.Notes = fmt.Sprintf("%s 은행 앱 %s %s", interestLabel, fmtMoney(req.Balance, req.Currency), cashSyncMark)
+		}
 	}
 	if err := s.db.Create(&e).Error; err != nil {
 		return nil, err

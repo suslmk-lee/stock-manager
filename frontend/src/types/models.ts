@@ -974,6 +974,31 @@ export interface ContributionPlanView {
   /** 자동 기록한 회차 수 · 부담금 합계 */
   rounds: number;
   paid: number;
+  /** 현금성자산: 투자하고 남은 돈 (계좌의 원화 예수금) */
+  cash: number;
+  /** 현금성자산 금리 (연 %, 0 이면 아직 안 넣음) */
+  cash_rate: number;
+  /** 마지막으로 은행 앱에 맞춘 날 (없으면 빈칸) */
+  cash_synced_on: string;
+  /** 배분 밖 보유: 이 계좌에 있지만 배분 상품이 아닌 것 */
+  others?: ContributionItemView[] | null;
+}
+
+/** 현금성자산 맞추기 결과 — 늘어난 차이는 이자, 줄어든 차이는 잔액 맞추기 (차이가 없으면 kind 빈칸) */
+export interface ContributionCashSync {
+  kind: 'interest' | 'adjust' | '';
+  amount: number;
+  cash: number;
+}
+
+/** 현금성자산으로 따로 산 것: ETF 는 수량·체결가, 펀드는 매수 금액 */
+export interface ContributionBuyRequest {
+  asset_id: number;
+  date: string;
+  amount?: number;
+  quantity?: number;
+  price?: number;
+  notes?: string;
 }
 
 export interface ContributionItemRequest {

@@ -36,6 +36,7 @@ type ContributionService struct {
 	ticker *TickerService
 	txs    *TransactionService
 	funds  *FundService
+	cash   *CashService // 현금성자산(예수금) — 없으면 0
 
 	now        func() time.Time
 	getHistory func(ticker, rangeStr string) (*PriceHistory, error)
@@ -487,6 +488,12 @@ type ContributionPlanView struct {
 	NextDate         string                 `json:"next_date"` // 다음 납입일
 	Rounds           int                    `json:"rounds"`    // 자동 기록한 회차 수
 	Paid             float64                `json:"paid"`      // 자동 기록한 부담금 합계
+	// 현금성자산: 투자하고 남은 돈 (계좌의 원화 예수금), 금리(연 %), 마지막으로 은행 앱에 맞춘 날
+	Cash         float64 `json:"cash"`
+	CashRate     float64 `json:"cash_rate"`
+	CashSyncedOn string  `json:"cash_synced_on"`
+	// 배분 밖 보유: 이 계좌에 있지만 배분 상품이 아닌 것 (현금성자산으로 따로 산 상품 등)
+	Others []ContributionItemView `json:"others"`
 }
 
 // payDay: 그달 납입일 (말일보다 크면 말일)
@@ -549,10 +556,21 @@ func (s *ContributionService) ListPlans() ([]ContributionPlanView, error) {
 	}
 	out := make([]ContributionPlanView, 0, len(plans))
 	var listed []string
+	held := map[uint][]models.Holding{} // 계좌별 보유 (배분 밖 상품을 찾으려고)
 	for _, p := range plans {
 		for _, it := range p.Items {
 			if !IsFundTicker(it.Asset.Ticker) {
 				listed = append(listed, it.Asset.Ticker)
+			}
+		}
+		if _, ok := held[p.AccountID]; !ok {
+			var hs []models.Holding
+			s.db.Preload("Asset").Where("account_id = ? AND quantity > 0", p.AccountID).Order("id").Find(&hs)
+			held[p.AccountID] = hs
+			for _, h := range hs {
+				if !IsFundTicker(h.Asset.Ticker) {
+					listed = append(listed, h.Asset.Ticker)
+				}
 			}
 		}
 	}
@@ -562,7 +580,13 @@ func (s *ContributionService) ListPlans() ([]ContributionPlanView, error) {
 	}
 	for _, p := range plans {
 		v := ContributionPlanView{ID: p.ID, AccountID: p.AccountID, Amount: p.Amount, MonthDay: p.MonthDay, Status: p.Status, StartedOn: p.StartedOn,
-			AutoFrom: p.AutoFrom, ProcessedThrough: p.ProcessedThrough, Notes: p.Notes, Account: p.Account, Items: []ContributionItemView{}}
+			AutoFrom: p.AutoFrom, ProcessedThrough: p.ProcessedThrough, Notes: p.Notes, Account: p.Account, Items: []ContributionItemView{},
+			CashRate: p.CashRate, CashSyncedOn: s.lastCashSync(p.AccountID), Others: []ContributionItemView{}}
+		if s.cash != nil {
+			if c, err := s.cash.BalanceKRW(p.AccountID); err == nil {
+				v.Cash = c
+			}
+		}
 		if p.Status == models.PlanStatusActive {
 			v.NextDate = s.nextDate(&p)
 		}
@@ -593,6 +617,28 @@ func (s *ContributionService) ListPlans() ([]ContributionPlanView, error) {
 			}
 			iv.Value = iv.Quantity * iv.Price
 			v.Items = append(v.Items, iv)
+		}
+		inPlan := map[uint]bool{}
+		for _, it := range p.Items {
+			inPlan[it.AssetID] = true
+		}
+		for _, h := range held[p.AccountID] {
+			if inPlan[h.AssetID] {
+				continue
+			}
+			iv := ContributionItemView{ContributionItem: models.ContributionItem{AssetID: h.AssetID, Asset: h.Asset}, IsFund: IsFundTicker(h.Asset.Ticker),
+				Quantity: h.Quantity, Cost: h.Quantity * h.AveragePrice}
+			if iv.IsFund {
+				var fp models.FundPrice
+				if err := s.db.Where("asset_id = ?", h.AssetID).Order("date DESC").Limit(1).Find(&fp).Error; err == nil && fp.ID != 0 {
+					iv.PriceDate = fp.Date
+				}
+				iv.Price = s.funds.BuyNav(h.AssetID, s.today())
+			} else if cp := prices[strings.ToUpper(h.Asset.Ticker)]; cp != nil {
+				iv.Price = cp.Price
+			}
+			iv.Value = iv.Quantity * iv.Price
+			v.Others = append(v.Others, iv)
 		}
 		out = append(out, v)
 	}

@@ -102,6 +102,48 @@ func registerContributionRoutes(api *gin.RouterGroup, s *Services) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
+	// 현금성자산 맞추기 (늘어난 차이는 이자)
+	api.POST("/contribution-plans/:id/cash", func(c *gin.Context) {
+		id, ok := parseProfileID(c, "id")
+		if !ok {
+			return
+		}
+		var req struct {
+			Balance float64 `json:"balance"`
+			Date    string  `json:"date"`
+			Rate    float64 `json:"rate"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		res, err := s.Contribution.SyncCash(id, req.Balance, req.Date, req.Rate)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
+	// 현금성자산으로 따로 산 상품
+	api.POST("/contribution-plans/:id/buys", func(c *gin.Context) {
+		id, ok := parseProfileID(c, "id")
+		if !ok {
+			return
+		}
+		var req services.ContributionBuyRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		res, err := s.Contribution.RecordBuy(id, req)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
 	// 펀드
 	api.POST("/funds", func(c *gin.Context) {
 		var req struct {

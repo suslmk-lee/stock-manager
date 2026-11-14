@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest, DivScoreRanking, DivScoreDetail, DivScoreWeights, ContributionPlanView, ContributionPlanRequest, ContributionRound, ContributionRunResult, FundPrice } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest, DivScoreRanking, DivScoreDetail, DivScoreWeights, ContributionPlanView, ContributionPlanRequest, ContributionRound, ContributionRunResult, FundPrice, ContributionCashSync, ContributionBuyRequest } from '../types/models';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -569,6 +569,18 @@ export const apiClient = {
   RunContributions: async (): Promise<ContributionRunResult> => {
     if (isWeb) return fetchApi<ContributionRunResult>('/contribution-plans/run', { method: 'POST' });
     return (await WailsApp.RunContributions()) as unknown as ContributionRunResult;
+  },
+
+  // 현금성자산 맞추기 — 늘어난 차이는 이자로 (rate 가 음수면 금리는 그대로)
+  SyncContributionCash: async (id: number, balance: number, date: string, rate: number): Promise<ContributionCashSync> => {
+    if (isWeb) return fetchApi<ContributionCashSync>(`/contribution-plans/${id}/cash`, { method: 'POST', body: JSON.stringify({ balance, date, rate }) });
+    return (await WailsApp.SyncContributionCash(id, balance, date, rate)) as unknown as ContributionCashSync;
+  },
+
+  // 현금성자산으로 따로 산 상품 (ETF 수량·체결가, 펀드 금액)
+  RecordContributionBuy: async (id: number, req: ContributionBuyRequest): Promise<Transaction> => {
+    if (isWeb) return fetchApi<Transaction>(`/contribution-plans/${id}/buys`, { method: 'POST', body: JSON.stringify(req) });
+    return (await WailsApp.RecordContributionBuy(id, req as unknown as Parameters<typeof WailsApp.RecordContributionBuy>[1])) as unknown as Transaction;
   },
 
   CreateFund: async (name: string, code: string): Promise<Asset> => {

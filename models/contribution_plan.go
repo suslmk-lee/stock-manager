@@ -22,6 +22,8 @@ type ContributionPlan struct {
 	Notes            string `gorm:"size:500" json:"notes"`
 	// 시작 잔고 매수만큼 그동안 들어온 부담금 입금 (예수금 기록 하나)
 	OpeningDepositID *uint `json:"opening_deposit_id,omitempty"`
+	// 투자하고 남은 돈(현금성자산)의 금리 (연 %, 표시·예상 이자용)
+	CashRate float64 `gorm:"default:0" json:"cash_rate"`
 
 	Items     []ContributionItem `gorm:"foreignKey:PlanID" json:"items"`
 	CreatedAt time.Time          `json:"created_at"`

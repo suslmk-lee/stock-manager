@@ -66,6 +66,7 @@ func NewApp() *App {
 	a.dividendScoreService = services.NewDividendScoreService(database.GetDB(), a.tickerService)
 	a.signalService.SetExtraAlerts(a.dividendScoreService.HoldingAlerts)
 	a.contributionService = services.NewContributionService(database.GetDB(), a.tickerService, a.fundService)
+	a.contributionService.SetCash(a.cashService)
 	a.updater = updater.New(appVersion)
 	return a
 }

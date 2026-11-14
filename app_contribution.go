@@ -35,6 +35,16 @@ func (a *App) RunContributions() (*services.ContributionRunResult, error) {
 	return a.contributionService.RunDue()
 }
 
+// SyncContributionCash: 은행 앱의 현금성자산에 맞춘다 (늘어난 차이는 이자). rate 가 음수면 금리는 그대로.
+func (a *App) SyncContributionCash(id uint, balance float64, date string, rate float64) (*services.ContributionCashSync, error) {
+	return a.contributionService.SyncCash(id, balance, date, rate)
+}
+
+// RecordContributionBuy: 현금성자산으로 따로 산 상품 (ETF 수량·체결가, 펀드 금액)
+func (a *App) RecordContributionBuy(id uint, req services.ContributionBuyRequest) (*models.Transaction, error) {
+	return a.contributionService.RecordBuy(id, req)
+}
+
 func (a *App) CreateFund(name, code string) (*models.Asset, error) {
 	return a.fundService.CreateFund(name, code)
 }
