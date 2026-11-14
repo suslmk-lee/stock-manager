@@ -949,6 +949,11 @@ export interface ContributionItemView extends ContributionItem {
   /** 펀드: 마지막으로 평가금액을 맞춘 날 */
   price_date: string;
   value: number;
+  /** 시작 잔고 (고치기 화면에 채워 둔다): ETF 수량·평균 단가, 펀드 원금·평가금액 */
+  opening_qty: number;
+  opening_avg: number;
+  opening_cost: number;
+  opening_value: number;
 }
 
 export interface ContributionPlanView {
@@ -974,7 +979,7 @@ export interface ContributionPlanView {
 export interface ContributionItemRequest {
   asset_id: number;
   weight: number;
-  /** 시작 잔고 (새로 만들 때만): ETF 는 수량·평균 단가, 펀드는 원금·평가금액 */
+  /** 시작 잔고: ETF 는 수량·평균 단가, 펀드는 원금·평가금액 (고칠 때는 openings 가 true 일 때만 반영) */
   opening_qty?: number;
   opening_avg?: number;
   opening_cost?: number;
@@ -990,6 +995,8 @@ export interface ContributionPlanRequest {
   auto_from?: string;
   notes?: string;
   items: ContributionItemRequest[];
+  /** 고칠 때: 시작 잔고도 items 의 값으로 맞춘다 (바뀐 상품만 다시 기록, 비우면 지움) */
+  openings?: boolean;
 }
 
 export interface ContributionRound {

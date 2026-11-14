@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../api/client';
-import type { Account, Asset, ContributionPlanView, ContributionPlanRequest } from '../../types/models';
+import type { Account, Asset, ContributionItemView, ContributionPlanView, ContributionPlanRequest } from '../../types/models';
 import Portal from '../ui/Portal';
 import DatePicker from '../ui/DatePicker';
 import AccountSelect from '../ui/AccountSelect';
@@ -9,8 +9,9 @@ import { assetPrimary, assetSecondary, isFundTicker, isKRTicker } from '../../ut
 import { fmtCcy } from '../../utils/fx';
 
 /**
- * 부담금 배분 만들기·고치기 — 계좌, 매달 부담금·납입일, 상품별 비율(합 100%).
- * 새로 만들 때만: 자동 기록 시작일과, 그 전까지 쌓인 시작 잔고(ETF 수량·평균 단가 / 펀드 원금·평가금액).
+ * 부담금 배분 만들기·고치기 — 계좌, 매달 부담금·납입일, 상품별 비율(합 100%),
+ * 자동 기록 시작일과 그 전까지 쌓인 시작 잔고(ETF 수량·평균 단가 / 펀드 원금·평가금액).
+ * 고칠 때도 시작 잔고를 넣고 고칠 수 있다 (처음에 한 상품만 넣고 나머지를 고치기로 더해 시작해도 된다).
  */
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '저장하지 못했습니다.');
@@ -24,7 +25,7 @@ interface Row {
   key: number;
   assetId: number;
   weight: string;
-  // 시작 잔고 (새로 만들 때만)
+  // 시작 잔고
   qty: string;
   avg: string;
   cost: string;
@@ -33,6 +34,15 @@ interface Row {
 
 let seq = 0;
 const emptyRow = (assetId = 0, weight = ''): Row => ({ key: ++seq, assetId, weight, qty: '', avg: '', cost: '', value: '' });
+const numText = (v: number | undefined) => (v && v > 0 ? String(Math.round(v * 10000) / 10000) : '');
+// 고칠 때: 지금 시작 잔고를 채워 둔다
+const rowOf = (it: ContributionItemView): Row => ({
+  ...emptyRow(it.asset_id, String(it.weight)),
+  qty: numText(it.opening_qty),
+  avg: numText(it.opening_avg),
+  cost: numText(it.opening_cost),
+  value: numText(it.opening_value),
+});
 
 export default function PensionForm({ plan, accounts, onClose, onSaved }: { plan: ContributionPlanView | null; accounts: Account[]; onClose: () => void; onSaved: (id?: number) => void }) {
   const editing = plan != null;
@@ -48,7 +58,9 @@ export default function PensionForm({ plan, accounts, onClose, onSaved }: { plan
   const [monthDay, setMonthDay] = useState(plan ? String(plan.month_day) : '25');
   const [autoFrom, setAutoFrom] = useState(plan?.auto_from ?? tomorrow);
   const [notes, setNotes] = useState(plan?.notes ?? '');
-  const [rows, setRows] = useState<Row[]>(() => (plan ? plan.items.map((it) => emptyRow(it.asset_id, String(it.weight))) : [emptyRow()]));
+  const [rows, setRows] = useState<Row[]>(() => (plan ? plan.items.map(rowOf) : [emptyRow()]));
+  // 자동 기록한 회차가 있으면 시작 잔고 날짜는 그대로 (자동 기록 시작일을 옮겨도)
+  const locked = editing && (plan?.rounds ?? 0) > 0;
   const [assets, setAssets] = useState<Asset[]>([]);
   // 같은 코드 찾기용 전체 목록 (꼬리표가 다르거나 없는 옛 기록까지)
   const [allAssets, setAllAssets] = useState<Asset[]>([]);
@@ -156,10 +168,14 @@ export default function PensionForm({ plan, accounts, onClose, onSaved }: { plan
       started_on: ymd(start),
       notes,
       status: plan?.status,
+      openings: true,
       items: filled.map((r) => ({
         asset_id: r.assetId,
         weight: num(r.weight),
-        ...(editing ? {} : { opening_qty: num(r.qty) || 0, opening_avg: num(r.avg) || 0, opening_cost: num(r.cost) || 0, opening_value: num(r.value) || 0 }),
+        opening_qty: num(r.qty) || 0,
+        opening_avg: num(r.avg) || 0,
+        opening_cost: num(r.cost) || 0,
+        opening_value: num(r.value) || 0,
       })),
     };
     setBusy(true);
@@ -258,19 +274,23 @@ export default function PensionForm({ plan, accounts, onClose, onSaved }: { plan
                         </button>
                       </div>
                       {share && <p className="num mt-1 text-[11px] text-zinc-500">매달 {share}{a && !fund ? ' · ETF 는 1주 단위로 사고 남는 돈은 예수금' : ''}</p>}
-                      {!editing && a && (
+                      {a && (
                         <div className="mt-2 grid grid-cols-2 gap-2">
-                          {fund ? (
-                            <>
-                              <input inputMode="numeric" className="input-field num !py-1.5 !text-xs" value={r.cost} onChange={(e) => setRow(r.key, { cost: e.target.value })} placeholder="지금까지 원금 (원, 선택)" />
-                              <input inputMode="numeric" className="input-field num !py-1.5 !text-xs" value={r.value} onChange={(e) => setRow(r.key, { value: e.target.value })} placeholder="지금 평가금액 (원, 선택)" />
-                            </>
-                          ) : (
-                            <>
-                              <input inputMode="decimal" className="input-field num !py-1.5 !text-xs" value={r.qty} onChange={(e) => setRow(r.key, { qty: e.target.value })} placeholder="지금 보유 수량 (선택)" />
-                              <input inputMode="numeric" className="input-field num !py-1.5 !text-xs" value={r.avg} onChange={(e) => setRow(r.key, { avg: e.target.value })} placeholder="평균 단가 (원, 선택)" />
-                            </>
-                          )}
+                          {(fund
+                            ? [
+                                { k: 'cost' as const, label: '시작 원금 (원)', ph: '지금까지 원금 (선택)', mode: 'numeric' as const },
+                                { k: 'value' as const, label: '시작 평가금액 (원)', ph: '지금 평가금액 (선택)', mode: 'numeric' as const },
+                              ]
+                            : [
+                                { k: 'qty' as const, label: '시작 보유 수량', ph: '지금 보유 수량 (선택)', mode: 'decimal' as const },
+                                { k: 'avg' as const, label: '평균 단가 (원)', ph: '평균 단가 (선택)', mode: 'numeric' as const },
+                              ]
+                          ).map((f) => (
+                            <label key={f.k} className="block">
+                              <span className="mb-0.5 block text-[10.5px] text-zinc-500">{f.label}</span>
+                              <input inputMode={f.mode} className="input-field num !py-1.5 !text-xs" value={r[f.k]} onChange={(e) => setRow(r.key, { [f.k]: e.target.value })} placeholder={f.ph} />
+                            </label>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -281,11 +301,19 @@ export default function PensionForm({ plan, accounts, onClose, onSaved }: { plan
                 <Plus className="h-3.5 w-3.5" />
                 상품 줄 더하기
               </button>
-              {!editing && (
-                <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-                  시작 잔고는 자동 기록 시작일 <b className="font-medium text-zinc-300">전날까지</b> 쌓인 것을 은행 앱에서 보고 넣으세요. 이미 이 계좌에 보유를 기록해 두었다면 비워 두면 됩니다. 펀드는 원금으로 좌수를, 평가금액으로 기준가를 정합니다.
-                </p>
-              )}
+              <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+                {locked ? (
+                  <>
+                    시작 잔고는 <b className="font-medium text-zinc-300">{plan!.started_on}</b> 기준입니다 (자동 기록한 회차가 있어 날짜는 그대로 둡니다).
+                  </>
+                ) : (
+                  <>
+                    시작 잔고는 자동 기록 시작일 <b className="font-medium text-zinc-300">전날까지</b> 쌓인 것을 은행 앱에서 보고 넣으세요.
+                  </>
+                )}{' '}
+                {editing ? '고친 상품만 시작 잔고 매수를 다시 기록하고, 비우면 지웁니다. ' : '이미 이 계좌에 보유를 기록해 두었다면 비워 두면 됩니다. '}
+                펀드는 원금으로 좌수를, 평가금액으로 기준가를 정합니다.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-3 rounded-xl border border-dashed border-white/[0.1] p-3 sm:grid-cols-2">

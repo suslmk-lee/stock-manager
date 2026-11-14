@@ -24,9 +24,11 @@ import (
 // 서버와 앱이 함께 돌아도 같은 회차는 한 번만 기록된다 (입금·매수의 고유 인덱스).
 
 const (
-	contribDepositNote = "부담금 입금"
-	contribBuyNote     = "부담금 배분"
-	contribQtyStep     = 0.0001 // 펀드 좌수 단위
+	contribDepositNote        = "부담금 입금"
+	contribBuyNote            = "부담금 배분"
+	contribOpeningNote        = "부담금 배분 시작 잔고"
+	contribOpeningDepositNote = "부담금 배분 시작 잔고 (그동안 들어온 부담금)"
+	contribQtyStep            = 0.0001 // 펀드 좌수 단위
 )
 
 type ContributionService struct {
@@ -55,7 +57,7 @@ func (s *ContributionService) today() string { return todayKST(s.now()) }
 type ContributionItemRequest struct {
 	AssetID uint    `json:"asset_id"`
 	Weight  float64 `json:"weight"` // %
-	// 시작 잔고 (선택, 새로 만들 때만): ETF·주식은 보유 수량·평균 단가, 펀드는 원금·평가금액
+	// 시작 잔고 (선택): ETF·주식은 보유 수량·평균 단가, 펀드는 원금·평가금액 — 고칠 때는 Openings 가 true 일 때만 본다
 	OpeningQty   float64 `json:"opening_qty"`
 	OpeningAvg   float64 `json:"opening_avg"`
 	OpeningCost  float64 `json:"opening_cost"`
@@ -71,6 +73,8 @@ type ContributionPlanRequest struct {
 	AutoFrom  string                    `json:"auto_from"`  // 이 날부터의 회차를 자동 기록 (기본 내일 — 다음 회차부터)
 	Notes     string                    `json:"notes"`
 	Items     []ContributionItemRequest `json:"items"`
+	// 고칠 때: true 면 시작 잔고도 Items 의 값으로 맞춘다 (바뀐 상품만 매수 기록을 다시 만들고, 비우면 지운다)
+	Openings bool `json:"openings"`
 }
 
 func (s *ContributionService) validate(req *ContributionPlanRequest) (map[uint]models.Asset, error) {
@@ -148,48 +152,216 @@ func (s *ContributionService) CreatePlan(req ContributionPlanRequest) (*models.C
 		return nil, err
 	}
 	// 시작 잔고 — 매수로 남기고, 그 돈만큼 그동안 들어온 부담금 입금도 함께 (안 그러면 예수금이 그만큼 마이너스가 된다)
-	day, _ := parseDay(req.StartedOn)
-	openingPaid := 0.0
-	for _, it := range req.Items {
-		if IsFundTicker(assets[it.AssetID].Ticker) {
-			if it.OpeningCost > 0 {
-				openingPaid += it.OpeningCost
-			}
-		} else if it.OpeningQty > 0 && it.OpeningAvg > 0 {
-			openingPaid += it.OpeningQty * it.OpeningAvg
-		}
+	created, err := s.getPlan(plan.ID)
+	if err != nil {
+		return nil, err
 	}
-	if openingPaid > 0 {
-		dep := models.CashEntry{AccountID: req.AccountID, Currency: "KRW", Date: day, Kind: models.CashDeposit, Amount: openingPaid, Notes: "부담금 배분 시작 잔고 (그동안 들어온 부담금)"}
-		if err := s.db.Create(&dep).Error; err != nil {
-			return nil, err
-		}
-	}
-	for _, it := range req.Items {
-		a := assets[it.AssetID]
-		if IsFundTicker(a.Ticker) {
-			if it.OpeningCost > 0 {
-				units := math.Floor(it.OpeningCost/fundStartNav/contribQtyStep) * contribQtyStep
-				if units > 0 {
-					if _, err := s.txs.CreateTransaction(CreateTransactionRequest{AccountID: req.AccountID, AssetID: a.ID, Type: models.TransactionTypeBuy,
-						Date: day, Price: it.OpeningCost / units, Quantity: units, Notes: "부담금 배분 시작 잔고 (원금)"}); err != nil {
-						return nil, err
-					}
-					if it.OpeningValue > 0 {
-						if err := s.funds.SetNav(a.ID, req.StartedOn, it.OpeningValue/units, "opening"); err != nil {
-							return nil, err
-						}
-					}
-				}
-			}
-		} else if it.OpeningQty > 0 && it.OpeningAvg > 0 {
-			if _, err := s.txs.CreateTransaction(CreateTransactionRequest{AccountID: req.AccountID, AssetID: a.ID, Type: models.TransactionTypeBuy,
-				Date: day, Price: it.OpeningAvg, Quantity: it.OpeningQty, Notes: "부담금 배분 시작 잔고"}); err != nil {
-				return nil, err
-			}
-		}
+	if err := s.syncOpenings(created, req, assets, req.StartedOn); err != nil {
+		return nil, err
 	}
 	return s.getPlan(plan.ID)
+}
+
+// contribOpening: 상품 하나의 시작 잔고 (연결된 매수 기록)
+type contribOpening struct {
+	tx                    models.Transaction
+	qty, avg, cost, value float64
+}
+
+// openingPaid: 시작 잔고로 들어간 돈 (ETF 수량 × 평균 단가, 펀드 원금)
+func openingPaid(a models.Asset, it ContributionItemRequest) float64 {
+	if IsFundTicker(a.Ticker) {
+		if it.OpeningCost > 0 {
+			return it.OpeningCost
+		}
+		return 0
+	}
+	if it.OpeningQty > 0 && it.OpeningAvg > 0 {
+		return it.OpeningQty * it.OpeningAvg
+	}
+	return 0
+}
+
+// openings: 계획의 상품별 시작 잔고 — 연결된 매수 기록, 연결 전에 만든 계획은 메모·날짜로 찾는다
+func (s *ContributionService) openings(p *models.ContributionPlan) map[uint]contribOpening {
+	out := map[uint]contribOpening{}
+	for _, it := range p.Items {
+		var tx models.Transaction
+		found := false
+		if it.OpeningTxID != nil {
+			found = s.db.First(&tx, *it.OpeningTxID).Error == nil
+		} else {
+			var cands []models.Transaction
+			s.db.Where("account_id = ? AND asset_id = ? AND contrib_plan_id IS NULL AND notes LIKE ?", p.AccountID, it.AssetID, contribOpeningNote+"%").Order("id").Find(&cands)
+			for _, c := range cands {
+				if dayString(c.Date) == p.StartedOn {
+					tx, found = c, true
+					break
+				}
+			}
+		}
+		if !found {
+			continue
+		}
+		o := contribOpening{tx: tx}
+		if IsFundTicker(it.Asset.Ticker) {
+			o.cost = tx.Quantity * tx.Price
+			var fp models.FundPrice
+			if s.db.Where("asset_id = ? AND date = ? AND source = ?", it.AssetID, p.StartedOn, "opening").Limit(1).Find(&fp).Error == nil && fp.ID != 0 {
+				o.value = fp.Nav * tx.Quantity
+			}
+		} else {
+			o.qty, o.avg = tx.Quantity, tx.Price
+		}
+		out[it.AssetID] = o
+	}
+	return out
+}
+
+// openingDeposit: 시작 잔고 입금 기록 (연결 전에 만든 계획은 메모·날짜로 찾는다)
+func (s *ContributionService) openingDeposit(p *models.ContributionPlan) *models.CashEntry {
+	if p.OpeningDepositID != nil {
+		var e models.CashEntry
+		if s.db.First(&e, *p.OpeningDepositID).Error == nil {
+			return &e
+		}
+		return nil
+	}
+	var cands []models.CashEntry
+	s.db.Where("account_id = ? AND kind = ? AND notes = ? AND contrib_plan_id IS NULL", p.AccountID, models.CashDeposit, contribOpeningDepositNote).Order("id").Find(&cands)
+	for i := range cands {
+		if dayString(cands[i].Date) == p.StartedOn {
+			return &cands[i]
+		}
+	}
+	return nil
+}
+
+// hasRounds: 자동 기록한 회차가 있는지 (있으면 시작 잔고 날짜는 옮기지 않는다)
+func (s *ContributionService) hasRounds(planID uint) bool {
+	var n, m int64
+	s.db.Model(&models.CashEntry{}).Where("contrib_plan_id = ?", planID).Count(&n)
+	s.db.Model(&models.Transaction{}).Where("contrib_plan_id = ?", planID).Count(&m)
+	return n+m > 0
+}
+
+// syncOpenings: 시작 잔고를 req 의 값으로 맞춘다 — 바뀐 상품만 매수 기록을 다시 만들고(비우면 지운다), 입금 하나를 합계로.
+// p.Items 에 계획에서 뺀 상품이 있으면 그 시작 잔고는 실제 보유라 그대로 두고 입금 합계에도 남긴다. day: 시작 잔고 날짜.
+func (s *ContributionService) syncOpenings(p *models.ContributionPlan, req ContributionPlanRequest, assets map[uint]models.Asset, day string) error {
+	t, ok := parseDay(day)
+	if !ok {
+		return planInputErr("시작 잔고 날짜가 올바르지 않습니다")
+	}
+	old := s.openings(p)
+	moved := day != p.StartedOn
+	links := map[uint]*uint{}
+	total := 0.0
+	inReq := map[uint]bool{}
+	for _, it := range req.Items {
+		inReq[it.AssetID] = true
+		a := assets[it.AssetID]
+		fund := IsFundTicker(a.Ticker)
+		paid := openingPaid(a, it)
+		total += paid
+		o, had := old[it.AssetID]
+		if had && !moved {
+			if fund && paid > 0 && math.Abs(o.cost-paid) < 0.5 {
+				// 원금이 같으면 매수는 그대로, 평가금액만 기준가로
+				if math.Abs(o.value-it.OpeningValue) >= 0.5 {
+					if err := s.setOpeningNav(a.ID, day, it.OpeningValue, o.tx.Quantity); err != nil {
+						return err
+					}
+				}
+				id := o.tx.ID
+				links[it.AssetID] = &id
+				continue
+			}
+			if !fund && paid > 0 && math.Abs(o.qty-it.OpeningQty) < 1e-9 && math.Abs(o.avg-it.OpeningAvg) < 1e-6 {
+				id := o.tx.ID
+				links[it.AssetID] = &id
+				continue
+			}
+		}
+		if had {
+			if err := s.txs.DeleteTransaction(o.tx.ID); err != nil {
+				return err
+			}
+			if fund {
+				if err := s.db.Where("asset_id = ? AND date = ? AND source = ?", a.ID, p.StartedOn, "opening").Delete(&models.FundPrice{}).Error; err != nil {
+					return err
+				}
+			}
+		}
+		if paid <= 0 {
+			continue
+		}
+		var tx *models.Transaction
+		var err error
+		if fund {
+			units := math.Floor(it.OpeningCost/fundStartNav/contribQtyStep) * contribQtyStep
+			if units <= 0 {
+				continue
+			}
+			tx, err = s.txs.CreateTransaction(CreateTransactionRequest{AccountID: p.AccountID, AssetID: a.ID, Type: models.TransactionTypeBuy,
+				Date: t, Price: it.OpeningCost / units, Quantity: units, Notes: contribOpeningNote + " (원금)"})
+			if err == nil {
+				err = s.setOpeningNav(a.ID, day, it.OpeningValue, units)
+			}
+		} else {
+			tx, err = s.txs.CreateTransaction(CreateTransactionRequest{AccountID: p.AccountID, AssetID: a.ID, Type: models.TransactionTypeBuy,
+				Date: t, Price: it.OpeningAvg, Quantity: it.OpeningQty, Notes: contribOpeningNote})
+		}
+		if err != nil {
+			return err
+		}
+		id := tx.ID
+		links[it.AssetID] = &id
+	}
+	for assetID, o := range old {
+		if !inReq[assetID] {
+			total += o.tx.Quantity * o.tx.Price
+		}
+	}
+
+	// 입금 하나를 합계로 (없던 시작 잔고가 생기면 만들고, 모두 비우면 지운다)
+	var depID *uint
+	dep := s.openingDeposit(p)
+	switch {
+	case total > 0 && dep != nil:
+		if err := s.db.Model(&models.CashEntry{}).Where("id = ?", dep.ID).Updates(map[string]interface{}{"amount": total, "date": t}).Error; err != nil {
+			return err
+		}
+		id := dep.ID
+		depID = &id
+	case total > 0:
+		e := models.CashEntry{AccountID: p.AccountID, Currency: "KRW", Date: t, Kind: models.CashDeposit, Amount: total, Notes: contribOpeningDepositNote}
+		if err := s.db.Create(&e).Error; err != nil {
+			return err
+		}
+		depID = &e.ID
+	case dep != nil:
+		if err := s.db.Delete(&models.CashEntry{}, dep.ID).Error; err != nil {
+			return err
+		}
+	}
+
+	// 연결을 남긴다 (상품 줄과 계획)
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		for _, it := range p.Items {
+			if err := tx.Model(&models.ContributionItem{}).Where("id = ?", it.ID).Update("opening_tx_id", links[it.AssetID]).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Model(&models.ContributionPlan{}).Where("id = ?", p.ID).Updates(map[string]interface{}{"opening_deposit_id": depID, "started_on": day}).Error
+	})
+}
+
+// setOpeningNav: 시작 잔고 평가금액으로 그날 기준가 (평가금액이 없으면 지운다)
+func (s *ContributionService) setOpeningNav(assetID uint, day string, value, units float64) error {
+	if value > 0 && units > 0 {
+		return s.funds.SetNav(assetID, day, value/units, "opening")
+	}
+	return s.db.Where("asset_id = ? AND date = ? AND source = ?", assetID, day, "opening").Delete(&models.FundPrice{}).Error
 }
 
 func (s *ContributionService) getPlan(id uint) (*models.ContributionPlan, error) {
@@ -207,8 +379,13 @@ func (s *ContributionService) UpdatePlan(id uint, req ContributionPlanRequest) (
 		return nil, err
 	}
 	req.AccountID = cur.AccountID // 계좌는 바꾸지 않는다
-	if _, err := s.validate(&req); err != nil {
+	assets, err := s.validate(&req)
+	if err != nil {
 		return nil, err
+	}
+	carry := map[uint]*uint{} // 상품 줄을 다시 만들어도 시작 잔고 연결은 이어 간다
+	for _, it := range cur.Items {
+		carry[it.AssetID] = it.OpeningTxID
 	}
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		upd := map[string]interface{}{"amount": req.Amount, "month_day": req.MonthDay, "notes": strings.TrimSpace(req.Notes)}
@@ -225,7 +402,7 @@ func (s *ContributionService) UpdatePlan(id uint, req ContributionPlanRequest) (
 			return err
 		}
 		for _, it := range req.Items {
-			if err := tx.Create(&models.ContributionItem{PlanID: id, AssetID: it.AssetID, Weight: it.Weight}).Error; err != nil {
+			if err := tx.Create(&models.ContributionItem{PlanID: id, AssetID: it.AssetID, Weight: it.Weight, OpeningTxID: carry[it.AssetID]}).Error; err != nil {
 				return err
 			}
 		}
@@ -234,7 +411,37 @@ func (s *ContributionService) UpdatePlan(id uint, req ContributionPlanRequest) (
 	if err != nil {
 		return nil, err
 	}
+	if req.Openings {
+		// 시작 잔고 날짜는 자동 기록한 회차가 아직 없을 때만 옮긴다
+		day := cur.StartedOn
+		if req.StartedOn != "" && req.StartedOn != cur.StartedOn && !s.hasRounds(id) {
+			day = req.StartedOn
+		}
+		p, err := s.getPlan(id)
+		if err != nil {
+			return nil, err
+		}
+		// 계획에서 뺀 상품의 예전 시작 잔고도 보이게 예전 상품 줄을 함께 넘긴다 (그대로 두고 입금 합계에 남긴다)
+		for _, it := range cur.Items {
+			if !containsAsset(p.Items, it.AssetID) {
+				p.Items = append(p.Items, it)
+			}
+		}
+		p.StartedOn = cur.StartedOn
+		if err := s.syncOpenings(p, req, assets, day); err != nil {
+			return nil, err
+		}
+	}
 	return s.getPlan(id)
+}
+
+func containsAsset(items []models.ContributionItem, assetID uint) bool {
+	for _, it := range items {
+		if it.AssetID == assetID {
+			return true
+		}
+	}
+	return false
 }
 
 // DeletePlan: 부담금 배분을 지운다. 이미 기록된 입금·매수는 실제 내역이라 그대로 둔다.
@@ -257,6 +464,11 @@ type ContributionItemView struct {
 	Price     float64 `json:"price"`      // 현재가 · 펀드는 마지막 기준가
 	PriceDate string  `json:"price_date"` // 펀드: 마지막으로 평가금액을 맞춘 날
 	Value     float64 `json:"value"`
+	// 시작 잔고 (고치기 화면에 채워 둔다): ETF 수량·평균 단가, 펀드 원금·평가금액
+	OpeningQty   float64 `json:"opening_qty"`
+	OpeningAvg   float64 `json:"opening_avg"`
+	OpeningCost  float64 `json:"opening_cost"`
+	OpeningValue float64 `json:"opening_value"`
 }
 
 // ContributionPlanView: 목록용 (계획을 내장하지 않고 필드를 풀어 둔다 — 내장하면 Wails 타입 생성에서 items 가 겹친다)
@@ -360,8 +572,12 @@ func (s *ContributionService) ListPlans() ([]ContributionPlanView, error) {
 		for _, d := range deps {
 			v.Paid += d.Amount
 		}
+		opening := s.openings(&p)
 		for _, it := range p.Items {
 			iv := ContributionItemView{ContributionItem: it, IsFund: IsFundTicker(it.Asset.Ticker)}
+			if o, ok := opening[it.AssetID]; ok {
+				iv.OpeningQty, iv.OpeningAvg, iv.OpeningCost, iv.OpeningValue = o.qty, o.avg, o.cost, o.value
+			}
 			var h models.Holding
 			if err := s.db.Where("account_id = ? AND asset_id = ?", p.AccountID, it.AssetID).First(&h).Error; err == nil {
 				iv.Quantity, iv.Cost = h.Quantity, h.Quantity*h.AveragePrice

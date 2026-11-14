@@ -20,6 +20,8 @@ type ContributionPlan struct {
 	AutoFrom         string `gorm:"size:10;not null" json:"auto_from"`
 	ProcessedThrough string `gorm:"size:10" json:"processed_through"`
 	Notes            string `gorm:"size:500" json:"notes"`
+	// 시작 잔고 매수만큼 그동안 들어온 부담금 입금 (예수금 기록 하나)
+	OpeningDepositID *uint `json:"opening_deposit_id,omitempty"`
 
 	Items     []ContributionItem `gorm:"foreignKey:PlanID" json:"items"`
 	CreatedAt time.Time          `json:"created_at"`
@@ -35,6 +37,8 @@ type ContributionItem struct {
 	PlanID  uint    `gorm:"not null;index" json:"plan_id"`
 	AssetID uint    `gorm:"not null" json:"asset_id"`
 	Weight  float64 `gorm:"not null" json:"weight"`
+	// 시작 잔고 매수 기록 (자동 기록 시작 전까지 쌓인 것 — 고치면 다시 만든다)
+	OpeningTxID *uint `json:"opening_tx_id,omitempty"`
 
 	Asset Asset `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
 }
