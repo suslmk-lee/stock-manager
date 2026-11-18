@@ -54,6 +54,7 @@ func NewApp() *App {
 	a.signalService = services.NewSignalService(database.GetDB(), a.tickerService, a.exchangeRateService)
 	a.dailySnapService = services.NewDailySnapshotService(database.GetDB(), a.tickerService)
 	a.accumulationService = services.NewAccumulationService(database.GetDB(), a.tickerService)
+	a.accumulationService.SetFunds(a.fundService)
 	a.cashService = services.NewCashService(database.GetDB(), a.tickerService)
 	fundamentals := services.NewFundamentalsService(nil)
 	a.signalService.SetFundamentals(fundamentals)

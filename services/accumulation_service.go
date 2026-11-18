@@ -56,6 +56,8 @@ type AccumulationService struct {
 	histories    func(tickers []string) map[string]*PriceHistory // 화면 표시용 현재가 (캐시)
 	now          func() time.Time
 
+	funds *FundService // 펀드 모으기: 앱 기준가 (없으면 펀드 계획은 기록하지 않는다)
+
 	runMu sync.Mutex
 }
 
@@ -135,7 +137,7 @@ func sessionClosed(ticker, day string, now time.Time) bool {
 		return false
 	}
 	off := usCloseOffset
-	if isKRTicker(ticker) {
+	if isKRTicker(ticker) || IsFundTicker(ticker) {
 		off = krCloseOffset
 	}
 	return !now.Before(d.Add(off))
@@ -252,9 +254,11 @@ type AccumulationPlanRequest struct {
 	OpeningRounds   int     `json:"opening_rounds"`
 	OpeningAmount   float64 `json:"opening_amount"`
 	OpeningQuantity float64 `json:"opening_quantity"`
-	// 등록할 때만: 지금까지 모은 수량을 보유에 더한다 (매매 기록에 아직 없을 때)
-	AddOpeningToHoldings bool   `json:"add_opening_to_holdings"`
-	Notes                string `json:"notes"`
+	// 등록할 때만: 지금까지 모은 수량을 보유에 더한다 (매매 기록에 아직 없을 때). 펀드는 수량 대신 금액으로 좌수를 센다.
+	AddOpeningToHoldings bool `json:"add_opening_to_holdings"`
+	// 지원금: 지금까지 모은 금액 중 이벤트로 받은 돈 — 예수금에 기타 수입으로 남긴다
+	OpeningBonus float64 `json:"opening_bonus"`
+	Notes        string  `json:"notes"`
 }
 
 func (s *AccumulationService) validate(req *AccumulationPlanRequest, now time.Time) error {
@@ -321,8 +325,8 @@ func (s *AccumulationService) validate(req *AccumulationPlanRequest, now time.Ti
 	} else if _, ok := parseDay(req.AutoFrom); !ok {
 		return planInputErr("자동 기록 시작일 형식이 올바르지 않습니다 (YYYY-MM-DD)")
 	}
-	if req.OpeningRounds < 0 || req.OpeningAmount < 0 || req.OpeningQuantity < 0 ||
-		!finite(req.OpeningAmount) || !finite(req.OpeningQuantity) {
+	if req.OpeningRounds < 0 || req.OpeningAmount < 0 || req.OpeningQuantity < 0 || req.OpeningBonus < 0 ||
+		!finite(req.OpeningAmount) || !finite(req.OpeningQuantity) || !finite(req.OpeningBonus) {
 		return planInputErr("지금까지 모은 값은 0 이상이어야 합니다")
 	}
 	if len(req.Notes) > 500 {
@@ -364,6 +368,13 @@ func (s *AccumulationService) CreatePlan(req AccumulationPlanRequest) (*models.A
 	if err := s.db.First(&asset, req.AssetID).Error; err != nil {
 		return nil, planInputErr("종목을 찾을 수 없습니다")
 	}
+	if err := s.fundRules(&req, asset); err != nil {
+		return nil, err
+	}
+	// 펀드는 좌수를 모르니 지금까지 모은 금액을 앱 기준가로 좌수로 바꾼다 (등록 뒤 평가금액 맞추기로 바로잡는다)
+	if IsFundTicker(asset.Ticker) && req.OpeningAmount > 0 {
+		req.OpeningQuantity = s.fundUnits(asset.ID, req.OpeningAmount, todayKST(now))
+	}
 
 	plan := models.AccumulationPlan{
 		AccountID: req.AccountID, AssetID: req.AssetID,
@@ -404,6 +415,11 @@ func (s *AccumulationService) CreatePlan(req AccumulationPlanRequest) (*models.A
 			return nil, err
 		}
 	}
+	if req.OpeningBonus > 0 {
+		if err := s.syncBonus(&plan, req.OpeningBonus, bonusDay(req.StartedOn, now), asset.Name); err != nil {
+			return nil, fmt.Errorf("지원금을 예수금에 남기지 못했습니다: %w", err)
+		}
+	}
 	return &plan, nil
 }
 
@@ -420,6 +436,20 @@ func (s *AccumulationService) UpdatePlan(id uint, req AccumulationPlanRequest) (
 	}
 	if err := s.validate(&req, now); err != nil {
 		return nil, err
+	}
+	if err := s.fundRules(&req, plan.Asset); err != nil {
+		return nil, err
+	}
+	// 펀드: 금액이 바뀌면 좌수를 다시 센다 (화면에서는 좌수를 받지 않는다)
+	if IsFundTicker(plan.Asset.Ticker) {
+		switch {
+		case req.OpeningAmount <= 0:
+			req.OpeningQuantity = 0
+		case req.OpeningAmount != plan.OpeningAmount || plan.OpeningQuantity <= 0:
+			req.OpeningQuantity = s.fundUnits(plan.AssetID, req.OpeningAmount, todayKST(now))
+		default:
+			req.OpeningQuantity = plan.OpeningQuantity
+		}
 	}
 
 	autoFrom := req.AutoFrom
@@ -467,6 +497,11 @@ func (s *AccumulationService) UpdatePlan(id uint, req AccumulationPlanRequest) (
 	if err := s.db.Model(&plan).Updates(updates).Error; err != nil {
 		return nil, fmt.Errorf("계획을 저장하지 못했습니다: %w", err)
 	}
+	if req.OpeningBonus != plan.OpeningBonus || plan.BonusEntryID != nil {
+		if err := s.syncBonus(&plan, req.OpeningBonus, bonusDay(req.StartedOn, now), plan.Asset.Name); err != nil {
+			return nil, fmt.Errorf("지원금을 예수금에 남기지 못했습니다: %w", err)
+		}
+	}
 	if err := s.db.First(&plan, id).Error; err != nil {
 		return nil, err
 	}
@@ -490,6 +525,7 @@ func (s *AccumulationService) DeletePlan(id uint) error {
 type AccumulationPlanView struct {
 	models.AccumulationPlan
 	AssetCurrency    string   `json:"asset_currency"`
+	IsFund           bool     `json:"is_fund"` // 펀드: 현재가는 앱 기준가, PriceDate 는 평가금액을 맞춘 날 (없으면 빈칸)
 	Rounds           int      `json:"rounds"`      // 지금까지 모은 회차 + 자동 기록 회차
 	AutoRounds       int      `json:"auto_rounds"` // 앱이 남긴 회차
 	Invested         float64  `json:"invested"`    // 금액 통화
@@ -639,6 +675,11 @@ func (s *AccumulationService) ListPlans() ([]AccumulationPlanView, error) {
 			last := bars[len(bars)-1]
 			v.CurrentPrice, v.PriceDate = last.close, last.day
 		}
+		if IsFundTicker(p.Asset.Ticker) && s.funds != nil {
+			// 펀드: 마지막으로 맞춘 기준가 (없으면 처음 기준가 1,000원) · 맞춘 날
+			v.IsFund = true
+			v.CurrentPrice, v.PriceDate = s.funds.BuyNav(p.AssetID, todayKST(now)), s.fundPriceDate(p.AssetID)
+		}
 		if v.CurrentPrice > 0 && investedOK {
 			fx := 0.0
 			if fxAt != nil {
@@ -787,6 +828,34 @@ func (s *AccumulationService) RunDue() (*AccumulationRunResult, error) {
 	if err := s.db.Preload("Asset").Where("status = ?", models.PlanStatusActive).Order("id").Find(&plans).Error; err != nil {
 		return nil, err
 	}
+
+	// 펀드는 거래소 시세 대신 국내 영업일마다 앱 기준가로
+	var fundPlans []models.AccumulationPlan
+	oldestFund := ""
+	stocks := plans[:0]
+	for _, p := range plans {
+		if !IsFundTicker(p.Asset.Ticker) {
+			stocks = append(stocks, p)
+			continue
+		}
+		if s.funds == nil {
+			continue
+		}
+		if from := firstPending(&p); sessionClosed(p.Asset.Ticker, from, now) {
+			fundPlans = append(fundPlans, p)
+			if oldestFund == "" || from < oldestFund {
+				oldestFund = from
+			}
+		}
+	}
+	if len(fundPlans) > 0 {
+		days := s.krTradingDays(oldestFund, now)
+		for i := range fundPlans {
+			res.Plans++
+			s.processFundPlan(&fundPlans[i], days, now, res)
+		}
+	}
+	plans = stocks
 
 	// 장이 끝난 처리 대상 거래일이 생긴 계획만 시세를 받는다
 	due := plans[:0]

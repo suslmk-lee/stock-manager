@@ -6,6 +6,7 @@ import DatePicker from '../ui/DatePicker';
 import { apiClient } from '../../api/client';
 import type { Account, AccumulationPlanRequest, AccumulationPlanView, Asset, Holding, PlanCondition, PlanCurrency, PlanSchedule } from '../../types/models';
 import AccountSelect from '../ui/AccountSelect';
+import AddProduct from '../pension/AddProduct';
 import {
   QTY_STEPS,
   accountLabel,
@@ -19,8 +20,10 @@ import {
   fmtDay,
   fmtPrice,
   fmtQty,
+  isFundTicker,
   isKRTicker,
   kstDate,
+  qtyUnit,
   ruleText,
 } from './planText';
 
@@ -84,6 +87,9 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
   const [openingRounds, setOpeningRounds] = useState(plan ? String(plan.opening_rounds || '') : '');
   const [openingAmount, setOpeningAmount] = useState(plan ? String(plan.opening_amount || '') : '');
   const [openingQty, setOpeningQty] = useState(plan ? String(plan.opening_quantity || '') : '');
+  // 지원금: 지금까지 모은 금액 중 이벤트로 받은 돈 (토스 펀드 첫 투자 지원금 등)
+  const [bonus, setBonus] = useState(plan?.opening_bonus ? String(plan.opening_bonus) : '');
+  const [showAdd, setShowAdd] = useState(false);
   const [startedOn, setStartedOn] = useState(plan?.started_on ?? '');
   const [autoFrom, setAutoFrom] = useState(plan?.auto_from ?? '');
   const [autoFromTouched, setAutoFromTouched] = useState(editing);
@@ -107,6 +113,15 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
   const asset = editing ? plan?.asset : assets.find((a) => a.id === assetId);
   const ticker = asset?.ticker ?? '';
   const assetCcy: PlanCurrency = ticker ? currencyOfTicker(ticker) : 'USD';
+  // 펀드: 원화 · 조건 없이 항상 · 앱 기준가로 좌수 (거래소 시세가 없다)
+  const fund = isFundTicker(ticker);
+  const unit = qtyUnit(ticker);
+  useEffect(() => {
+    if (!fund) return;
+    setCurrency('KRW');
+    setCondition('always');
+    setStep(0.0001);
+  }, [fund]);
 
   // 계좌·종목을 고르면 수량 단위 기본값 (직접 바꾸기 전까지)
   useEffect(() => {
@@ -182,10 +197,13 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
     if (condition !== 'always' && condValue.trim() === '') return setError(condition === 'return_below' ? '수익률 기준을 입력하세요.' : '주가 기준을 입력하세요.');
     if (condition === 'price_below' && numOr(condValue) <= 0) return setError('주가 기준은 0보다 커야 합니다.');
     const oAmount = numOr(openingAmount);
-    const oQty = numOr(openingQty);
-    if (!editing && addToHoldings && (oAmount > 0 || oQty > 0) && (oAmount <= 0 || oQty <= 0)) {
+    const oQty = fund ? 0 : numOr(openingQty);
+    const oBonus = numOr(bonus);
+    if (!fund && !editing && addToHoldings && (oAmount > 0 || oQty > 0) && (oAmount <= 0 || oQty <= 0)) {
       return setError('보유에 더하려면 지금까지 모은 금액과 수량을 모두 입력하세요.');
     }
+    if (oBonus < 0) return setError('지원금은 0 이상이어야 합니다.');
+    if (oBonus > 0 && oBonus > oAmount) return setError('지원금은 지금까지 모은 금액 안에 들어 있어야 합니다 (투자 금액에 지원금까지 더해 적으세요).');
     const req: AccumulationPlanRequest = {
       account_id: editing ? plan!.account_id : accountId,
       asset_id: editing ? plan!.asset_id : assetId,
@@ -203,7 +221,8 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
       opening_rounds: Math.max(0, Math.round(numOr(openingRounds))),
       opening_amount: oAmount,
       opening_quantity: oQty,
-      add_opening_to_holdings: !editing && addToHoldings && oAmount > 0 && oQty > 0,
+      add_opening_to_holdings: !editing && addToHoldings && oAmount > 0 && (fund || oQty > 0),
+      opening_bonus: oBonus,
       notes,
     };
     setSaving(true);
@@ -231,10 +250,10 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
     <Portal>
       {/* 입력 중인 값을 잃지 않도록 바깥을 눌러도 닫지 않는다 — 닫기(X)·취소로만 닫는다 */}
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-4">
-        <div className="surface flex max-h-[92vh] w-full max-w-xl flex-col" role="dialog" aria-modal="true" aria-label={editing ? '주식 모으기 수정' : '주식 모으기 추가'}>
+        <div className="surface flex max-h-[92vh] w-full max-w-xl flex-col" role="dialog" aria-modal="true" aria-label={editing ? '모으기 수정' : '모으기 추가'}>
           <div className="flex items-start justify-between gap-3 border-b border-white/[0.07] px-5 py-4">
             <div className="min-w-0">
-              <h3 className="section-title">{editing ? '주식 모으기 수정' : '주식 모으기 추가'}</h3>
+              <h3 className="section-title">{`${fund ? '펀드' : '주식'} 모으기 ${editing ? '수정' : '추가'}`}</h3>
               <p className="mt-0.5 text-xs text-zinc-500">증권사에 설정한 모으기를 그대로 적어 두면, 장이 끝날 때마다 앱이 회차를 기록합니다.</p>
             </div>
             <button type="button" onClick={onClose} className="shrink-0 text-zinc-400 hover:text-white" aria-label="닫기">
@@ -263,11 +282,29 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
                     <option value="">종목 선택 ({filteredAssets.length})</option>
                     {filteredAssets.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.name} ({a.ticker})
+                        {a.name} ({isFundTicker(a.ticker) ? '펀드' : a.ticker})
                       </option>
                     ))}
                   </select>
+                  <button type="button" className="text-[11px] text-mint-300 hover:underline" onClick={() => setShowAdd((v) => !v)}>
+                    {showAdd ? '닫기' : '+ 목록에 없는 펀드·국내 ETF 추가'}
+                  </button>
                 </Field>
+                {showAdd && (
+                  <div className="sm:col-span-2">
+                    <AddProduct
+                      known={assets}
+                      stacked
+                      onError={setError}
+                      onAdded={(a) => {
+                        setAssets((xs) => (xs.some((x) => x.id === a.id) ? xs : [...xs, a].sort((x, y) => x.name.localeCompare(y.name, 'ko'))));
+                        setAssetId(a.id);
+                        setAssetQuery('');
+                        setShowAdd(false);
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -275,19 +312,23 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
             <Field label="한 번에 살 금액">
               <div className="flex gap-2">
                 <input inputMode="decimal" className="input-field num flex-1" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="금액" />
-                <Segmented
-                  label="금액 통화"
-                  value={currency}
-                  onChange={setCurrency}
-                  options={[
-                    { value: 'KRW', label: '원' },
-                    { value: 'USD', label: '달러' },
-                  ]}
-                />
+                {fund ? (
+                  <span className="self-center text-sm text-zinc-400">원</span>
+                ) : (
+                  <Segmented
+                    label="금액 통화"
+                    value={currency}
+                    onChange={setCurrency}
+                    options={[
+                      { value: 'KRW', label: '원' },
+                      { value: 'USD', label: '달러' },
+                    ]}
+                  />
+                )}
               </div>
             </Field>
 
-            <Field label="주기" hint={schedule !== 'daily' ? '그날이 휴장이면 그 회차는 건너뜁니다.' : '장이 열린 날마다 기록합니다.'}>
+            <Field label="주기" hint={fund ? (schedule !== 'daily' ? '그날이 공휴일이면 다음 영업일에 기록합니다.' : '영업일마다 기록합니다.') : schedule !== 'daily' ? '그날이 휴장이면 그 회차는 건너뜁니다.' : '장이 열린 날마다 기록합니다.'}>
               <Segmented
                 label="주기"
                 value={schedule}
@@ -326,6 +367,7 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
               )}
             </Field>
 
+            {!fund && (
             <Field
               label="조건"
               hint={
@@ -353,7 +395,13 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
                 </div>
               )}
             </Field>
+            )}
 
+            {fund ? (
+              <p className="rounded-xl border border-white/[0.07] px-3.5 py-2.5 text-[11.5px] leading-relaxed text-zinc-400">
+                펀드는 거래소 시세가 없어 <b className="font-medium text-zinc-200">앱 기준가</b>로 좌수를 셉니다 (처음 1,000원). 등록한 뒤 모으기 상세의 '평가금액 맞추기'에 증권사 앱의 평가금액을 넣으면 기준가가 맞춰지고, 그 뒤 회차는 맞춘 기준가로 기록합니다.
+              </p>
+            ) : (
             <Field label="수량 단위" hint={QTY_STEPS.find((s) => s.value === step)?.hint}>
               <Segmented
                 label="수량 단위"
@@ -370,6 +418,7 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
                 </p>
               )}
             </Field>
+            )}
 
             {/* 지금까지 모은 것 */}
             <div className="surface-inset space-y-3 rounded-xl p-3.5">
@@ -386,11 +435,29 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
                   <span className="label-mono">투자 금액 ({currency === 'KRW' ? '원' : '$'})</span>
                   <input inputMode="decimal" className="input-field num !px-2.5" value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)} placeholder={currency === 'KRW' ? '21343' : '15'} />
                 </label>
-                <label className="space-y-1">
-                  <span className="label-mono">수량 (주)</span>
-                  <input inputMode="decimal" className="input-field num !px-2.5" value={openingQty} onChange={(e) => setOpeningQty(e.target.value)} placeholder="0.087" />
-                </label>
+                {fund ? (
+                  <label className="space-y-1">
+                    <span className="label-mono">그중 지원금 (원)</span>
+                    <input inputMode="decimal" className="input-field num !px-2.5" value={bonus} onChange={(e) => setBonus(e.target.value)} placeholder="3000" />
+                  </label>
+                ) : (
+                  <label className="space-y-1">
+                    <span className="label-mono">수량 ({unit})</span>
+                    <input inputMode="decimal" className="input-field num !px-2.5" value={openingQty} onChange={(e) => setOpeningQty(e.target.value)} placeholder="0.087" />
+                  </label>
+                )}
               </div>
+              {!fund && (
+                <label className="flex items-center gap-2">
+                  <span className="label-mono shrink-0">그중 지원금 ({currency === 'KRW' ? '원' : '$'})</span>
+                  <input inputMode="decimal" className="input-field num !w-32 !px-2.5 !py-1.5" value={bonus} onChange={(e) => setBonus(e.target.value)} placeholder="선택" />
+                </label>
+              )}
+              {numOr(bonus) > 0 && (
+                <p className="text-[11px] leading-relaxed text-zinc-500">
+                  지원금은 이벤트로 받은 돈이라 이 계좌 예수금에 기타 수입으로 들어온 것으로 남깁니다 (그 돈으로 산 몫 때문에 예수금이 줄지 않게). 투자 금액에는 지원금까지 더해 적으세요.
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 <span className="label-mono shrink-0">처음 시작한 날</span>
                 <DatePicker value={startedOn} onChange={setStartedOn} max={kstDate()} clearable placeholder="선택 (안 적어도 됨)" className="!w-auto !py-1.5" ariaLabel="처음 시작한 날" />
@@ -401,8 +468,10 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
                     <p className="text-zinc-200">이 수량을 보유에 더하기</p>
                     <p className="mt-0.5 leading-relaxed text-zinc-500">
                       {heldQty > 0
-                        ? `이 계좌에 이미 ${fmtQty(heldQty)}를 갖고 있습니다. 모은 것을 매매 기록에 이미 넣었다면 끄세요.`
-                        : '오늘 날짜의 매수 1건으로 기록합니다.'}
+                        ? `이 계좌에 이미 ${fmtQty(heldQty, unit)}를 갖고 있습니다. 모은 것을 매매 기록에 이미 넣었다면 끄세요.`
+                        : fund
+                          ? '오늘 날짜의 매수 1건으로 기록합니다 (좌수는 앱 기준가로 셉니다).'
+                          : '오늘 날짜의 매수 1건으로 기록합니다.'}
                     </p>
                   </div>
                   <Switch
@@ -422,7 +491,9 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
               label="자동 기록 시작"
               hint={
                 ticker
-                  ? isKRTicker(ticker)
+                  ? fund
+                    ? '오늘 회차가 이미 위 누적 값에 들어 있다고 보고 다음 영업일부터 기록합니다. 계획한 날이 공휴일이면 다음 영업일에 기록합니다.'
+                    : isKRTicker(ticker)
                     ? '한국 종목은 오늘 회차가 이미 위 누적 값에 들어 있다고 보고 다음 거래일부터 기록합니다.'
                     : '미국 종목은 오늘 밤 열리는 장부터 기록합니다. 증권사 앱에 오늘 밤 회차까지 이미 보이면 하루 뒤로 미루세요.'
                   : undefined
@@ -438,7 +509,7 @@ export default function PlanForm({ plan, onClose, onSaved }: PlanFormProps) {
                   className="!w-auto !py-1.5"
                   ariaLabel="자동 기록 시작일"
                 />
-                {autoFrom && <span className="text-xs text-zinc-400">{fmtDay(autoFrom)} 장부터</span>}
+                {autoFrom && <span className="text-xs text-zinc-400">{fmtDay(autoFrom)} {fund ? '부터' : '장부터'}</span>}
               </div>
             </Field>
 

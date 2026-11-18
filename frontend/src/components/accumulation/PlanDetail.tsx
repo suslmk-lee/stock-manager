@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Check, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
+import { Check, Pause, Pencil, Play, Scale, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { AccumulationFill, AccumulationPlanRequest, AccumulationPlanView, PlanCurrency, PlanStatus } from '../../types/models';
-import { accountLabel, assetTitle, belowMinimum, fmtAmount, fmtDay, fmtPrice, fmtQty, fmtSignedAmount, fmtSignedPct, nextText, ruleText, signTone, stepLabel } from './planText';
+import { accountLabel, assetTitle, belowMinimum, fmtAmount, fmtDay, fmtPrice, fmtQty, fmtSignedAmount, fmtSignedPct, nextText, qtyUnit, ruleText, signTone, stepLabel } from './planText';
+import FundReconcileModal from '../pension/FundReconcileModal';
 import { cashText, LOW_DAYS, type AccountCashNeed } from './cashNeed';
 import { askConfirm } from '../ui/confirmDialog';
 
@@ -45,6 +46,7 @@ export const toRequest = (p: AccumulationPlanView): AccumulationPlanRequest => (
   opening_rounds: p.opening_rounds,
   opening_amount: p.opening_amount,
   opening_quantity: p.opening_quantity,
+  opening_bonus: p.opening_bonus ?? 0, // 빠뜨리면 지원금 기록이 지워진다
   notes: p.notes,
 });
 
@@ -58,6 +60,11 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
   const [editId, setEditId] = useState<number | null>(null);
   const [editAmount, setEditAmount] = useState('');
   const [editQty, setEditQty] = useState('');
+  // 펀드: 좌 · 앱 기준가 · 평가금액 맞추기
+  const fund = !!plan.is_fund;
+  const unit = qtyUnit(plan.asset?.ticker);
+  const [reconcile, setReconcile] = useState(false);
+  const staleDays = plan.price_date ? Math.floor((Date.now() - new Date(`${plan.price_date}T00:00:00`).getTime()) / 86400000) : null;
 
   const loadFills = useCallback(async () => {
     try {
@@ -152,10 +159,23 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
             </p>
             <p className="mt-2 text-sm text-zinc-200">{ruleText(plan, assetCcy)}</p>
             <p className="mt-0.5 text-[11px] text-zinc-500">
-              {stepLabel(plan.qty_step)}
+              {fund ? '앱 기준가로 좌수 계산 · 공휴일이면 다음 영업일' : stepLabel(plan.qty_step)}
               {plan.started_on ? ` · ${fmtDay(plan.started_on)} 시작` : ''}
               {plan.notes ? ` · ${plan.notes}` : ''}
             </p>
+            {fund && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button type="button" className="btn-ghost !px-2.5 !py-1 !text-xs" onClick={() => setReconcile(true)} disabled={busy || plan.holding_quantity <= 0} title="증권사 앱의 평가금액으로 기준가 맞추기">
+                  <Scale className="h-3.5 w-3.5" />
+                  평가금액 맞추기
+                </button>
+                <span className={`num text-[11px] ${staleDays == null || staleDays > 45 ? 'text-amber-300' : 'text-zinc-500'}`}>
+                  {plan.price_date
+                    ? `${plan.price_date.slice(5).replace('-', '/')} 맞춤 · 기준가 ${fmtPrice(plan.current_price, assetCcy)}${staleDays != null && staleDays > 45 ? ' · 한 달 넘게 안 맞춤' : ''}`
+                    : '아직 안 맞춤 — 증권사 앱의 평가금액을 넣으면 기준가가 정해집니다'}
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex shrink-0 gap-1.5">
             <button type="button" className="btn-icon" onClick={onEdit} disabled={busy} aria-label="수정" title="수정">
@@ -190,8 +210,16 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
       {/* 현황 */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-4 border-b border-white/[0.07] p-4 sm:grid-cols-4 sm:p-5">
         <Stat label="모은 회차" value={`${plan.rounds}회`} sub={plan.opening_rounds > 0 ? `등록 전 ${plan.opening_rounds} · 앱 기록 ${plan.auto_rounds}` : `앱 기록 ${plan.auto_rounds}`} />
-        <Stat label="투자금" value={fmtAmount(plan.invested, ccy)} sub={fmtQty(plan.quantity)} />
-        <Stat label="평가금" value={plan.value != null ? fmtAmount(plan.value, ccy) : '—'} sub={plan.current_price > 0 ? `${fmtPrice(plan.current_price, assetCcy)}${plan.price_date ? ` · ${plan.price_date.slice(5).replace('-', '/')}` : ''}` : '시세 없음'} />
+        <Stat label="투자금" value={fmtAmount(plan.invested, ccy)} sub={`${fmtQty(plan.quantity, unit)}${plan.opening_bonus ? ` · 지원금 ${fmtAmount(plan.opening_bonus, ccy)} 포함` : ''}`} />
+        <Stat
+          label="평가금"
+          value={plan.value != null ? fmtAmount(plan.value, ccy) : '—'}
+          sub={
+            plan.current_price > 0
+              ? `${fund ? '기준가 ' : ''}${fmtPrice(plan.current_price, assetCcy)}${plan.price_date ? ` · ${plan.price_date.slice(5).replace('-', '/')}` : fund ? ' · 안 맞춤' : ''}`
+              : '시세 없음'
+          }
+        />
         <Stat
           label="모으기 손익"
           value={plan.pnl != null ? fmtSignedAmount(plan.pnl, ccy) : '—'}
@@ -201,7 +229,7 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
         <Stat
           label="보유 수익률"
           value={ret != null ? fmtSignedPct(ret) : '—'}
-          sub={plan.holding_quantity > 0 ? `계좌 전체 ${fmtQty(plan.holding_quantity)} · 평단 ${fmtPrice(plan.holding_avg_price, assetCcy)}` : '이 계좌 보유 없음'}
+          sub={plan.holding_quantity > 0 ? `계좌 전체 ${fmtQty(plan.holding_quantity, unit)} · 평단 ${fmtPrice(plan.holding_avg_price, assetCcy)}` : '이 계좌 보유 없음'}
           tone={ret != null ? signTone(ret) : 'text-zinc-500'}
         />
         <Stat
@@ -224,7 +252,7 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
       <div className="p-4 sm:p-5">
         <div className="mb-2 flex items-baseline justify-between gap-3">
           <h3 className="section-title">모으기 내역</h3>
-          <span className="label-mono">그날 종가로 계산한 값 · 다르면 고치세요</span>
+          <span className="label-mono">{fund ? '앱 기준가로 계산한 값 · 평가금액을 맞추면 그 뒤 회차는 맞춘 기준가로' : '그날 종가로 계산한 값 · 다르면 고치세요'}</span>
         </div>
         {fills == null ? (
           <div className="h-24 animate-pulse rounded-xl bg-white/[0.03]" />
@@ -235,7 +263,9 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
                 {plan.processed_through && plan.processed_through >= plan.auto_from
                   ? `${fmtDay(plan.auto_from)}부터 확인했지만 ${belowMinimum(plan) ? '금액이 최소 단위보다 작아' : plan.condition !== 'always' ? '조건에 맞는 날이 없어' : '아직'} 산 회차가 없습니다.`
                   : plan.status === 'active'
-                    ? `${fmtDay(plan.auto_from)} 장이 끝나면 첫 회차가 기록됩니다.`
+                    ? fund
+                      ? `${fmtDay(plan.auto_from)}부터 계획한 날(공휴일이면 다음 영업일)이 지나면 첫 회차가 기록됩니다.`
+                      : `${fmtDay(plan.auto_from)} 장이 끝나면 첫 회차가 기록됩니다.`
                     : '앱이 기록한 회차가 없습니다.'}
               </p>
             )}
@@ -250,7 +280,8 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
                   </label>
                   <label className="flex items-center gap-1 text-xs text-zinc-500">
                     수량
-                    <input inputMode="decimal" className="input-field num !w-24 !px-2 !py-1 text-right" value={editQty} onChange={(e) => setEditQty(e.target.value)} aria-label="실제 수량" />주
+                    <input inputMode="decimal" className="input-field num !w-24 !px-2 !py-1 text-right" value={editQty} onChange={(e) => setEditQty(e.target.value)} aria-label="실제 수량" />
+                    {unit}
                   </label>
                   <span className="ml-auto flex gap-1">
                     <button type="button" className="btn-icon !h-7 !w-7" onClick={saveFill} disabled={busy} aria-label="저장">
@@ -273,7 +304,7 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
                   <div className="text-right">
                     <p className="num text-sm text-zinc-100">{fmtAmount(f.amount, ccy)}</p>
                     <p className="num text-[11px] text-zinc-500">
-                      {fmtQty(f.quantity)} · {fmtPrice(f.price, assetCcy)}
+                      {fmtQty(f.quantity, unit)} · {fmtPrice(f.price, assetCcy)}
                     </p>
                   </div>
                   <span className="flex shrink-0 gap-1 opacity-60 transition-opacity group-hover:opacity-100">
@@ -291,11 +322,15 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
               <div className="flex items-center gap-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-zinc-300">등록 전 {plan.opening_rounds}회 합계</p>
-                  <p className="text-[11px] text-zinc-500">{plan.started_on ? `${fmtDay(plan.started_on)}부터` : '증권사 앱의 누적 값'}{plan.opening_tx_id ? ' · 보유에 더함' : ''}</p>
+                  <p className="text-[11px] text-zinc-500">
+                    {plan.started_on ? `${fmtDay(plan.started_on)}부터` : '증권사 앱의 누적 값'}
+                    {plan.opening_tx_id ? ' · 보유에 더함' : ''}
+                    {plan.opening_bonus ? ` · 지원금 ${fmtAmount(plan.opening_bonus, ccy)} 포함` : ''}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="num text-sm text-zinc-300">{fmtAmount(plan.opening_amount, ccy)}</p>
-                  <p className="num text-[11px] text-zinc-500">{fmtQty(plan.opening_quantity)}</p>
+                  <p className="num text-[11px] text-zinc-500">{fmtQty(plan.opening_quantity, unit)}</p>
                 </div>
                 <span className="w-[60px] shrink-0" />
               </div>
@@ -303,6 +338,26 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
           </div>
         )}
       </div>
+
+      {reconcile && (
+        <FundReconcileModal
+          accountId={plan.account_id}
+          item={{
+            asset_id: plan.asset_id,
+            asset: plan.asset,
+            quantity: plan.holding_quantity,
+            cost: plan.holding_quantity * plan.holding_avg_price,
+            price: plan.current_price,
+            value: plan.holding_quantity * plan.current_price,
+            price_date: plan.price_date ?? '',
+          }}
+          onClose={() => setReconcile(false)}
+          onSaved={() => {
+            setReconcile(false);
+            onChanged();
+          }}
+        />
+      )}
     </div>
   );
 }

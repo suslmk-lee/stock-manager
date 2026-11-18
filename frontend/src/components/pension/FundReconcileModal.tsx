@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Trash2, X } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { ContributionItemView, FundPrice } from '../../types/models';
+
+/** 맞출 펀드 보유: 퇴직연금 상품 줄 또는 모으기 계획에서 필요한 값만 */
+export type FundReconcileItem = Pick<ContributionItemView, 'asset_id' | 'asset' | 'quantity' | 'cost' | 'price' | 'value' | 'price_date'>;
 import Portal from '../ui/Portal';
 import DatePicker from '../ui/DatePicker';
 import { assetPrimary } from '../../utils/assetLabel';
@@ -19,7 +22,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const shortDate = (d: string) => `${d.slice(2, 4)}.${d.slice(5, 7)}.${d.slice(8, 10)}`;
 
-export default function FundReconcileModal({ accountId, item, onClose, onSaved }: { accountId: number; item: ContributionItemView; onClose: () => void; onSaved: (msg: string) => void }) {
+export default function FundReconcileModal({ accountId, item, onClose, onSaved }: { accountId: number; item: FundReconcileItem; onClose: () => void; onSaved: (msg: string) => void }) {
   const [date, setDate] = useState(ymd(new Date()));
   const [value, setValue] = useState('');
   const [prices, setPrices] = useState<FundPrice[] | null>(null);

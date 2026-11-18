@@ -4,8 +4,11 @@ import type { Account, AccumulationPlanRequest, AccumulationPlanView, Asset, Pla
 
 export const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
-export const currencyOfTicker = (ticker: string): PlanCurrency => (/\.(KS|KQ)$/i.test(ticker) ? 'KRW' : 'USD');
+export const isFundTicker = (ticker: string) => /^FUND:/i.test(ticker);
+export const currencyOfTicker = (ticker: string): PlanCurrency => (/\.(KS|KQ)$/i.test(ticker) || isFundTicker(ticker) ? 'KRW' : 'USD');
 export const isKRTicker = (ticker: string) => /\.(KS|KQ)$/i.test(ticker);
+/** 수량 단위 이름: 펀드는 좌 */
+export const qtyUnit = (ticker = '') => (isFundTicker(ticker) ? '좌' : '주');
 
 /** 1,000원 / $1 / $1.25 */
 export function fmtAmount(v: number, ccy: PlanCurrency): string {
@@ -23,7 +26,7 @@ export function fmtPrice(v: number, ccy: PlanCurrency): string {
 }
 
 /** 0.004주 · 0.087123주 (소수 여섯째 자리까지, 끝의 0은 지움) */
-export const fmtQty = (q: number) => `${q.toLocaleString('ko-KR', { maximumFractionDigits: 6 })}주`;
+export const fmtQty = (q: number, unit = '주') => `${q.toLocaleString('ko-KR', { maximumFractionDigits: unit === '좌' ? 4 : 6 })}${unit}`;
 
 export const fmtSignedPct = (v: number, d = 2) => `${v > 0 ? '+' : ''}${v.toFixed(d)}%`;
 export const signTone = (v: number) => (v > 0 ? 'text-mint-300' : v < 0 ? 'text-rose-300' : 'text-zinc-300');
@@ -102,7 +105,7 @@ function nextWeekday(day: string): string {
  */
 export function defaultAutoFrom(ticker: string, now = new Date()): string {
   const today = kstDate(now);
-  return isKRTicker(ticker) ? nextWeekday(today) : today;
+  return isKRTicker(ticker) || isFundTicker(ticker) ? nextWeekday(today) : today;
 }
 
 /** 11월 12일 (목) */
@@ -115,13 +118,15 @@ export function fmtDay(day: string): string {
 /** 다음 회차 안내: 미국 장은 한국 시각으로 그날 밤에 열린다 */
 export function nextText(plan: Pick<AccumulationPlanView, 'next_date' | 'asset'>, now = new Date()): string {
   if (!plan.next_date) return '';
-  const us = !isKRTicker(plan.asset?.ticker ?? '');
+  const tk = plan.asset?.ticker ?? '';
+  const fund = isFundTicker(tk);
+  const us = !isKRTicker(tk) && !fund;
   const today = kstDate(now);
   const tomorrow = kstDate(now, 1);
   // 장은 끝났지만 아직 기록 전 (미국 장은 한국 시각 다음 날 아침 7시쯤 확정)
   if (plan.next_date < today) return `${plan.next_date.slice(5).replace('-', '/').replace(/^0/, '')} 장 · 기록 대기`;
   const when = plan.next_date === today ? '오늘' : plan.next_date === tomorrow ? '내일' : fmtDay(plan.next_date);
-  return us ? `${when} 밤 미국 장` : `${when} 장 마감 후`;
+  return fund ? when : us ? `${when} 밤 미국 장` : `${when} 장 마감 후`;
 }
 
 /** 한 달 거래일 기준 예상 횟수 (요약용) */
@@ -140,6 +145,7 @@ export function monthlyTimes(p: Pick<AccumulationPlanRequest, 'schedule' | 'week
 export function assetTitle(asset?: Pick<Asset, 'ticker' | 'name'> | null): { primary: string; secondary: string; tickerFirst: boolean } {
   const ticker = asset?.ticker ?? '';
   const name = asset?.name ?? '';
+  if (isFundTicker(ticker) && name) return { primary: name, secondary: '펀드', tickerFirst: false }; // 펀드는 이름으로 (티커는 앱 안에서만 쓰는 값)
   if (!ticker || isKRTicker(ticker) || !name) return { primary: name || ticker, secondary: name && ticker ? ticker : '', tickerFirst: false };
   return { primary: ticker, secondary: name === ticker ? '' : name, tickerFirst: true };
 }

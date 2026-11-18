@@ -628,8 +628,10 @@ export interface AccumulationPlanRequest {
   opening_rounds: number;
   opening_amount: number;
   opening_quantity: number;
-  /** 등록할 때만: 지금까지 모은 수량을 보유에 더한다 */
+  /** 등록할 때만: 지금까지 모은 수량을 보유에 더한다 (펀드는 금액으로 좌수를 센다) */
   add_opening_to_holdings?: boolean;
+  /** 지원금: 지금까지 모은 금액 중 이벤트로 받은 돈 — 예수금에 기타 수입으로 남긴다 */
+  opening_bonus?: number;
   notes: string;
 }
 
@@ -642,6 +644,9 @@ export interface AccumulationPlanView extends Omit<AccumulationPlanRequest, 'add
   account?: Account;
   asset?: Asset;
   asset_currency: PlanCurrency;
+  /** 펀드: 현재가는 앱 기준가, price_date 는 평가금액을 맞춘 날 (없으면 빈칸) */
+  is_fund?: boolean;
+  bonus_entry_id?: number;
   rounds: number;
   auto_rounds: number;
   invested: number;

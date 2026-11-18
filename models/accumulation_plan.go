@@ -53,6 +53,10 @@ type AccumulationPlan struct {
 	// 등록하면서 보유에 더한 경우 그 매수 기록 (PlanID 는 비워 둔다 — 회차로 세지 않음)
 	OpeningTxID *uint `json:"opening_tx_id,omitempty"`
 
+	// 지원금: 이벤트로 받아 모으기에 들어간 돈 (토스 펀드 첫 투자 지원금 등) — 예수금에 기타 수입으로 남긴 기록
+	OpeningBonus float64 `gorm:"default:0" json:"opening_bonus"`
+	BonusEntryID *uint   `json:"bonus_entry_id,omitempty"`
+
 	Notes     string         `gorm:"size:500" json:"notes"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
