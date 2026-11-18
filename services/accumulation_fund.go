@@ -42,23 +42,29 @@ func (s *AccumulationService) fundUnits(assetID uint, amount float64, day string
 // syncBonus: 지원금(이벤트로 받은 돈)을 그 계좌 예수금에 기타 수입(이자)으로 남긴다 — 그 돈으로 산 몫 때문에 예수금이 줄지 않게.
 // 금액이 바뀌면 고치고, 0 이면 지운다. day: 지원금을 받은 날 (처음 시작한 날, 없으면 오늘).
 func (s *AccumulationService) syncBonus(plan *models.AccumulationPlan, bonus float64, day time.Time, assetName string) error {
+	var acc models.Account
+	noCash := s.db.First(&acc, plan.AccountID).Error == nil && acc.NoCash
+	entryBonus := bonus
+	if noCash {
+		entryBonus = 0 // 예수금 기록 안 하는 계좌 (토스뱅크 등): 예수금 기록 없이 금액만 남긴다
+	}
 	if plan.BonusEntryID != nil {
 		var e models.CashEntry
 		if err := s.db.First(&e, *plan.BonusEntryID).Error; err != nil {
 			plan.BonusEntryID = nil // 예수금 화면에서 이미 지운 경우
-		} else if bonus <= 0 {
+		} else if entryBonus <= 0 {
 			if err := s.db.Delete(&models.CashEntry{}, e.ID).Error; err != nil {
 				return err
 			}
 			plan.BonusEntryID = nil
-		} else if math.Abs(e.Amount-bonus) > 1e-9 || !e.Date.Equal(day) {
-			if err := s.db.Model(&models.CashEntry{}).Where("id = ?", e.ID).Updates(map[string]any{"amount": bonus, "date": day}).Error; err != nil {
+		} else if math.Abs(e.Amount-entryBonus) > 1e-9 || !e.Date.Equal(day) {
+			if err := s.db.Model(&models.CashEntry{}).Where("id = ?", e.ID).Updates(map[string]any{"amount": entryBonus, "date": day}).Error; err != nil {
 				return err
 			}
 		}
 	}
-	if bonus > 0 && plan.BonusEntryID == nil {
-		e := models.CashEntry{AccountID: plan.AccountID, Currency: plan.AmountCurrency, Date: day, Kind: models.CashInterest, Amount: bonus,
+	if entryBonus > 0 && plan.BonusEntryID == nil {
+		e := models.CashEntry{AccountID: plan.AccountID, Currency: plan.AmountCurrency, Date: day, Kind: models.CashInterest, Amount: entryBonus,
 			Notes: fmt.Sprintf("모으기 지원금 (%s)", assetName)}
 		if err := s.db.Create(&e).Error; err != nil {
 			return err

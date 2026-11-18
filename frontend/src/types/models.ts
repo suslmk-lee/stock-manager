@@ -52,6 +52,8 @@ export interface Account {
   foreign_settle?: ForeignSettle;
   /** 자동 환전 수수료 (%) — KRW·AFX 일 때 환율에 얹는다 */
   fx_fee_pct?: number;
+  /** 예수금 기록 안 함: 투자 대금이 연결 통장에서 바로 빠져나가는 계좌 (토스뱅크 펀드 모으기 등) — 예수금 0 */
+  no_cash?: boolean;
   currency: string;
   description: string;
   created_at: string;

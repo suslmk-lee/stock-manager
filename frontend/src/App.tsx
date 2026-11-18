@@ -34,7 +34,8 @@ const DOMESTIC_BROKERS = [
   '부국증권',
   '케이프투자증권',
   '하이투자증권',
-  // 은행 (퇴직연금 DC·IRP 등)
+  // 은행 (퇴직연금 DC·IRP, 펀드 모으기 등)
+  '토스뱅크',
   'IBK기업은행',
   'KB국민은행',
   '신한은행',
@@ -56,7 +57,12 @@ const EMPTY_FORM = {
   accountType: 'General' as AccountType,
   foreignSettle: 'USD' as ForeignSettle,
   fxFeePct: '0',
+  // 예수금 기록 안 함 (투자 대금이 연결 통장에서 바로 빠져나가는 계좌 — 토스뱅크 펀드 모으기 등)
+  noCash: false,
 };
+
+/** 예수금 없이 통장에서 바로 사는 곳 (새 계좌를 만들 때 '예수금 기록 안 함'을 켜 둔다) */
+const NO_CASH_BROKERS = new Set(['토스뱅크']);
 
 const SETTLE_HINT: Record<ForeignSettle, string> = {
   USD: "미국 주식은 외화예수금(달러)에서 사고팝니다. 원화↔달러는 예수금의 '환전'으로 기록합니다.",
@@ -142,6 +148,7 @@ function App() {
       accountType: getAccountType(account),
       foreignSettle: account.foreign_settle === 'KRW' || account.foreign_settle === 'AFX' ? account.foreign_settle : 'USD',
       fxFeePct: String(account.fx_fee_pct ?? 0),
+      noCash: !!account.no_cash,
     });
     setShowForm(true);
   };
@@ -165,7 +172,8 @@ function App() {
           formData.description,
           formData.accountType,
           formData.foreignSettle,
-          fxFee
+          fxFee,
+          formData.noCash
         );
       } else {
         const created = (await apiClient.CreateAccount(
@@ -177,7 +185,8 @@ function App() {
           formData.description,
           formData.accountType,
           formData.foreignSettle,
-          fxFee
+          fxFee,
+          formData.noCash
         )) as Account | null;
         if (created?.id) setSelectedId(created.id);
       }
@@ -309,7 +318,14 @@ function App() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="field-label">증권사 · 은행 *</label>
-            <select value={formData.broker} onChange={(e) => setFormData({ ...formData, broker: e.target.value })} className="input-field" required>
+            <select
+              value={formData.broker}
+              onChange={(e) =>
+                setFormData({ ...formData, broker: e.target.value, ...(editingId === null ? { noCash: NO_CASH_BROKERS.has(e.target.value) } : {}) })
+              }
+              className="input-field"
+              required
+            >
               <option value="">증권사 · 은행을 선택하세요</option>
               {DOMESTIC_BROKERS.map((broker) => (
                 <option key={broker} value={broker}>
@@ -368,6 +384,16 @@ function App() {
             <option value="JPY">JPY (엔)</option>
           </select>
         </div>
+        <label className="flex items-start gap-2.5 rounded-xl border border-white/[0.08] px-3.5 py-3">
+          <input type="checkbox" className="mt-0.5" checked={formData.noCash} onChange={(e) => setFormData({ ...formData, noCash: e.target.checked })} />
+          <span className="min-w-0">
+            <span className="block text-sm text-zinc-200">예수금 기록 안 함</span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
+              투자 대금이 연결 통장에서 바로 빠져나가는 계좌 (토스뱅크 펀드 모으기 등). 예수금을 0으로 보고 매수로 빼지 않습니다 — 자산 추이·계좌 총액에는 보유 평가금액만 더합니다.
+            </span>
+          </span>
+        </label>
+        {!formData.noCash && (
         <div>
           <label className="field-label">예수금 구성</label>
           <select value={formData.foreignSettle} onChange={(e) => setFormData({ ...formData, foreignSettle: e.target.value as ForeignSettle })} className="input-field">
@@ -377,7 +403,8 @@ function App() {
           </select>
           <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{SETTLE_HINT[formData.foreignSettle]}</p>
         </div>
-        {formData.foreignSettle !== 'USD' && (
+        )}
+        {!formData.noCash && formData.foreignSettle !== 'USD' && (
           <div>
             <label className="field-label">자동 환전 수수료 (%)</label>
             <input

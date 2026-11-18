@@ -32,7 +32,7 @@ export function cashNeeds(plans: AccumulationPlanView[], balances: CashBalance[]
   const byAcc = new Map<number, AccountCashNeed>();
   const bal = new Map((balances ?? []).map((b) => [b.account_id, b]));
   for (const p of plans) {
-    if (p.status !== 'active') continue;
+    if (p.status !== 'active' || p.account?.no_cash) continue; // 예수금 기록 안 하는 계좌 (연결 통장에서 바로)
     let r = byAcc.get(p.account_id);
     if (!r) {
       const b = bal.get(p.account_id);

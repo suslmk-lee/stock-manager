@@ -140,7 +140,7 @@ func (a *App) GetAccount(id uint) (interface{}, error) {
 	return a.accountService.GetAccount(id)
 }
 
-func (a *App) CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle string, fxFeePct float64) (interface{}, error) {
+func (a *App) CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle string, fxFeePct float64, noCash bool) (interface{}, error) {
 	return a.accountService.CreateAccount(services.CreateAccountRequest{
 		Name:          name,
 		Broker:        broker,
@@ -151,10 +151,11 @@ func (a *App) CreateAccount(name, broker, accountNumber, marketType, currency, d
 		AccountType:   models.AccountType(accountType),
 		ForeignSettle: foreignSettle,
 		FxFeePct:      fxFeePct,
+		NoCash:        noCash,
 	})
 }
 
-func (a *App) UpdateAccount(id uint, name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle string, fxFeePct float64) (interface{}, error) {
+func (a *App) UpdateAccount(id uint, name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle string, fxFeePct float64, noCash bool) (interface{}, error) {
 	return a.accountService.UpdateAccount(id, services.UpdateAccountRequest{
 		Name:          name,
 		Broker:        broker,
@@ -165,6 +166,7 @@ func (a *App) UpdateAccount(id uint, name, broker, accountNumber, marketType, cu
 		AccountType:   models.AccountType(accountType),
 		ForeignSettle: foreignSettle,
 		FxFeePct:      &fxFeePct,
+		NoCash:        &noCash,
 	})
 }
 

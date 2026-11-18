@@ -303,7 +303,7 @@ export default function CashPanel({ account }: { account: Account }) {
   const showUSD = shownCcys.includes('USD');
   const showKRW = shownCcys.includes('KRW');
   const negative = !!summary && (summary.krw < -0.5 || summary.usd < -0.005);
-  const neverAdjusted = !!summary && !summary.last_adjusted && summary.flows.some((f) => f.kind === 'buy' || f.kind === 'sell');
+  const neverAdjusted = !!summary && !summary.last_adjusted && (summary.flows ?? []).some((f) => f.kind === 'buy' || f.kind === 'sell');
   const flows = useMemo(() => summary?.flows ?? [], [summary]);
   const pending = useMemo(() => summary?.pending ?? [], [summary]);
   const pendingOf = (ccy: Ccy) => pending.filter((p) => p.currency === ccy);
@@ -311,6 +311,22 @@ export default function CashPanel({ account }: { account: Account }) {
   const settleByTx = useMemo(() => new Map(pending.filter((p) => p.transaction_id != null).map((p) => [p.transaction_id!, p.settle_date])), [pending]);
   // 계좌 총액에서 예수금이 차지하는 비중
   const cashShare = summary?.account_total_krw && summary.account_total_krw > 0 ? (summary.total_krw / summary.account_total_krw) * 100 : null;
+
+  // 예수금 기록 안 하는 계좌 (투자 대금이 연결 통장에서 바로 빠져나감)
+  if (account.no_cash) {
+    return (
+      <section className="surface-inset mb-5 p-4 sm:p-5">
+        <div className="flex items-center gap-3">
+          <CardIcon icon={IconWallet} size="sm" />
+          <p className="section-title">예수금</p>
+          <span className="label-mono">기록 안 함</span>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+          이 계좌는 투자 대금이 연결 통장에서 바로 빠져나가 예수금을 기록하지 않습니다. 계좌 총액과 자산 추이에는 보유 평가금액만 더합니다. 바꾸려면 계좌 수정에서 '예수금 기록 안 함'을 끄세요.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="surface-inset mb-5 p-4 sm:p-5">

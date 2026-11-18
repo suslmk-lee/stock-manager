@@ -43,6 +43,7 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				AccountType   string  `json:"account_type"`
 				ForeignSettle string  `json:"foreign_settle"`
 				FxFeePct      float64 `json:"fx_fee_pct"`
+				NoCash        bool    `json:"no_cash"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -58,6 +59,7 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				AccountType:   models.AccountType(req.AccountType),
 				ForeignSettle: req.ForeignSettle,
 				FxFeePct:      req.FxFeePct,
+				NoCash:        req.NoCash,
 			})
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -78,6 +80,7 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				AccountType   string   `json:"account_type"`
 				ForeignSettle string   `json:"foreign_settle"`
 				FxFeePct      *float64 `json:"fx_fee_pct"` // 없으면 그대로
+				NoCash        *bool    `json:"no_cash"`    // 없으면 그대로
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -93,6 +96,7 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				AccountType:   models.AccountType(req.AccountType),
 				ForeignSettle: req.ForeignSettle,
 				FxFeePct:      req.FxFeePct,
+				NoCash:        req.NoCash,
 			})
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

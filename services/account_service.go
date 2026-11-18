@@ -30,6 +30,7 @@ type CreateAccountRequest struct {
 	AccountType   models.AccountType
 	ForeignSettle string  // "" = 기본(USD)
 	FxFeePct      float64 // 자동 환전 수수료(%)
+	NoCash        bool    // 예수금 기록 안 함 (투자 대금은 연결 통장에서)
 }
 
 type UpdateAccountRequest struct {
@@ -42,6 +43,7 @@ type UpdateAccountRequest struct {
 	AccountType   models.AccountType
 	ForeignSettle string   // "" = 그대로
 	FxFeePct      *float64 // nil = 그대로
+	NoCash        *bool    // nil = 그대로
 }
 
 // validSettle: 예수금 구성 — 달러 따로(USD) · 원화로 바로(KRW) · 자동 환전(AFX)
@@ -95,6 +97,7 @@ func (s *AccountService) CreateAccount(req CreateAccountRequest) (*models.Accoun
 		AccountType:   req.AccountType,
 		ForeignSettle: req.ForeignSettle,
 		FxFeePct:      req.FxFeePct,
+		NoCash:        req.NoCash,
 	}
 
 	if err := s.db.Create(account).Error; err != nil {
@@ -168,6 +171,9 @@ func (s *AccountService) UpdateAccount(id uint, req UpdateAccountRequest) (*mode
 			return nil, fmt.Errorf("자동 환전 수수료는 0~5%% 사이여야 합니다")
 		}
 		account.FxFeePct = *req.FxFeePct
+	}
+	if req.NoCash != nil {
+		account.NoCash = *req.NoCash
 	}
 	account.Description = req.Description
 

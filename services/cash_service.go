@@ -160,6 +160,9 @@ func assetLabel(a models.Asset) string {
 
 // flows: 계좌의 모든 현금 흐름 (오래된 것부터, 통화별 누적 잔액 포함)
 func (s *CashService) flows(account *models.Account) ([]CashFlow, error) {
+	if account.NoCash {
+		return nil, nil // 예수금 기록 안 함 (투자 대금은 연결 통장에서) — 예수금 0
+	}
 	var entries []models.CashEntry
 	if err := s.db.Where("account_id = ?", account.ID).Find(&entries).Error; err != nil {
 		return nil, err
@@ -488,6 +491,9 @@ func (s *CashService) GetSummary(accountID uint) (*CashSummary, error) {
 		flows[i], flows[j] = flows[j], flows[i]
 	}
 	sum.Flows = flows
+	if sum.Flows == nil {
+		sum.Flows = []CashFlow{} // 예수금 기록 안 하는 계좌 등 — 화면이 빈 목록으로 받게
+	}
 	return sum, nil
 }
 
@@ -623,9 +629,14 @@ func parseCashDate(s string, now time.Time) (time.Time, error) {
 func validCurrency(c string) bool { return c == "KRW" || c == "USD" }
 
 // CreateEntry: 입금·출금·이자
+// ErrNoCashAccount: 예수금을 기록하지 않는 계좌에 현금 기록을 넣으려 할 때
+var errNoCash = cashInputErr("이 계좌는 예수금을 기록하지 않습니다 (계좌 설정의 '예수금 기록 안 함')")
+
 func (s *CashService) CreateEntry(accountID uint, req CashEntryRequest) (*models.CashEntry, error) {
-	if _, err := s.account(accountID); err != nil {
+	if acc, err := s.account(accountID); err != nil {
 		return nil, err
+	} else if acc.NoCash {
+		return nil, errNoCash
 	}
 	req.Currency = strings.ToUpper(strings.TrimSpace(req.Currency))
 	if !validCurrency(req.Currency) {
@@ -663,8 +674,10 @@ type CashExchangeRequest struct {
 
 // CreateExchange: 환전 — 내준 통화 −, 받은 통화 + 두 줄을 한 쌍으로
 func (s *CashService) CreateExchange(accountID uint, req CashExchangeRequest) ([]models.CashEntry, error) {
-	if _, err := s.account(accountID); err != nil {
+	if acc, err := s.account(accountID); err != nil {
 		return nil, err
+	} else if acc.NoCash {
+		return nil, errNoCash
 	}
 	from := strings.ToUpper(strings.TrimSpace(req.FromCurrency))
 	if !validCurrency(from) {
@@ -752,6 +765,9 @@ func (s *CashService) reconcile(accountID uint, req CashReconcileRequest, intere
 	acc, err := s.account(accountID)
 	if err != nil {
 		return nil, err
+	}
+	if acc.NoCash {
+		return nil, errNoCash
 	}
 	req.Currency = strings.ToUpper(strings.TrimSpace(req.Currency))
 	if !validCurrency(req.Currency) {

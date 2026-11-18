@@ -80,7 +80,9 @@ type Account struct {
 	// 예수금 구성 (미국 주식을 어느 예수금으로 사고파는지) — SettleUSD · SettleKRW · SettleAutoFX
 	ForeignSettle string `gorm:"size:3;not null;default:'USD'" json:"foreign_settle"`
 	// 자동 환전 수수료(%): 원화로 바로(KRW)·자동 환전(AFX) 때 환율에 얹는다 (살 때 +, 팔 때·배당 −)
-	FxFeePct    float64        `gorm:"not null;default:0" json:"fx_fee_pct"`
+	FxFeePct float64 `gorm:"not null;default:0" json:"fx_fee_pct"`
+	// 예수금 기록 안 함: 투자 대금이 연결 통장에서 바로 빠져나가는 계좌 (토스뱅크 펀드 모으기 등) — 예수금을 0으로 보고 매매로 계산하지 않는다
+	NoCash      bool           `gorm:"not null;default:false" json:"no_cash"`
 	Description string         `gorm:"size:500" json:"description"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
