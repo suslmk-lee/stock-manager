@@ -11,6 +11,7 @@ import AccumulationPage from './pages/AccumulationPage';
 import PensionPage from './pages/PensionPage';
 import DividendAnalysisPage from './pages/DividendAnalysisPage';
 import DividendScorePage from './pages/DividendScorePage';
+import TodayPage from './pages/TodayPage';
 import TransactionManager from './components/TransactionManager';
 import MobileTabBar from './components/shell/MobileTabBar';
 import ProfileManager from './components/signals/ProfileManager';
@@ -188,6 +189,7 @@ export default function Dashboard() {
 
         <PageSlotsProvider value={{ lead: leadSlot, actions: actionsSlot }}>
           <main key={route} className={`relative mx-auto max-w-screen-2xl px-4 py-5 sm:px-6 sm:py-6 animate-fade-up ${mobile ? 'pb-24' : ''}`}>
+            {route === 'today' && <TodayPage />}
             {route === 'accounts' && <App />}
             {route === 'assets' && <AssetManager />}
             {route === 'trades' && <TransactionManager selectedAccountId={selectedAccountId} onAccountChange={setSelectedAccountId} />}

@@ -30,6 +30,7 @@ type App struct {
 	dividendScoreService *services.DividendScoreService
 	fundService          *services.FundService
 	contributionService  *services.ContributionService
+	todayService         *services.TodayService
 	updater              *updater.Updater
 }
 
@@ -68,6 +69,7 @@ func NewApp() *App {
 	a.signalService.SetExtraAlerts(a.dividendScoreService.HoldingAlerts)
 	a.contributionService = services.NewContributionService(database.GetDB(), a.tickerService, a.fundService)
 	a.contributionService.SetCash(a.cashService)
+	a.todayService = services.NewTodayService(database.GetDB(), a.signalService, a.dividendScoreService, a.cashService, a.accumulationService, a.tickerService)
 	a.updater = updater.New(appVersion)
 	return a
 }
@@ -92,6 +94,7 @@ func (a *App) apiServices() *httpapi.Services {
 		DividendScore: a.dividendScoreService,
 		Fund:          a.fundService,
 		Contribution:  a.contributionService,
+		Today:         a.todayService,
 	}
 }
 

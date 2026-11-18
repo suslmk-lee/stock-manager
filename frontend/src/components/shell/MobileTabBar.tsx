@@ -18,7 +18,7 @@ export default function MobileTabBar({ activeGroup, onGroup, onMore }: MobileTab
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="메뉴"
     >
-      <div className="grid grid-cols-4">
+      <div className="grid" style={{ gridTemplateColumns: `repeat(${NAV_GROUPS.length + 1}, minmax(0, 1fr))` }}>
         {NAV_GROUPS.map((g) => {
           const Icon = g.icon;
           const active = g.id === activeGroup;

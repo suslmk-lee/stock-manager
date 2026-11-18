@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { IconAccumulate, IconBars, IconCandidates, IconChart, IconCoin, IconLayers, IconPodium, IconRadar, IconSliders, IconTrades, IconTrend, IconWallet, type AppIcon } from './components/ui/appIcons';
+import { IconAccumulate, IconBars, IconBuy, IconCandidates, IconChart, IconCoin, IconLayers, IconPodium, IconRadar, IconSliders, IconTrades, IconTrend, IconWallet, type AppIcon } from './components/ui/appIcons';
 
-export type RouteId = 'accounts' | 'assets' | 'trades' | 'accumulate' | 'pension' | 'trend' | 'dividends' | 'dividend-analysis' | 'dividend-score' | 'signals' | 'profiles' | 'candidates';
-export type GroupId = 'assets' | 'dividends' | 'signals';
+export type RouteId = 'today' | 'accounts' | 'assets' | 'trades' | 'accumulate' | 'pension' | 'trend' | 'dividends' | 'dividend-analysis' | 'dividend-score' | 'signals' | 'profiles' | 'candidates';
+export type GroupId = 'today' | 'assets' | 'dividends' | 'signals';
 
 export interface NavItem {
   id: RouteId;
@@ -24,6 +24,13 @@ export interface NavGroup {
 
 // 사이드바 묶음 = 모바일 하단 탭
 export const NAV_GROUPS: NavGroup[] = [
+  {
+    // 오늘 살 종목 Top 3 — 앱을 열면 이 화면부터
+    id: 'today',
+    label: '오늘',
+    icon: IconBuy,
+    items: [{ id: 'today', label: '오늘', title: '오늘 살 종목', icon: IconBuy, isNew: true }],
+  },
   {
     id: 'assets',
     label: '자산',
@@ -62,7 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
 export const NAV_ITEMS_BY_ID = Object.fromEntries(NAV_GROUPS.flatMap((g) => g.items).map((i) => [i.id, i])) as Record<RouteId, NavItem>;
 export const GROUP_OF = Object.fromEntries(NAV_GROUPS.flatMap((g) => g.items.map((i) => [i.id, g.id]))) as Record<RouteId, GroupId>;
 
-export const DEFAULT_ROUTE: RouteId = 'accounts';
+export const DEFAULT_ROUTE: RouteId = 'today';
 
 // 예전 탭 주소 → 새 페이지 (하위 탭은 각 페이지가 해시를 보고 고른다)
 const ROUTE_ALIASES: Record<string, RouteId> = {

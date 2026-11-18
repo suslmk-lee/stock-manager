@@ -1059,3 +1059,60 @@ export interface FundPrice {
   source: string;
   created_at: string;
 }
+
+// ── 오늘 살 종목 Top 3 ──
+/** 오늘 점수 구성 (신호 40 · 배당 30 · 비중 15 · 살 돈 15, 배당이 없으면 신호 70) */
+export interface TodayParts {
+  signal: number;
+  dividend: number;
+  weight: number;
+  cash: number;
+  signal_max: number;
+}
+
+/** 이 종목을 살 계좌와 예수금 (예수금 통화 기준) */
+export interface TodayAccount {
+  id: number;
+  name: string;
+  broker: string;
+  currency: string;
+  cash: number;
+  /** 제안 금액 */
+  need: number;
+  /** 모자란 금액 (0 이면 충분) */
+  short: number;
+  no_cash: boolean;
+}
+
+export interface TodayPick {
+  rank: number;
+  asset_id: number;
+  ticker: string;
+  name: string;
+  market: string;
+  currency: string;
+  score: number;
+  parts: TodayParts;
+  action: string;
+  met_buy: number;
+  total_buy: number;
+  div_rank?: number;
+  price: number;
+  from_high_pct: number;
+  weight_pct: number;
+  /** 최근 6개월 종가 (오래된 것부터) */
+  series: number[];
+  reasons: string[];
+  suggest_qty: number;
+  suggest_krw: number;
+  account?: TodayAccount | null;
+}
+
+export interface TodayPicks {
+  date: string;
+  picks: TodayPick[];
+  /** 점수를 넘긴 종목 수 */
+  considered: number;
+  /** 오늘 모으기로 사는 종목 (추천에서 뺌) */
+  plans: { asset_id: number; name: string; account: string; amount: number; currency: string }[];
+}

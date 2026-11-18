@@ -27,6 +27,8 @@ type Services struct {
 	// 펀드(기준가·평가금액 맞추기)와 부담금 배분(퇴직연금 DC 등)
 	Fund         *services.FundService
 	Contribution *services.ContributionService
+	// 오늘 살 종목 Top 3
+	Today *services.TodayService
 }
 
 // NewServices 는 기본 서비스 묶음을 생성한다.
@@ -52,6 +54,7 @@ func NewServices() *Services {
 	contribution := services.NewContributionService(database.GetDB(), ticker, fund)
 	accumulation := services.NewAccumulationService(database.GetDB(), ticker)
 	accumulation.SetFunds(fund)
+	today := services.NewTodayService(database.GetDB(), signal, divScore, cash, accumulation, ticker)
 	contribution.SetCash(cash)
 	signal.SetExtraAlerts(divScore.HoldingAlerts)
 
@@ -72,5 +75,6 @@ func NewServices() *Services {
 		DividendScore: divScore,
 		Fund:          fund,
 		Contribution:  contribution,
+		Today:         today,
 	}
 }
