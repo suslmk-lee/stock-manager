@@ -1,7 +1,10 @@
-import type { SignalItem, SignalProfile, SignalRule } from '../../types/models';
+import { useEffect, useState } from 'react';
+import type { PriceZoneDetail, SignalItem, SignalProfile, SignalRule } from '../../types/models';
+import { apiClient } from '../../api/client';
 import SignalHistory from '../alerts/SignalHistory';
 import ProfileChip from './ProfileChip';
 import PriceChart from './PriceChart';
+import PriceZonePanel from './PriceZonePanel';
 import SignalRuleEditor from './SignalRuleEditor';
 import StrategyAdvisor from './StrategyAdvisor';
 import { ACTION_META, SignalCard, actionLabelOf } from './SignalCard';
@@ -29,10 +32,40 @@ interface SignalDetailProps {
   onProfileSaved: () => void;
 }
 
-/** 매매 신호 상세 패널: 개요(가격 차트 + 카드 본문) · 규칙(종목별 전략 편집) · 전략 추천 · 이력 */
+/** 사기 좋은 가격: 이번 실행 동안 종목별로 기억 (백그라운드 계산은 몇 시간에 한 번) */
+const zoneCache = new Map<number, PriceZoneDetail>();
+
+function useZone(assetId: number) {
+  const [detail, setDetail] = useState<PriceZoneDetail | null>(() => zoneCache.get(assetId) ?? null);
+  const [loading, setLoading] = useState(!zoneCache.has(assetId));
+  useEffect(() => {
+    let cancelled = false;
+    setDetail(zoneCache.get(assetId) ?? null);
+    setLoading(true);
+    apiClient
+      .GetPriceZone(assetId)
+      .then((d) => {
+        zoneCache.set(assetId, d);
+        if (!cancelled) setDetail(d);
+      })
+      .catch(() => {
+        if (!cancelled) setDetail(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assetId]);
+  return { detail, loading };
+}
+
+/** 매매 신호 상세 패널: 개요(가격 차트 + 사기 좋은 가격 + 카드 본문) · 규칙(종목별 전략 편집) · 전략 추천 · 이력 */
 export default function SignalDetail({ item, rule, assetRule, profiles, tab, onTab, onRuleSaved, onProfileSaved }: SignalDetailProps) {
   const meta = ACTION_META[item.action];
   const accountCount = item.accounts.length;
+  const zone = useZone(item.asset_id);
 
   return (
     <div className="flex flex-col gap-4">
@@ -73,7 +106,8 @@ export default function SignalDetail({ item, rule, assetRule, profiles, tab, onT
 
       {tab === 'overview' && (
         <div className="flex flex-col gap-4" role="tabpanel">
-          {item.action !== 'NO_PRICE' && <PriceChart ticker={item.ticker} currency={item.currency} avgPrice={item.avg_price} />}
+          {item.action !== 'NO_PRICE' && <PriceChart ticker={item.ticker} currency={item.currency} avgPrice={item.avg_price} goodPrice={zone.detail?.zone?.good} />}
+          {!/^FUND:/i.test(item.ticker) && <PriceZonePanel detail={zone.detail} loading={zone.loading} />}
           <SignalCard item={item} rule={rule} variant="detail" onEdit={() => onTab('rule')} />
         </div>
       )}

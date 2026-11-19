@@ -4,12 +4,14 @@ import { PageActions } from '../components/shell/PageSlots';
 import { apiClient } from '../api/client';
 import type { TodayPick, TodayPicks } from '../types/models';
 import TodayCard, { pickTitle } from '../components/today/TodayCard';
+import ZoneList from '../components/today/ZoneList';
 import QuickBuyModal from '../components/today/QuickBuyModal';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import { fmtCcy } from '../utils/fx';
 
 /**
- * 오늘 살 종목 Top 3 — 보유 종목마다 '오늘 점수'(매수 신호 40 · 배당 점수 30 · 비중 여유 15 · 살 돈 15)를 매겨 높은 순으로 3개.
+ * 오늘 살 종목 Top 3 — 보유 종목마다 '오늘 점수'(가격 매력 30 · 매수 신호 25 · 배당 점수 20 · 비중 여유 10 · 살 돈 15)를 매겨 높은 순으로 3개.
+ * 가격 매력은 백그라운드에서 날짜별로 계산해 둔 '사기 좋은 가격'을 쓰고, 그 가격대에 있는 보유 종목을 아래에 모아 보여 준다.
  * 보여 주는 방식: 커버플로우 · 카드 스택 · 피크 캐러셀 (고른 방식을 이 PC에 기억)
  */
 
@@ -21,6 +23,12 @@ const STYLES: { key: Style; label: string; hint: string }[] = [
 ];
 const STYLE_KEY = 'today-style';
 const CARD_W = 'min(330px, 80vw)';
+
+const clock = (iso: string | null) => {
+  if (!iso) return '';
+  const t = new Date(iso);
+  return Number.isNaN(t.getTime()) ? '' : `${t.getMonth() + 1}월 ${t.getDate()}일 ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+};
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'string' ? e : '불러오지 못했습니다.');
 const dayLabel = (d: string) => {
@@ -114,10 +122,10 @@ export default function TodayPage() {
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-[13px] text-zinc-400">
-          {data ? `${dayLabel(data.date)} · ` : ''}보유 종목을 매매 신호 · 배당 점수 · 비중 · 예수금으로 매긴 오늘 점수 순
+          {data ? `${dayLabel(data.date)} · ` : ''}보유 종목을 가격 매력 · 매매 신호 · 배당 점수 · 비중 · 예수금으로 매긴 오늘 점수 순
           {data && data.considered > 0 ? ` (점수를 넘긴 ${data.considered}종목 중)` : ''}
         </p>
-        <span className="text-zinc-500" title={'오늘 점수 = 매수 신호 40 + 배당 점수 30 + 비중 여유 15 + 살 돈 15 (배당이 없으면 신호 70)\n매도·충돌, 매수를 막은 종목(쉬는 기간·최대 비중·반등 미확인), 오늘 산 종목, 오늘 모으기로 사는 종목은 뺍니다.\n규칙으로 계산한 참고값이며 투자 권유가 아닙니다.'} aria-label="안내">
+        <span className="text-zinc-500" title={'오늘 점수 = 가격 매력 30 + 매수 신호 25 + 배당 점수 20 + 비중 여유 10 + 살 돈 15 (배당 점수·가격 매력이 없으면 그 몫은 신호로)\n가격 매력: 1년·3년 종가 가운데 지금 위치와 배당률 위치, 과거에 싸게 산 날 1년 뒤 수익이 평소보다 나빴던 종목은 절반\n매도·충돌, 매수를 막은 종목(쉬는 기간·최대 비중·반등 미확인), 오늘 산 종목, 오늘 모으기로 사는 종목은 뺍니다.\n규칙으로 계산한 참고값이며 투자 권유가 아닙니다.'} aria-label="안내">
           <Info className="h-4 w-4" />
         </span>
       </div>
@@ -131,7 +139,7 @@ export default function TodayPage() {
         <div className="surface px-6 py-16 text-center">
           <p className="text-base font-semibold text-white">오늘은 추천할 종목이 없어요</p>
           <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-zinc-400">
-            매수 조건을 채운 보유 종목이 없거나, 모두 쉬는 기간 · 최대 비중 · 오늘 이미 산 종목입니다. 매매 신호 화면에서 종목별 조건을 볼 수 있어요.
+            점수를 넘긴 보유 종목이 없거나, 모두 쉬는 기간 · 최대 비중 · 오늘 이미 산 종목입니다. 매매 신호 화면에서 종목별 조건을 볼 수 있어요.
           </p>
         </div>
       ) : (
@@ -165,6 +173,29 @@ export default function TodayPage() {
         </>
       )}
 
+      {data && (
+        <div className="surface p-4 sm:p-5">
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <p className="text-[14px] font-semibold text-white">
+              사기 좋은 가격대 <span className="num text-zinc-400">{data.in_zone.length}종목</span>
+            </p>
+            <p className="num text-[11.5px] text-zinc-500">
+              {data.zone_count > 0
+                ? `${clock(data.zone_updated_at)} 계산 · 보유 ${data.zone_held}종목 중 ${data.zone_count}종목 (1년 이력이 없는 종목·펀드 제외)`
+                : ''}
+            </p>
+          </div>
+          <p className="mb-2 text-[12px] leading-relaxed text-zinc-500">각 종목의 지난 3년 종가 중 싼 20% 이하 가격 · 과거 이만큼 쌌을 때 샀다면 1년 뒤 총수익(배당 포함)과 평소를 비교해요</p>
+          {data.zone_count === 0 ? (
+            <p className="py-6 text-center text-[13px] text-zinc-400">아직 가격대를 계산하지 않았어요. 앱이 켜져 있으면 백그라운드에서 보유 종목의 10년 주가를 받아 계산해요 (몇 분 걸려요).</p>
+          ) : data.in_zone.length === 0 ? (
+            <p className="py-6 text-center text-[13px] text-zinc-400">지금 사기 좋은 가격대에 있는 보유 종목이 없어요.</p>
+          ) : (
+            <ZoneList rows={data.in_zone} picked={new Set(picks.map((p) => p.asset_id))} onOpen={focusAsset} />
+          )}
+        </div>
+      )}
+
       {data && data.plans.length > 0 && (
         <div className="surface p-4 sm:p-5">
           <p className="label-mono mb-2">오늘 모으기로 사는 종목 · 추천에서 뺐어요</p>
@@ -181,11 +212,12 @@ export default function TodayPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
-          { pt: '40', title: '매수 신호', text: '매매 신호의 매수 조건을 얼마나 채웠나 (매수 검토면 만점)', cls: 'border-mint-400' },
-          { pt: '30', title: '배당 점수', text: '배당 점수와 지금 수익률 매력. 배당이 없으면 신호가 70점', cls: 'border-amber-300' },
-          { pt: '15', title: '비중 여유', text: '매수 최대 비중(없으면 20%)보다 낮을수록', cls: 'border-sky-400' },
+          { pt: '30', title: '가격 매력', text: '과거 1년·3년 가격과 배당률에 비해 지금 얼마나 싼가 (과거에 싸게 사도 안 통한 종목은 절반)', cls: 'border-emerald-400' },
+          { pt: '25', title: '매수 신호', text: '매매 신호의 매수 조건을 얼마나 채웠나 (매수 검토면 만점)', cls: 'border-mint-400' },
+          { pt: '20', title: '배당 점수', text: '배당 점수와 지금 수익률 매력', cls: 'border-amber-300' },
+          { pt: '10', title: '비중 여유', text: '매수 최대 비중(없으면 20%)보다 낮을수록', cls: 'border-sky-400' },
           { pt: '15', title: '살 돈', text: '그 종목을 살 계좌의 예수금이 제안 금액을 얼마나 채우나', cls: 'border-zinc-500' },
         ].map((x) => (
           <div key={x.title} className={`min-w-0 border-t-[3px] pt-2 ${x.cls}`}>

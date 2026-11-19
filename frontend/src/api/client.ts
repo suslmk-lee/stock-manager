@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest, DivScoreRanking, DivScoreDetail, DivScoreWeights, ContributionPlanView, ContributionPlanRequest, ContributionRound, ContributionRunResult, FundPrice, ContributionCashSync, ContributionBuyRequest, TodayPicks } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest, DivScoreRanking, DivScoreDetail, DivScoreWeights, ContributionPlanView, ContributionPlanRequest, ContributionRound, ContributionRunResult, FundPrice, ContributionCashSync, ContributionBuyRequest, TodayPicks, PriceZoneList, PriceZoneDetail } from '../types/models';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -575,6 +575,17 @@ export const apiClient = {
   GetTodayPicks: async (): Promise<TodayPicks> => {
     if (isWeb) return fetchApi<TodayPicks>('/today-picks');
     return (await WailsApp.GetTodayPicks()) as unknown as TodayPicks;
+  },
+
+  // 사기 좋은 가격 (백그라운드에서 계산해 둔 가장 최근 기록 · 종목별 30일 기록)
+  GetPriceZones: async (): Promise<PriceZoneList> => {
+    if (isWeb) return fetchApi<PriceZoneList>('/price-zones');
+    return (await WailsApp.GetPriceZones()) as unknown as PriceZoneList;
+  },
+
+  GetPriceZone: async (assetId: number): Promise<PriceZoneDetail> => {
+    if (isWeb) return fetchApi<PriceZoneDetail>(`/price-zones/${assetId}`);
+    return (await WailsApp.GetPriceZone(assetId)) as unknown as PriceZoneDetail;
   },
 
   // 현금성자산 맞추기 — 늘어난 차이는 이자로 (rate 가 음수면 금리는 그대로)

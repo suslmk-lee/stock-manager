@@ -46,6 +46,9 @@ func main() {
 	// 부담금 배분(퇴직연금) 자동 기록 (같은 회차는 한 번만 남는다)
 	go svc.Contribution.RunEvery(context.Background(), 4*time.Hour)
 
+	// 사기 좋은 가격: 보유 종목 가격대를 날짜별로 계산해 둔다 (앱과 같은 DB — 새 기록이 있으면 건너뜀, 30일 지난 기록은 지움)
+	go svc.PriceZone.RunEvery(context.Background(), time.Minute, time.Hour)
+
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}

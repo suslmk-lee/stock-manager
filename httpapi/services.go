@@ -29,6 +29,8 @@ type Services struct {
 	Contribution *services.ContributionService
 	// 오늘 살 종목 Top 3
 	Today *services.TodayService
+	// 사기 좋은 가격 (보유 종목 가격대, 날짜별 30일 보관)
+	PriceZone *services.PriceZoneService
 }
 
 // NewServices 는 기본 서비스 묶음을 생성한다.
@@ -55,8 +57,10 @@ func NewServices() *Services {
 	accumulation := services.NewAccumulationService(database.GetDB(), ticker)
 	accumulation.SetFunds(fund)
 	today := services.NewTodayService(database.GetDB(), signal, divScore, cash, accumulation, ticker)
+	zones := services.NewPriceZoneService(database.GetDB(), ticker)
+	today.SetZones(zones)
 	contribution.SetCash(cash)
-	signal.SetExtraAlerts(divScore.HoldingAlerts)
+	signal.SetExtraAlerts(services.CombineAlerts(divScore.HoldingAlerts, zones.Alerts))
 
 	return &Services{
 		Account:       services.NewAccountService(),
@@ -76,5 +80,6 @@ func NewServices() *Services {
 		Fund:          fund,
 		Contribution:  contribution,
 		Today:         today,
+		PriceZone:     zones,
 	}
 }

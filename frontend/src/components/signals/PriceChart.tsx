@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Area, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { apiClient } from '../../api/client';
 import type { PriceHistory } from '../../types/models';
 import { useThemeColors } from '../../appearance/AppearanceContext';
@@ -51,10 +51,12 @@ interface PriceChartProps {
   ticker: string;
   currency: string;
   avgPrice?: number;
+  /** 사기 좋은 가격 (이 가격 아래를 띠로 칠한다) */
+  goodPrice?: number;
 }
 
-/** 상세 패널의 1년 가격 차트: 종가, 200일선, 평단 */
-export default function PriceChart({ ticker, currency, avgPrice }: PriceChartProps) {
+/** 상세 패널의 1년 가격 차트: 종가, 200일선, 평단, 사기 좋은 가격대 */
+export default function PriceChart({ ticker, currency, avgPrice, goodPrice }: PriceChartProps) {
   const tc = useThemeColors();
   const [series, setSeries] = useState<Point[] | null>(() => cache.get(ticker) ?? null);
   const [failed, setFailed] = useState(false);
@@ -90,8 +92,9 @@ export default function PriceChart({ ticker, currency, avgPrice }: PriceChartPro
     if (!series || series.length === 0) return undefined;
     const vals = series.flatMap((p) => (p.ma200 ? [p.close, p.ma200] : [p.close]));
     if (avgPrice && avgPrice > 0) vals.push(avgPrice);
+    if (goodPrice && goodPrice > 0) vals.push(goodPrice);
     return niceTicks(Math.min(...vals), Math.max(...vals));
-  }, [series, avgPrice]);
+  }, [series, avgPrice, goodPrice]);
   const domain: [number, number] | undefined = ticks && ticks.length > 1 ? [ticks[0], ticks[ticks.length - 1]] : undefined;
 
   const hasMa = !!series?.some((p) => p.ma200);
@@ -116,6 +119,12 @@ export default function PriceChart({ ticker, currency, avgPrice }: PriceChartPro
             <span className="inline-flex items-center gap-1.5">
               <span className="w-3.5 border-t-2 border-dashed" style={{ borderColor: tc.accent }} />
               평단
+            </span>
+          )}
+          {!!goodPrice && (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-3.5 rounded-[2px]" style={{ background: tc.zone, opacity: 0.35 }} />
+              좋은 가격
             </span>
           )}
         </span>
@@ -164,6 +173,10 @@ export default function PriceChart({ ticker, currency, avgPrice }: PriceChartPro
                 labelFormatter={(t) => dayLabel(Number(t))}
                 formatter={(v: number, name: string) => [fmt(v), name]}
               />
+              {!!goodPrice && domain && goodPrice > domain[0] && (
+                <ReferenceArea y1={domain[0]} y2={goodPrice} fill={tc.zone} fillOpacity={0.1} stroke="none" ifOverflow="hidden" />
+              )}
+              {!!goodPrice && <ReferenceLine y={goodPrice} stroke={tc.zone} strokeDasharray="3 3" strokeWidth={1.1} />}
               {!!avgPrice && <ReferenceLine y={avgPrice} stroke={tc.accent} strokeDasharray="4 4" strokeWidth={1.2} ifOverflow="extendDomain" />}
               <Area type="monotone" dataKey="close" name="종가" stroke={tc.text} strokeWidth={1.6} fill="url(#price-fill)" dot={false} isAnimationActive={false} />
               {hasMa && <Line type="monotone" dataKey="ma200" name="200일선" stroke={tc.restricted} strokeDasharray="5 4" strokeWidth={1.3} dot={false} isAnimationActive={false} connectNulls />}

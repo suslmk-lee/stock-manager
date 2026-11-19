@@ -31,6 +31,7 @@ type App struct {
 	fundService          *services.FundService
 	contributionService  *services.ContributionService
 	todayService         *services.TodayService
+	zoneService          *services.PriceZoneService
 	updater              *updater.Updater
 }
 
@@ -66,10 +67,12 @@ func NewApp() *App {
 	a.snapshotService.SetCash(a.cashService)
 	a.lockService = services.NewLockService(services.DefaultLockDir())
 	a.dividendScoreService = services.NewDividendScoreService(database.GetDB(), a.tickerService)
-	a.signalService.SetExtraAlerts(a.dividendScoreService.HoldingAlerts)
+	a.zoneService = services.NewPriceZoneService(database.GetDB(), a.tickerService)
+	a.signalService.SetExtraAlerts(services.CombineAlerts(a.dividendScoreService.HoldingAlerts, a.zoneService.Alerts))
 	a.contributionService = services.NewContributionService(database.GetDB(), a.tickerService, a.fundService)
 	a.contributionService.SetCash(a.cashService)
 	a.todayService = services.NewTodayService(database.GetDB(), a.signalService, a.dividendScoreService, a.cashService, a.accumulationService, a.tickerService)
+	a.todayService.SetZones(a.zoneService)
 	a.updater = updater.New(appVersion)
 	return a
 }
@@ -95,6 +98,7 @@ func (a *App) apiServices() *httpapi.Services {
 		Fund:          a.fundService,
 		Contribution:  a.contributionService,
 		Today:         a.todayService,
+		PriceZone:     a.zoneService,
 	}
 }
 
@@ -130,6 +134,9 @@ func (a *App) startup(ctx context.Context) {
 
 	// 부담금 배분(퇴직연금): 지난 납입일 회차를 지금 한 번, 이후 몇 시간마다 채운다
 	go a.contributionService.RunEvery(ctx, 4*time.Hour)
+
+	// 사기 좋은 가격: 보유 종목의 가격대를 백그라운드에서 계산해 날짜별로 저장 (서버와 같은 DB — 새 기록이 있으면 건너뜀, 30일 지난 기록은 지움)
+	go a.zoneService.RunEvery(ctx, time.Minute, time.Hour)
 
 	// 신호 백그라운드 점검 (ctx 종료 시 중단)
 	a.startSignalMonitor(ctx)

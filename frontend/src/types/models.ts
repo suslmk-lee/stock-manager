@@ -546,8 +546,8 @@ export interface SignalEvent {
   ticker: string;
   name: string;
   from_action: SignalAction | '';
-  to_action: SignalAction | 'SUGGEST' | 'HOLDING';
-  kind?: 'signal' | 'suggestion' | 'holding';
+  to_action: SignalAction | 'SUGGEST' | 'HOLDING' | 'ZONE';
+  kind?: 'signal' | 'suggestion' | 'holding' | 'zone';
   suggested_profile_id?: number;
   met_codes: string; // 쉼표로 구분
   message: string;
@@ -1060,14 +1060,85 @@ export interface FundPrice {
   created_at: string;
 }
 
+// ── 사기 좋은 가격 (보유 종목 가격대, 백그라운드에서 날짜별로 계산해 30일 보관) ──
+export type ZoneLevel = 'great' | 'good' | 'fair' | 'high';
+export type ZoneVerdict = 'works' | 'trap' | 'few';
+
+export interface PriceZone {
+  id: number;
+  asset_id: number;
+  /** KST YYYY-MM-DD */
+  date: string;
+  ticker: string;
+  currency: string;
+  price: number;
+  /** 그 종가 시각 (unix 초) */
+  price_at: number;
+  years: number;
+  /** 1년 · 3년 종가 가운데 지금보다 낮았던 비율 (0 = 최저) */
+  pos_1y: number;
+  pos_3y: number;
+  low_1y: number;
+  high_1y: number;
+  /** 아주 좋은 가격 (3년 하위 10%) */
+  great: number;
+  /** 좋은 가격 (3년 하위 20%) */
+  good: number;
+  /** 3년 중간값 */
+  mid: number;
+  /** 최근 1년 배당 ÷ 가격 (%) */
+  yield: number;
+  /** 지난 배당률 가운데 지금보다 낮았던 비율, -1 = 비교 불가 */
+  yield_pos: number;
+  yield_good_price: number;
+  ma20: number;
+  from_low20: number;
+  falling: boolean;
+  test_days: number;
+  cheap_days: number;
+  cheap_episodes: number;
+  /** 과거 1년 하위 20% 가격이던 날 샀다면 1년 뒤 총수익 평균 (%) */
+  cheap_avg: number;
+  all_avg: number;
+  cheap_win: number;
+  verdict: ZoneVerdict;
+  level: ZoneLevel;
+  /** 가격 매력 0~100 */
+  score: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PriceZoneRow extends PriceZone {
+  name: string;
+}
+
+export interface PriceZoneList {
+  date: string;
+  updated_at: string | null;
+  held: number;
+  rows: PriceZoneRow[];
+}
+
+export interface PriceZoneDetail {
+  zone: PriceZoneRow | null;
+  /** 최근 30일 (오래된 것부터) */
+  history: PriceZone[];
+}
+
 // ── 오늘 살 종목 Top 3 ──
-/** 오늘 점수 구성 (신호 40 · 배당 30 · 비중 15 · 살 돈 15, 배당이 없으면 신호 70) */
+/** 오늘 점수 구성 (가격 매력 30 · 신호 25 · 배당 20 · 비중 10 · 살 돈 15, 배당 점수·가격 매력이 없으면 그 몫은 신호로) */
 export interface TodayParts {
+  price: number;
   signal: number;
   dividend: number;
   weight: number;
   cash: number;
+  price_max: number;
   signal_max: number;
+  dividend_max: number;
+  weight_max: number;
+  cash_max: number;
 }
 
 /** 이 종목을 살 계좌와 예수금 (예수금 통화 기준) */
@@ -1100,9 +1171,12 @@ export interface TodayPick {
   price: number;
   from_high_pct: number;
   weight_pct: number;
-  /** 최근 6개월 종가 (오래된 것부터) */
+  /** 최근 1년 종가 (오래된 것부터) */
   series: number[];
   reasons: string[];
+  /** 주의 (아직 내려가는 중 · 싸게 사도 안 통했던 종목) */
+  warn?: string;
+  zone?: PriceZoneRow | null;
   suggest_qty: number;
   suggest_krw: number;
   account?: TodayAccount | null;
@@ -1115,4 +1189,10 @@ export interface TodayPicks {
   considered: number;
   /** 오늘 모으기로 사는 종목 (추천에서 뺌) */
   plans: { asset_id: number; name: string; account: string; amount: number; currency: string }[];
+  /** 사기 좋은 가격: 마지막 계산 날짜·시각, 계산한 종목 수 / 보유 종목 수, 좋은 가격대 종목 */
+  zone_date: string;
+  zone_updated_at: string | null;
+  zone_count: number;
+  zone_held: number;
+  in_zone: PriceZoneRow[];
 }

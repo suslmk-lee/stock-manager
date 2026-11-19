@@ -247,6 +247,7 @@ func runMigrations() error {
 		&models.ContributionItem{},
 		&models.FundPrice{},
 		&models.HoldingCheckAlert{},
+		&models.PriceZone{},
 	); err != nil {
 		return err
 	}

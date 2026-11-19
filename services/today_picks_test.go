@@ -8,7 +8,8 @@ import (
 	"stock-manager/models"
 )
 
-// 오늘 살 종목: 신호 40 · 배당 30 · 비중 15 · 살 돈 15 (배당 없으면 신호 70), 매도·막힌·오늘 산·오늘 모으기 종목은 빼고 상위 3개
+// 오늘 살 종목: 가격 매력 30 · 신호 25 · 배당 20 · 비중 10 · 살 돈 15 (배당 점수·가격 매력이 없으면 그 몫은 신호로),
+// 매도·막힌·오늘 산·오늘 모으기 종목은 빼고 상위 3개
 func TestRankToday(t *testing.T) {
 	today := "2026-11-19"
 	checks := func(met, total int) []SignalCheck {
@@ -39,6 +40,11 @@ func TestRankToday(t *testing.T) {
 		1: {AssetID: 1, Score: 80, Rank: 1, Parts: DivScoreParts{Yield: 0.9}},
 		2: {AssetID: 2, Score: 70, Rank: 3, Parts: DivScoreParts{Yield: 0.7}},
 	}
+	// JEPQ 만 가격대 기록이 있다: 좋은 가격 · 과거에 통함 · 아직 내려가는 중
+	zones := map[uint]PriceZoneRow{
+		2: {PriceZone: models.PriceZone{AssetID: 2, Currency: "USD", Score: 80, Level: models.ZoneLevelGood, Pos1y: 3, Good: 54.5,
+			Verdict: models.ZoneVerdictWorks, CheapAvg: 11.7, AllAvg: 7.8, Falling: true, MA20: 57.27}},
+	}
 	planned := map[uint]bool{7: true}
 	accounts := map[uint]models.Account{
 		1: {ID: 1, Name: "토스증권", Broker: "토스증권"},
@@ -48,7 +54,7 @@ func TestRankToday(t *testing.T) {
 	}
 	balances := map[uint]CashBalance{1: {KRW: 412300}, 2: {USD: 230.4}, 3: {KRW: 96120}}
 
-	picks, considered := rankToday(items, divRows, planned, accounts, balances, 1400, today)
+	picks, considered := rankToday(items, divRows, zones, planned, accounts, balances, 1400, today)
 	if considered != 4 {
 		t.Fatalf("점수를 넘긴 종목 = %d (1·2·3·9)", considered)
 	}
@@ -56,13 +62,13 @@ func TestRankToday(t *testing.T) {
 	for _, p := range picks {
 		got = append(got, p.AssetID)
 	}
-	if len(picks) != 3 || got[0] != 1 || got[1] != 9 || got[2] != 2 {
-		t.Fatalf("순서 = %v (1, 9, 2 — 3번은 4위)", got)
+	if len(picks) != 3 || got[0] != 1 || got[1] != 2 || got[2] != 9 {
+		t.Fatalf("순서 = %v (1, 2, 9 — 3번은 4위)", got)
 	}
 	near := func(a, b float64) bool { return math.Abs(a-b) < 0.11 }
 	a := picks[0]
-	// 신호 40 · 배당 30×(0.6×0.8+0.4×0.9)=25.2 · 비중 15×(1−4/20)=12 · 살 돈 15 = 92.2
-	if a.Rank != 1 || !near(a.Parts.Signal, 40) || !near(a.Parts.Dividend, 25.2) || !near(a.Parts.Weight, 12) || !near(a.Parts.Cash, 15) || !near(a.Score, 92.2) {
+	// 가격대 기록 없음 → 신호 25+30=55 · 배당 20×(0.6×0.8+0.4×0.9)=16.8 · 비중 10×(1−4/20)=8 · 살 돈 15 = 94.8
+	if a.Rank != 1 || a.Parts.SignalMax != 55 || a.Parts.PriceMax != 0 || !near(a.Parts.Signal, 55) || !near(a.Parts.Dividend, 16.8) || !near(a.Parts.Weight, 8) || !near(a.Parts.Cash, 15) || !near(a.Score, 94.8) || a.Zone != nil {
 		t.Fatalf("1위 = %+v", a)
 	}
 	if a.Account == nil || a.Account.Currency != "KRW" || a.Account.Short != 0 || a.Market != "KR" {
@@ -71,18 +77,37 @@ func TestRankToday(t *testing.T) {
 	if len(a.Reasons) == 0 || !strings.HasPrefix(a.Reasons[0], "매수 신호") || !strings.Contains(strings.Join(a.Reasons, "|"), "배당 점수 1위") {
 		t.Fatalf("1위 이유 = %v", a.Reasons)
 	}
-	// 배당 없는 펀드: 신호 70×2/4=35 · 비중 15×0.95=14.25 · 예수금 기록 안 함 → 살 돈 만점
-	f := picks[1]
-	if f.Parts.SignalMax != 70 || !near(f.Parts.Signal, 35) || !near(f.Parts.Cash, 15) || f.Account == nil || !f.Account.NoCash {
-		t.Fatalf("펀드 = %+v %+v", f.Parts, f.Account)
+	// JEPQ: 가격 매력 30×0.8=24 · 신호 25×2/4=12.5 · 배당 20×0.7=14 · 비중 10×(1−10/15)=3.3 · 살 돈 15 = 68.8
+	j := picks[1]
+	if !near(j.Parts.Price, 24) || j.Parts.PriceMax != 30 || j.Parts.SignalMax != 25 || !near(j.Parts.Signal, 12.5) || !near(j.Parts.Dividend, 14) || !near(j.Parts.Weight, 3.3) || !near(j.Score, 68.8) || j.Zone == nil {
+		t.Fatalf("JEPQ = %+v (%v)", j.Parts, j.Score)
+	}
+	reasons := strings.Join(j.Reasons, "|")
+	if !strings.Contains(reasons, "1년 중 하위 3% 가격 · 좋은 가격 $54.50 이하") || !strings.Contains(reasons, "이만큼 쌌을 때 1년 뒤 평균 +11.7% (평소 +7.8%)") {
+		t.Fatalf("JEPQ 이유 = %v", j.Reasons)
+	}
+	if j.Warn != "아직 내려가는 중 · 20일선 $57.27 아래" {
+		t.Fatalf("JEPQ 주의 = %q", j.Warn)
 	}
 	// 달러 계좌: 제안 20만 원 ÷ 1,400 = $142.86, 예수금 $230.40 → 충분
-	j := picks[2]
 	if j.Account == nil || j.Account.Currency != "USD" || !near(j.Account.Need, 142.86) || j.Account.Short != 0 || j.Market != "US" {
 		t.Fatalf("JEPQ 계좌 = %+v", j.Account)
 	}
+	// 배당 점수·가격대 없는 펀드: 신호 75×2/4=37.5 · 비중 10×0.95=9.5 · 예수금 기록 안 함 → 살 돈 만점 = 62
+	f := picks[2]
+	if f.Parts.SignalMax != 75 || !near(f.Parts.Signal, 37.5) || !near(f.Parts.Cash, 15) || !near(f.Score, 62) || f.Account == nil || !f.Account.NoCash {
+		t.Fatalf("펀드 = %+v %+v", f.Parts, f.Account)
+	}
+	// 싸 보여도 과거에 안 통한 종목은 주의
+	trap := &PriceZoneRow{PriceZone: models.PriceZone{Currency: "USD", Level: models.ZoneLevelGood, Pos1y: 2, Verdict: models.ZoneVerdictTrap, CheapAvg: -8.6, AllAvg: 0.4, Falling: true}}
+	if w := zoneWarn(trap); w != "싸게 사도 과거엔 1년 뒤 평균 -8.6% (평소 +0.4%)" {
+		t.Fatalf("함정 주의 = %q", w)
+	}
+	if w := zoneWarn(&PriceZoneRow{PriceZone: models.PriceZone{Level: models.ZoneLevelHigh, Pos1y: 90, Falling: true}}); w != "" {
+		t.Fatalf("비싼 종목은 주의 없음: %q", w)
+	}
 	// 예수금이 모자라면 모자란 금액
-	only3, _ := rankToday(items[2:3], nil, nil, accounts, balances, 1400, today)
+	only3, _ := rankToday(items[2:3], nil, nil, nil, accounts, balances, 1400, today)
 	if len(only3) != 1 || only3[0].Account == nil || !near(only3[0].Account.Short, 3820) {
 		t.Fatalf("모자란 금액 = %+v", only3)
 	}

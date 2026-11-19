@@ -274,6 +274,7 @@ export interface ThemeColors {
   restricted: string; // 인출 제한 · 연금 (앰버)
   positive: string;
   negative: string;
+  zone: string; // 사기 좋은 가격대 (에메랄드)
   text: string; // 최대 대비 글자
   muted: string; // 보조 글자
   axis: string; // 차트 축 글자
@@ -315,6 +316,7 @@ export function useThemeColors(): ThemeColors {
       restricted: c('amber-400'),
       positive: c('mint-400'),
       negative: c('rose-400'),
+      zone: c('emerald-400'),
       text: c('white'),
       muted: c('zinc-400'),
       axis: c('zinc-500'),
