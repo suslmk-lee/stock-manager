@@ -175,7 +175,14 @@ func (s *CashService) flows(account *models.Account) ([]CashFlow, error) {
 	if err := s.db.Preload("Asset").Where("account_id = ? AND is_received = ?", account.ID, true).Find(&divs).Error; err != nil {
 		return nil, err
 	}
+	return s.flowsOf(account, entries, txs, divs)
+}
 
+// flowsOf: 이미 읽어 온 그 계좌의 현금 기록·거래·받은 배당으로 현금 흐름을 만든다
+func (s *CashService) flowsOf(account *models.Account, entries []models.CashEntry, txs []models.Transaction, divs []models.Dividend) ([]CashFlow, error) {
+	if account.NoCash {
+		return nil, nil
+	}
 	mode := account.ForeignSettle
 	settleKRW := mode == models.SettleKRW
 	fee := account.FxFeePct / 100
@@ -505,13 +512,39 @@ func (s *CashService) GetBalances() ([]CashBalance, float64, error) {
 	}
 	fx := s.currentFx()
 	today := todayKST(s.clock())
+	// 모든 계좌의 기록을 한 번에 읽는다 (계좌마다 읽으면 원격 DB 왕복이 계좌 수 × 5번)
+	var entries []models.CashEntry
+	if err := s.db.Find(&entries).Error; err != nil {
+		return nil, 0, err
+	}
+	var txs []models.Transaction
+	if err := s.db.Preload("Asset").Find(&txs).Error; err != nil {
+		return nil, 0, err
+	}
+	var divs []models.Dividend
+	if err := s.db.Preload("Asset").Where("is_received = ?", true).Find(&divs).Error; err != nil {
+		return nil, 0, err
+	}
+	entriesOf := map[uint][]models.CashEntry{}
+	for _, e := range entries {
+		entriesOf[e.AccountID] = append(entriesOf[e.AccountID], e)
+	}
+	txsOf := map[uint][]models.Transaction{}
+	for _, t := range txs {
+		txsOf[t.AccountID] = append(txsOf[t.AccountID], t)
+	}
+	divsOf := map[uint][]models.Dividend{}
+	for _, d := range divs {
+		divsOf[d.AccountID] = append(divsOf[d.AccountID], d)
+	}
 	out := make([]CashBalance, 0, len(accounts))
 	for i := range accounts {
-		flows, err := s.flows(&accounts[i])
+		id := accounts[i].ID
+		flows, err := s.flowsOf(&accounts[i], entriesOf[id], txsOf[id], divsOf[id])
 		if err != nil {
 			return nil, 0, err
 		}
-		out = append(out, balanceOf(accounts[i].ID, flows, fx, today))
+		out = append(out, balanceOf(id, flows, fx, today))
 	}
 	return out, fx, nil
 }

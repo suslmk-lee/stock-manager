@@ -1,10 +1,13 @@
 package services
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"stock-manager/models"
@@ -43,6 +46,10 @@ type TodayService struct {
 	ticker   *TickerService
 	zones    *PriceZoneService
 	now      func() time.Time
+
+	// 마지막으로 계산한 결과 — 오늘 탭을 다시 열면 이것부터 보여 주고 새로 계산한다
+	lastMu sync.Mutex
+	last   *TodayPicks
 }
 
 // SetZones: 가격 매력(사기 좋은 가격)을 오늘 점수에 쓴다
@@ -114,6 +121,7 @@ type TodayPlan struct {
 
 type TodayPicks struct {
 	Date       string      `json:"date"` // KST 오늘
+	ComputedAt time.Time   `json:"computed_at"`
 	Picks      []TodayPick `json:"picks"`
 	Considered int         `json:"considered"` // 점수를 매긴 종목 수
 	Plans      []TodayPlan `json:"plans"`
@@ -141,78 +149,128 @@ func marketOf(ticker string) string {
 func clamp01(v float64) float64 { return math.Max(0, math.Min(1, v)) }
 
 // GetTodayPicks: 오늘 살 종목 Top 3
+// 신호 리포트·배당 점수·모으기·계좌·예수금·가격대는 서로 기다릴 필요가 없어 동시에 읽는다 (처음 열 때 시세를 받느라 각각 몇 초씩 걸린다).
 func (s *TodayService) GetTodayPicks() (*TodayPicks, error) {
 	now := s.now()
 	today := todayKST(now)
-	report, err := s.signals.buildSignalReport()
-	if err != nil {
-		return nil, err
-	}
-	out := &TodayPicks{Date: today, Picks: []TodayPick{}, Plans: []TodayPlan{}, InZone: []PriceZoneRow{}}
+	out := &TodayPicks{Date: today, ComputedAt: now, Picks: []TodayPick{}, Plans: []TodayPlan{}, InZone: []PriceZoneRow{}}
 
-	// 사기 좋은 가격 (백그라운드에서 계산해 둔 가장 최근 기록)
-	zones := map[uint]PriceZoneRow{}
+	var (
+		wg       sync.WaitGroup
+		report   *SignalReport
+		repErr   error
+		zoneList *PriceZoneList
+		ranking  *DivScoreRanking
+		plans    []AccumulationPlanView
+		accs     []models.Account
+		bals     []CashBalance
+		cashFx   float64
+	)
+	run := func(f func()) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			f()
+		}()
+	}
+	run(func() { report, repErr = s.signals.buildSignalReport() })
 	if s.zones != nil {
-		if list, err := s.zones.GetLatest(); err == nil {
-			out.ZoneDate, out.ZoneUpdatedAt, out.ZoneCount, out.ZoneHeld = list.Date, list.UpdatedAt, len(list.Rows), list.Held
-			for _, r := range list.Rows {
-				zones[r.AssetID] = r
-				if r.InZone() {
-					out.InZone = append(out.InZone, r)
-				}
+		run(func() { zoneList, _ = s.zones.GetLatest() }) // 백그라운드에서 계산해 둔 가장 최근 기록
+	}
+	if s.divScore != nil {
+		run(func() { ranking, _ = s.divScore.GetRanking("") }) // 이번 달
+	}
+	if s.accum != nil {
+		run(func() { plans, _ = s.accum.ListPlans() })
+	}
+	run(func() { _ = s.db.Find(&accs).Error })
+	if s.cash != nil {
+		run(func() { bals, cashFx, _ = s.cash.GetBalances() })
+	}
+	wg.Wait()
+	if repErr != nil {
+		return nil, repErr
+	}
+
+	// 사기 좋은 가격
+	zones := map[uint]PriceZoneRow{}
+	if zoneList != nil {
+		out.ZoneDate, out.ZoneUpdatedAt, out.ZoneCount, out.ZoneHeld = zoneList.Date, zoneList.UpdatedAt, len(zoneList.Rows), zoneList.Held
+		for _, r := range zoneList.Rows {
+			zones[r.AssetID] = r
+			if r.InZone() {
+				out.InZone = append(out.InZone, r)
 			}
 		}
 	}
-
-	// 배당 점수 (이번 달)
+	// 배당 점수
 	divRows := map[uint]DivScoreRow{}
-	if s.divScore != nil {
-		if r, err := s.divScore.GetRanking(""); err == nil {
-			for _, row := range r.Rows {
-				divRows[row.AssetID] = row
-			}
+	if ranking != nil {
+		for _, row := range ranking.Rows {
+			divRows[row.AssetID] = row
 		}
 	}
 	// 오늘 모으기로 사는 종목 (계좌·종목)
 	planned := map[uint]bool{}
-	if s.accum != nil {
-		if plans, err := s.accum.ListPlans(); err == nil {
-			for _, p := range plans {
-				if p.Status == models.PlanStatusActive && p.NextDate == today {
-					planned[p.AssetID] = true
-					out.Plans = append(out.Plans, TodayPlan{AssetID: p.AssetID, Name: p.Asset.Name, Account: accountLabelOf(p.Account), Amount: p.Amount, Currency: p.AmountCurrency})
-				}
-			}
+	for _, p := range plans {
+		if p.Status == models.PlanStatusActive && p.NextDate == today {
+			planned[p.AssetID] = true
+			out.Plans = append(out.Plans, TodayPlan{AssetID: p.AssetID, Name: p.Asset.Name, Account: accountLabelOf(p.Account), Amount: p.Amount, Currency: p.AmountCurrency})
 		}
 	}
 	// 계좌·예수금
 	accounts := map[uint]models.Account{}
-	var accs []models.Account
-	if err := s.db.Find(&accs).Error; err == nil {
-		for _, a := range accs {
-			accounts[a.ID] = a
-		}
+	for _, a := range accs {
+		accounts[a.ID] = a
 	}
 	balances := map[uint]CashBalance{}
+	for _, b := range bals {
+		balances[b.AccountID] = b
+	}
 	fx := report.USDKRW
-	if s.cash != nil {
-		if bs, f, err := s.cash.GetBalances(); err == nil {
-			for _, b := range bs {
-				balances[b.AccountID] = b
-			}
-			if f > 0 {
-				fx = f
-			}
-		}
+	if cashFx > 0 {
+		fx = cashFx
 	}
 
 	picks, considered := rankToday(report.Items, divRows, zones, planned, accounts, balances, fx, today)
 	out.Considered = considered
+	var sw sync.WaitGroup
 	for i := range picks {
-		picks[i].Series = s.series(picks[i].Ticker)
+		sw.Add(1)
+		go func(i int) {
+			defer sw.Done()
+			picks[i].Series = s.series(picks[i].Ticker)
+		}(i)
 	}
+	sw.Wait()
 	out.Picks = picks
+
+	s.lastMu.Lock()
+	s.last = out
+	s.lastMu.Unlock()
 	return out, nil
+}
+
+// GetTodayPicksCached: 마지막으로 계산한 결과 (없거나 날짜가 바뀌었으면 nil) — 화면은 이것부터 보여 주고 새로 계산한다
+func (s *TodayService) GetTodayPicksCached() *TodayPicks {
+	s.lastMu.Lock()
+	defer s.lastMu.Unlock()
+	if s.last == nil || s.last.Date != todayKST(s.now()) {
+		return nil
+	}
+	return s.last
+}
+
+// WarmAfter: 앱을 켜고 delay 뒤 한 번 계산해 둔다 (처음 오늘 탭을 열 때 기다리지 않게)
+func (s *TodayService) WarmAfter(ctx context.Context, delay time.Duration) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(delay):
+	}
+	if _, err := s.GetTodayPicks(); err != nil {
+		log.Printf("[Today] 미리 계산 오류: %v", err)
+	}
 }
 
 

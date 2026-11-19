@@ -13,7 +13,23 @@ import { fmtCcy } from '../utils/fx';
  * 오늘 살 종목 Top 3 — 보유 종목마다 '오늘 점수'(가격 매력 30 · 매수 신호 25 · 배당 점수 20 · 비중 여유 10 · 살 돈 15)를 매겨 높은 순으로 3개.
  * 가격 매력은 백그라운드에서 날짜별로 계산해 둔 '사기 좋은 가격'을 쓰고, 그 가격대에 있는 보유 종목을 아래에 모아 보여 준다.
  * 보여 주는 방식: 커버플로우 · 카드 스택 · 피크 캐러셀 (고른 방식을 이 PC에 기억)
+ * 계산은 시세를 받느라 몇 초 걸려서, 다시 열면 마지막 결과부터 보여 주고 뒤에서 새로 계산해 바꾼다.
  */
+
+// 이번 실행 동안 마지막 결과 (오늘 탭을 다시 열면 바로 보여 준다)
+let lastToday: TodayPicks | null = null;
+const sameDay = (iso: string) => {
+  const t = new Date(iso);
+  return !Number.isNaN(t.getTime()) && t.toDateString() === new Date().toDateString();
+};
+const ageText = (iso: string) => {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return '';
+  const min = Math.floor((Date.now() - t.getTime()) / 60000);
+  if (min < 1) return '방금 계산';
+  if (min < 60) return `${min}분 전 계산`;
+  return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')} 계산`;
+};
 
 type Style = 'cover' | 'stack' | 'peek';
 const STYLES: { key: Style; label: string; hint: string }[] = [
@@ -47,9 +63,10 @@ function savedStyle(): Style {
 }
 
 export default function TodayPage() {
-  const [data, setData] = useState<TodayPicks | null>(null);
+  const [data, setData] = useState<TodayPicks | null>(() => (lastToday && sameDay(lastToday.computed_at) ? lastToday : null));
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !(lastToday && sameDay(lastToday.computed_at)));
+  const [refreshing, setRefreshing] = useState(false);
   const [style, setStyle] = useState<Style>(savedStyle);
   const [active, setActive] = useState(0);
   const [buy, setBuy] = useState<TodayPick | null>(null);
@@ -58,20 +75,48 @@ export default function TodayPage() {
   const picks = data?.picks ?? [];
   const n = picks.length;
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // quiet: 보이는 결과는 그대로 두고 뒤에서 새로 계산
+  const load = useCallback(async (quiet = false) => {
+    if (quiet) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
-      setData(await apiClient.GetTodayPicks());
-      setActive(0);
+      const d = await apiClient.GetTodayPicks();
+      lastToday = d;
+      setData(d);
+      setActive((a) => (quiet && d.picks.length > 0 ? Math.min(a, d.picks.length - 1) : 0));
     } catch (e) {
       setError(`오늘 살 종목을 계산하지 못했습니다: ${errText(e)}`);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
   useEffect(() => {
-    load();
+    let cancelled = false;
+    (async () => {
+      let shown = lastToday && sameDay(lastToday.computed_at) ? lastToday : null;
+      if (!shown) {
+        // 앱이 켜질 때 미리 계산해 둔 결과
+        try {
+          const c = await apiClient.GetTodayPicksCached();
+          if (c && sameDay(c.computed_at) && !cancelled) {
+            lastToday = c;
+            shown = c;
+            setData(c);
+            setLoading(false);
+          }
+        } catch {
+          /* 없으면 새로 계산 */
+        }
+      }
+      if (cancelled) return;
+      if (shown && Date.now() - new Date(shown.computed_at).getTime() < 60_000) return; // 1분 안에 계산한 결과면 그대로
+      load(!!shown);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   useEffect(() => {
@@ -115,8 +160,8 @@ export default function TodayPage() {
             </button>
           ))}
         </div>
-        <button type="button" className="btn-icon !h-9 !w-9" onClick={load} disabled={loading} aria-label="다시 계산" title="지금 시세로 다시 계산">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        <button type="button" className="btn-icon !h-9 !w-9" onClick={() => load(!!data)} disabled={loading || refreshing} aria-label="다시 계산" title="지금 시세로 다시 계산">
+          <RefreshCw className={`h-4 w-4 ${loading || refreshing ? 'animate-spin' : ''}`} />
         </button>
       </PageActions>
 
@@ -124,6 +169,11 @@ export default function TodayPage() {
         <p className="text-[13px] text-zinc-400">
           {data ? `${dayLabel(data.date)} · ` : ''}보유 종목을 가격 매력 · 매매 신호 · 배당 점수 · 비중 · 예수금으로 매긴 오늘 점수 순
           {data && data.considered > 0 ? ` (점수를 넘긴 ${data.considered}종목 중)` : ''}
+          {data && (
+            <span className="num ml-2 text-[12px] text-zinc-500">
+              · {refreshing ? '지금 시세로 새로 계산하는 중…' : ageText(data.computed_at)}
+            </span>
+          )}
         </p>
         <span className="text-zinc-500" title={'오늘 점수 = 가격 매력 30 + 매수 신호 25 + 배당 점수 20 + 비중 여유 10 + 살 돈 15 (배당 점수·가격 매력이 없으면 그 몫은 신호로)\n가격 매력: 1년·3년 종가 가운데 지금 위치와 배당률 위치, 과거에 싸게 산 날 1년 뒤 수익이 평소보다 나빴던 종목은 절반\n매도·충돌, 매수를 막은 종목(쉬는 기간·최대 비중·반등 미확인), 오늘 산 종목, 오늘 모으기로 사는 종목은 뺍니다.\n규칙으로 계산한 참고값이며 투자 권유가 아닙니다.'} aria-label="안내">
           <Info className="h-4 w-4" />
@@ -235,7 +285,7 @@ export default function TodayPage() {
           onSaved={(msg) => {
             setBuy(null);
             setNotice(msg);
-            load();
+            load(true);
           }}
         />
       )}

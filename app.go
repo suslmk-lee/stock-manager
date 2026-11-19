@@ -138,6 +138,9 @@ func (a *App) startup(ctx context.Context) {
 	// 사기 좋은 가격: 보유 종목의 가격대를 백그라운드에서 계산해 날짜별로 저장 (서버와 같은 DB — 새 기록이 있으면 건너뜀, 30일 지난 기록은 지움)
 	go a.zoneService.RunEvery(ctx, time.Minute, time.Hour)
 
+	// 오늘 살 종목: 신호 첫 점검(20초 뒤)으로 시세가 채워진 다음 한 번 계산해 둔다 (처음 오늘 탭을 열 때 기다리지 않게)
+	go a.todayService.WarmAfter(ctx, 45*time.Second)
+
 	// 신호 백그라운드 점검 (ctx 종료 시 중단)
 	a.startSignalMonitor(ctx)
 }

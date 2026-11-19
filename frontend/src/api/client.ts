@@ -577,6 +577,12 @@ export const apiClient = {
     return (await WailsApp.GetTodayPicks()) as unknown as TodayPicks;
   },
 
+  // 마지막으로 계산한 결과 (없으면 null) — 화면은 이것부터 보여 주고 새로 계산한다
+  GetTodayPicksCached: async (): Promise<TodayPicks | null> => {
+    if (isWeb) return fetchApi<TodayPicks | null>('/today-picks/cached');
+    return (await WailsApp.GetTodayPicksCached()) as unknown as TodayPicks | null;
+  },
+
   // 사기 좋은 가격 (백그라운드에서 계산해 둔 가장 최근 기록 · 종목별 30일 기록)
   GetPriceZones: async (): Promise<PriceZoneList> => {
     if (isWeb) return fetchApi<PriceZoneList>('/price-zones');

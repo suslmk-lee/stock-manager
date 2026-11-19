@@ -22,6 +22,15 @@ func registerTodayRoutes(api *gin.RouterGroup, s *Services) {
 		c.JSON(http.StatusOK, res)
 	})
 
+	// 마지막으로 계산한 결과 (없으면 null)
+	api.GET("/today-picks/cached", func(c *gin.Context) {
+		if s.Today == nil {
+			c.JSON(http.StatusOK, nil)
+			return
+		}
+		c.JSON(http.StatusOK, s.Today.GetTodayPicksCached())
+	})
+
 	api.GET("/price-zones", func(c *gin.Context) {
 		if s.PriceZone == nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "사기 좋은 가격을 계산할 수 없습니다"})

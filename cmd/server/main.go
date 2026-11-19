@@ -49,6 +49,9 @@ func main() {
 	// 사기 좋은 가격: 보유 종목 가격대를 날짜별로 계산해 둔다 (앱과 같은 DB — 새 기록이 있으면 건너뜀, 30일 지난 기록은 지움)
 	go svc.PriceZone.RunEvery(context.Background(), time.Minute, time.Hour)
 
+	// 오늘 살 종목: 한 번 계산해 둔다 (웹에서 처음 열 때 기다리지 않게)
+	go svc.Today.WarmAfter(context.Background(), 45*time.Second)
+
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}

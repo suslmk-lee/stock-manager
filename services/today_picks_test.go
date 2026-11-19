@@ -4,9 +4,27 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"stock-manager/models"
 )
+
+// 마지막 결과는 같은 날(KST)에만 돌려준다 — 날짜가 바뀌면 새로 계산해야 한다
+func TestTodayPicksCached(t *testing.T) {
+	now := time.Date(2026, 11, 20, 14, 0, 0, 0, time.UTC) // 11/20 23:00 KST
+	s := &TodayService{now: func() time.Time { return now }}
+	if s.GetTodayPicksCached() != nil {
+		t.Fatal("계산한 적 없으면 nil")
+	}
+	s.last = &TodayPicks{Date: "2026-11-20", ComputedAt: now}
+	if c := s.GetTodayPicksCached(); c == nil || c.Date != "2026-11-20" {
+		t.Fatalf("같은 날 = %+v", c)
+	}
+	now = now.Add(2 * time.Hour) // 11/21 01:00 KST
+	if s.GetTodayPicksCached() != nil {
+		t.Fatal("날짜가 바뀌면 nil")
+	}
+}
 
 // 오늘 살 종목: 가격 매력 30 · 신호 25 · 배당 20 · 비중 10 · 살 돈 15 (배당 점수·가격 매력이 없으면 그 몫은 신호로),
 // 매도·막힌·오늘 산·오늘 모으기 종목은 빼고 상위 3개

@@ -1184,6 +1184,8 @@ export interface TodayPick {
 
 export interface TodayPicks {
   date: string;
+  /** 계산한 시각 */
+  computed_at: string;
   picks: TodayPick[];
   /** 점수를 넘긴 종목 수 */
   considered: number;
