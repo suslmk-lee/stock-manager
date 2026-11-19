@@ -7,22 +7,57 @@ import (
 	"time"
 
 	"stock-manager/models"
+
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-// 마지막 결과는 같은 날(KST)에만 돌려준다 — 날짜가 바뀌면 새로 계산해야 한다
+// 마지막 결과: 이번 실행에서 계산한 것, 없으면 DB 에 남긴 것 (앱을 새로 켰을 때) — 3일 안의 것만, 7일 지난 기록은 지운다
 func TestTodayPicksCached(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&models.TodaySnapshot{}); err != nil {
+		t.Fatal(err)
+	}
 	now := time.Date(2026, 11, 20, 14, 0, 0, 0, time.UTC) // 11/20 23:00 KST
-	s := &TodayService{now: func() time.Time { return now }}
+	clock := func() time.Time { return now }
+	s := &TodayService{db: db, now: clock}
 	if s.GetTodayPicksCached() != nil {
 		t.Fatal("계산한 적 없으면 nil")
 	}
-	s.last = &TodayPicks{Date: "2026-11-20", ComputedAt: now}
-	if c := s.GetTodayPicksCached(); c == nil || c.Date != "2026-11-20" {
-		t.Fatalf("같은 날 = %+v", c)
+	db.Create(&models.TodaySnapshot{Date: "2026-11-10", Data: "{}", ComputedAt: now.AddDate(0, 0, -10)}) // 7일 지나 지워질 기록
+	p := &TodayPicks{Date: "2026-11-20", ComputedAt: now, Picks: []TodayPick{{Rank: 1, Ticker: "JEPI"}}}
+	s.last = p
+	s.saveSnapshot(p)
+	if c := s.GetTodayPicksCached(); c != p {
+		t.Fatalf("이번 실행 결과 = %+v", c)
 	}
-	now = now.Add(2 * time.Hour) // 11/21 01:00 KST
-	if s.GetTodayPicksCached() != nil {
-		t.Fatal("날짜가 바뀌면 nil")
+
+	// 앱을 새로 켬 (메모리 비어 있음) → DB 에 남긴 결과, 다음 날이어도 3일 안이면 (계산 시각과 함께)
+	now = now.Add(10 * time.Hour) // 11/21 09:00 KST
+	r := &TodayService{db: db, now: clock}
+	c := r.GetTodayPicksCached()
+	if c == nil || c.Date != "2026-11-20" || len(c.Picks) != 1 || c.Picks[0].Ticker != "JEPI" || !c.ComputedAt.Equal(p.ComputedAt) {
+		t.Fatalf("다시 켠 뒤 = %+v", c)
+	}
+	// 같은 날 다시 계산하면 그날 기록을 덮어쓴다
+	p2 := &TodayPicks{Date: "2026-11-20", ComputedAt: now, Picks: []TodayPick{{Rank: 1, Ticker: "JEPQ"}}}
+	r.saveSnapshot(p2)
+	var rows []models.TodaySnapshot
+	db.Order("date").Find(&rows)
+	if len(rows) != 1 || rows[0].Date != "2026-11-20" {
+		t.Fatalf("남은 기록 = %+v (7일 지난 11/10 은 지우고 11/20 은 한 줄)", rows)
+	}
+	if c := (&TodayService{db: db, now: clock}).GetTodayPicksCached(); c == nil || c.Picks[0].Ticker != "JEPQ" {
+		t.Fatalf("덮어쓴 결과 = %+v", c)
+	}
+	// 3일 넘게 지난 결과는 먼저 보여 주지 않는다
+	now = now.Add(80 * time.Hour)
+	if c := (&TodayService{db: db, now: clock}).GetTodayPicksCached(); c != nil {
+		t.Fatalf("오래된 결과 = %+v", c)
 	}
 }
 

@@ -13,22 +13,30 @@ import { fmtCcy } from '../utils/fx';
  * 오늘 살 종목 Top 3 — 보유 종목마다 '오늘 점수'(가격 매력 30 · 매수 신호 25 · 배당 점수 20 · 비중 여유 10 · 살 돈 15)를 매겨 높은 순으로 3개.
  * 가격 매력은 백그라운드에서 날짜별로 계산해 둔 '사기 좋은 가격'을 쓰고, 그 가격대에 있는 보유 종목을 아래에 모아 보여 준다.
  * 보여 주는 방식: 커버플로우 · 카드 스택 · 피크 캐러셀 (고른 방식을 이 PC에 기억)
- * 계산은 시세를 받느라 몇 초 걸려서, 다시 열면 마지막 결과부터 보여 주고 뒤에서 새로 계산해 바꾼다.
+ * 계산은 시세를 받느라 몇 초 걸려서(앱을 막 켰을 때는 10초 넘게), 마지막 결과(앱을 새로 켰으면 DB 에 남긴 것)부터
+ * 계산 시각과 함께 보여 주고 뒤에서 새로 계산해 바꾼다.
  */
 
 // 이번 실행 동안 마지막 결과 (오늘 탭을 다시 열면 바로 보여 준다)
 let lastToday: TodayPicks | null = null;
-const sameDay = (iso: string) => {
-  const t = new Date(iso);
-  return !Number.isNaN(t.getTime()) && t.toDateString() === new Date().toDateString();
+/** 먼저 보여 줘도 되는 결과: 3일 안에 계산한 것 */
+const recent = (p: TodayPicks | null): p is TodayPicks => {
+  if (!p) return false;
+  const t = new Date(p.computed_at).getTime();
+  return !Number.isNaN(t) && Date.now() - t <= 72 * 3600_000;
 };
+const hm = (t: Date) => `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
 const ageText = (iso: string) => {
   const t = new Date(iso);
   if (Number.isNaN(t.getTime())) return '';
   const min = Math.floor((Date.now() - t.getTime()) / 60000);
   if (min < 1) return '방금 계산';
   if (min < 60) return `${min}분 전 계산`;
-  return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')} 계산`;
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(new Date()) - startOf(t)) / 86400000);
+  if (days <= 0) return `${hm(t)} 계산`;
+  if (days === 1) return `어제 ${hm(t)} 계산`;
+  return `${t.getMonth() + 1}월 ${t.getDate()}일 ${hm(t)} 계산`;
 };
 
 type Style = 'cover' | 'stack' | 'peek';
@@ -63,9 +71,9 @@ function savedStyle(): Style {
 }
 
 export default function TodayPage() {
-  const [data, setData] = useState<TodayPicks | null>(() => (lastToday && sameDay(lastToday.computed_at) ? lastToday : null));
+  const [data, setData] = useState<TodayPicks | null>(() => (recent(lastToday) ? lastToday : null));
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(() => !(lastToday && sameDay(lastToday.computed_at)));
+  const [loading, setLoading] = useState(() => !recent(lastToday));
   const [refreshing, setRefreshing] = useState(false);
   const [style, setStyle] = useState<Style>(savedStyle);
   const [active, setActive] = useState(0);
@@ -95,12 +103,12 @@ export default function TodayPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      let shown = lastToday && sameDay(lastToday.computed_at) ? lastToday : null;
+      let shown = recent(lastToday) ? lastToday : null;
       if (!shown) {
-        // 앱이 켜질 때 미리 계산해 둔 결과
+        // 앱에서 마지막으로 계산한 결과 (새로 켰으면 DB 에 남긴 것)
         try {
           const c = await apiClient.GetTodayPicksCached();
-          if (c && sameDay(c.computed_at) && !cancelled) {
+          if (recent(c) && !cancelled) {
             lastToday = c;
             shown = c;
             setData(c);
@@ -171,7 +179,8 @@ export default function TodayPage() {
           {data && data.considered > 0 ? ` (점수를 넘긴 ${data.considered}종목 중)` : ''}
           {data && (
             <span className="num ml-2 text-[12px] text-zinc-500">
-              · {refreshing ? '지금 시세로 새로 계산하는 중…' : ageText(data.computed_at)}
+              · {ageText(data.computed_at)}
+              {refreshing && ' · 지금 시세로 새로 계산하는 중…'}
             </span>
           )}
         </p>

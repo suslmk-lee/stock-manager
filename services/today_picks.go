@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -13,6 +14,7 @@ import (
 	"stock-manager/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // 오늘 살 종목 Top 3 — 보유 종목마다 100점 만점 '오늘 점수'를 매겨 높은 순으로 3개.
@@ -248,25 +250,76 @@ func (s *TodayService) GetTodayPicks() (*TodayPicks, error) {
 	s.lastMu.Lock()
 	s.last = out
 	s.lastMu.Unlock()
+	s.saveSnapshot(out)
 	return out, nil
 }
 
-// GetTodayPicksCached: 마지막으로 계산한 결과 (없거나 날짜가 바뀌었으면 nil) — 화면은 이것부터 보여 주고 새로 계산한다
-func (s *TodayService) GetTodayPicksCached() *TodayPicks {
-	s.lastMu.Lock()
-	defer s.lastMu.Unlock()
-	if s.last == nil || s.last.Date != todayKST(s.now()) {
-		return nil
+const (
+	todayCacheMaxAge  = 72 * time.Hour // 이보다 오래된 결과는 먼저 보여 주지 않는다
+	todaySnapshotKeep = 7              // DB 에 남기는 날 수
+)
+
+// saveSnapshot: 그날 결과를 DB 에 남긴다 (앱을 새로 켜면 이것부터 보여 준다). 실패해도 화면에는 영향 없다.
+func (s *TodayService) saveSnapshot(p *TodayPicks) {
+	if s.db == nil {
+		return
 	}
-	return s.last
+	data, err := json.Marshal(p)
+	if err != nil {
+		return
+	}
+	row := models.TodaySnapshot{Date: p.Date, Data: string(data), ComputedAt: p.ComputedAt}
+	err = s.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "date"}},
+		DoUpdates: clause.AssignmentColumns([]string{"data", "computed_at", "updated_at"}),
+	}).Create(&row).Error
+	if err != nil {
+		log.Printf("[Today] 결과 저장 실패: %v", err)
+		return
+	}
+	cutoff := s.now().In(kst).AddDate(0, 0, -todaySnapshotKeep).Format(dateLayout)
+	s.db.Where("date < ?", cutoff).Delete(&models.TodaySnapshot{})
 }
 
-// WarmAfter: 앱을 켜고 delay 뒤 한 번 계산해 둔다 (처음 오늘 탭을 열 때 기다리지 않게)
+// GetTodayPicksCached: 마지막으로 계산한 결과 (이번 실행에서 계산한 것, 없으면 DB 에 남긴 것 — 3일 안, 없으면 nil).
+// 날짜가 지난 결과일 수 있다 — 화면은 계산 시각을 함께 보여 주고 바로 새로 계산한다.
+func (s *TodayService) GetTodayPicksCached() *TodayPicks {
+	now := s.now()
+	s.lastMu.Lock()
+	last := s.last
+	s.lastMu.Unlock()
+	if last != nil && now.Sub(last.ComputedAt) <= todayCacheMaxAge {
+		return last
+	}
+	if s.db == nil {
+		return nil
+	}
+	var rows []models.TodaySnapshot
+	if err := s.db.Order("computed_at DESC").Limit(1).Find(&rows).Error; err != nil || len(rows) == 0 {
+		return nil
+	}
+	if now.Sub(rows[0].ComputedAt) > todayCacheMaxAge {
+		return nil
+	}
+	var p TodayPicks
+	if err := json.Unmarshal([]byte(rows[0].Data), &p); err != nil {
+		return nil
+	}
+	return &p
+}
+
+// WarmAfter: 앱을 켜고 delay 뒤 한 번 계산해 둔다 (처음 오늘 탭을 열 때 기다리지 않게). 그사이 화면이 계산했으면 건너뛴다.
 func (s *TodayService) WarmAfter(ctx context.Context, delay time.Duration) {
 	select {
 	case <-ctx.Done():
 		return
 	case <-time.After(delay):
+	}
+	s.lastMu.Lock()
+	recent := s.last != nil && s.now().Sub(s.last.ComputedAt) < 5*time.Minute
+	s.lastMu.Unlock()
+	if recent {
+		return
 	}
 	if _, err := s.GetTodayPicks(); err != nil {
 		log.Printf("[Today] 미리 계산 오류: %v", err)

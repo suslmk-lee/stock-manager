@@ -1,11 +1,15 @@
 package database
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"stock-manager/models"
@@ -14,6 +18,7 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
@@ -220,8 +225,9 @@ func getGormSlowThreshold() time.Duration {
 	return time.Duration(ms) * time.Millisecond
 }
 
-func runMigrations() error {
-	if err := DB.AutoMigrate(
+// migrationModels: AutoMigrate 로 맞추는 표 (여기에 넣거나 필드·태그를 바꾸면 지문이 바뀌어 다음 실행 때 표 구조를 다시 맞춘다)
+func migrationModels() []interface{} {
+	return []interface{}{
 		&models.Account{},
 		&models.Asset{},
 		&models.Holding{},
@@ -248,8 +254,61 @@ func runMigrations() error {
 		&models.FundPrice{},
 		&models.HoldingCheckAlert{},
 		&models.PriceZone{},
-	); err != nil {
-		return err
+		&models.TodaySnapshot{},
+		&models.AppMeta{},
+	}
+}
+
+const schemaMetaKey = "schema_fingerprint"
+
+// schemaFingerprint: 표로 쓰는 모델들의 필드 이름·타입·gorm 태그로 만든 지문
+func schemaFingerprint(ms []interface{}) string {
+	var b strings.Builder
+	var walk func(t reflect.Type, depth int)
+	walk = func(t reflect.Type, depth int) {
+		for t.Kind() == reflect.Pointer {
+			t = t.Elem()
+		}
+		b.WriteString(t.PkgPath() + "." + t.Name() + "{")
+		if t.Kind() == reflect.Struct {
+			for i := 0; i < t.NumField(); i++ {
+				f := t.Field(i)
+				fmt.Fprintf(&b, "%s %s `%s`;", f.Name, f.Type.String(), f.Tag)
+				if f.Anonymous && depth < 4 {
+					walk(f.Type, depth+1) // gorm.Model 처럼 끼워 넣은 구조체
+				}
+			}
+		}
+		b.WriteString("}")
+	}
+	for _, m := range ms {
+		walk(reflect.TypeOf(m), 0)
+	}
+	sum := sha256.Sum256([]byte(b.String()))
+	return hex.EncodeToString(sum[:16])
+}
+
+// runMigrations: 표 구조를 맞춘다. 원격 DB 에서 AutoMigrate 는 표마다 구조를 하나씩 비교해 수십 초 걸려서,
+// 마지막으로 맞춘 구조의 지문이 지금과 같으면 건너뛴다 (앱이 켜질 때 창이 늦게 뜨던 원인).
+func runMigrations() error {
+	ms := migrationModels()
+	fp := schemaFingerprint(ms)
+	var stored []string
+	if err := DB.Raw("SELECT value FROM app_meta WHERE key = ?", schemaMetaKey).Scan(&stored).Error; err == nil && len(stored) == 1 && stored[0] == fp {
+		log.Printf("DB 표 구조가 그대로라 맞추기를 건너뜁니다")
+	} else {
+		start := time.Now()
+		if err := DB.AutoMigrate(ms...); err != nil {
+			return err
+		}
+		meta := models.AppMeta{Key: schemaMetaKey, Value: fp}
+		if err := DB.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "key"}},
+			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
+		}).Create(&meta).Error; err != nil {
+			log.Printf("표 구조 지문 저장 실패 (다음에 다시 맞춘다): %v", err)
+		}
+		log.Printf("DB 표 구조를 맞췄습니다 (%.1fs)", time.Since(start).Seconds())
 	}
 	if err := backfillAccountTypes(); err != nil {
 		return err
