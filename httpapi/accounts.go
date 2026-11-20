@@ -44,6 +44,9 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				ForeignSettle string  `json:"foreign_settle"`
 				FxFeePct      float64 `json:"fx_fee_pct"`
 				NoCash        bool    `json:"no_cash"`
+				FxSpreadPct   float64 `json:"fx_spread_pct"`
+				FxDayDiscPct  float64 `json:"fx_day_disc_pct"`
+				FxOffDiscPct  float64 `json:"fx_off_disc_pct"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -60,6 +63,9 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				ForeignSettle: req.ForeignSettle,
 				FxFeePct:      req.FxFeePct,
 				NoCash:        req.NoCash,
+				FxSpreadPct:   req.FxSpreadPct,
+				FxDayDiscPct:  req.FxDayDiscPct,
+				FxOffDiscPct:  req.FxOffDiscPct,
 			})
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -81,6 +87,9 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				ForeignSettle string   `json:"foreign_settle"`
 				FxFeePct      *float64 `json:"fx_fee_pct"` // 없으면 그대로
 				NoCash        *bool    `json:"no_cash"`    // 없으면 그대로
+				FxSpreadPct   *float64 `json:"fx_spread_pct"`
+				FxDayDiscPct  *float64 `json:"fx_day_disc_pct"`
+				FxOffDiscPct  *float64 `json:"fx_off_disc_pct"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -97,6 +106,9 @@ func registerAccountRoutes(api *gin.RouterGroup, s *Services) {
 				ForeignSettle: req.ForeignSettle,
 				FxFeePct:      req.FxFeePct,
 				NoCash:        req.NoCash,
+				FxSpreadPct:   req.FxSpreadPct,
+				FxDayDiscPct:  req.FxDayDiscPct,
+				FxOffDiscPct:  req.FxOffDiscPct,
 			})
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

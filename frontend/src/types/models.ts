@@ -52,6 +52,10 @@ export interface Account {
   foreign_settle?: ForeignSettle;
   /** 자동 환전 수수료 (%) — KRW·AFX 일 때 환율에 얹는다 */
   fx_fee_pct?: number;
+  /** 직접 환전 수수료 (원화·외화 따로): 기본 수수료(%) · 정규 시간(평일 09:00~15:30) 우대율(%) · 그 외 우대율(%). 기본이 0 이면 모름 */
+  fx_spread_pct?: number;
+  fx_day_disc_pct?: number;
+  fx_off_disc_pct?: number;
   /** 예수금 기록 안 함: 투자 대금이 연결 통장에서 바로 빠져나가는 계좌 (토스뱅크 펀드 모으기 등) — 예수금 0 */
   no_cash?: boolean;
   currency: string;
@@ -1103,7 +1107,9 @@ export interface PriceZone {
   cheap_win: number;
   verdict: ZoneVerdict;
   level: ZoneLevel;
-  /** 가격 매력 0~100 */
+  /** 과거 기준 지금 사면 평소보다 1년 뒤 더 기대되는 수익 (%p) = 싸게 산 날의 추가 수익(±30) × 지금 싼 정도 */
+  expect: number;
+  /** 가격 매력 0~100 (expect 30%p 면 100) */
   score: number;
   created_at: string;
   updated_at: string;
@@ -1127,18 +1133,40 @@ export interface PriceZoneDetail {
 }
 
 // ── 오늘 살 종목 Top 3 ──
-/** 오늘 점수 구성 (가격 매력 30 · 신호 25 · 배당 20 · 비중 10 · 살 돈 15, 배당 점수·가격 매력이 없으면 그 몫은 신호로) */
+/** 오늘 점수 구성 (가격 매력 70 · 신호 15 · 배당 10 · 비중 5, 예수금은 점수에 안 넣음) */
 export interface TodayParts {
   price: number;
   signal: number;
   dividend: number;
   weight: number;
-  cash: number;
   price_max: number;
   signal_max: number;
   dividend_max: number;
   weight_max: number;
-  cash_max: number;
+}
+
+/** 보유 종목 전체 순위 한 줄 (Top 3 와 같은 점수) */
+export interface TodayRow {
+  rank: number;
+  asset_id: number;
+  ticker: string;
+  name: string;
+  currency: string;
+  price: number;
+  score: number;
+  parts: TodayParts;
+  has_zone: boolean;
+  /** 과거 기준 평소보다 1년 뒤 더 기대되는 수익 (%p) */
+  expect: number;
+  level?: ZoneLevel;
+  pos_1y: number;
+  good: number;
+  verdict?: ZoneVerdict;
+  falling: boolean;
+  /** Top 3 에서 뺀 이유 */
+  excluded?: string;
+  /** Top 3 순위 (1~3) */
+  pick?: number;
 }
 
 /** 이 종목을 살 계좌와 예수금 (예수금 통화 기준) */
@@ -1153,6 +1181,13 @@ export interface TodayAccount {
   /** 모자란 금액 (0 이면 충분) */
   short: number;
   no_cash: boolean;
+  /** 원화·외화 따로 계좌에서 달러 종목을 살 때: 원화예수금 (환전하면 쓸 수 있음) · 계산 때 환율 */
+  krw?: number;
+  fx?: number;
+  /** 그 계좌의 직접 환전 수수료 (없으면 모름) */
+  fx_spread_pct?: number;
+  fx_day_disc_pct?: number;
+  fx_off_disc_pct?: number;
 }
 
 export interface TodayPick {
@@ -1191,10 +1226,11 @@ export interface TodayPicks {
   considered: number;
   /** 오늘 모으기로 사는 종목 (추천에서 뺌) */
   plans: { asset_id: number; name: string; account: string; amount: number; currency: string }[];
-  /** 사기 좋은 가격: 마지막 계산 날짜·시각, 계산한 종목 수 / 보유 종목 수, 좋은 가격대 종목 */
+  /** 보유 종목 전체 순위 (오늘 점수 높은 순, 예전 버전이 남긴 결과에는 없을 수 있음) */
+  ranking?: TodayRow[];
+  /** 사기 좋은 가격: 마지막 계산 날짜·시각, 계산한 종목 수 / 보유 종목 수 */
   zone_date: string;
   zone_updated_at: string | null;
   zone_count: number;
   zone_held: number;
-  in_zone: PriceZoneRow[];
 }

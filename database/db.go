@@ -313,7 +313,37 @@ func runMigrations() error {
 	if err := backfillAccountTypes(); err != nil {
 		return err
 	}
+	applyFxPresets(DB)
 	return repairKoreanTickerPnLCurrency(DB)
+}
+
+const fxPresetMetaKey = "fx_preset_v1"
+
+// applyFxPresets: 직접 환전 수수료 칸이 생긴 뒤 처음 한 번, 비어 있는 계좌(원화·외화 따로)에 증권사 기준을 넣는다
+// (토스증권 기본 1% · 정규 시간 95% 우대 · 그 외 50% 우대). 한 번 넣은 뒤에는 계좌 화면에서 고친 값을 건드리지 않는다.
+func applyFxPresets(db *gorm.DB) {
+	var done []string
+	if err := db.Raw("SELECT value FROM app_meta WHERE key = ?", fxPresetMetaKey).Scan(&done).Error; err != nil || len(done) > 0 {
+		return
+	}
+	n := int64(0)
+	for broker, p := range models.FxPresets {
+		res := db.Model(&models.Account{}).
+			Where("broker = ? AND foreign_settle = ? AND fx_spread_pct = 0", broker, models.SettleUSD).
+			UpdateColumns(map[string]interface{}{"fx_spread_pct": p.SpreadPct, "fx_day_disc_pct": p.DayDiscPct, "fx_off_disc_pct": p.OffDiscPct})
+		if res.Error != nil {
+			log.Printf("환전 수수료 기본값 넣기 실패 (다음에 다시): %v", res.Error)
+			return
+		}
+		n += res.RowsAffected
+	}
+	meta := models.AppMeta{Key: fxPresetMetaKey, Value: "done"}
+	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&meta).Error; err != nil {
+		log.Printf("환전 수수료 기본값 기록 실패: %v", err)
+	}
+	if n > 0 {
+		log.Printf("환전 수수료 기본값을 %d개 계좌에 넣었습니다", n)
+	}
 }
 
 // repairKoreanTickerPnLCurrency 는 국내 상장(.KS/.KQ) 종목인데 원화가 아닌 통화로 저장된 실현손익을 원화로 고친다.

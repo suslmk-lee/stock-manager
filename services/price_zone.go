@@ -21,7 +21,7 @@ import (
 //   배당      : 최근 1년 배당 ÷ 가격이 지난 5년 배당률 가운데 어디인가 (배당률 2% 이상만 점수에 쓴다)
 //   흐름      : 20일선 아래이고 직전 20거래일 저점에서 2% 안쪽이면 '아직 내려가는 중'
 //   자기 검증 : 과거에 1년 종가 하위 20%였던 날 샀다면 1년 뒤 총수익(배당 재투자)이 모든 날보다 좋았나
-//   가격 매력 : (100 − 가격 위치) × 0.7 + 배당률 위치 × 0.3 (배당을 안 쓰면 가격만), 과거에 안 통했으면 절반, 사례가 적으면 0.8배
+//   가격 매력 : 과거에 싸게 산 날이 평소보다 1년 뒤 더 번 정도(±30%p) × 지금 싼 정도 → 0~100 (30%p 면 만점, 0 이하·사례 부족이면 0)
 // 계산은 백그라운드에서 몇 시간마다 (앱과 서버가 같은 DB 를 쓰므로 오늘 기록이 새것이면 건너뛴다), 30일 지난 기록은 지운다.
 
 const (
@@ -250,24 +250,26 @@ func computeZone(ticker string, points []PricePoint, divs []DividendEvent) (mode
 		z.Verdict = models.ZoneVerdictWorks
 	}
 
-	// 가격 매력
+	// 가격 매력 = 과거에 싸게 산 날이 평소보다 1년 뒤 몇 %p 더 벌었나(±30 으로 자름) × 지금 싼 정도(0~1).
+	// 보유 156종목 2017~2025 백테스트에서 종목을 고르는 힘이 가장 일관된 조합이었다 (싼 정도만·배당률 위치는 힘이 없었다).
 	pos := z.Pos1y
 	if z.Years >= 1.5 {
 		pos = (z.Pos1y + z.Pos3y) / 2
 	}
-	score := 100 - pos
-	if z.YieldPos >= 0 {
-		score = 0.7*score + 0.3*z.YieldPos
+	if z.CheapDays >= zoneMinCheapDays {
+		edge := math.Max(-zoneEdgeCap, math.Min(zoneEdgeCap, z.CheapAvg-z.AllAvg))
+		z.Expect = round2(edge * (100 - pos) / 100)
 	}
-	switch z.Verdict {
-	case models.ZoneVerdictTrap:
-		score *= 0.5
-	case models.ZoneVerdictFew:
-		score *= 0.8
-	}
-	z.Score = math.Round(score*10) / 10
+	z.Score = math.Round(clamp01(z.Expect/zoneEdgeCap)*1000) / 10
+	z.Formula = zoneFormula
 	return z, true
 }
+
+// zoneEdgeCap: 가격 매력 만점이 되는 과거 추가 수익 (%p) — 이보다 큰 값은 몇 종목(레버리지 ETF 등)에 쏠려 잘라 낸다
+const zoneEdgeCap = 30.0
+
+// zoneFormula: 가격 매력 공식 버전 (1: 싼 정도·배당률 위치, 2: 과거 추가 수익 × 싼 정도)
+const zoneFormula = 2
 
 // ttmDelta: (from, to] 에 배당락이 있는 주당 배당 합
 func ttmDelta(ds []DividendEvent, from, to int64) float64 {
@@ -394,7 +396,7 @@ func (s *PriceZoneService) RefreshIfStale() (bool, error) {
 	if err := s.db.Where("date = ?", todayKST(now)).Order("updated_at DESC").Limit(1).Find(&last).Error; err != nil {
 		return false, err
 	}
-	if len(last) > 0 && now.Sub(last[0].UpdatedAt) < zoneStaleAfter {
+	if len(last) > 0 && now.Sub(last[0].UpdatedAt) < zoneStaleAfter && last[0].Formula >= zoneFormula {
 		return false, nil
 	}
 	_, err := s.Refresh()

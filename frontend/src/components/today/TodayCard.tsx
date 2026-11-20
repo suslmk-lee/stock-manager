@@ -1,16 +1,17 @@
-import type { PriceZoneRow, TodayParts, TodayPick, ZoneLevel } from '../../types/models';
+import { useEffect, useState } from 'react';
+import type { PriceZoneRow, TodayAccount, TodayParts, TodayPick, ZoneLevel } from '../../types/models';
 import { fmtCcy } from '../../utils/fx';
 import { accountDisplayName } from '../../utils/accountLabel';
+import { feeDay, fxFeeAt, fxRuleOf, krwForUSD, pctText } from '../../utils/fxFee';
 
 /** 오늘 살 종목 카드 — 순위 · 오늘 점수와 구성 · 1년 주가와 사기 좋은 가격대 · 고른 이유 · 제안 금액과 살 계좌 */
 
-type PartKey = 'price' | 'signal' | 'dividend' | 'weight' | 'cash';
+type PartKey = 'price' | 'signal' | 'dividend' | 'weight';
 const PARTS: { key: PartKey; label: string; cls: string }[] = [
   { key: 'price', label: '가격', cls: 'bg-emerald-400' },
   { key: 'signal', label: '신호', cls: 'bg-mint-400' },
   { key: 'dividend', label: '배당', cls: 'bg-amber-300' },
   { key: 'weight', label: '비중', cls: 'bg-sky-400' },
-  { key: 'cash', label: '살 돈', cls: 'bg-zinc-500' },
 ];
 
 /** 가격대 이름과 색 */
@@ -87,11 +88,55 @@ export function suggestQty(p: TodayPick): number {
 
 const partMax = (parts: TodayParts, key: PartKey) => parts[`${key}_max` as const] ?? 0;
 
+/**
+ * 원화·외화 따로 계좌에서 달러가 모자랄 때: 모자란 달러를 원화예수금에서 지금 환전하면 원화가 얼마 드는지.
+ * 수수료는 보는 시각의 우대율 (정규 시간 평일 09:00~15:30 · 그 외), 계좌에 수수료가 없으면 빼고 계산.
+ */
+export function exchangePlan(a: TodayAccount | null | undefined, now: Date = new Date()) {
+  if (!a || a.no_cash || !(a.short > 0) || a.currency !== 'USD' || !a.krw || !a.fx) return null;
+  const rule = fxRuleOf(a);
+  const at = rule ? fxFeeAt(rule, now) : null;
+  const krw = krwForUSD(a.short, a.fx, at?.pct ?? 0);
+  const fee = Math.max(0, krw - Math.round(a.short * a.fx));
+  // 그 외 시간이면 정규 시간에 바꿀 때 덜 드는 원화
+  const save = rule && at && !at.day ? krw - krwForUSD(a.short, a.fx, feeDay(rule)) : 0;
+  return { rule, at, krw, fee, save, enough: a.krw >= krw, lack: krw - a.krw };
+}
+
+/** 1분마다 바뀌는 지금 (정규 환전 시간이 지나면 문구가 바뀌게) */
+function useNow(ms = 60_000) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(new Date()), ms);
+    return () => window.clearInterval(t);
+  }, [ms]);
+  return now;
+}
+
+const won = (v: number) => fmtCcy(v, 'KRW');
+
+/** 살 계좌의 모자란 금액 — 원화를 환전하면 되는지, 지금 우대율은 얼마인지 */
+function ShortNote({ a, x }: { a: TodayAccount; x: ReturnType<typeof exchangePlan> }) {
+  if (!x) return a.no_cash || !(a.short > 0) ? null : <p className="num truncate text-[11.5px] text-amber-300">{fmtCcy(a.short, a.currency)} 모자람 · 입금 필요</p>;
+  const disc = x.at ? ` · 지금${x.at.day ? '' : '은'} ${x.at.disc}% 우대` : ' (수수료 빼고)';
+  const title = [
+    `${fmtCcy(a.short, 'USD')} 모자람 — 원화예수금 ${won(a.krw ?? 0)}에서 환전`,
+    x.at && x.rule ? `지금 ${x.at.day ? '정규 시간' : '정규 시간 밖'} · 수수료 ${pctText(x.at.pct)} (약 ${won(x.fee)}) · 환율 ${a.fx?.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}원 기준` : '계좌에 환전 수수료를 넣으면 수수료까지 계산합니다',
+  ].join('\n');
+  return (
+    <p className={`num truncate text-[11.5px] ${x.enough ? 'text-mint-300' : 'text-amber-300'}`} title={title}>
+      {x.enough ? `${won(x.krw)} 환전하면 됨${disc}` : `환전해도 ${won(x.lack)} 모자람 · 입금 필요`}
+    </p>
+  );
+}
+
 export default function TodayCard({ pick: p, onBuy, onDetail }: { pick: TodayPick; onBuy: () => void; onDetail: () => void }) {
   const t = pickTitle(p);
   const a = p.account;
   const z = p.zone;
   const parts = PARTS.map((x) => ({ ...x, value: p.parts[x.key] ?? 0, max: partMax(p.parts, x.key) })).filter((x) => x.max > 0);
+  const now = useNow();
+  const fx = exchangePlan(a, now);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
@@ -165,25 +210,36 @@ export default function TodayCard({ pick: p, onBuy, onDetail }: { pick: TodayPic
           </li>
         )}
       </ul>
-      <div className="flex items-center justify-between gap-3 border-t border-white/[0.08] pt-3">
-        <div className="min-w-0">
-          <p className="num truncate text-[14px] font-semibold text-white">제안 {suggestText(p)}</p>
-          <p className="num truncate text-[11.5px] text-zinc-400">
-            {a ? (a.no_cash ? `${accountDisplayName(a)} · 통장에서 바로` : `${accountDisplayName(a)} 예수금 ${fmtCcy(a.cash, a.currency)}`) : '살 계좌 없음'}
-          </p>
-          {a && !a.no_cash && a.short > 0 && <p className="num truncate text-[11.5px] text-amber-300">{fmtCcy(a.short, a.currency)} 모자람 · 입금 필요</p>}
+      <div className="border-t border-white/[0.08] pt-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="num truncate text-[14px] font-semibold text-white">제안 {suggestText(p)}</p>
+            <p className="num truncate text-[11.5px] text-zinc-400">
+              {a
+                ? a.no_cash
+                  ? `${accountDisplayName(a)} · 통장에서 바로`
+                  : `${accountDisplayName(a)} 예수금 ${fmtCcy(a.cash, a.currency)}${a.krw && a.short > 0 ? ` · 원화 ${fmtCcy(a.krw, 'KRW')}` : ''}`
+                : '살 계좌 없음'}
+            </p>
+            {a && <ShortNote a={a} x={fx} />}
+          </div>
+          <button
+            type="button"
+            className="btn-primary shrink-0 !px-3.5 !py-1.5 !text-[13px]"
+            disabled={!a}
+            onClick={(e) => {
+              e.stopPropagation();
+              onBuy();
+            }}
+          >
+            매수 기록
+          </button>
         </div>
-        <button
-          type="button"
-          className="btn-primary shrink-0 !px-3.5 !py-1.5 !text-[13px]"
-          disabled={!a}
-          onClick={(e) => {
-            e.stopPropagation();
-            onBuy();
-          }}
-        >
-          매수 기록
-        </button>
+        {fx?.enough && fx.rule && fx.save > 0 && (
+          <p className="num mt-1 truncate text-[11px] text-zinc-500">
+            평일 09:00~15:30엔 {fx.rule.dayDisc}% 우대 · {won(fx.save)} 덜 듦
+          </p>
+        )}
       </div>
     </div>
   );

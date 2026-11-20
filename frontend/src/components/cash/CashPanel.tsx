@@ -8,6 +8,7 @@ import Portal from '../ui/Portal';
 import { IconWallet } from '../ui/appIcons';
 import { fmtCcy } from '../../utils/fx';
 import { askConfirm } from '../ui/confirmDialog';
+import { feeDay, feeOff, fxFeeAt, fxRuleOf, pctText } from '../../utils/fxFee';
 
 /**
  * 계좌 예수금 — 원화·달러 잔액, 계좌 총액(주식 평가금 + 예수금), 현금 흐름(입출금·매매·배당).
@@ -118,6 +119,21 @@ export function CashForm({
   const a = num(amount);
   const b = num(toAmount);
   const rate = a > 0 && b > 0 ? (from === 'KRW' ? a / b : b / a) : 0;
+  // 환전 예상 금액: 지금 환율에 계좌의 직접 환전 수수료(오늘이면 지금 시각의 우대율, 지난 날이면 정규 시간·그 외 둘 다)
+  const fx = summary.usd_krw > 0 ? summary.usd_krw : 0;
+  const fxRule = account.foreign_settle === 'USD' || !account.foreign_settle ? fxRuleOf(account) : null;
+  const estimate = (feePct: number) => (from === 'KRW' ? Math.floor((a / (fx * (1 + feePct / 100))) * 100) / 100 : Math.floor(a * fx * (1 - feePct / 100)));
+  const nowFee = fxRule && date === today() ? fxFeeAt(fxRule) : null;
+  const est = mode === 'exchange' && a > 0 && fx > 0 ? estimate(nowFee?.pct ?? (fxRule ? feeDay(fxRule) : 0)) : 0;
+  const estText = (v: number) => (to === 'USD' ? money(v, 'USD') : money(v, 'KRW'));
+  const estHint =
+    est > 0
+      ? fxRule
+        ? nowFee
+          ? `예상 ${estText(est)} · 지금 ${nowFee.day ? '정규 시간' : '정규 시간 밖'} ${nowFee.disc}% 우대 (수수료 ${pctText(nowFee.pct)})${nowFee.day ? '' : ` · 평일 09:00~15:30엔 ${estText(estimate(feeDay(fxRule)))}`}`
+          : `예상 정규 시간(평일 09:00~15:30) ${estText(estimate(feeDay(fxRule)))} · 그 외 ${estText(estimate(feeOff(fxRule)))}`
+        : `예상 ${estText(est)} (지금 환율 ${fx.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}원, 수수료 빼고)`
+      : null;
 
   const save = async () => {
     setError(null);
@@ -225,10 +241,25 @@ export function CashForm({
                     <input inputMode="decimal" className="input-field num" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
                   </Field>
                   <Field label={`받은 금액 (${to === 'KRW' ? '원' : '$'})`}>
-                    <input inputMode="decimal" className="input-field num" value={toAmount} onChange={(e) => setToAmount(e.target.value)} />
+                    <input inputMode="decimal" className="input-field num" value={toAmount} onChange={(e) => setToAmount(e.target.value)} placeholder={est > 0 ? String(est) : undefined} />
                   </Field>
                 </div>
-                {rate > 0 && <p className="num text-xs text-zinc-400">적용 환율 {rate.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}원 / $1</p>}
+                {estHint && (
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="num text-[11px] leading-relaxed text-zinc-500">{estHint}</p>
+                    {toAmount.trim() === '' && (
+                      <button type="button" className="shrink-0 text-[11px] text-zinc-300 hover:text-white hover:underline" onClick={() => setToAmount(String(est))}>
+                        예상값 넣기
+                      </button>
+                    )}
+                  </div>
+                )}
+                {rate > 0 && (
+                  <p className="num text-xs text-zinc-400">
+                    적용 환율 {rate.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}원 / $1
+                    {fx > 0 && date === today() && ` · 지금 환율보다 ${Math.abs((rate / fx - 1) * 100).toFixed(2)}% ${rate >= fx ? '높음' : '낮음'}`}
+                  </p>
+                )}
               </>
             )}
             <Field label="날짜" hint={mode === 'reconcile' ? '그날 장이 끝난 뒤의 잔액으로 봅니다.' : undefined}>

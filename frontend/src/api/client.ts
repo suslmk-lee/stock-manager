@@ -1,5 +1,6 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
 import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest, DivScoreRanking, DivScoreDetail, DivScoreWeights, ContributionPlanView, ContributionPlanRequest, ContributionRound, ContributionRunResult, FundPrice, ContributionCashSync, ContributionBuyRequest, TodayPicks, PriceZoneList, PriceZoneDetail } from '../types/models';
+import { NO_FX_RULE, type FxRuleInput } from '../utils/fxFee';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
 // Wails 환경에서는 window.go 객체가 존재합니다.
@@ -55,24 +56,24 @@ export const apiClient = {
     return WailsApp.GetAccount(id);
   },
 
-  CreateAccount: async (name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string, foreignSettle = 'USD', fxFeePct = 0, noCash = false) => {
+  CreateAccount: async (name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string, foreignSettle = 'USD', fxFeePct = 0, noCash = false, fxRule: FxRuleInput = NO_FX_RULE) => {
     if (isWeb) {
       return fetchApi<Account>('/accounts', {
         method: 'POST',
-        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType, foreign_settle: foreignSettle, fx_fee_pct: fxFeePct, no_cash: noCash }),
+        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType, foreign_settle: foreignSettle, fx_fee_pct: fxFeePct, no_cash: noCash, ...fxRule }),
       });
     }
-    return WailsApp.CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle, fxFeePct, noCash);
+    return WailsApp.CreateAccount(name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle, fxFeePct, noCash, fxRule.fx_spread_pct, fxRule.fx_day_disc_pct, fxRule.fx_off_disc_pct);
   },
 
-  UpdateAccount: async (id: number, name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string, foreignSettle = '', fxFeePct = 0, noCash = false) => {
+  UpdateAccount: async (id: number, name: string, broker: string, accountNumber: string, marketType: string, currency: string, description: string, accountType: string, foreignSettle = '', fxFeePct = 0, noCash = false, fxRule: FxRuleInput = NO_FX_RULE) => {
     if (isWeb) {
       return fetchApi<Account>(`/accounts/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType, foreign_settle: foreignSettle, fx_fee_pct: fxFeePct, no_cash: noCash }),
+        body: JSON.stringify({ name, broker, account_number: accountNumber, market_type: marketType, currency, description, account_type: accountType, foreign_settle: foreignSettle, fx_fee_pct: fxFeePct, no_cash: noCash, ...fxRule }),
       });
     }
-    return WailsApp.UpdateAccount(id, name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle, fxFeePct, noCash);
+    return WailsApp.UpdateAccount(id, name, broker, accountNumber, marketType, currency, description, accountType, foreignSettle, fxFeePct, noCash, fxRule.fx_spread_pct, fxRule.fx_day_disc_pct, fxRule.fx_off_disc_pct);
   },
 
   DeleteAccount: async (id: number) => {

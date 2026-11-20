@@ -57,8 +57,12 @@ type PriceZone struct {
 	CheapWin      float64 `json:"cheap_win"`      // 그날 샀다면 1년 뒤 이익이던 비율 (%)
 	Verdict       string  `gorm:"size:10" json:"verdict"`
 
-	Level string  `gorm:"size:10" json:"level"` // great | good | fair | high
-	Score float64 `json:"score"`                // 가격 매력 0~100
+	Level string `gorm:"size:10" json:"level"` // great | good | fair | high
+	// Expect: 과거 기준 지금 사면 평소보다 1년 뒤 더 기대되는 수익 (%p) = 싸게 산 날의 추가 수익(±30) × 지금 싼 정도. 사례가 부족하면 0
+	Expect float64 `json:"expect"`
+	Score  float64 `json:"score"` // 가격 매력 0~100 (Expect 30%p 면 100, 0 이하면 0)
+	// Formula: 계산 공식 버전 — 공식이 바뀌면 그날 기록이 새것이어도 다시 계산한다
+	Formula int `gorm:"not null;default:0" json:"formula"`
 
 	Alerted   bool      `gorm:"not null;default:false" json:"-"` // 좋은 가격대에 들어왔다고 알렸다
 	CreatedAt time.Time `json:"created_at"`

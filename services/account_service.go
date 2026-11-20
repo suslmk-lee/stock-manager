@@ -31,6 +31,10 @@ type CreateAccountRequest struct {
 	ForeignSettle string  // "" = 기본(USD)
 	FxFeePct      float64 // 자동 환전 수수료(%)
 	NoCash        bool    // 예수금 기록 안 함 (투자 대금은 연결 통장에서)
+	// 직접 환전 수수료: 기본(%) · 정규 시간 우대(%) · 그 외 우대(%)
+	FxSpreadPct  float64
+	FxDayDiscPct float64
+	FxOffDiscPct float64
 }
 
 type UpdateAccountRequest struct {
@@ -44,6 +48,10 @@ type UpdateAccountRequest struct {
 	ForeignSettle string   // "" = 그대로
 	FxFeePct      *float64 // nil = 그대로
 	NoCash        *bool    // nil = 그대로
+	// 직접 환전 수수료 (nil = 그대로)
+	FxSpreadPct  *float64
+	FxDayDiscPct *float64
+	FxOffDiscPct *float64
 }
 
 // validSettle: 예수금 구성 — 달러 따로(USD) · 원화로 바로(KRW) · 자동 환전(AFX)
@@ -53,6 +61,19 @@ func validSettle(v string) bool {
 
 // validFxFee: 자동 환전 수수료는 0~5%
 func validFxFee(v float64) bool { return v >= 0 && v <= 5 && !math.IsNaN(v) }
+
+// checkFxRule: 직접 환전 수수료 — 기본 0~5%, 우대율 0~100%
+func checkFxRule(spread, day, off float64) error {
+	if !validFxFee(spread) {
+		return fmt.Errorf("환전 기본 수수료는 0~5%% 사이여야 합니다")
+	}
+	for _, v := range []float64{day, off} {
+		if v < 0 || v > 100 || math.IsNaN(v) {
+			return fmt.Errorf("환전 우대율은 0~100%% 사이여야 합니다")
+		}
+	}
+	return nil
+}
 
 func (s *AccountService) CreateAccount(req CreateAccountRequest) (*models.Account, error) {
 	if req.Name == "" {
@@ -86,6 +107,9 @@ func (s *AccountService) CreateAccount(req CreateAccountRequest) (*models.Accoun
 	if !validFxFee(req.FxFeePct) {
 		return nil, fmt.Errorf("자동 환전 수수료는 0~5%% 사이여야 합니다")
 	}
+	if err := checkFxRule(req.FxSpreadPct, req.FxDayDiscPct, req.FxOffDiscPct); err != nil {
+		return nil, err
+	}
 
 	account := &models.Account{
 		Name:          req.Name,
@@ -98,6 +122,9 @@ func (s *AccountService) CreateAccount(req CreateAccountRequest) (*models.Accoun
 		ForeignSettle: req.ForeignSettle,
 		FxFeePct:      req.FxFeePct,
 		NoCash:        req.NoCash,
+		FxSpreadPct:   req.FxSpreadPct,
+		FxDayDiscPct:  req.FxDayDiscPct,
+		FxOffDiscPct:  req.FxOffDiscPct,
 	}
 
 	if err := s.db.Create(account).Error; err != nil {
@@ -174,6 +201,22 @@ func (s *AccountService) UpdateAccount(id uint, req UpdateAccountRequest) (*mode
 	}
 	if req.NoCash != nil {
 		account.NoCash = *req.NoCash
+	}
+	if req.FxSpreadPct != nil || req.FxDayDiscPct != nil || req.FxOffDiscPct != nil {
+		spread, day, off := account.FxSpreadPct, account.FxDayDiscPct, account.FxOffDiscPct
+		if req.FxSpreadPct != nil {
+			spread = *req.FxSpreadPct
+		}
+		if req.FxDayDiscPct != nil {
+			day = *req.FxDayDiscPct
+		}
+		if req.FxOffDiscPct != nil {
+			off = *req.FxOffDiscPct
+		}
+		if err := checkFxRule(spread, day, off); err != nil {
+			return nil, err
+		}
+		account.FxSpreadPct, account.FxDayDiscPct, account.FxOffDiscPct = spread, day, off
 	}
 	account.Description = req.Description
 

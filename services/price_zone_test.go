@@ -58,19 +58,20 @@ func TestComputeZone(t *testing.T) {
 	if z.Verdict != models.ZoneVerdictWorks || z.CheapEpisodes < 2 || z.CheapDays < zoneMinCheapDays || z.CheapAvg <= z.AllAvg || z.CheapWin < 90 {
 		t.Fatalf("자기 검증 = %s · 싼 날 %d(%d구간) 평균 %v 승률 %v · 전체 %v", z.Verdict, z.CheapDays, z.CheapEpisodes, z.CheapAvg, z.CheapWin, z.AllAvg)
 	}
-	if z.Score < 98 {
-		t.Fatalf("가격 매력 = %v (가격 100 × 0.7 + 배당률 위치 × 0.3)", z.Score)
+	// 가격 매력: 싸게 산 날의 추가 수익(34.8 − 11.0 ≈ 23.9%p) × 지금 싼 정도(1) → 23.9 / 30 × 100
+	if math.Abs(z.Expect-(z.CheapAvg-z.AllAvg)) > 0.02 || math.Abs(z.Score-math.Round(z.Expect/30*1000)/10) > 0.11 || z.Score < 70 {
+		t.Fatalf("가격 매력 = %v (기대 %v%%p)", z.Score, z.Expect)
 	}
 
 	// 꼭대기에서 끝나면 비싼 편
 	hi, _ := computeZone("JEPI", zoneSeries(1126, zoneWave), zoneDivs(1126))
-	if hi.Level != models.ZoneLevelHigh || hi.Pos1y != 100 || hi.Falling || hi.Score > 5 {
+	if hi.Level != models.ZoneLevelHigh || hi.Pos1y != 100 || hi.Falling || hi.Score > 1 {
 		t.Fatalf("꼭대기 = %+v", hi)
 	}
 
-	// 계속 내려가는 종목: 매일 1년 최저라 싸 보이지만 1년 뒤는 늘 손해 → 안 통함, 가격 매력 절반
+	// 계속 내려가는 종목: 매일 1년 최저라 싸 보이지만 싸게 산 날이 평소보다 낫지 않다 → 안 통함, 가격 매력 0
 	trap, _ := computeZone("NKE", zoneSeries(1000, func(i int) float64 { return 200 * math.Pow(0.999, float64(i)) }), nil)
-	if trap.Verdict != models.ZoneVerdictTrap || trap.CheapAvg >= 0 || trap.Level != models.ZoneLevelGreat || math.Abs(trap.Score-50) > 0.01 || trap.Yield != 0 || trap.YieldPos != -1 {
+	if trap.Verdict != models.ZoneVerdictTrap || trap.CheapAvg >= 0 || trap.Level != models.ZoneLevelGreat || trap.Score != 0 || trap.Expect > 0 || trap.Yield != 0 || trap.YieldPos != -1 {
 		t.Fatalf("함정 = %s · 평균 %v · 가격 매력 %v · 배당 %v/%v", trap.Verdict, trap.CheapAvg, trap.Score, trap.Yield, trap.YieldPos)
 	}
 
@@ -159,6 +160,14 @@ func TestPriceZoneRefreshAndAlerts(t *testing.T) {
 	f.now = f.now.Add(3 * time.Hour)
 	if ran, _ := f.svc.RefreshIfStale(); ran || f.calls != 2 {
 		t.Fatalf("새 기록이 있는데 다시 계산함 (%d)", f.calls)
+	}
+	// 예전 공식으로 계산한 기록이면 새것이어도 다시 계산한다 (업데이트 직후)
+	f.db.Model(&models.PriceZone{}).Where("date = ?", "2026-11-19").Update("formula", 1)
+	if ran, _ := f.svc.RefreshIfStale(); !ran || f.calls != 4 {
+		t.Fatalf("예전 공식 기록인데 다시 계산하지 않음 (%d)", f.calls)
+	}
+	if ran, _ := f.svc.RefreshIfStale(); ran || f.calls != 4 {
+		t.Fatalf("새 공식으로 바꾼 뒤 또 계산함 (%d)", f.calls)
 	}
 	if evs, _ := f.svc.Alerts(true, f.now); len(evs) != 0 {
 		t.Fatalf("비싼 편인데 알림 %v", evs)

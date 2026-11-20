@@ -12,6 +12,7 @@ import { ACCOUNT_TYPES, getAccountType, getAccountTypeMeta, isRestrictedAccount 
 import { IconWallet } from './components/ui/appIcons';
 import BrokerLogo from './components/ui/BrokerLogo';
 import { askConfirm } from './components/ui/confirmDialog';
+import { FX_PRESETS, NO_FX_RULE, feeDay, feeOff, fxRuleOf, pctText, type FxRuleInput } from './utils/fxFee';
 
 const DOMESTIC_BROKERS = [
   '삼성증권',
@@ -57,6 +58,10 @@ const EMPTY_FORM = {
   accountType: 'General' as AccountType,
   foreignSettle: 'USD' as ForeignSettle,
   fxFeePct: '0',
+  // 직접 환전 수수료 (원화·외화 따로): 기본 수수료(%) · 정규 시간 우대(%) · 그 외 우대(%) — 비우면 모름
+  fxSpread: '',
+  fxDayDisc: '',
+  fxOffDisc: '',
   // 예수금 기록 안 함 (투자 대금이 연결 통장에서 바로 빠져나가는 계좌 — 토스뱅크 펀드 모으기 등)
   noCash: false,
 };
@@ -70,6 +75,19 @@ const SETTLE_HINT: Record<ForeignSettle, string> = {
   KRW: '미국 주식 매매·배당이 그날 환율로 원화예수금에 바로 반영됩니다 (카카오페이 원화 모으기·원화 주문 등).',
 };
 
+
+/** 증권사 기준 환전 수수료를 폼 값으로 */
+const presetForm = (broker: string) => {
+  const p = FX_PRESETS[broker];
+  return p ? { fxSpread: String(p.fx_spread_pct), fxDayDisc: String(p.fx_day_disc_pct), fxOffDisc: String(p.fx_off_disc_pct) } : {};
+};
+
+/** 넣은 환전 수수료가 실제로 얼마인지 (정규 시간 · 그 외) */
+function fxRuleHint(f: { fxSpread: string; fxDayDisc: string; fxOffDisc: string }): string {
+  const rule = fxRuleOf({ fx_spread_pct: Number(f.fxSpread || '0'), fx_day_disc_pct: Number(f.fxDayDisc || '0'), fx_off_disc_pct: Number(f.fxOffDisc || '0') });
+  if (!rule) return '원화예수금을 달러로 직접 바꿀 때의 수수료입니다. 오늘 화면의 환전 금액과 환전 기록의 예상 금액에 씁니다. 모르면 비워 두세요.';
+  return `정규 시간(평일 09:00~15:30) ${pctText(feeDay(rule))} · 그 외 시간(밤·주말) ${pctText(feeOff(rule))}. 오늘 화면의 환전 금액과 환전 기록의 예상 금액에 씁니다.`;
+}
 
 // 목록 맨 위 '예수금 한눈에'를 고른 상태 (계좌 id 대신)
 const CASH_VIEW = -1;
@@ -148,6 +166,9 @@ function App() {
       accountType: getAccountType(account),
       foreignSettle: account.foreign_settle === 'KRW' || account.foreign_settle === 'AFX' ? account.foreign_settle : 'USD',
       fxFeePct: String(account.fx_fee_pct ?? 0),
+      fxSpread: account.fx_spread_pct ? String(account.fx_spread_pct) : '',
+      fxDayDisc: account.fx_spread_pct ? String(account.fx_day_disc_pct ?? 0) : '',
+      fxOffDisc: account.fx_spread_pct ? String(account.fx_off_disc_pct ?? 0) : '',
       noCash: !!account.no_cash,
     });
     setShowForm(true);
@@ -158,6 +179,20 @@ function App() {
     const fxFee = formData.foreignSettle === 'USD' ? 0 : Number(formData.fxFeePct.trim() || '0');
     if (!Number.isFinite(fxFee) || fxFee < 0 || fxFee > 5) {
       setError('자동 환전 수수료는 0~5% 사이로 넣어 주세요.');
+      return;
+    }
+    // 직접 환전 수수료: 원화·외화 따로 계좌만 (기본 수수료가 비면 모름 = 0)
+    const direct = formData.foreignSettle === 'USD' && !formData.noCash;
+    const fxNum = (v: string) => Number(v.trim() || '0');
+    const fxRule: FxRuleInput = direct
+      ? { fx_spread_pct: fxNum(formData.fxSpread), fx_day_disc_pct: fxNum(formData.fxDayDisc), fx_off_disc_pct: fxNum(formData.fxOffDisc) }
+      : NO_FX_RULE;
+    if (!Number.isFinite(fxRule.fx_spread_pct) || fxRule.fx_spread_pct < 0 || fxRule.fx_spread_pct > 5) {
+      setError('환전 기본 수수료는 0~5% 사이로 넣어 주세요.');
+      return;
+    }
+    if ([fxRule.fx_day_disc_pct, fxRule.fx_off_disc_pct].some((v) => !Number.isFinite(v) || v < 0 || v > 100)) {
+      setError('환전 우대율은 0~100% 사이로 넣어 주세요.');
       return;
     }
     try {
@@ -173,7 +208,8 @@ function App() {
           formData.accountType,
           formData.foreignSettle,
           fxFee,
-          formData.noCash
+          formData.noCash,
+          fxRule
         );
       } else {
         const created = (await apiClient.CreateAccount(
@@ -186,7 +222,8 @@ function App() {
           formData.accountType,
           formData.foreignSettle,
           fxFee,
-          formData.noCash
+          formData.noCash,
+          fxRule
         )) as Account | null;
         if (created?.id) setSelectedId(created.id);
       }
@@ -321,7 +358,12 @@ function App() {
             <select
               value={formData.broker}
               onChange={(e) =>
-                setFormData({ ...formData, broker: e.target.value, ...(editingId === null ? { noCash: NO_CASH_BROKERS.has(e.target.value) } : {}) })
+                setFormData({
+                  ...formData,
+                  broker: e.target.value,
+                  ...(editingId === null ? { noCash: NO_CASH_BROKERS.has(e.target.value) } : {}),
+                  ...(editingId === null && !formData.fxSpread.trim() && FX_PRESETS[e.target.value] ? presetForm(e.target.value) : {}),
+                })
               }
               className="input-field"
               required
@@ -403,6 +445,39 @@ function App() {
           </select>
           <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{SETTLE_HINT[formData.foreignSettle]}</p>
         </div>
+        )}
+        {!formData.noCash && formData.foreignSettle === 'USD' && (
+          <div>
+            <div className="flex items-baseline justify-between gap-2">
+              <label className="field-label">환전 수수료 (직접 환전)</label>
+              {FX_PRESETS[formData.broker] && (
+                <button type="button" className="text-xs text-zinc-400 hover:text-white hover:underline" onClick={() => setFormData({ ...formData, ...presetForm(formData.broker) })}>
+                  {formData.broker} 기준 넣기
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  ['fxSpread', '기본 수수료 (%)', '예: 1'],
+                  ['fxDayDisc', '정규 시간 우대 (%)', '예: 95'],
+                  ['fxOffDisc', '그 외 시간 우대 (%)', '예: 50'],
+                ] as const
+              ).map(([key, label, ph]) => (
+                <label key={key} className="min-w-0">
+                  <span className="mb-1 block truncate text-[11px] text-zinc-500">{label}</span>
+                  <input
+                    inputMode="decimal"
+                    value={formData[key]}
+                    onChange={(e) => setFormData({ ...formData, [key]: e.target.value.replace(/[^0-9.]/g, '') })}
+                    className="input-field num"
+                    placeholder={ph}
+                  />
+                </label>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{fxRuleHint(formData)}</p>
+          </div>
         )}
         {!formData.noCash && formData.foreignSettle !== 'USD' && (
           <div>

@@ -17,26 +17,37 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// 오늘 살 종목 Top 3 — 보유 종목마다 100점 만점 '오늘 점수'를 매겨 높은 순으로 3개.
-//   가격 매력 30 : 사기 좋은 가격(price_zone.go)의 가격 매력 — 자기 과거 가격·배당률 대비 지금 얼마나 싼가
-//   매수 신호 25 : 매매 신호의 매수 조건을 얼마나 채웠나 ('매수 검토'면 만점)
-//   배당 점수 20 : 배당 점수(종합 60% · 지금 수익률 매력 40%)
-//   비중 여유 10 : 매수 최대 비중(없으면 20%)보다 낮을수록
-//   살 돈     15 : 그 종목을 살 계좌의 예수금이 제안 금액을 얼마나 채우나 (예수금 기록 안 하는 계좌는 만점)
-//   배당 점수나 가격 매력이 없는 종목(배당 없음 · 이력 1년 미만)은 그 몫을 매수 신호에 더한다.
-// 빼는 종목: 매도·충돌·시세 없음, 매매 신호가 매수를 막은 종목(쉬는 기간·최대 비중·반등 미확인), 오늘 이미 산 종목, 오늘 모으기로 사는 종목.
+// 오늘 살 종목 — 보유 종목 전체에 100점 만점 '오늘 점수'를 매겨 순위를 내고(아래 목록), 살 수 있는 앞의 3개가 Top 3.
+//   가격 매력 70 : 과거에 싸게 산 날이 평소보다 1년 뒤 더 번 정도(±30%p) × 지금 싼 정도 (price_zone.go)
+//                  — 보유 156종목 2017~2025 백테스트에서 종목을 고르는 힘이 가장 일관됐다. 이력이 없으면 0 (다른 항목으로 넘기지 않는다)
+//   매수 신호 15 : 매매 신호의 매수 조건을 얼마나 채웠나 ('매수 검토'면 만점)
+//   배당 점수 10 : 배당 점수(종합 60% · 지금 수익률 매력 40%)
+//   비중 여유  5 : 매수 최대 비중(없으면 20%)보다 낮을수록
+//   예수금은 점수에 넣지 않는다 (살 계좌와 모자란 금액은 카드에 보여만 준다).
+// Top 3 에서 빼는 종목 (목록에는 이유와 함께 남는다): 매도·충돌·시세 없음, 매매 신호가 매수를 막은 종목(쉬는 기간·최대 비중·반등 미확인),
+// 오늘 이미 산 종목, 오늘 모으기로 사는 종목, 점수가 너무 낮은 종목.
 
 const (
 	todayPickCount   = 3
-	todayMinScore    = 35  // 이보다 낮으면 추천하지 않는다
+	todayMinScore    = 20   // 이보다 낮으면 Top 3 에 넣지 않는다
 	todayDefaultMaxW = 20.0 // 매수 최대 비중을 정하지 않았을 때 비중 여유의 기준 (%)
-	todaySeriesLen   = 60  // 카드 미니 차트 점 수
+	todaySeriesLen   = 60   // 카드 미니 차트 점 수
 
-	todayPriceMax  = 30.0
-	todaySignalMax = 25.0
-	todayDivMax    = 20.0
-	todayWeightMax = 10.0
-	todayCashMax   = 15.0
+	todayPriceMax  = 70.0
+	todaySignalMax = 15.0
+	todayDivMax    = 10.0
+	todayWeightMax = 5.0
+)
+
+// Top 3 에서 뺀 이유
+const (
+	TodayExSell        = "sell"
+	TodayExConflict    = "conflict"
+	TodayExNoPrice     = "no_price"
+	TodayExBoughtToday = "bought_today"
+	TodayExPlanned     = "planned"
+	TodayExLowScore    = "low_score"
+	// 그 밖에는 매매 신호의 BuyExcludedReason (cooldown | max_weight | no_rebound)
 )
 
 type TodayService struct {
@@ -66,13 +77,32 @@ type TodayParts struct {
 	Signal   float64 `json:"signal"`
 	Dividend float64 `json:"dividend"`
 	Weight   float64 `json:"weight"`
-	Cash     float64 `json:"cash"`
-	// 항목별 만점 (배당 점수·가격 매력이 없으면 그 몫이 신호로 간다)
+	// 항목별 만점
 	PriceMax    float64 `json:"price_max"`
 	SignalMax   float64 `json:"signal_max"`
 	DividendMax float64 `json:"dividend_max"`
 	WeightMax   float64 `json:"weight_max"`
-	CashMax     float64 `json:"cash_max"`
+}
+
+// TodayRow: 보유 종목 전체 순위 한 줄 (Top 3 와 같은 점수)
+type TodayRow struct {
+	Rank     int        `json:"rank"` // 오늘 점수 순위 (1부터)
+	AssetID  uint       `json:"asset_id"`
+	Ticker   string     `json:"ticker"`
+	Name     string     `json:"name"`
+	Currency string     `json:"currency"`
+	Price    float64    `json:"price"`
+	Score    float64    `json:"score"`
+	Parts    TodayParts `json:"parts"`
+	HasZone  bool       `json:"has_zone"`
+	Expect   float64    `json:"expect"` // 과거 기준 평소보다 1년 뒤 더 기대되는 수익 (%p)
+	Level    string     `json:"level,omitempty"`
+	Pos1y    float64    `json:"pos_1y"`
+	Good     float64    `json:"good"`
+	Verdict  string     `json:"verdict,omitempty"`
+	Falling  bool       `json:"falling"`
+	Excluded string     `json:"excluded,omitempty"` // Top 3 에서 뺀 이유
+	Pick     int        `json:"pick,omitempty"`     // Top 3 순위 (1~3)
 }
 
 // TodayAccount: 이 종목을 살 계좌와 그 예수금 (종목 통화 기준)
@@ -85,6 +115,13 @@ type TodayAccount struct {
 	Need     float64 `json:"need"`  // 제안 금액 (예수금 통화)
 	Short    float64 `json:"short"` // 모자란 금액 (0 이면 충분)
 	NoCash   bool    `json:"no_cash"`
+	// 원화·외화 따로 계좌에서 달러 종목을 살 때: 원화예수금(환전하면 쓸 수 있음)·계산 때 환율·직접 환전 수수료.
+	// 지금 환전하면 원화가 얼마 드는지는 화면이 보는 시각(정규 시간 여부)으로 계산한다
+	KRW          float64 `json:"krw,omitempty"`
+	Fx           float64 `json:"fx,omitempty"`
+	FxSpreadPct  float64 `json:"fx_spread_pct,omitempty"`
+	FxDayDiscPct float64 `json:"fx_day_disc_pct,omitempty"`
+	FxOffDiscPct float64 `json:"fx_off_disc_pct,omitempty"`
 }
 
 type TodayPick struct {
@@ -125,14 +162,14 @@ type TodayPicks struct {
 	Date       string      `json:"date"` // KST 오늘
 	ComputedAt time.Time   `json:"computed_at"`
 	Picks      []TodayPick `json:"picks"`
-	Considered int         `json:"considered"` // 점수를 매긴 종목 수
+	Considered int         `json:"considered"` // 점수를 매긴 보유 종목 수
 	Plans      []TodayPlan `json:"plans"`
-	// 사기 좋은 가격: 마지막 계산 날짜·시각, 계산한 종목 수 / 보유 종목 수, 좋은 가격대에 있는 종목 (가격 매력 높은 순)
-	ZoneDate      string         `json:"zone_date"`
-	ZoneUpdatedAt *time.Time     `json:"zone_updated_at"`
-	ZoneCount     int            `json:"zone_count"`
-	ZoneHeld      int            `json:"zone_held"`
-	InZone        []PriceZoneRow `json:"in_zone"`
+	Ranking    []TodayRow  `json:"ranking"` // 보유 종목 전체 순위 (오늘 점수 높은 순)
+	// 사기 좋은 가격: 마지막 계산 날짜·시각, 계산한 종목 수 / 보유 종목 수
+	ZoneDate      string     `json:"zone_date"`
+	ZoneUpdatedAt *time.Time `json:"zone_updated_at"`
+	ZoneCount     int        `json:"zone_count"`
+	ZoneHeld      int        `json:"zone_held"`
 }
 
 func marketOf(ticker string) string {
@@ -155,7 +192,7 @@ func clamp01(v float64) float64 { return math.Max(0, math.Min(1, v)) }
 func (s *TodayService) GetTodayPicks() (*TodayPicks, error) {
 	now := s.now()
 	today := todayKST(now)
-	out := &TodayPicks{Date: today, ComputedAt: now, Picks: []TodayPick{}, Plans: []TodayPlan{}, InZone: []PriceZoneRow{}}
+	out := &TodayPicks{Date: today, ComputedAt: now, Picks: []TodayPick{}, Plans: []TodayPlan{}, Ranking: []TodayRow{}}
 
 	var (
 		wg       sync.WaitGroup
@@ -200,9 +237,6 @@ func (s *TodayService) GetTodayPicks() (*TodayPicks, error) {
 		out.ZoneDate, out.ZoneUpdatedAt, out.ZoneCount, out.ZoneHeld = zoneList.Date, zoneList.UpdatedAt, len(zoneList.Rows), zoneList.Held
 		for _, r := range zoneList.Rows {
 			zones[r.AssetID] = r
-			if r.InZone() {
-				out.InZone = append(out.InZone, r)
-			}
 		}
 	}
 	// 배당 점수
@@ -234,8 +268,9 @@ func (s *TodayService) GetTodayPicks() (*TodayPicks, error) {
 		fx = cashFx
 	}
 
-	picks, considered := rankToday(report.Items, divRows, zones, planned, accounts, balances, fx, today)
-	out.Considered = considered
+	picks, rows := rankToday(report.Items, divRows, zones, planned, accounts, balances, fx, today)
+	out.Considered = len(rows)
+	out.Ranking = rows
 	var sw sync.WaitGroup
 	for i := range picks {
 		sw.Add(1)
@@ -327,103 +362,116 @@ func (s *TodayService) WarmAfter(ctx context.Context, delay time.Duration) {
 }
 
 
-// rankToday: 신호 항목·배당 점수·가격 매력·오늘 모으기·계좌·예수금으로 오늘 점수를 매겨 상위 3개 (미니 차트는 붙이지 않는다). considered: 점수를 넘긴 종목 수
-func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]PriceZoneRow, planned map[uint]bool, accounts map[uint]models.Account, balances map[uint]CashBalance, fx float64, today string) ([]TodayPick, int) {
-	var picks []TodayPick
+// rankToday: 보유 종목 전체에 오늘 점수를 매겨 순위(rows)를 내고, Top 3 에서 뺄 종목을 표시한 뒤 앞의 3개를 카드(picks)로 만든다 (미니 차트는 붙이지 않는다).
+func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]PriceZoneRow, planned map[uint]bool, accounts map[uint]models.Account, balances map[uint]CashBalance, fx float64, today string) ([]TodayPick, []TodayRow) {
+	type scored struct {
+		it        SignalItem
+		row       TodayRow
+		metLabels []string
+		met, tot  int
+		div       DivScoreRow
+		hasDiv    bool
+		zone      *PriceZoneRow
+		maxW      float64
+	}
+	var all []scored
 	for _, it := range items {
-		if it.Action == SignalSell || it.Action == SignalConflict || it.Action == SignalNoPrice || it.CurrentPrice <= 0 {
-			continue
+		x := scored{it: it}
+		r := TodayRow{AssetID: it.AssetID, Ticker: it.Ticker, Name: it.Name, Currency: it.Currency, Price: it.CurrentPrice}
+		r.Parts = TodayParts{PriceMax: todayPriceMax, SignalMax: todaySignalMax, DividendMax: todayDivMax, WeightMax: todayWeightMax}
+		// 가격 매력
+		if z, ok := zones[it.AssetID]; ok {
+			zz := z
+			x.zone = &zz
+			r.HasZone, r.Expect, r.Level, r.Pos1y, r.Good, r.Verdict, r.Falling = true, z.Expect, z.Level, z.Pos1y, z.Good, z.Verdict, z.Falling
+			r.Parts.Price = todayPriceMax * clamp01(z.Score/100)
 		}
-		if it.BuyExcludedReason != "" || it.LastBuyDate == today || planned[it.AssetID] {
-			continue
-		}
-		p := TodayPick{AssetID: it.AssetID, Ticker: it.Ticker, Name: it.Name, Market: marketOf(it.Ticker), Currency: it.Currency,
-			Action: it.Action, Price: it.CurrentPrice, FromHighPct: it.FromHighPct, WeightPct: it.WeightPct,
-			SuggestQty: it.SuggestedBuyQty, SuggestKRW: it.SuggestedBuyKRW}
-
 		// 매수 신호
-		var metLabels []string
 		for _, c := range it.BuyChecks {
-			p.TotalBuy++
+			x.tot++
 			if c.Met {
-				p.MetBuy++
-				metLabels = append(metLabels, c.Label)
+				x.met++
+				x.metLabels = append(x.metLabels, c.Label)
 			}
 		}
 		sigFrac := 0.0
 		if it.Action == SignalBuy {
 			sigFrac = 1
-		} else if p.TotalBuy > 0 {
-			sigFrac = float64(p.MetBuy) / float64(p.TotalBuy)
+		} else if x.tot > 0 {
+			sigFrac = float64(x.met) / float64(x.tot)
 		}
-		// 만점: 배당 점수·가격 매력이 없으면 그 몫을 신호에
-		row, hasDiv := divRows[it.AssetID]
-		zone, hasZone := zones[it.AssetID]
-		p.Parts.SignalMax, p.Parts.WeightMax, p.Parts.CashMax = todaySignalMax, todayWeightMax, todayCashMax
-		if hasDiv {
-			p.Parts.DividendMax = todayDivMax
-		} else {
-			p.Parts.SignalMax += todayDivMax
-		}
-		if hasZone {
-			p.Parts.PriceMax = todayPriceMax
-			z := zone
-			p.Zone = &z
-			p.Parts.Price = todayPriceMax * clamp01(zone.Score/100)
-		} else {
-			p.Parts.SignalMax += todayPriceMax
-		}
-		p.Parts.Signal = p.Parts.SignalMax * sigFrac
-		if hasDiv {
-			p.Parts.Dividend = todayDivMax * clamp01(0.6*row.Score/100+0.4*row.Parts.Yield)
-			p.DivRank = row.Rank
+		r.Parts.Signal = todaySignalMax * sigFrac
+		// 배당 점수
+		x.div, x.hasDiv = divRows[it.AssetID]
+		if x.hasDiv {
+			r.Parts.Dividend = todayDivMax * clamp01(0.6*x.div.Score/100+0.4*x.div.Parts.Yield)
 		}
 		// 비중 여유
-		maxW := it.BuyMaxWeightPct
-		if maxW <= 0 {
-			maxW = todayDefaultMaxW
+		x.maxW = it.BuyMaxWeightPct
+		if x.maxW <= 0 {
+			x.maxW = todayDefaultMaxW
 		}
-		p.Parts.Weight = todayWeightMax * clamp01(1-it.WeightPct/maxW)
-		// 살 돈: 이 종목을 가진 계좌 가운데 예수금이 가장 넉넉한 곳
-		p.Account = pickAccount(it, accounts, balances, fx)
-		if p.Account != nil {
-			if p.Account.NoCash || p.Account.Need <= 0 {
-				p.Parts.Cash = todayCashMax
-			} else {
-				p.Parts.Cash = todayCashMax * clamp01(p.Account.Cash/p.Account.Need)
-			}
-		}
-		for _, v := range []*float64{&p.Parts.Price, &p.Parts.Signal, &p.Parts.Dividend, &p.Parts.Weight, &p.Parts.Cash} {
+		r.Parts.Weight = todayWeightMax * clamp01(1-it.WeightPct/x.maxW)
+		for _, v := range []*float64{&r.Parts.Price, &r.Parts.Signal, &r.Parts.Dividend, &r.Parts.Weight} {
 			*v = math.Round(*v*10) / 10
 		}
-		p.Score = math.Round((p.Parts.Price+p.Parts.Signal+p.Parts.Dividend+p.Parts.Weight+p.Parts.Cash)*10) / 10
-		if p.Score < todayMinScore {
-			continue
+		r.Score = math.Round((r.Parts.Price+r.Parts.Signal+r.Parts.Dividend+r.Parts.Weight)*10) / 10
+		// Top 3 에서 뺄 이유
+		switch {
+		case it.Action == SignalSell:
+			r.Excluded = TodayExSell
+		case it.Action == SignalConflict:
+			r.Excluded = TodayExConflict
+		case it.Action == SignalNoPrice || it.CurrentPrice <= 0:
+			r.Excluded = TodayExNoPrice
+		case it.BuyExcludedReason != "":
+			r.Excluded = it.BuyExcludedReason
+		case it.LastBuyDate == today:
+			r.Excluded = TodayExBoughtToday
+		case planned[it.AssetID]:
+			r.Excluded = TodayExPlanned
+		case r.Score < todayMinScore:
+			r.Excluded = TodayExLowScore
 		}
-		p.Reasons = todayReasons(it, p, metLabels, row, hasDiv, maxW)
-		p.Warn = zoneWarn(p.Zone)
-		picks = append(picks, p)
+		x.row = r
+		all = append(all, x)
 	}
-	considered := len(picks)
-	sort.SliceStable(picks, func(i, j int) bool {
-		if picks[i].Score != picks[j].Score {
-			return picks[i].Score > picks[j].Score
+	sort.SliceStable(all, func(i, j int) bool {
+		a, b := all[i].row, all[j].row
+		if a.Score != b.Score {
+			return a.Score > b.Score
 		}
-		if picks[i].Parts.Price != picks[j].Parts.Price {
-			return picks[i].Parts.Price > picks[j].Parts.Price
+		if a.Expect != b.Expect {
+			return a.Expect > b.Expect
 		}
-		return picks[i].Parts.Signal > picks[j].Parts.Signal
+		return a.Parts.Signal > b.Parts.Signal
 	})
-	if len(picks) > todayPickCount {
-		picks = picks[:todayPickCount]
+	rows := make([]TodayRow, 0, len(all))
+	var picks []TodayPick
+	for i := range all {
+		x := &all[i]
+		x.row.Rank = i + 1
+		if x.row.Excluded == "" && len(picks) < todayPickCount {
+			it := x.it
+			p := TodayPick{Rank: len(picks) + 1, AssetID: it.AssetID, Ticker: it.Ticker, Name: it.Name, Market: marketOf(it.Ticker), Currency: it.Currency,
+				Score: x.row.Score, Parts: x.row.Parts, Action: it.Action, MetBuy: x.met, TotalBuy: x.tot, Price: it.CurrentPrice,
+				FromHighPct: it.FromHighPct, WeightPct: it.WeightPct, SuggestQty: it.SuggestedBuyQty, SuggestKRW: it.SuggestedBuyKRW, Zone: x.zone}
+			if x.hasDiv {
+				p.DivRank = x.div.Rank
+			}
+			p.Account = pickAccount(it, accounts, balances, fx) // 예수금은 점수에 넣지 않고 보여만 준다
+			p.Reasons = todayReasons(it, p, x.metLabels, x.div, x.hasDiv, x.maxW)
+			p.Warn = zoneWarn(p.Zone)
+			picks = append(picks, p)
+			x.row.Pick = p.Rank
+		}
+		rows = append(rows, x.row)
 	}
-	for i := range picks {
-		picks[i].Rank = i + 1
-	}
-	return picks, considered
+	return picks, rows
 }
 
-// pickAccount: 이 종목을 가진 계좌 가운데 그 종목을 살 예수금이 가장 넉넉한 곳 (예수금 기록 안 하는 계좌는 늘 충분)
+// pickAccount: 이 종목을 가진 계좌 가운데 그 종목을 살 예수금이 가장 넉넉한 곳 (예수금 기록 안 하는 계좌는 늘 충분).
+// 고르는 순서: 예수금으로 바로 살 수 있는 계좌 → 원화를 환전하면 살 수 있는 계좌(원화·외화 따로) → 가장 많이 채우는 계좌
 func pickAccount(it SignalItem, accounts map[uint]models.Account, balances map[uint]CashBalance, fx float64) *TodayAccount {
 	assetCcy := tickerCurrency(it.Ticker)
 	needKRW := it.SuggestedBuyKRW
@@ -434,7 +482,7 @@ func pickAccount(it SignalItem, accounts map[uint]models.Account, balances map[u
 		}
 	}
 	var best *TodayAccount
-	bestFrac := -1.0
+	bestLevel, bestFrac := -1, -1.0
 	for _, ab := range it.Accounts {
 		acc, ok := accounts[ab.AccountID]
 		if !ok {
@@ -452,19 +500,40 @@ func pickAccount(it SignalItem, accounts map[uint]models.Account, balances map[u
 			t.Currency, t.Cash = "USD", b.USD
 			if fx > 0 {
 				t.Need = needKRW / fx
+				// 원화·외화 따로: 원화예수금은 직접 환전하면 쓸 수 있다
+				if !acc.NoCash && b.KRW > 0 {
+					t.KRW, t.Fx = math.Round(b.KRW), fx
+					if acc.HasFxFee() {
+						t.FxSpreadPct, t.FxDayDiscPct, t.FxOffDiscPct = acc.FxSpreadPct, acc.FxDayDiscPct, acc.FxOffDiscPct
+					}
+				}
 			}
 		}
-		frac := 1.0
+		level, frac := 2, 1.0
 		if !acc.NoCash && t.Need > 0 {
 			frac = t.Cash / t.Need
+			if t.Cash < t.Need {
+				level = 0
+				if t.KRW > 0 {
+					// 환전하면: 그 외 시간 수수료(더 비싼 쪽)로 넉넉히 본다
+					fee := 0.0
+					if acc.HasFxFee() {
+						fee = math.Max(acc.FxFeePctDay(), acc.FxFeePctOff())
+					}
+					frac = (math.Max(t.Cash, 0) + t.KRW/(t.Fx*(1+fee/100))) / t.Need
+					if frac >= 1 {
+						level = 1
+					}
+				}
+			}
 		}
 		if acc.NoCash || t.Cash >= t.Need {
 			t.Short = 0
 		} else {
 			t.Short = t.Need - math.Max(t.Cash, 0)
 		}
-		if frac > bestFrac {
-			best, bestFrac = t, frac
+		if level > bestLevel || (level == bestLevel && frac > bestFrac) {
+			best, bestLevel, bestFrac = t, level, frac
 		}
 	}
 	if best != nil {
@@ -489,8 +558,11 @@ func todayReasons(it SignalItem, p TodayPick, metLabels []string, row DivScoreRo
 		out = append(out, "매수 신호")
 	}
 	zoneLine := false
-	if z := p.Zone; z != nil && (z.InZone() || z.Pos1y <= 30) {
+	if z := p.Zone; z != nil {
 		zoneLine = true
+		if z.Expect > 0 {
+			out = append(out, fmt.Sprintf("과거 기준 1년 뒤 평소보다 %+.1f%%p (싸게 산 날 %+.1f%% · 평소 %+.1f%%)", z.Expect, z.CheapAvg, z.AllAvg))
+		}
 		switch z.Level {
 		case models.ZoneLevelGreat:
 			out = append(out, fmt.Sprintf("1년 중 하위 %.0f%% 가격 · 아주 좋은 가격 %s 이하", z.Pos1y, holdingMoney(z.Great, z.Currency)))
@@ -498,9 +570,6 @@ func todayReasons(it SignalItem, p TodayPick, metLabels []string, row DivScoreRo
 			out = append(out, fmt.Sprintf("1년 중 하위 %.0f%% 가격 · 좋은 가격 %s 이하", z.Pos1y, holdingMoney(z.Good, z.Currency)))
 		default:
 			out = append(out, fmt.Sprintf("1년 중 하위 %.0f%% 가격 · 좋은 가격은 %s 이하", z.Pos1y, holdingMoney(z.Good, z.Currency)))
-		}
-		if z.Verdict == models.ZoneVerdictWorks {
-			out = append(out, fmt.Sprintf("이만큼 쌌을 때 1년 뒤 평균 %+.1f%% (평소 %+.1f%%)", z.CheapAvg, z.AllAvg))
 		}
 	}
 	if it.Action != SignalBuy && p.MetBuy > 0 {

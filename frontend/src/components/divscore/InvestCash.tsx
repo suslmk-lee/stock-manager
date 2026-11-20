@@ -5,11 +5,12 @@ import BrokerLogo from '../ui/BrokerLogo';
 import { accountDisplayName } from '../../utils/accountLabel';
 import { getAccountType, isRestrictedAccount } from '../../utils/accountType';
 import { money } from '../cash/CashPanel';
+import { fxFeeAt, fxRuleOf } from '../../utils/fxFee';
 
 /**
  * 이 종목을 살 수 있는 예수금 — 계좌마다 지금 쓸 수 있는 금액(종목 통화)과 현재가로 살 수 있는 수량.
  * 국내 종목은 원화예수금, 미국 종목은 계좌의 예수금 구성을 따른다:
- *   원화·외화 따로(USD) = 달러만 (원화는 환전하면 쓸 수 있음으로 따로 보여 줌)
+ *   원화·외화 따로(USD) = 달러만 (원화는 환전하면 쓸 수 있음으로 따로 보여 줌 — 계좌의 직접 환전 수수료를 지금 시각의 우대율로 뺀다)
  *   자동 환전(AFX) = 달러 + 원화(수수료 얹은 환율로 바꿔 계산)
  *   원화 하나(KRW) = 원화를 수수료 얹은 환율로 바꿔 계산
  * 매수에는 결제 전 매도 대금도 쓸 수 있으므로 '출금 가능'이 아니라 예수금 잔액을 쓴다.
@@ -116,10 +117,13 @@ export default function InvestCash({ asset, ccy, price, ctx, rate = 0 }: { asset
           parts = [cashUSD > 0 && `달러 ${money(cashUSD, 'USD')}`, krw > 0 && `원화 ${money(krw, 'KRW')} 자동 환전${feeText}`].filter(Boolean).join(' + ') || '예수금 없음';
         } else {
           now = cashUSD;
+          const rule = fxRuleOf(account);
+          const at = rule ? fxFeeAt(rule) : null;
           if (krw > 0 && fx > 0) {
-            exchangeable = krw / fx;
+            exchangeable = krw / (fx * (1 + (at?.pct ?? 0) / 100));
           }
-          parts = cashUSD > 0 ? `외화예수금${exchangeable > 0 ? ` · 원화 ${money(krw, 'KRW')} 환전하면 +${money(exchangeable, 'USD')}` : ''}` : `외화예수금 없음${exchangeable > 0 ? ` · 원화 ${money(krw, 'KRW')}` : ''}`;
+          const disc = at ? ` (지금 ${at.disc}% 우대)` : '';
+          parts = cashUSD > 0 ? `외화예수금${exchangeable > 0 ? ` · 원화 ${money(krw, 'KRW')} 환전하면 +${money(exchangeable, 'USD')}${disc}` : ''}` : `외화예수금 없음${exchangeable > 0 ? ` · 원화 ${money(krw, 'KRW')}${disc}` : ''}`;
         }
       }
       if (now < (usd ? 0.01 : 1) && exchangeable <= 0 && held <= 0) continue;

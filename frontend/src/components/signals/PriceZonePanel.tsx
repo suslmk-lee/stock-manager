@@ -103,7 +103,7 @@ export default function PriceZonePanel({ detail, loading }: { detail: PriceZoneD
           <span className={`badge !py-0 !text-[11px] ${lv.badge}`}>{lv.label}</span>
         </span>
         <span className="num text-[10.5px] text-zinc-500">
-          가격 매력 {Math.round(z.score)}/100 · {clock(z.updated_at)} 계산
+          가격 매력 {Math.round(z.score)}/100{z.expect > 0 ? ` · 과거 기준 +${z.expect.toFixed(1)}%p` : ''} · {clock(z.updated_at)} 계산
         </span>
       </div>
 
@@ -118,17 +118,18 @@ export default function PriceZonePanel({ detail, loading }: { detail: PriceZoneD
 
       {z.verdict === 'works' && (
         <p className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] px-3 py-2 text-[12.5px] leading-relaxed text-zinc-200">
-          과거에 1년 중 싼 20% 가격이던 날({z.cheap_days}일 · {z.cheap_episodes}번의 하락기)에 샀다면 1년 뒤 총수익이 평균 <b className="text-emerald-300">{pct(z.cheap_avg)}</b>, 이익인 날이 {Math.round(z.cheap_win)}% — 아무 날이나 샀을 때는 평균 {pct(z.all_avg)}
+          과거에 1년 중 싼 20% 가격이던 날({z.cheap_days}일 · {z.cheap_episodes}번의 하락기)에 샀다면 1년 뒤 총수익이 평균 <b className="text-emerald-300">{pct(z.cheap_avg)}</b>, 이익인 날이 {Math.round(z.cheap_win)}% — 아무 날이나 샀을 때는 평균 {pct(z.all_avg)}.
+          {z.expect > 0 && <> 지금 싼 정도를 곱하면 평소보다 <b className="text-emerald-300">+{z.expect.toFixed(1)}%p</b> (가격 매력 {Math.round(z.score)}/100, 30%p 면 만점)</>}
         </p>
       )}
       {z.verdict === 'trap' && (
         <p className="rounded-xl border border-amber-300/30 bg-amber-300/[0.08] px-3 py-2 text-[12.5px] leading-relaxed text-zinc-200">
-          과거에 1년 중 싼 20% 가격이던 날({z.cheap_days}일)에 샀다면 1년 뒤 총수익이 평균 <b className="text-amber-300">{pct(z.cheap_avg)}</b> — 아무 날이나 샀을 때 {pct(z.all_avg)}보다 나빴어요. 싸 보여도 더 떨어진 적이 많아 가격 매력을 절반으로 봐요.
+          과거에 1년 중 싼 20% 가격이던 날({z.cheap_days}일)에 샀다면 1년 뒤 총수익이 평균 <b className="text-amber-300">{pct(z.cheap_avg)}</b> — 아무 날이나 샀을 때 {pct(z.all_avg)}보다 나빴어요. 싸 보여도 더 떨어진 적이 많아 가격 매력은 0이에요.
         </p>
       )}
       {z.verdict === 'few' && (
         <p className="rounded-xl bg-white/[0.03] px-3 py-2 text-[12.5px] text-zinc-400">
-          비교할 과거 사례가 적어요 (1년 뒤를 알 수 있는 날 {z.test_days}일 중 싼 날 {z.cheap_days}일). 가격 매력을 0.8배로 봐요.
+          비교할 과거 사례가 적어요 (1년 뒤를 알 수 있는 날 {z.test_days}일 중 싼 날 {z.cheap_days}일).{z.cheap_days < 40 ? ' 가격 매력은 0이에요.' : ' 하락기가 한 번뿐이라 참고만 하세요.'}
         </p>
       )}
       {z.falling && (z.level === 'great' || z.level === 'good' || z.pos_1y <= 30) && (
