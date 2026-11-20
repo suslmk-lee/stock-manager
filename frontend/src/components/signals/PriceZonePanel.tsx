@@ -129,7 +129,7 @@ export default function PriceZonePanel({ detail, loading }: { detail: PriceZoneD
       )}
       {z.verdict === 'few' && (
         <p className="rounded-xl bg-white/[0.03] px-3 py-2 text-[12.5px] text-zinc-400">
-          비교할 과거 사례가 적어요 (1년 뒤를 알 수 있는 날 {z.test_days}일 중 싼 날 {z.cheap_days}일).{z.cheap_days < 40 ? ' 가격 매력은 0이에요.' : ' 하락기가 한 번뿐이라 참고만 하세요.'}
+          비교할 과거 사례가 적어요 (1년 뒤를 알 수 있는 날 {z.test_days}일 중 싼 날 {z.cheap_days}일).{z.cheap_days < 40 ? ' 오늘 점수에서는 가격 매력을 0 대신 보유 종목 중간값으로 매겨요 (적은 사례로 따로 추정하면 과거에 오히려 틀렸어요).' : ' 하락기가 한 번뿐이라 참고만 하세요.'}
         </p>
       )}
       {z.falling && (z.level === 'great' || z.level === 'good' || z.pos_1y <= 30) && (

@@ -81,7 +81,7 @@ func TestRankToday(t *testing.T) {
 		{AssetID: 3, Ticker: "475720.KS", Name: "RISE 200위클리커버드콜", Currency: "KRW", Action: SignalHold, CurrentPrice: 9994, WeightPct: 2,
 			BuyChecks: checks(1, 4), SuggestedBuyKRW: 99940, Accounts: acc(3)},
 		{AssetID: 4, Ticker: "SPYI", Action: SignalSell, CurrentPrice: 50, BuyChecks: checks(4, 4), Accounts: acc(2)},                             // 매도
-		{AssetID: 5, Ticker: "QQQI", Action: SignalBuy, CurrentPrice: 50, BuyChecks: checks(4, 4), BuyExcludedReason: "cooldown", Accounts: acc(2)}, // 쉬는 기간
+		{AssetID: 5, Ticker: "QQQI", Action: SignalBuy, CurrentPrice: 50, BuyChecks: checks(4, 4), BuyExcludedReason: "cooldown", Accounts: acc(2)}, // 쉬는 기간 — 빼지 않음
 		{AssetID: 6, Ticker: "GPIQ", Action: SignalBuy, CurrentPrice: 50, BuyChecks: checks(4, 4), LastBuyDate: today, Accounts: acc(2)},         // 오늘 이미 삼
 		{AssetID: 7, Ticker: "SCHD", Action: SignalBuy, CurrentPrice: 27, BuyChecks: checks(4, 4), Accounts: acc(2)},                             // 오늘 모으기
 		{AssetID: 8, Ticker: "005930.KS", Name: "삼성전자", Currency: "KRW", Action: SignalHold, CurrentPrice: 60000, WeightPct: 30,
@@ -96,8 +96,8 @@ func TestRankToday(t *testing.T) {
 	// 가격대 기록: JEPQ (좋은 가격 · 과거에 통함 · 아직 내려가는 중), 삼성전자 (가격 매력 50)
 	zones := map[uint]PriceZoneRow{
 		2: {PriceZone: models.PriceZone{AssetID: 2, Currency: "USD", Score: 80, Expect: 24, Level: models.ZoneLevelGood, Pos1y: 3, Good: 54.5,
-			Verdict: models.ZoneVerdictWorks, CheapAvg: 35, AllAvg: 10, Falling: true, MA20: 57.27}},
-		8: {PriceZone: models.PriceZone{AssetID: 8, Currency: "KRW", Score: 50, Expect: 15, Level: models.ZoneLevelFair, Pos1y: 40, Good: 55000, Verdict: models.ZoneVerdictWorks, CheapAvg: 40, AllAvg: 20}},
+			Verdict: models.ZoneVerdictWorks, CheapAvg: 35, AllAvg: 10, Falling: true, MA20: 57.27, CheapDays: 120}},
+		8: {PriceZone: models.PriceZone{AssetID: 8, Currency: "KRW", Score: 50, Expect: 15, Level: models.ZoneLevelFair, Pos1y: 40, Good: 55000, Verdict: models.ZoneVerdictWorks, CheapAvg: 40, AllAvg: 20, CheapDays: 90}},
 	}
 	planned := map[uint]bool{7: true}
 	accounts := map[uint]models.Account{
@@ -110,7 +110,7 @@ func TestRankToday(t *testing.T) {
 
 	picks, rows := rankToday(items, divRows, zones, planned, accounts, balances, 1400, today)
 	near := func(a, b float64) bool { return math.Abs(a-b) < 0.11 }
-	// 전체 순위: JEPQ 72.2 · 삼성전자 35 · ACE 27.4 · (20점: 매도·쉬는 기간·오늘 산·오늘 모으기) · 펀드 12.3 · RISE 8.3
+	// 전체 순위: JEPQ 72.2 · 삼성전자 35 · ACE 27.4 · (20점: 매도·쉬는 기간(빼지 않음)·오늘 산·오늘 모으기) · 펀드 12.3 · RISE 8.3
 	var order, excluded []string
 	for _, r := range rows {
 		order = append(order, r.Ticker)
@@ -119,7 +119,7 @@ func TestRankToday(t *testing.T) {
 	if strings.Join(order, ",") != "JEPQ,005930.KS,402970.KS,SPYI,QQQI,GPIQ,SCHD,FUND:XZU9SMKB,475720.KS" {
 		t.Fatalf("순위 = %v", order)
 	}
-	if strings.Join(excluded, ",") != ",,,sell,cooldown,bought_today,planned,low_score,low_score" {
+	if strings.Join(excluded, ",") != ",,,sell,,bought_today,planned,low_score,low_score" {
 		t.Fatalf("뺀 이유 = %v", excluded)
 	}
 	for i, r := range rows {
@@ -178,9 +178,43 @@ func TestRankToday(t *testing.T) {
 		t.Fatalf("비싼 종목은 주의 없음: %q", w)
 	}
 	// 예수금이 모자라면 모자란 금액 (가격 매력 50 → 35 + 신호 3.8 + 비중 4.5)
-	only3, _ := rankToday(items[2:3], nil, map[uint]PriceZoneRow{3: {PriceZone: models.PriceZone{AssetID: 3, Currency: "KRW", Score: 50}}}, nil, accounts, balances, 1400, today)
+	only3, _ := rankToday(items[2:3], nil, map[uint]PriceZoneRow{3: {PriceZone: models.PriceZone{AssetID: 3, Currency: "KRW", Score: 50, CheapDays: 60}}}, nil, accounts, balances, 1400, today)
 	if len(only3) != 1 || only3[0].Account == nil || !near(only3[0].Account.Short, 3820) {
 		t.Fatalf("모자란 금액 = %+v", only3)
+	}
+}
+
+// 싸게 산 사례가 적은 종목(1년 하위 20% 날 40일 미만)은 가격 매력을 0 대신 사례가 충분한 종목들의 중간값으로, 가격대 기록이 없으면 0
+func TestRankTodayNeutralPrice(t *testing.T) {
+	item := func(id uint, tk string) SignalItem {
+		return SignalItem{AssetID: id, Ticker: tk, Action: SignalHold, CurrentPrice: 10, WeightPct: 20}
+	}
+	items := []SignalItem{item(1, "A"), item(2, "B"), item(3, "C"), item(4, "FEW"), item(5, "NOZONE"), item(6, "TRAPFEW")}
+	zone := func(id uint, score float64, days int) PriceZoneRow {
+		return PriceZoneRow{PriceZone: models.PriceZone{AssetID: id, Score: score, CheapDays: days}}
+	}
+	zones := map[uint]PriceZoneRow{1: zone(1, 80, 120), 2: zone(2, 20, 45), 3: zone(3, 50, 300), 4: zone(4, 0, 26), 6: zone(6, 0, 0)}
+	_, rows := rankToday(items, nil, zones, nil, nil, nil, 1400, "2026-11-20")
+	got := map[string]TodayRow{}
+	for _, r := range rows {
+		got[r.Ticker] = r
+	}
+	// 중간값 50 → 70 × 0.5 = 35
+	for _, tk := range []string{"FEW", "TRAPFEW"} {
+		if r := got[tk]; r.Parts.Price != 35 || !r.PriceNeutral {
+			t.Fatalf("%s = %+v", tk, r)
+		}
+	}
+	if r := got["A"]; r.Parts.Price != 56 || r.PriceNeutral {
+		t.Fatalf("A = %+v", r)
+	}
+	if r := got["NOZONE"]; r.Parts.Price != 0 || r.PriceNeutral {
+		t.Fatalf("가격대 기록 없음 = %+v", r)
+	}
+	// 사례가 충분한 종목이 하나도 없으면 0
+	_, rows = rankToday(items[3:4], nil, map[uint]PriceZoneRow{4: zone(4, 0, 26)}, nil, nil, nil, 1400, "2026-11-20")
+	if rows[0].Parts.Price != 0 {
+		t.Fatalf("기준 없음 = %+v", rows[0])
 	}
 }
 

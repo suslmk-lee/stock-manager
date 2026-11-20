@@ -210,7 +210,7 @@ export default function TodayPage() {
             </span>
           )}
         </p>
-        <span className="text-zinc-500" title={'오늘 점수 = 가격 매력 70 + 매수 신호 15 + 배당 점수 10 + 비중 여유 5 (예수금은 점수에 넣지 않음)\n가격 매력: 그 종목을 과거에 싸게 샀을 때 1년 뒤 평소보다 더 번 정도(최대 30%p) × 지금 얼마나 싼가 — 보유 종목 2017~2025 백테스트에서 가장 일관되게 맞은 조합\nTop 3 는 아래 순위에서 매도·충돌, 매수를 막은 종목(쉬는 기간·최대 비중·반등 미확인), 오늘 산 종목, 오늘 모으기로 사는 종목, 20점 미만을 건너뛴 앞의 3개입니다.\n과거 가격으로 계산한 참고값이며 투자 권유가 아닙니다.'} aria-label="안내">
+        <span className="text-zinc-500" title={'오늘 점수 = 가격 매력 70 + 매수 신호 15 + 배당 점수 10 + 비중 여유 5 (예수금은 점수에 넣지 않음)\n가격 매력: 그 종목을 과거에 싸게 샀을 때 1년 뒤 평소보다 더 번 정도(최대 30%p) × 지금 얼마나 싼가 — 보유 종목 2017~2025 백테스트에서 가장 일관되게 맞은 조합. 싸게 산 사례가 적은 종목(꾸준히 오른 종목 등)은 보유 종목 중간값\nTop 3 는 아래 순위에서 매도·충돌, 매수를 막은 종목(최대 비중·반등 미확인), 오늘 산 종목, 오늘 모으기로 사는 종목, 20점 미만을 건너뛴 앞의 3개입니다. 최근에 사서 매수 신호가 쉬는 중인 종목은 빼지 않아요.\n과거 가격으로 계산한 참고값이며 투자 권유가 아닙니다.'} aria-label="안내">
           <Info className="h-4 w-4" />
         </span>
       </div>
@@ -224,7 +224,7 @@ export default function TodayPage() {
         <div className="surface px-6 py-16 text-center">
           <p className="text-base font-semibold text-white">오늘은 추천할 종목이 없어요</p>
           <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-zinc-400">
-            20점을 넘긴 보유 종목이 없거나, 모두 매도 신호 · 쉬는 기간 · 최대 비중 · 오늘 이미 산 종목입니다. 아래 순위에서 빠진 이유를 볼 수 있어요.
+            20점을 넘긴 보유 종목이 없거나, 모두 매도 신호 · 최대 비중 · 오늘 이미 산 종목입니다. 아래 순위에서 빠진 이유를 볼 수 있어요.
           </p>
         </div>
       ) : (
@@ -298,7 +298,7 @@ export default function TodayPage() {
             <p className="mb-2 rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] text-zinc-400">이 계좌에는 오늘 Top 3 에 넣을 종목이 없어요 (모두 빠질 이유가 있거나 20점 미만). 순서는 참고로 보세요.</p>
           )}
           {data.zone_count > 0 && (
-            <p className="num mb-2 text-[11.5px] text-zinc-500">가격대 {clock(data.zone_updated_at)} 계산 · {data.zone_count}종목 (1년 이력이 없는 종목·펀드는 가격 매력 0)</p>
+            <p className="num mb-2 text-[11.5px] text-zinc-500">가격대 {clock(data.zone_updated_at)} 계산 · {data.zone_count}종목 (싸게 산 사례가 적으면 가격 매력은 보유 종목 중간값, 1년 이력이 없는 종목·펀드는 0)</p>
           )}
           {data.zone_count === 0 && (
             <p className="mb-2 rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] text-zinc-400">아직 가격대를 계산하지 않아 가격 매력이 0이에요. 앱이 켜져 있으면 백그라운드에서 보유 종목의 10년 주가를 받아 계산해요 (몇 분 걸려요).</p>
@@ -329,7 +329,7 @@ export default function TodayPage() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { pt: '70', title: '가격 매력', text: '과거에 싸게 샀을 때 1년 뒤 평소보다 더 번 정도(최대 30%p) × 지금 얼마나 싼가. 이력이 없으면 0', cls: 'border-emerald-400' },
+          { pt: '70', title: '가격 매력', text: '과거에 싸게 샀을 때 1년 뒤 평소보다 더 번 정도(최대 30%p) × 지금 얼마나 싼가. 싸게 산 사례가 적으면 보유 종목 중간값, 이력이 없으면 0', cls: 'border-emerald-400' },
           { pt: '15', title: '매수 신호', text: '매매 신호의 매수 조건을 얼마나 채웠나 (매수 검토면 만점)', cls: 'border-mint-400' },
           { pt: '10', title: '배당 점수', text: '배당 점수와 지금 수익률 매력', cls: 'border-amber-300' },
           { pt: '5', title: '비중 여유', text: '매수 최대 비중(없으면 20%)보다 낮을수록. 예수금은 점수에 넣지 않고 카드에 보여만 줘요', cls: 'border-sky-400' },

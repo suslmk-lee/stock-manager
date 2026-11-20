@@ -19,13 +19,15 @@ import (
 
 // 오늘 살 종목 — 보유 종목 전체에 100점 만점 '오늘 점수'를 매겨 순위를 내고(아래 목록), 살 수 있는 앞의 3개가 Top 3.
 //   가격 매력 70 : 과거에 싸게 산 날이 평소보다 1년 뒤 더 번 정도(±30%p) × 지금 싼 정도 (price_zone.go)
-//                  — 보유 156종목 2017~2025 백테스트에서 종목을 고르는 힘이 가장 일관됐다. 이력이 없으면 0 (다른 항목으로 넘기지 않는다)
+//                  — 보유 156종목 2017~2025 백테스트에서 종목을 고르는 힘이 가장 일관됐다. 이력이 없으면 0 (다른 항목으로 넘기지 않는다).
+//                  싸게 산 사례가 적은 종목(1년 하위 20%였던 날이 40일 미만 — 꾸준히 오른 종목·짧은 이력)은 0 대신 그날 다른 보유 종목의
+//                  가격 매력 중간값 — 같은 백테스트에서 0보다 순위가 잘 맞았고, 적은 사례로 따로 추정하면 오히려 틀렸다.
 //   매수 신호 15 : 매매 신호의 매수 조건을 얼마나 채웠나 ('매수 검토'면 만점)
 //   배당 점수 10 : 배당 점수(종합 60% · 지금 수익률 매력 40%)
 //   비중 여유  5 : 매수 최대 비중(없으면 20%)보다 낮을수록
 //   예수금은 점수에 넣지 않는다 (살 계좌와 모자란 금액은 카드에 보여만 준다).
-// Top 3 에서 빼는 종목 (목록에는 이유와 함께 남는다): 매도·충돌·시세 없음, 매매 신호가 매수를 막은 종목(쉬는 기간·최대 비중·반등 미확인),
-// 오늘 이미 산 종목, 오늘 모으기로 사는 종목, 점수가 너무 낮은 종목.
+// Top 3 에서 빼는 종목 (목록에는 이유와 함께 남는다): 매도·충돌·시세 없음, 매매 신호가 매수를 막은 종목(최대 비중·반등 미확인),
+// 오늘 이미 산 종목, 오늘 모으기로 사는 종목, 점수가 너무 낮은 종목. 최근에 사서 매수 신호가 쉬는 중(쉬는 기간)인 종목은 빼지 않는다.
 
 const (
 	todayPickCount   = 3
@@ -47,7 +49,7 @@ const (
 	TodayExBoughtToday = "bought_today"
 	TodayExPlanned     = "planned"
 	TodayExLowScore    = "low_score"
-	// 그 밖에는 매매 신호의 BuyExcludedReason (cooldown | max_weight | no_rebound)
+	// 그 밖에는 매매 신호의 BuyExcludedReason (max_weight | no_rebound — cooldown 은 빼지 않는다)
 )
 
 type TodayService struct {
@@ -86,24 +88,26 @@ type TodayParts struct {
 
 // TodayRow: 보유 종목 전체 순위 한 줄 (Top 3 와 같은 점수)
 type TodayRow struct {
-	Rank     int         `json:"rank"` // 오늘 점수 순위 (1부터)
-	AssetID  uint        `json:"asset_id"`
-	Ticker   string      `json:"ticker"`
-	Name     string      `json:"name"`
-	Currency string      `json:"currency"`
-	Price    float64     `json:"price"`
-	Score    float64     `json:"score"`
-	Parts    TodayParts  `json:"parts"`
-	HasZone  bool        `json:"has_zone"`
-	Expect   float64     `json:"expect"` // 과거 기준 평소보다 1년 뒤 더 기대되는 수익 (%p)
-	Level    string      `json:"level,omitempty"`
-	Pos1y    float64     `json:"pos_1y"`
-	Good     float64     `json:"good"`
-	Verdict  string      `json:"verdict,omitempty"`
-	Falling  bool        `json:"falling"`
-	Excluded string      `json:"excluded,omitempty"` // Top 3 에서 뺀 이유
-	Pick     int         `json:"pick,omitempty"`     // Top 3 순위 (1~3)
-	Held     []TodayHeld `json:"held,omitempty"`     // 이 종목을 가진 계좌 (계좌별 순위용)
+	Rank     int        `json:"rank"` // 오늘 점수 순위 (1부터)
+	AssetID  uint       `json:"asset_id"`
+	Ticker   string     `json:"ticker"`
+	Name     string     `json:"name"`
+	Currency string     `json:"currency"`
+	Price    float64    `json:"price"`
+	Score    float64    `json:"score"`
+	Parts    TodayParts `json:"parts"`
+	HasZone  bool       `json:"has_zone"`
+	Expect   float64    `json:"expect"` // 과거 기준 평소보다 1년 뒤 더 기대되는 수익 (%p)
+	Level    string     `json:"level,omitempty"`
+	Pos1y    float64    `json:"pos_1y"`
+	Good     float64    `json:"good"`
+	Verdict  string     `json:"verdict,omitempty"`
+	Falling  bool       `json:"falling"`
+	Excluded string     `json:"excluded,omitempty"` // Top 3 에서 뺀 이유
+	Pick     int        `json:"pick,omitempty"`     // Top 3 순위 (1~3)
+	// 싸게 산 사례가 적어 가격 매력을 보유 종목 중간값으로 매김
+	PriceNeutral bool        `json:"price_neutral,omitempty"`
+	Held         []TodayHeld `json:"held,omitempty"` // 이 종목을 가진 계좌 (계좌별 순위용)
 }
 
 // TodayHeld: 한 계좌에 담긴 수량과 평가금액 (원화)
@@ -396,6 +400,7 @@ func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]
 		zone      *PriceZoneRow
 		maxW      float64
 	}
+	neutral := todayNeutralPrice(zones)
 	var all []scored
 	for _, it := range items {
 		x := scored{it: it}
@@ -412,6 +417,9 @@ func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]
 			x.zone = &zz
 			r.HasZone, r.Expect, r.Level, r.Pos1y, r.Good, r.Verdict, r.Falling = true, z.Expect, z.Level, z.Pos1y, z.Good, z.Verdict, z.Falling
 			r.Parts.Price = todayPriceMax * clamp01(z.Score/100)
+			if z.CheapDays < zoneMinCheapDays {
+				r.Parts.Price, r.PriceNeutral = todayPriceMax*clamp01(neutral/100), true
+			}
 		}
 		// 매수 신호
 		for _, c := range it.BuyChecks {
@@ -451,7 +459,7 @@ func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]
 			r.Excluded = TodayExConflict
 		case it.Action == SignalNoPrice || it.CurrentPrice <= 0:
 			r.Excluded = TodayExNoPrice
-		case it.BuyExcludedReason != "":
+		case it.BuyExcludedReason != "" && it.BuyExcludedReason != "cooldown":
 			r.Excluded = it.BuyExcludedReason
 		case it.LastBuyDate == today:
 			r.Excluded = TodayExBoughtToday
@@ -495,6 +503,24 @@ func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]
 		rows = append(rows, x.row)
 	}
 	return picks, rows
+}
+
+// todayNeutralPrice: 싸게 산 사례가 충분한 보유 종목들의 가격 매력(0~100) 중간값 — 사례가 적은 종목에 준다
+func todayNeutralPrice(zones map[uint]PriceZoneRow) float64 {
+	var v []float64
+	for _, z := range zones {
+		if z.CheapDays >= zoneMinCheapDays {
+			v = append(v, z.Score)
+		}
+	}
+	if len(v) == 0 {
+		return 0
+	}
+	sort.Float64s(v)
+	if len(v)%2 == 1 {
+		return v[len(v)/2]
+	}
+	return (v[len(v)/2-1] + v[len(v)/2]) / 2
 }
 
 // todayAccounts: 순위에 든 종목을 담고 있는 계좌와 예수금 — 담은 종목이 많은 순 (같으면 계좌 번호 순)

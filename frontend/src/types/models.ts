@@ -1167,6 +1167,8 @@ export interface TodayRow {
   excluded?: string;
   /** Top 3 순위 (1~3) — 계좌별 순위에서는 그 계좌 안의 Top 3 */
   pick?: number;
+  /** 싸게 산 사례가 적어(1년 하위 20% 날 40일 미만) 가격 매력을 보유 종목 중간값으로 매김 */
+  price_neutral?: boolean;
   /** 이 종목을 담은 계좌 (수량 · 원화 평가금액) */
   held?: { account_id: number; qty: number; value_krw: number }[];
   /** 화면에서만: 계좌별 순위로 볼 때 전체 계좌 기준 순위 */
