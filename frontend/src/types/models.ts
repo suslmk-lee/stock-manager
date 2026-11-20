@@ -576,6 +576,8 @@ export interface NotificationSetting {
   notify_sell: boolean;
   notify_buy: boolean;
   notify_conflict: boolean;
+  /** 같은 신호에서 조건이 하나 더 채워졌을 때도 알릴지 (기본 끔) */
+  notify_new_cond?: boolean;
   updated_at?: string;
 }
 
@@ -754,6 +756,32 @@ export interface CashEntryRequest {
   kind: 'deposit' | 'withdraw' | 'interest';
   amount: number;
   notes: string;
+}
+
+/** 매수를 기록하기 전 예수금 확인 요청 */
+export interface BuyCashRequest {
+  asset_id: number;
+  date: string;
+  price: number;
+  quantity: number;
+  fee: number;
+}
+
+/** 이 매수 때문에 모자라는 예수금 (그 통화) */
+export interface BuyCashShort {
+  currency: string;
+  /** 이 매수 몫으로 모자란 금액 — 이만큼 입금하면 이 매수로 마이너스가 되지 않는다 */
+  short: number;
+  /** 이 매수 전 그날 예수금 */
+  balance: number;
+  /** 달러가 모자라고 원화가 충분하면 입금 대신 원화에서 환전한 기록을 제안 — 그때 내줄 원화 */
+  exchange_krw?: number;
+}
+
+export interface BuyCashCheck {
+  /** 예수금을 기록하고 잔액을 맞춘 계좌 (아니면 확인하지 않음) */
+  tracked: boolean;
+  shorts?: BuyCashShort[];
 }
 
 export interface CashExchangeRequest {

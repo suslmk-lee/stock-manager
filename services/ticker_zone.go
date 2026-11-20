@@ -16,6 +16,17 @@ func (s *TickerService) GetZoneHistory(ticker string) (*PriceHistory, []Dividend
 	if ticker == "" || IsFundTicker(ticker) {
 		return nil, nil, fmt.Errorf("이력을 받을 수 없는 종목: %s", ticker)
 	}
+	h, divs, err := yahooZoneHistory(ticker)
+	// 국내 종목은 Yahoo 이력이 너무 짧으면 네이버 일봉으로 (배당은 Yahoo 에서 받은 것만)
+	h, err = withKRDailyFallback(ticker, "10y", "1d", h, err)
+	if err != nil {
+		return nil, nil, err
+	}
+	return h, divs, nil
+}
+
+// yahooZoneHistory: Yahoo chart API 한 번으로 10년 일봉과 배당 (보완 없이)
+func yahooZoneHistory(ticker string) (*PriceHistory, []DividendEvent, error) {
 	params := url.Values{}
 	params.Add("range", "10y")
 	params.Add("interval", "1d")

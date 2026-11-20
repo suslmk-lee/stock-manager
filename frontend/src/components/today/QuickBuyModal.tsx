@@ -7,6 +7,7 @@ import DatePicker from '../ui/DatePicker';
 import { fmtCcy } from '../../utils/fx';
 import { accountDisplayName } from '../../utils/accountLabel';
 import { pickTitle, suggestQty } from './TodayCard';
+import BuyCashNotice, { pendingText, recordPendingCash, type PendingCash } from '../cash/BuyCashNotice';
 
 /** 오늘 살 종목에서 바로 매수 기록 — 수량은 제안 수량, 가격은 지금 가격, 날짜는 오늘로 채워 둔다 */
 
@@ -27,6 +28,7 @@ export default function QuickBuyModal({ pick: p, onClose, onSaved }: { pick: Tod
   const [date, setDate] = useState(today());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cashItems, setCashItems] = useState<PendingCash[]>([]);
   const q = num(qty);
   const pr = num(price);
   const total = q > 0 && pr > 0 ? q * pr : 0;
@@ -38,7 +40,9 @@ export default function QuickBuyModal({ pick: p, onClose, onSaved }: { pick: Tod
     setError(null);
     try {
       await apiClient.CreateTransaction(a.id, p.asset_id, 'Buy', date, pr, q, 0, '오늘 살 종목에서 기록');
-      onSaved(`${t.primary} ${q.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}${unit} 매수를 기록했습니다.`);
+      await recordPendingCash(a.id, date, cashItems);
+      const dep = cashItems.length ? ` · ${cashItems.map(pendingText).join(' · ')}도 기록` : '';
+      onSaved(`${t.primary} ${q.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}${unit} 매수를 기록했습니다${dep}.`);
     } catch (e) {
       setError(errText(e));
     } finally {
@@ -80,6 +84,7 @@ export default function QuickBuyModal({ pick: p, onClose, onSaved }: { pick: Tod
               {total > 0 ? `합계 ${fmtCcy(total, p.currency)}` : ''}
               {total > 0 && !a.no_cash ? ` · ${accountDisplayName(a)} 예수금 ${fmtCcy(a.cash, a.currency)}` : ''}
             </p>
+            {!a.no_cash && <BuyCashNotice input={{ accountId: a.id, assetId: p.asset_id, date, price: pr, quantity: q, fee: 0 }} onChange={setCashItems} />}
             <p className="text-[11px] leading-relaxed text-zinc-500">증권사 앱에서 체결된 수량과 가격으로 고쳐 넣으세요. 기록하면 오늘은 이 종목을 추천에서 뺍니다.</p>
             {error && <p className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{error}</p>}
           </div>

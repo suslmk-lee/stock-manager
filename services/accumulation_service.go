@@ -1113,40 +1113,7 @@ func (s *AccumulationService) newPlanWallet(acc models.Account) (*planWallet, er
 
 // balanceAt: day 마감 예수금 (그날까지의 기록만, 앞선 모으기의 자동 환전 포함). extra 가 있으면 그 매수도 더한다.
 func (w *planWallet) balanceAt(day string, extra *models.Transaction) (krw, usd float64, err error) {
-	var es []models.CashEntry
-	for _, e := range w.entries {
-		if dayString(e.Date) <= day {
-			es = append(es, e)
-		}
-	}
-	var ts []models.Transaction
-	for _, t := range w.txs {
-		if dayString(t.Date) <= day {
-			ts = append(ts, t)
-		}
-	}
-	if extra != nil {
-		ts = append(ts, *extra)
-	}
-	var ds []models.Dividend
-	for _, d := range w.divs {
-		if dayString(d.Date) <= day {
-			ds = append(ds, d)
-		}
-	}
-	flows, err := w.cash.flowsOf(&w.acc, es, ts, ds)
-	if err != nil {
-		return 0, 0, err
-	}
-	for _, f := range flows {
-		switch f.Currency {
-		case "KRW":
-			krw += f.Amount
-		case "USD":
-			usd += f.Amount
-		}
-	}
-	return krw, usd, nil
+	return w.cash.cashAsOf(&w.acc, w.entries, w.txs, w.divs, day, extra)
 }
 
 // affordable: 그날 예수금으로 이 회차를 살 수 있나 — 이 매수를 더해 그날 마감 잔액을 계좌 규칙대로 다시 계산하고,

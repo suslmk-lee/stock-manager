@@ -102,6 +102,25 @@ func registerCashRoutes(api *gin.RouterGroup, s *Services) {
 		c.JSON(http.StatusOK, gin.H{"entry": res})
 	})
 
+	// 이 매수를 기록하면 그날 예수금이 모자라는지 (매수 기록 창)
+	api.POST("/accounts/:id/cash/check-buy", func(c *gin.Context) {
+		id, ok := parseProfileID(c, "id")
+		if !ok {
+			return
+		}
+		var req services.BuyCashRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		res, err := s.Cash.CheckBuy(id, req)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	})
+
 	api.DELETE("/cash-entries/:id", func(c *gin.Context) {
 		id, ok := parseProfileID(c, "id")
 		if !ok {

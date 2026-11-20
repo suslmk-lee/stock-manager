@@ -344,12 +344,12 @@ type PricePoint struct {
 }
 
 type PriceHistory struct {
-	Symbol   string       `json:"symbol"`
-	Currency string       `json:"currency"`
-	Range    string       `json:"range"`
-	Interval string       `json:"interval"`
-	GmtOffset int64       `json:"gmtoffset"`
-	Points   []PricePoint `json:"points"`
+	Symbol    string       `json:"symbol"`
+	Currency  string       `json:"currency"`
+	Range     string       `json:"range"`
+	Interval  string       `json:"interval"`
+	GmtOffset int64        `json:"gmtoffset"`
+	Points    []PricePoint `json:"points"`
 }
 
 // GetPriceHistory fetches historical close prices from Yahoo Finance chart API.
@@ -368,7 +368,13 @@ func (s *TickerService) GetPriceHistory(ticker, rangeStr, interval string) (*Pri
 	if interval == "" {
 		interval = "1d"
 	}
+	// 국내 종목 일봉은 Yahoo 이력이 너무 짧으면 네이버 일봉으로 보완 (ticker_naver_daily.go)
+	h, err := yahooPriceHistory(ticker, rangeStr, interval)
+	return withKRDailyFallback(ticker, rangeStr, interval, h, err)
+}
 
+// yahooPriceHistory: Yahoo chart API 로 받은 이력 (보완 없이)
+func yahooPriceHistory(ticker, rangeStr, interval string) (*PriceHistory, error) {
 	baseURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s", url.QueryEscape(ticker))
 	params := url.Values{}
 	params.Add("range", rangeStr)
@@ -406,9 +412,9 @@ func parsePriceHistory(body []byte, ticker, rangeStr, interval string) (*PriceHi
 		Chart struct {
 			Result []struct {
 				Meta struct {
-					Symbol   string `json:"symbol"`
-					Currency string `json:"currency"`
-					GmtOffset int64 `json:"gmtoffset"`
+					Symbol    string `json:"symbol"`
+					Currency  string `json:"currency"`
+					GmtOffset int64  `json:"gmtoffset"`
 				} `json:"meta"`
 				Timestamp  []int64 `json:"timestamp"`
 				Indicators struct {
@@ -449,12 +455,12 @@ func parsePriceHistory(body []byte, ticker, rangeStr, interval string) (*PriceHi
 	}
 
 	return &PriceHistory{
-		Symbol:   r.Meta.Symbol,
-		Currency: r.Meta.Currency,
-		Range:    rangeStr,
-		Interval: interval,
+		Symbol:    r.Meta.Symbol,
+		Currency:  r.Meta.Currency,
+		Range:     rangeStr,
+		Interval:  interval,
 		GmtOffset: r.Meta.GmtOffset,
-		Points:   points,
+		Points:    points,
 	}, nil
 }
 

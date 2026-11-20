@@ -46,14 +46,16 @@ func (e *SignalEvent) AfterFind(_ *gorm.DB) error {
 
 // NotificationSetting 은 신호 알림 설정이다 (단일 행, id=1).
 type NotificationSetting struct {
-	ID              uint      `gorm:"primaryKey" json:"-"`
-	Enabled         bool      `json:"enabled"`
-	IntervalMinutes int       `json:"interval_minutes"`
-	OSNotify        bool      `json:"os_notify"`
-	NotifySell      bool      `json:"notify_sell"`
-	NotifyBuy       bool      `json:"notify_buy"`
-	NotifyConflict  bool      `json:"notify_conflict"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID              uint `gorm:"primaryKey" json:"-"`
+	Enabled         bool `json:"enabled"`
+	IntervalMinutes int  `json:"interval_minutes"`
+	OSNotify        bool `json:"os_notify"`
+	NotifySell      bool `json:"notify_sell"`
+	NotifyBuy       bool `json:"notify_buy"`
+	NotifyConflict  bool `json:"notify_conflict"`
+	// 같은 신호(매수·매도 검토)에서 조건이 하나 더 채워졌을 때도 알릴지 — 기본은 끔 (기록에는 읽음으로 남는다)
+	NotifyNewCond bool      `gorm:"not null;default:false" json:"notify_new_cond"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 func DefaultNotificationSetting() NotificationSetting {

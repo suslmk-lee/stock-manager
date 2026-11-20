@@ -99,6 +99,10 @@ func TestRankToday(t *testing.T) {
 		2: {PriceZone: models.PriceZone{AssetID: 2, Currency: "USD", Score: 80, Expect: 24, Level: models.ZoneLevelGood, Pos1y: 3, Good: 54.5,
 			Verdict: models.ZoneVerdictWorks, CheapAvg: 35, AllAvg: 10, Falling: true, MA20: 57.27, CheapDays: 120}},
 		8: {PriceZone: models.PriceZone{AssetID: 8, Currency: "KRW", Score: 50, Expect: 15, Level: models.ZoneLevelFair, Pos1y: 40, Good: 55000, Verdict: models.ZoneVerdictWorks, CheapAvg: 40, AllAvg: 20, CheapDays: 90}},
+		// 가격 매력 0 인 다른 보유 종목들 — 중간값이 0 이라 가격대가 없는 종목도 가격 매력 0 (순서는 아래 계산 그대로)
+		101: {PriceZone: models.PriceZone{AssetID: 101, CheapDays: 100}},
+		102: {PriceZone: models.PriceZone{AssetID: 102, CheapDays: 100}},
+		103: {PriceZone: models.PriceZone{AssetID: 103, CheapDays: 100}},
 	}
 	planned := map[uint]bool{7: true}
 	accounts := map[uint]models.Account{
@@ -160,10 +164,13 @@ func TestRankToday(t *testing.T) {
 	if sm := picks[1]; !near(sm.Score, 35) || !near(sm.Parts.Price, 35) || sm.Parts.Dividend != 0 || sm.Parts.DividendMax != 10 {
 		t.Fatalf("삼성전자 = %+v (%v)", sm.Parts, sm.Score)
 	}
-	// ACE: 가격대 기록 없음 → 가격 매력 0 (다른 항목으로 넘기지 않는다) · 신호 15 · 배당 10×0.84=8.4 · 비중 5×0.8=4 = 27.4
+	// ACE: 가격대 기록 없음 → 가격 매력은 보유 종목 중간값(여기선 0) · 신호 15 · 배당 10×0.84=8.4 · 비중 5×0.8=4 = 27.4
 	a := picks[2]
 	if a.Parts.PriceMax != 70 || a.Parts.Price != 0 || !near(a.Parts.Signal, 15) || !near(a.Parts.Dividend, 8.4) || !near(a.Parts.Weight, 4) || !near(a.Score, 27.4) || a.Zone != nil {
 		t.Fatalf("ACE = %+v (%v)", a.Parts, a.Score)
+	}
+	if r := rows[2]; r.Ticker != "402970.KS" || !r.PriceNeutral || r.HasZone {
+		t.Fatalf("ACE 줄 = %+v", r)
 	}
 	if a.Account == nil || a.Account.Currency != "KRW" || a.Account.Short != 0 || a.Market != "KR" {
 		t.Fatalf("ACE 계좌 = %+v", a.Account)
@@ -194,12 +201,13 @@ func TestRankToday(t *testing.T) {
 	}
 }
 
-// 싸게 산 사례가 적은 종목(1년 하위 20% 날 40일 미만)은 가격 매력을 0 대신 사례가 충분한 종목들의 중간값으로, 가격대 기록이 없으면 0
+// 싸게 산 사례가 적은 종목(1년 하위 20% 날 40일 미만)과 가격대 기록이 없는 주식(상장 1년 미만 등)은 가격 매력을 0 대신
+// 사례가 충분한 종목들의 중간값으로. 펀드는 거래소 가격이 없어 0.
 func TestRankTodayNeutralPrice(t *testing.T) {
 	item := func(id uint, tk string) SignalItem {
 		return SignalItem{AssetID: id, Ticker: tk, Action: SignalHold, CurrentPrice: 10, WeightPct: 20}
 	}
-	items := []SignalItem{item(1, "A"), item(2, "B"), item(3, "C"), item(4, "FEW"), item(5, "NOZONE"), item(6, "TRAPFEW")}
+	items := []SignalItem{item(1, "A"), item(2, "B"), item(3, "C"), item(4, "FEW"), item(5, "NOZONE"), item(6, "TRAPFEW"), item(7, "FUND:ABC")}
 	zone := func(id uint, score float64, days int) PriceZoneRow {
 		return PriceZoneRow{PriceZone: models.PriceZone{AssetID: id, Score: score, CheapDays: days}}
 	}
@@ -210,16 +218,19 @@ func TestRankTodayNeutralPrice(t *testing.T) {
 		got[r.Ticker] = r
 	}
 	// 중간값 50 → 70 × 0.5 = 35
-	for _, tk := range []string{"FEW", "TRAPFEW"} {
+	for _, tk := range []string{"FEW", "TRAPFEW", "NOZONE"} {
 		if r := got[tk]; r.Parts.Price != 35 || !r.PriceNeutral {
 			t.Fatalf("%s = %+v", tk, r)
 		}
 	}
+	if r := got["NOZONE"]; r.HasZone {
+		t.Fatalf("가격대 기록 없음 = %+v", r)
+	}
 	if r := got["A"]; r.Parts.Price != 56 || r.PriceNeutral {
 		t.Fatalf("A = %+v", r)
 	}
-	if r := got["NOZONE"]; r.Parts.Price != 0 || r.PriceNeutral {
-		t.Fatalf("가격대 기록 없음 = %+v", r)
+	if r := got["FUND:ABC"]; r.Parts.Price != 0 || r.PriceNeutral {
+		t.Fatalf("펀드 = %+v", r)
 	}
 	// 사례가 충분한 종목이 하나도 없으면 0
 	_, rows = rankToday(items[3:4], nil, map[uint]PriceZoneRow{4: zone(4, 0, 26)}, nil, nil, nil, 1400, "2026-11-20")

@@ -116,6 +116,7 @@ func DiffSignals(items []SignalItem, prev map[uint]models.SignalState, baseline 
 
 		var msg string
 		var evCodes []string
+		newCond := false // 같은 신호에서 조건이 하나 더 채워짐 (전환이 아님)
 		switch {
 		case it.Action != p.Action && isAlertAction(it.Action):
 			msg = actionLabel(it) + "로 전환"
@@ -137,6 +138,7 @@ func DiffSignals(items []SignalItem, prev map[uint]models.SignalState, baseline 
 				continue
 			}
 			msg = "새 조건 충족 · " + strings.Join(metLabels(it, newSet), ", ") + sellSuggestionSuffix(it) + buySuggestionSuffix(it)
+			newCond = true
 		case it.Action == SignalHold && isAlertAction(p.Action):
 			msg = "신호 해제 · 관망"
 		default:
@@ -148,7 +150,7 @@ func DiffSignals(items []SignalItem, prev map[uint]models.SignalState, baseline 
 			Message: msg, TotalReturnPct: it.TotalReturnPct, CurrentPrice: it.CurrentPrice,
 			Currency: it.Currency, CreatedAt: now, Kind: models.SignalEventKindSignal,
 		}
-		if it.Action == SignalHold || !set.Enabled || !alertKindEnabled(set, it.Action) {
+		if it.Action == SignalHold || !set.Enabled || !alertKindEnabled(set, it.Action) || (newCond && !set.NotifyNewCond) {
 			t := now
 			ev.ReadAt = &t
 		}

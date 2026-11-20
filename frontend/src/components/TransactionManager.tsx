@@ -15,6 +15,7 @@ import TradeHistory from './trades/TradeHistory';
 import { assetPrimary, assetSecondary } from '../utils/assetLabel';
 import { accountDisplayName } from '../utils/accountLabel';
 import { askConfirm } from './ui/confirmDialog';
+import BuyCashNotice, { recordPendingCash, type PendingCash } from './cash/BuyCashNotice';
 
 interface TransactionManagerProps {
   selectedAccountId?: number;
@@ -124,6 +125,8 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
   });
   // 수수료 자동 계산 모드 (사용자가 직접 입력하면 false)
   const [feeAutoMode, setFeeAutoMode] = useState(true);
+  // 매수로 예수금이 모자라면 같이 남길 입금·환전 기록 (BuyCashNotice)
+  const [buyCash, setBuyCash] = useState<PendingCash[]>([]);
   // 매도가 자동 채움 모드 (사용자가 직접 입력하면 false)
   const [sellPriceAutoMode, setSellPriceAutoMode] = useState(true);
 
@@ -546,6 +549,7 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
         parseFloat(formData.fee || '0'),
         formData.notes,
       );
+      if (formData.type === 'Buy') await recordPendingCash(formData.accountId, formData.date, buyCash);
       resetForm();
       setShowForm(false);
       await reloadAccountData(selectedAccount);
@@ -2126,6 +2130,20 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
                       매입원가 {formatMoney(pnlPreview.costBasis, previewCurrency)} (평단 {formatMoney(pnlPreview.buyAvg, previewCurrency)})
                     </p>
                   </div>
+                )}
+
+                {formData.type === 'Buy' && (
+                  <BuyCashNotice
+                    input={{
+                      accountId: formData.accountId,
+                      assetId: formData.assetId,
+                      date: formData.date,
+                      price: parseFloat(formData.price) || 0,
+                      quantity: parseFloat(formData.quantity) || 0,
+                      fee: parseFloat(formData.fee || '0') || 0,
+                    }}
+                    onChange={setBuyCash}
+                  />
                 )}
 
                 <div>

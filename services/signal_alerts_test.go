@@ -53,6 +53,15 @@ func TestDiffEnteredNewConditionCleared(t *testing.T) {
 	if len(ev) != 1 || ev[0].Message != "새 조건 충족 · 저배당" || ev[0].FromAction != SignalSell || ev[0].MetCodes != "low_yield" {
 		t.Fatalf("newcond %+v", ev)
 	}
+	// 새 조건 충족은 기본으로 알리지 않는다 (읽음으로 기록) — 설정에서 켜면 알린다
+	if ev[0].ReadAt == nil {
+		t.Fatalf("newcond should be read by default %+v", ev[0])
+	}
+	on := defSet()
+	on.NotifyNewCond = true
+	if ev2, _ := DiffSignals([]SignalItem{item(1, SignalSell, sell2, nil)}, prev, false, on, t0); len(ev2) != 1 || ev2[0].ReadAt != nil {
+		t.Fatalf("newcond on %+v", ev2)
+	}
 	prev[1] = st[0]
 
 	// condition dropped only: no event

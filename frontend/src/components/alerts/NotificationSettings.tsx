@@ -22,6 +22,7 @@ const DEFAULTS: NotificationSetting = {
   notify_sell: true,
   notify_buy: true,
   notify_conflict: true,
+  notify_new_cond: false,
 };
 
 function Row({ title, note, children, dim }: { title: string; note?: string; children: React.ReactNode; dim?: boolean }) {
@@ -147,6 +148,10 @@ export default function NotificationSettings({ open, onClose }: { open: boolean;
                 ))}
               </div>
             </div>
+
+            <Row title="새 조건 충족도 알리기" note="이미 매수·매도 검토인 종목에서 조건이 하나 더 채워졌을 때 · 끄면 알림 목록에 읽음으로만 남아요" dim={off}>
+              <Switch checked={!!draft.notify_new_cond} onChange={(v) => set('notify_new_cond', v)} label="새 조건 충족 알림" disabled={off} />
+            </Row>
           </div>
 
           <div className="flex items-center justify-between gap-3 border-t border-white/[0.08] px-5 py-3.5">

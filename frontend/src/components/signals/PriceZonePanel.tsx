@@ -87,7 +87,7 @@ export default function PriceZonePanel({ detail, loading }: { detail: PriceZoneD
     return (
       <div className="surface-inset px-4 py-3">
         <p className="text-xs font-medium text-zinc-200">사기 좋은 가격</p>
-        <p className="mt-1 text-[12px] text-zinc-500">아직 계산한 기록이 없어요. 보유 종목은 백그라운드에서 매일 계산해요 (주가 이력이 1년보다 짧은 종목·펀드는 빼요).</p>
+        <p className="mt-1 text-[12px] text-zinc-500">아직 계산한 기록이 없어요. 보유 종목은 백그라운드에서 매일 계산해요 (주가 이력이 1년보다 짧은 종목·펀드는 빼요). 오늘 점수에서는 이력이 짧은 주식의 가격 매력을 보유 종목 중간값으로 매겨요 (펀드는 0).</p>
       </div>
     );
   }

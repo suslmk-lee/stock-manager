@@ -36,6 +36,11 @@ func (a *App) ReconcileCash(accountID uint, req services.CashReconcileRequest) (
 	return map[string]interface{}{"entry": res}, nil
 }
 
+// CheckBuyCash: 이 매수를 기록하면 그날 예수금이 모자라는지 (매수 기록 창에서 입금도 같이 기록할 때)
+func (a *App) CheckBuyCash(accountID uint, req services.BuyCashRequest) (*services.BuyCashCheck, error) {
+	return a.cashService.CheckBuy(accountID, req)
+}
+
 func (a *App) DeleteCashEntry(id uint) error {
 	return a.cashService.DeleteEntry(id)
 }

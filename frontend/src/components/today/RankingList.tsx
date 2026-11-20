@@ -99,9 +99,15 @@ export default function RankingList({ rows, onOpen, accountId }: { rows: TodayRo
               </span>
               <span
                 className={`num hidden text-right text-[12.5px] sm:block ${r.expect > 0 ? 'text-emerald-300' : 'text-zinc-500'}`}
-                title={r.price_neutral ? '싸게 산 사례가 적어(1년 하위 20%였던 날 40일 미만) 가격 매력을 보유 종목 중간값으로 매겼어요' : undefined}
+                title={
+                  r.price_neutral
+                    ? r.has_zone
+                      ? '싸게 산 사례가 적어(1년 하위 20%였던 날 40일 미만) 가격 매력을 보유 종목 중간값으로 매겼어요'
+                      : '가격대 기록이 없어(상장 1년 미만이거나 아직 계산 전) 가격 매력을 보유 종목 중간값으로 매겼어요'
+                    : undefined
+                }
               >
-                {r.price_neutral ? '사례 적음' : r.has_zone ? (r.expect > 0 ? `+${r.expect.toFixed(1)}%p` : r.verdict === 'trap' ? '안 통함' : '—') : '—'}
+                {r.price_neutral ? (r.has_zone ? '사례 적음' : '가격대 없음') : r.has_zone ? (r.expect > 0 ? `+${r.expect.toFixed(1)}%p` : r.verdict === 'trap' ? '안 통함' : '—') : '—'}
               </span>
               <span className="col-span-2 col-start-2 flex flex-wrap justify-start gap-1 sm:col-span-1 sm:col-start-auto sm:justify-end">
                 {r.excluded && <span className="badge !py-0 !text-[10.5px] border border-white/10 bg-white/[0.04] text-zinc-400">{EXCLUDED[r.excluded] ?? r.excluded}</span>}

@@ -1,5 +1,5 @@
 import * as WailsApp from '../../wailsjs/go/main/App';
-import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, CashExchangeRequest, CashReconcileRequest, DivScoreRanking, DivScoreDetail, DivScoreWeights, ContributionPlanView, ContributionPlanRequest, ContributionRound, ContributionRunResult, FundPrice, ContributionCashSync, ContributionBuyRequest, TodayPicks, PriceZoneList, PriceZoneDetail } from '../types/models';
+import { Account, Asset, Holding, Transaction, Dividend, SignalRule, SignalRulesResponse, SignalReport, SignalEvent, SignalEventsResponse, NotificationSetting, SignalProfile, SignalProfilesResponse, CreateProfileRequest, UpdateProfileRequest, ProfileAssignment, ProfileCandidate, DailyAssetSeries, DailyCaptureResult, AccumulationPlanView, AccumulationPlanRequest, AccumulationFill, AccumulationRunResult, CashBalance, CashSummary, CashEntryRequest, BuyCashRequest, BuyCashCheck, CashExchangeRequest, CashReconcileRequest, DivScoreRanking, DivScoreDetail, DivScoreWeights, ContributionPlanView, ContributionPlanRequest, ContributionRound, ContributionRunResult, FundPrice, ContributionCashSync, ContributionBuyRequest, TodayPicks, PriceZoneList, PriceZoneDetail } from '../types/models';
 import { NO_FX_RULE, type FxRuleInput } from '../utils/fxFee';
 
 // Wails 환경(데스크톱 앱)인지 웹 브라우저(모바일 등)인지 판별
@@ -645,6 +645,12 @@ export const apiClient = {
       return;
     }
     await WailsApp.CreateCashEntry(accountId, req as unknown as Parameters<typeof WailsApp.CreateCashEntry>[1]);
+  },
+
+  // 이 매수를 기록하면 그날 예수금이 모자라는지 (매수 기록 창)
+  CheckBuyCash: async (accountId: number, req: BuyCashRequest): Promise<BuyCashCheck> => {
+    if (isWeb) return fetchApi<BuyCashCheck>(`/accounts/${accountId}/cash/check-buy`, { method: 'POST', body: JSON.stringify(req) });
+    return (await WailsApp.CheckBuyCash(accountId, req as unknown as Parameters<typeof WailsApp.CheckBuyCash>[1])) as unknown as BuyCashCheck;
   },
 
   CreateCashExchange: async (accountId: number, req: CashExchangeRequest): Promise<void> => {
