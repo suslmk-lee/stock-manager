@@ -16,7 +16,7 @@ import (
 
 // 펀더멘털(PER/PBR 등) 조회와 캐시.
 //   - 국내(.KS/.KQ): 네이버 모바일 API https://m.stock.naver.com/api/stock/{code}/integration 의 totalInfos
-//     (per, eps, cnsPer(추정PER), pbr, bps)
+//     (per, eps, cnsPer(추정PER), cnsEps(추정EPS), pbr, bps)
 //   - 그 외: Yahoo quoteSummary (summaryDetail, defaultKeyStatistics). crumb + 쿠키가 필요하다.
 
 const (
@@ -33,6 +33,7 @@ type Fundamentals struct {
 	ForwardPER float64   `json:"forward_per"`
 	PBR        float64   `json:"pbr"`
 	EPS        float64   `json:"eps"`
+	ForwardEPS float64   `json:"forward_eps"` // 추정(컨센서스) EPS — 날마다 쌓아 두면 추정 이익이 깎이는지 볼 수 있다
 	BPS        float64   `json:"bps"`
 	Source     string    `json:"source"` // "yahoo" | "naver"
 	AsOf       time.Time `json:"as_of"`
@@ -40,7 +41,7 @@ type Fundamentals struct {
 
 // IsEmpty 는 사용할 수 있는 값이 하나도 없는지 알려준다.
 func (f *Fundamentals) IsEmpty() bool {
-	return f == nil || (f.PER == 0 && f.ForwardPER == 0 && f.PBR == 0 && f.EPS == 0 && f.BPS == 0)
+	return f == nil || (f.PER == 0 && f.ForwardPER == 0 && f.PBR == 0 && f.EPS == 0 && f.ForwardEPS == 0 && f.BPS == 0)
 }
 
 type fundamentalsEntry struct {
@@ -207,7 +208,7 @@ func (s *FundamentalsService) fetchNaver(code string) (*Fundamentals, error) {
 	return parseNaverFundamentals(body)
 }
 
-// parseNaverFundamentals 는 integration 응답의 totalInfos 에서 per/eps/cnsPer/pbr/bps 를 뽑는다.
+// parseNaverFundamentals 는 integration 응답의 totalInfos 에서 per/eps/cnsPer/cnsEps/pbr/bps 를 뽑는다.
 // 값은 "9.04배", "22,292원", "N/A", "-" 같은 문자열이다.
 func parseNaverFundamentals(body []byte) (*Fundamentals, error) {
 	var res struct {
@@ -227,6 +228,8 @@ func parseNaverFundamentals(body []byte) (*Fundamentals, error) {
 			f.PER = v
 		case "cnsPer":
 			f.ForwardPER = v
+		case "cnsEps":
+			f.ForwardEPS = v
 		case "pbr":
 			f.PBR = v
 		case "eps":
@@ -290,6 +293,7 @@ func parseYahooFundamentals(body []byte) (*Fundamentals, error) {
 					ForwardPE   yahooNum `json:"forwardPE"`
 					PriceToBook yahooNum `json:"priceToBook"`
 					TrailingEps yahooNum `json:"trailingEps"`
+					ForwardEps  yahooNum `json:"forwardEps"`
 					BookValue   yahooNum `json:"bookValue"`
 				} `json:"defaultKeyStatistics"`
 			} `json:"result"`
@@ -310,6 +314,7 @@ func parseYahooFundamentals(body []byte) (*Fundamentals, error) {
 	}
 	f.PBR = float64(r.DefaultKeyStatistics.PriceToBook)
 	f.EPS = float64(r.DefaultKeyStatistics.TrailingEps)
+	f.ForwardEPS = float64(r.DefaultKeyStatistics.ForwardEps)
 	f.BPS = float64(r.DefaultKeyStatistics.BookValue)
 	return f, nil
 }

@@ -23,7 +23,7 @@ func UpsertFundamentalSnapshots(db *gorm.DB, date string, tickers map[uint]strin
 		}
 		rows = append(rows, models.FundamentalSnapshot{
 			Date: date, AssetID: assetID, Ticker: strings.ToUpper(tk),
-			PER: f.PER, ForwardPER: f.ForwardPER, PBR: f.PBR, EPS: f.EPS, BPS: f.BPS, Source: f.Source,
+			PER: f.PER, ForwardPER: f.ForwardPER, PBR: f.PBR, EPS: f.EPS, ForwardEPS: f.ForwardEPS, BPS: f.BPS, Source: f.Source,
 		})
 	}
 	if len(rows) == 0 {
@@ -31,7 +31,7 @@ func UpsertFundamentalSnapshots(db *gorm.DB, date string, tickers map[uint]strin
 	}
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "date"}, {Name: "asset_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"ticker", "per", "forward_per", "pbr", "eps", "bps", "source", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"ticker", "per", "forward_per", "pbr", "eps", "forward_eps", "bps", "source", "updated_at"}),
 	}).CreateInBatches(&rows, 100).Error
 }
 

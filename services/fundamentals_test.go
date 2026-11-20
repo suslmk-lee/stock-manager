@@ -40,7 +40,7 @@ func TestParseNaverFundamentalsFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.Source != "naver" || f.PER != 9.04 || f.ForwardPER != 4.41 || f.PBR != 2.34 || f.EPS != 22292 || f.BPS != 86052 {
+	if f.Source != "naver" || f.PER != 9.04 || f.ForwardPER != 4.41 || f.PBR != 2.34 || f.EPS != 22292 || f.ForwardEPS != 45655 || f.BPS != 86052 {
 		t.Errorf("%+v", f)
 	}
 	// N/A / - 는 0
@@ -64,7 +64,7 @@ func TestParseYahooFundamentalsFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	if f.Source != "yahoo" || f.PER < 38 || f.PER > 39 || f.ForwardPER < 32 || f.ForwardPER > 33 ||
-		f.PBR < 44 || f.PBR > 45 || f.EPS != 8.98 || f.BPS < 7.7 || f.BPS > 7.8 {
+		f.PBR < 44 || f.PBR > 45 || f.EPS != 8.98 || f.ForwardEPS < 10.6 || f.ForwardEPS > 10.7 || f.BPS < 7.7 || f.BPS > 7.8 {
 		t.Errorf("%+v", f)
 	}
 	// 비어 있는 값({}), 문자열("Infinity"), 누락은 모두 0

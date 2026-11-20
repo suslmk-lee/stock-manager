@@ -196,6 +196,11 @@ export default function TodayCard({ pick: p, onBuy, onDetail }: { pick: TodayPic
         ))}
       </div>
       <Spark series={p.series} zone={z} />
+      {p.facts && p.facts.length > 0 && (
+        <p className="num -mt-1 text-[11px] leading-snug text-zinc-500" title="참고 사실 — 점수에는 넣지 않아요 (실적 충격을 점수에 넣으면 과거에 순위가 오히려 나빠졌어요)">
+          {p.facts.join(' · ')}
+        </p>
+      )}
       <ul className="flex flex-col gap-1.5 text-[13px] text-zinc-200">
         {p.reasons.map((r) => (
           <li key={r} className="flex items-baseline gap-2">

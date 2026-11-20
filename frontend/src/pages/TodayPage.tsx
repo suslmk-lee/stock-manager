@@ -222,7 +222,7 @@ export default function TodayPage() {
       {error && <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">{error}</p>}
 
       {loading && !data ? (
-        <div className="h-[600px] animate-pulse rounded-[22px] bg-white/[0.03]" />
+        <div className="h-[640px] animate-pulse rounded-[22px] bg-white/[0.03]" />
       ) : n === 0 ? (
         <div className="surface px-6 py-16 text-center">
           <p className="text-base font-semibold text-white">오늘은 추천할 종목이 없어요</p>
@@ -435,7 +435,7 @@ function Stage({ style, picks, active, go, card, onActive }: { style: Style; pic
     }
   };
 
-  const frame = 'relative h-[600px] overflow-hidden rounded-[22px] border border-white/[0.08] bg-[radial-gradient(120%_90%_at_50%_0%,rgb(var(--c-mint-400)/0.08)_0%,transparent_60%)]';
+  const frame = 'relative h-[640px] overflow-hidden rounded-[22px] border border-white/[0.08] bg-[radial-gradient(120%_90%_at_50%_0%,rgb(var(--c-mint-400)/0.08)_0%,transparent_60%)]';
   const cardCls = 'surface cursor-pointer select-none rounded-[20px] p-[18px] shadow-2xl';
 
   if (style === 'peek') {

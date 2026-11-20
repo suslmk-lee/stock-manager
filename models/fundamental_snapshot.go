@@ -12,6 +12,7 @@ type FundamentalSnapshot struct {
 	ForwardPER float64   `gorm:"not null;default:0" json:"forward_per"`
 	PBR        float64   `gorm:"not null;default:0" json:"pbr"`
 	EPS        float64   `gorm:"not null;default:0" json:"eps"`
+	ForwardEPS float64   `gorm:"not null;default:0" json:"forward_eps"` // 추정(컨센서스) EPS — 쌓이면 추정 이익이 깎이는지 본다
 	BPS        float64   `gorm:"not null;default:0" json:"bps"`
 	Source     string    `gorm:"size:10;not null;default:''" json:"source"` // yahoo | naver
 	CreatedAt  time.Time `json:"created_at"`

@@ -1236,6 +1236,8 @@ export interface TodayPick {
   warn?: string;
   /** 참고 (아직 내려가는 중 — 기다려도 더 싸게 산 경우가 적었다는 것과 함께) */
   note?: string;
+  /** 참고 사실 — 점수에는 넣지 않음 (최근 3개월 지수보다 크게 빠진 하루 · PER/PBR/추정 EPS) */
+  facts?: string[];
   zone?: PriceZoneRow | null;
   suggest_qty: number;
   suggest_krw: number;

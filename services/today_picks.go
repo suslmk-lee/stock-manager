@@ -149,29 +149,31 @@ type TodayAccount struct {
 }
 
 type TodayPick struct {
-	Rank        int           `json:"rank"`
-	AssetID     uint          `json:"asset_id"`
-	Ticker      string        `json:"ticker"`
-	Name        string        `json:"name"`
-	Market      string        `json:"market"` // KR | US | JP …
-	Currency    string        `json:"currency"`
-	Score       float64       `json:"score"`
-	Parts       TodayParts    `json:"parts"`
-	Action      string        `json:"action"`
-	MetBuy      int           `json:"met_buy"`
-	TotalBuy    int           `json:"total_buy"`
-	DivRank     int           `json:"div_rank,omitempty"`
-	Price       float64       `json:"price"`
-	FromHighPct float64       `json:"from_high_pct"`
-	WeightPct   float64       `json:"weight_pct"`
-	Series      []float64     `json:"series"` // 최근 1년 종가 (오래된 것부터, 줄임)
-	Reasons     []string      `json:"reasons"`
-	Warn        string        `json:"warn,omitempty"` // 주의 (싸게 사도 안 통했던 종목)
-	Note        string        `json:"note,omitempty"` // 참고 (아직 내려가는 중 — 기다려도 더 싸게 산 경우가 적었다는 것과 함께)
-	Zone        *PriceZoneRow `json:"zone,omitempty"` // 사기 좋은 가격 (가장 최근 계산)
-	SuggestQty  float64       `json:"suggest_qty"`
-	SuggestKRW  float64       `json:"suggest_krw"`
-	Account     *TodayAccount `json:"account,omitempty"`
+	Rank        int        `json:"rank"`
+	AssetID     uint       `json:"asset_id"`
+	Ticker      string     `json:"ticker"`
+	Name        string     `json:"name"`
+	Market      string     `json:"market"` // KR | US | JP …
+	Currency    string     `json:"currency"`
+	Score       float64    `json:"score"`
+	Parts       TodayParts `json:"parts"`
+	Action      string     `json:"action"`
+	MetBuy      int        `json:"met_buy"`
+	TotalBuy    int        `json:"total_buy"`
+	DivRank     int        `json:"div_rank,omitempty"`
+	Price       float64    `json:"price"`
+	FromHighPct float64    `json:"from_high_pct"`
+	WeightPct   float64    `json:"weight_pct"`
+	Series      []float64  `json:"series"` // 최근 1년 종가 (오래된 것부터, 줄임)
+	Reasons     []string   `json:"reasons"`
+	Warn        string     `json:"warn,omitempty"` // 주의 (싸게 사도 안 통했던 종목)
+	Note        string     `json:"note,omitempty"` // 참고 (아직 내려가는 중 — 기다려도 더 싸게 산 경우가 적었다는 것과 함께)
+	// 참고 사실 — 점수에는 넣지 않음 (최근 3개월 지수보다 크게 빠진 하루 · PER/PBR/추정 EPS), today_facts.go
+	Facts      []string      `json:"facts,omitempty"`
+	Zone       *PriceZoneRow `json:"zone,omitempty"` // 사기 좋은 가격 (가장 최근 계산)
+	SuggestQty float64       `json:"suggest_qty"`
+	SuggestKRW float64       `json:"suggest_krw"`
+	Account    *TodayAccount `json:"account,omitempty"`
 }
 
 // TodayPlan: 오늘 모으기로 사는 종목 (추천에서 뺀 이유를 보여 준다)
@@ -308,6 +310,10 @@ func (s *TodayService) GetTodayPicks() (*TodayPicks, error) {
 		}(i)
 	}
 	sw.Wait()
+	facts := s.pickFacts(picks) // 차트를 받으며 캐시된 일봉을 다시 쓴다
+	for i := range picks {
+		picks[i].Facts = facts[picks[i].AssetID]
+	}
 	out.Picks = picks
 
 	s.lastMu.Lock()
