@@ -19,7 +19,7 @@ import (
 
 // 오늘 살 종목 — 보유 종목 전체에 100점 만점 '오늘 점수'를 매겨 순위를 내고(아래 목록), 살 수 있는 앞의 3개가 Top 3.
 //   가격 매력 70 : 과거에 싸게 산 날이 평소보다 1년 뒤 더 번 정도(±30%p) × 지금 싼 정도 (price_zone.go)
-//                  — 보유 156종목 2017~2025 백테스트에서 종목을 고르는 힘이 가장 일관됐다. 이력이 없으면 0 (다른 항목으로 넘기지 않는다).
+//                  — 보유 156종목 백테스트(2018년 말~2025년 매달, 1년 뒤 총수익)에서 종목을 고르는 힘이 가장 일관됐다. 이력이 없으면 0 (다른 항목으로 넘기지 않는다).
 //                  싸게 산 사례가 적은 종목(1년 하위 20%였던 날이 40일 미만 — 꾸준히 오른 종목·짧은 이력)은 0 대신 그날 다른 보유 종목의
 //                  가격 매력 중간값 — 같은 백테스트에서 0보다 순위가 잘 맞았고, 적은 사례로 따로 추정하면 오히려 틀렸다.
 //   매수 신호 15 : 매매 신호의 매수 조건을 얼마나 채웠나 ('매수 검토'면 만점)
@@ -166,7 +166,8 @@ type TodayPick struct {
 	WeightPct   float64       `json:"weight_pct"`
 	Series      []float64     `json:"series"` // 최근 1년 종가 (오래된 것부터, 줄임)
 	Reasons     []string      `json:"reasons"`
-	Warn        string        `json:"warn,omitempty"` // 주의 (아직 내려가는 중 · 싸게 사도 안 통했던 종목)
+	Warn        string        `json:"warn,omitempty"` // 주의 (싸게 사도 안 통했던 종목)
+	Note        string        `json:"note,omitempty"` // 참고 (아직 내려가는 중 — 기다려도 더 싸게 산 경우가 적었다는 것과 함께)
 	Zone        *PriceZoneRow `json:"zone,omitempty"` // 사기 좋은 가격 (가장 최근 계산)
 	SuggestQty  float64       `json:"suggest_qty"`
 	SuggestKRW  float64       `json:"suggest_krw"`
@@ -497,6 +498,7 @@ func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]
 			p.Account = pickAccount(it, accounts, balances, fx) // 예수금은 점수에 넣지 않고 보여만 준다
 			p.Reasons = todayReasons(it, p, x.metLabels, x.div, x.hasDiv, x.maxW)
 			p.Warn = zoneWarn(p.Zone)
+			p.Note = zoneNote(p.Zone)
 			picks = append(picks, p)
 			x.row.Pick = p.Rank
 		}
@@ -673,18 +675,22 @@ func todayReasons(it SignalItem, p TodayPick, metLabels []string, row DivScoreRo
 	return firstN(out, 3)
 }
 
-// zoneWarn: 가격이 싸 보여도 조심할 점
+// zoneWarn: 가격이 싸 보여도 조심할 점 (싸게 사도 과거에 안 통했던 종목)
 func zoneWarn(z *PriceZoneRow) string {
-	if z == nil || !(z.InZone() || z.Pos1y <= 30) {
+	if z == nil || !(z.InZone() || z.Pos1y <= 30) || z.Verdict != models.ZoneVerdictTrap {
 		return ""
 	}
-	switch {
-	case z.Verdict == models.ZoneVerdictTrap:
-		return fmt.Sprintf("싸게 사도 과거엔 1년 뒤 평균 %+.1f%% (평소 %+.1f%%)", z.CheapAvg, z.AllAvg)
-	case z.Falling:
-		return fmt.Sprintf("아직 내려가는 중 · 20일선 %s 아래", holdingMoney(z.MA20, z.Currency))
+	return fmt.Sprintf("싸게 사도 과거엔 1년 뒤 평균 %+.1f%% (평소 %+.1f%%)", z.CheapAvg, z.AllAvg)
+}
+
+// zoneNote: 참고할 흐름 — 아직 내려가는 중. 기다리라는 뜻이 아니다: 보유 종목 백테스트(2018년 말~2025년)에서
+// 가격 매력 상위 종목이 내려가는 중일 때 멈출 때까지 기다렸다 사면 보통 3거래일 뒤, 평균 0.4% 더 비쌌고 더 싸게 산 경우는 30%였다
+// (1년 뒤 수익도 내려가는 중이던 때와 아닐 때가 같았다).
+func zoneNote(z *PriceZoneRow) string {
+	if z == nil || !z.Falling || !(z.InZone() || z.Pos1y <= 30) {
+		return ""
 	}
-	return ""
+	return fmt.Sprintf("아직 내려가는 중 (20일선 %s 아래) · 과거엔 멈출 때까지 기다려도 더 싸게 산 경우가 30%%뿐", holdingMoney(z.MA20, z.Currency))
 }
 
 func firstN(xs []string, n int) []string {

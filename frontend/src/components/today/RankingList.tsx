@@ -27,12 +27,24 @@ const SEGS: { key: 'price' | 'signal' | 'dividend' | 'weight'; cls: string }[] =
   { key: 'weight', cls: 'bg-sky-400' },
 ];
 
-/** 계좌별 순위: 그 계좌에 담긴 종목만 같은 점수 순서로, 빠질 이유가 없는 앞의 3개가 그 계좌의 Top 3 */
+/** 아직 내려가는 중 — 주의가 아니라 참고 (보유 종목 백테스트: 멈출 때까지 기다리면 보통 3거래일, 평균 0.4% 더 비쌌다) */
+export const FALLING_NOTE = '20일선 아래이고 최근 저점 근처예요.\n과거 보유 종목에서는 멈출 때까지 기다려도 더 싸게 산 경우가 30%뿐이었어요 (보통 3거래일 뒤, 평균 0.4% 더 비쌈).';
+
+/** 전체 Top 3 에 넣는 최소 점수 (서버 todayMinScore) */
+export const TODAY_MIN_SCORE = 20;
+
+/**
+ * 계좌별 순위: 그 계좌에 담긴 종목만 같은 점수 순서로, 빠질 이유가 없는 앞의 3개가 그 계좌의 Top 3.
+ * 20점 기준(점수 낮음)은 쓰지 않는다 — 그 계좌에 있던 것 가운데서 고르려는 것이라 (채권·배당 ETF 만 담은 연금 계좌도 Top 3 가 나오게).
+ */
 export function accountRanking(rows: TodayRow[], accountId: number): TodayRow[] {
   let pick = 0;
   return rows
     .filter((r) => r.held?.some((h) => h.account_id === accountId))
-    .map((r, i) => ({ ...r, rank: i + 1, global_rank: r.rank, pick: !r.excluded && pick < 3 ? ++pick : undefined }));
+    .map((r, i) => {
+      const excluded = r.excluded === 'low_score' ? undefined : r.excluded;
+      return { ...r, excluded, rank: i + 1, global_rank: r.rank, pick: !excluded && pick < 3 ? ++pick : undefined };
+    });
 }
 
 const qtyText = (q: number, ticker: string) => `${q.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}${/^FUND:/i.test(ticker) ? '좌' : '주'}`;
@@ -94,7 +106,11 @@ export default function RankingList({ rows, onOpen, accountId }: { rows: TodayRo
               <span className="col-span-2 col-start-2 flex flex-wrap justify-start gap-1 sm:col-span-1 sm:col-start-auto sm:justify-end">
                 {r.excluded && <span className="badge !py-0 !text-[10.5px] border border-white/10 bg-white/[0.04] text-zinc-400">{EXCLUDED[r.excluded] ?? r.excluded}</span>}
                 {lv && !r.excluded && <span className={`badge !py-0 !text-[10.5px] ${lv.badge}`}>{lv.label}</span>}
-                {r.falling && (r.level === 'great' || r.level === 'good') && <span className="badge !py-0 !text-[10.5px] border border-amber-300/40 text-amber-300">내려가는 중</span>}
+                {r.falling && (r.level === 'great' || r.level === 'good') && (
+                  <span className="badge !py-0 !text-[10.5px] border border-white/10 text-zinc-400" title={FALLING_NOTE}>
+                    내려가는 중
+                  </span>
+                )}
               </span>
             </button>
           );

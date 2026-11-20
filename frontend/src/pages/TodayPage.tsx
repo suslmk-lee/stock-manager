@@ -4,7 +4,7 @@ import { PageActions } from '../components/shell/PageSlots';
 import { apiClient } from '../api/client';
 import type { TodayPick, TodayPicks } from '../types/models';
 import TodayCard, { pickTitle } from '../components/today/TodayCard';
-import RankingList, { accountRanking } from '../components/today/RankingList';
+import RankingList, { accountRanking, TODAY_MIN_SCORE } from '../components/today/RankingList';
 import QuickBuyModal from '../components/today/QuickBuyModal';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import { fmtCcy } from '../utils/fx';
@@ -210,7 +210,7 @@ export default function TodayPage() {
             </span>
           )}
         </p>
-        <span className="text-zinc-500" title={'오늘 점수 = 가격 매력 70 + 매수 신호 15 + 배당 점수 10 + 비중 여유 5 (예수금은 점수에 넣지 않음)\n가격 매력: 그 종목을 과거에 싸게 샀을 때 1년 뒤 평소보다 더 번 정도(최대 30%p) × 지금 얼마나 싼가 — 보유 종목 2017~2025 백테스트에서 가장 일관되게 맞은 조합. 싸게 산 사례가 적은 종목(꾸준히 오른 종목 등)은 보유 종목 중간값\nTop 3 는 아래 순위에서 매도·충돌, 매수를 막은 종목(최대 비중·반등 미확인), 오늘 산 종목, 오늘 모으기로 사는 종목, 20점 미만을 건너뛴 앞의 3개입니다. 최근에 사서 매수 신호가 쉬는 중인 종목은 빼지 않아요.\n과거 가격으로 계산한 참고값이며 투자 권유가 아닙니다.'} aria-label="안내">
+        <span className="text-zinc-500" title={'오늘 점수 = 가격 매력 70 + 매수 신호 15 + 배당 점수 10 + 비중 여유 5 (예수금은 점수에 넣지 않음)\n가격 매력: 그 종목을 과거에 싸게 샀을 때 1년 뒤 평소보다 더 번 정도(최대 30%p) × 지금 얼마나 싼가 — 보유 종목 백테스트(2018년 말~2025년 매달, 1년 뒤 총수익)에서 가장 일관되게 맞은 조합. 싸게 산 사례가 적은 종목(꾸준히 오른 종목 등)은 보유 종목 중간값\nTop 3 는 아래 순위에서 매도·충돌, 매수를 막은 종목(최대 비중·반등 미확인), 오늘 산 종목, 오늘 모으기로 사는 종목, 20점 미만을 건너뛴 앞의 3개입니다. 최근에 사서 매수 신호가 쉬는 중인 종목은 빼지 않아요.\n과거 가격으로 계산한 참고값이며 투자 권유가 아닙니다.'} aria-label="안내">
           <Info className="h-4 w-4" />
         </span>
       </div>
@@ -282,7 +282,7 @@ export default function TodayPage() {
           </div>
           {rankAcc ? (
             <p className="mb-2 text-[12px] leading-relaxed text-zinc-500">
-              이 계좌에 담긴 종목만 — 점수는 위와 같고 이 계좌 안에서 순위를 매겨요. 빠질 이유가 없는 앞의 3개가 이 계좌 Top 3 예요.
+              이 계좌에 담긴 종목만 — 점수는 위와 같고 이 계좌 안에서 순위를 매겨요. 빠질 이유가 없는 앞의 3개가 이 계좌 Top 3 예요 (이 계좌 안에서 고르는 것이라 {TODAY_MIN_SCORE}점 기준은 쓰지 않아요).
               <span className="num block text-zinc-400">
                 {rankAcc.no_cash
                   ? '예수금 기록 안 함 · 통장에서 바로'
@@ -295,7 +295,12 @@ export default function TodayPage() {
             </p>
           )}
           {rankAcc && rankRows.length > 0 && !rankRows.some((r) => r.pick) && (
-            <p className="mb-2 rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] text-zinc-400">이 계좌에는 오늘 Top 3 에 넣을 종목이 없어요 (모두 빠질 이유가 있거나 20점 미만). 순서는 참고로 보세요.</p>
+            <p className="mb-2 rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] text-zinc-400">이 계좌에는 오늘 Top 3 에 넣을 종목이 없어요 (모두 매도 신호 · 최대 비중 · 오늘 산 종목 같은 빠질 이유가 있어요). 순서는 참고로 보세요.</p>
+          )}
+          {rankAcc && rankRows.some((r) => r.pick && r.score < TODAY_MIN_SCORE) && (
+            <p className="mb-2 rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] text-zinc-400">
+              이 계좌 Top 3 에 {TODAY_MIN_SCORE}점 미만인 종목이 있어요. 전체 Top 3 기준({TODAY_MIN_SCORE}점)에는 못 미치니 이 계좌 안에서 고를 때만 참고하세요.
+            </p>
           )}
           {data.zone_count > 0 && (
             <p className="num mb-2 text-[11.5px] text-zinc-500">가격대 {clock(data.zone_updated_at)} 계산 · {data.zone_count}종목 (싸게 산 사례가 적으면 가격 매력은 보유 종목 중간값, 1년 이력이 없는 종목·펀드는 0)</p>

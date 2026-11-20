@@ -209,6 +209,12 @@ export default function TodayCard({ pick: p, onBuy, onDetail }: { pick: TodayPic
             <span className="min-w-0">{p.warn}</span>
           </li>
         )}
+        {p.note && !p.warn && (
+          <li className="flex items-baseline gap-2 text-[12px] text-zinc-400">
+            <span className="h-1.5 w-1.5 shrink-0 -translate-y-px rounded-full bg-zinc-500" />
+            <span className="min-w-0">{p.note}</span>
+          </li>
+        )}
       </ul>
       <div className="border-t border-white/[0.08] pt-3">
         <div className="flex items-center justify-between gap-3">

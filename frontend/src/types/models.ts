@@ -1232,8 +1232,10 @@ export interface TodayPick {
   /** 최근 1년 종가 (오래된 것부터) */
   series: number[];
   reasons: string[];
-  /** 주의 (아직 내려가는 중 · 싸게 사도 안 통했던 종목) */
+  /** 주의 (싸게 사도 안 통했던 종목) */
   warn?: string;
+  /** 참고 (아직 내려가는 중 — 기다려도 더 싸게 산 경우가 적었다는 것과 함께) */
+  note?: string;
   zone?: PriceZoneRow | null;
   suggest_qty: number;
   suggest_krw: number;

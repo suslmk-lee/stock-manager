@@ -124,7 +124,15 @@ export default function PriceZonePanel({ detail, loading }: { detail: PriceZoneD
       )}
       {z.verdict === 'trap' && (
         <p className="rounded-xl border border-amber-300/30 bg-amber-300/[0.08] px-3 py-2 text-[12.5px] leading-relaxed text-zinc-200">
-          과거에 1년 중 싼 20% 가격이던 날({z.cheap_days}일)에 샀다면 1년 뒤 총수익이 평균 <b className="text-amber-300">{pct(z.cheap_avg)}</b> — 아무 날이나 샀을 때 {pct(z.all_avg)}보다 나빴어요. 싸 보여도 더 떨어진 적이 많아 가격 매력은 0이에요.
+          과거에 1년 중 싼 20% 가격이던 날({z.cheap_days}일)에 샀다면 1년 뒤 총수익이 평균 <b className="text-amber-300">{pct(z.cheap_avg)}</b> —{' '}
+          {z.cheap_avg < z.all_avg ? `아무 날이나 샀을 때 ${pct(z.all_avg)}보다 나빴어요. 싸 보여도 더 떨어진 적이 많았어요.` : `아무 날이나 샀을 때(${pct(z.all_avg)})보다는 나았지만 싸게 사도 손해였어요.`}{' '}
+          {z.expect > 0 ? (
+            <>
+              평소보다 나았던 만큼만 가격 매력 {Math.round(z.score)}/100 (+{z.expect.toFixed(1)}%p)이에요.
+            </>
+          ) : (
+            '그래서 가격 매력은 0이에요.'
+          )}
         </p>
       )}
       {z.verdict === 'few' && (
@@ -133,8 +141,8 @@ export default function PriceZonePanel({ detail, loading }: { detail: PriceZoneD
         </p>
       )}
       {z.falling && (z.level === 'great' || z.level === 'good' || z.pos_1y <= 30) && (
-        <p className="text-[12px] text-amber-300">
-          아직 내려가는 중 · 20일선 {fmtCcy(z.ma20, z.currency)} 아래, 직전 20거래일 저점 대비 {pct(z.from_low20)}
+        <p className="text-[12px] leading-relaxed text-zinc-400">
+          아직 내려가는 중 · 20일선 {fmtCcy(z.ma20, z.currency)} 아래, 직전 20거래일 저점 대비 {pct(z.from_low20)}. 과거 보유 종목에서는 멈출 때까지 기다려도 더 싸게 산 경우가 30%뿐이었어요 (보통 3거래일 뒤, 평균 0.4% 더 비쌈).
         </p>
       )}
 

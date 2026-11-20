@@ -80,10 +80,10 @@ func TestRankToday(t *testing.T) {
 			BuyChecks: checks(2, 4), SuggestedBuyKRW: 200000, Accounts: acc(2)},
 		{AssetID: 3, Ticker: "475720.KS", Name: "RISE 200위클리커버드콜", Currency: "KRW", Action: SignalHold, CurrentPrice: 9994, WeightPct: 2,
 			BuyChecks: checks(1, 4), SuggestedBuyKRW: 99940, Accounts: acc(3)},
-		{AssetID: 4, Ticker: "SPYI", Action: SignalSell, CurrentPrice: 50, BuyChecks: checks(4, 4), Accounts: acc(2)},                             // 매도
+		{AssetID: 4, Ticker: "SPYI", Action: SignalSell, CurrentPrice: 50, BuyChecks: checks(4, 4), Accounts: acc(2)},                               // 매도
 		{AssetID: 5, Ticker: "QQQI", Action: SignalBuy, CurrentPrice: 50, BuyChecks: checks(4, 4), BuyExcludedReason: "cooldown", Accounts: acc(2)}, // 쉬는 기간 — 빼지 않음
-		{AssetID: 6, Ticker: "GPIQ", Action: SignalBuy, CurrentPrice: 50, BuyChecks: checks(4, 4), LastBuyDate: today, Accounts: acc(2)},         // 오늘 이미 삼
-		{AssetID: 7, Ticker: "SCHD", Action: SignalBuy, CurrentPrice: 27, BuyChecks: checks(4, 4), Accounts: acc(2)},                             // 오늘 모으기
+		{AssetID: 6, Ticker: "GPIQ", Action: SignalBuy, CurrentPrice: 50, BuyChecks: checks(4, 4), LastBuyDate: today, Accounts: acc(2)},            // 오늘 이미 삼
+		{AssetID: 7, Ticker: "SCHD", Action: SignalBuy, CurrentPrice: 27, BuyChecks: checks(4, 4), Accounts: acc(2)},                                // 오늘 모으기
 		{AssetID: 8, Ticker: "005930.KS", Name: "삼성전자", Currency: "KRW", Action: SignalHold, CurrentPrice: 60000, WeightPct: 30,
 			BuyChecks: checks(0, 4), Accounts: acc(1)}, // 신호·비중은 0 이지만 가격 매력이 높다
 		{AssetID: 9, Ticker: "FUND:XZU9SMKB", Name: "한국벨류10년투자배당", Currency: "KRW", Action: SignalHold, CurrentPrice: 1007, WeightPct: 1,
@@ -143,8 +143,8 @@ func TestRankToday(t *testing.T) {
 	if !strings.Contains(reasons, "과거 기준 1년 뒤 평소보다 +24.0%p (싸게 산 날 +35.0% · 평소 +10.0%)") || !strings.Contains(reasons, "1년 중 하위 3% 가격 · 좋은 가격 $54.50 이하") {
 		t.Fatalf("JEPQ 이유 = %v", j.Reasons)
 	}
-	if j.Warn != "아직 내려가는 중 · 20일선 $57.27 아래" {
-		t.Fatalf("JEPQ 주의 = %q", j.Warn)
+	if j.Warn != "" || j.Note != "아직 내려가는 중 (20일선 $57.27 아래) · 과거엔 멈출 때까지 기다려도 더 싸게 산 경우가 30%뿐" {
+		t.Fatalf("JEPQ 주의 = %q · 참고 = %q", j.Warn, j.Note)
 	}
 	// 달러 계좌: 제안 20만 원 ÷ 1,400 = $142.86, 예수금 $230.40 → 충분 (예수금은 점수에 안 들어감)
 	if j.Account == nil || j.Account.Currency != "USD" || !near(j.Account.Need, 142.86) || j.Account.Short != 0 || j.Market != "US" {
@@ -176,6 +176,10 @@ func TestRankToday(t *testing.T) {
 	}
 	if w := zoneWarn(&PriceZoneRow{PriceZone: models.PriceZone{Level: models.ZoneLevelHigh, Pos1y: 90, Falling: true}}); w != "" {
 		t.Fatalf("비싼 종목은 주의 없음: %q", w)
+	}
+	// 내려가는 중은 주의가 아니라 참고 (기다려도 더 싸게 산 경우가 적었다) — 비싼 종목은 없음
+	if n := zoneNote(&PriceZoneRow{PriceZone: models.PriceZone{Level: models.ZoneLevelHigh, Pos1y: 90, Falling: true}}); n != "" {
+		t.Fatalf("비싼 종목은 참고 없음: %q", n)
 	}
 	// 예수금이 모자라면 모자란 금액 (가격 매력 50 → 35 + 신호 3.8 + 비중 4.5)
 	only3, _ := rankToday(items[2:3], nil, map[uint]PriceZoneRow{3: {PriceZone: models.PriceZone{AssetID: 3, Currency: "KRW", Score: 50, CheapDays: 60}}}, nil, accounts, balances, 1400, today)
