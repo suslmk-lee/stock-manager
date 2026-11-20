@@ -45,3 +45,10 @@ func (a Account) FxFeePctAt(t time.Time) float64 {
 	}
 	return a.FxFeePctOff()
 }
+
+// PlanAutoFx: 모으기에서 달러가 모자라면 원화예수금에서 모자란 만큼 자동으로 바꾸는 계좌 (직접 환전 수수료를 아는 계좌).
+// 토스증권 모으기는 회차마다 그 금액을 정규 시간 밖 우대율(50%)로 바꾸고, 원화도 모자라면 사지 않는다.
+func (a Account) PlanAutoFx() bool { return a.HasFxFee() && !a.NoCash }
+
+// PlanFxFeePct: 모으기 자동 환전 수수료 (%) — 회차는 밤(미국 장)에 사므로 정규 시간 밖 우대율
+func (a Account) PlanFxFeePct() float64 { return a.FxFeePctOff() }

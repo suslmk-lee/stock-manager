@@ -671,6 +671,8 @@ export interface AccumulationPlanView extends Omit<AccumulationPlanRequest, 'add
   monthly_max: number;
   /** 지금 가격에서 수량 단위 하나를 사는 데 드는 금액 (금액 통화) */
   min_amount?: number;
+  /** 예수금(원화까지)이 모자라 회차를 건너뛰기 시작한 거래일 — 그 뒤 산 회차가 생기면 없어진다 (모으기에서 자동 환전하는 계좌만) */
+  cash_short_from?: string;
 }
 
 export interface AccumulationFill {
@@ -687,6 +689,8 @@ export interface AccumulationFill {
 export interface AccumulationRunResult {
   created: number;
   skipped: number;
+  /** 그중 예수금이 모자라 건너뛴 회차 */
+  no_cash?: number;
   plans: number;
   errors?: string[];
 }

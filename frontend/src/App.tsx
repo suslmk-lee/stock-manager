@@ -86,7 +86,7 @@ const presetForm = (broker: string) => {
 function fxRuleHint(f: { fxSpread: string; fxDayDisc: string; fxOffDisc: string }): string {
   const rule = fxRuleOf({ fx_spread_pct: Number(f.fxSpread || '0'), fx_day_disc_pct: Number(f.fxDayDisc || '0'), fx_off_disc_pct: Number(f.fxOffDisc || '0') });
   if (!rule) return '원화예수금을 달러로 직접 바꿀 때의 수수료입니다. 오늘 화면의 환전 금액과 환전 기록의 예상 금액에 씁니다. 모르면 비워 두세요.';
-  return `정규 시간(평일 09:00~15:30) ${pctText(feeDay(rule))} · 그 외 시간(밤·주말) ${pctText(feeOff(rule))}. 오늘 화면의 환전 금액과 환전 기록의 예상 금액에 씁니다.`;
+  return `정규 시간(평일 09:00~15:30) ${pctText(feeDay(rule))} · 그 외 시간(밤·주말) ${pctText(feeOff(rule))}. 오늘 화면의 환전 금액과 환전 기록의 예상 금액에 씁니다. 모으기는 달러가 모자라면 모자란 만큼 원화에서 그 외 시간 수수료로 자동 환전하고, 원화도 모자라면 사지 않은 것으로 봅니다.`;
 }
 
 // 목록 맨 위 '예수금 한눈에'를 고른 상태 (계좌 id 대신)

@@ -45,6 +45,9 @@ type AccumulationPlan struct {
 	StartedOn        string `gorm:"size:10" json:"started_on"`         // 증권사에서 처음 시작한 날 (표시용)
 	AutoFrom         string `gorm:"size:10;not null" json:"auto_from"` // 이 거래일부터 자동 기록
 	ProcessedThrough string `gorm:"size:10" json:"processed_through"`  // 이 거래일까지 처리 끝
+	// 예수금이 모자라 회차를 건너뛰기 시작한 거래일 (모으기에서 자동 환전하는 계좌만 — 원화까지 모자라면 증권사도 사지 않는다).
+	// 그 뒤 산 회차가 생기면 지운다.
+	CashShortFrom string `gorm:"size:10" json:"cash_short_from,omitempty"`
 
 	// 앱에 등록하기 전까지 모은 것 (증권사 앱의 누적 값). 금액은 AmountCurrency 기준.
 	OpeningRounds   int     `gorm:"default:0" json:"opening_rounds"`

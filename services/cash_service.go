@@ -20,6 +20,8 @@ import (
 // 미국 주식은 계좌의 예수금 구성(ForeignSettle)을 따른다:
 //   USD = 외화예수금(달러)에서 · KRW = 그날 환율로 원화예수금에서 · AFX = 달러 먼저, 모자란 만큼 원화에서 자동 환전.
 // 자동으로 바꿀 때(KRW·AFX)는 계좌의 자동 환전 수수료(%)를 환율에 얹는다 (살 때 +, 받을 때 −).
+// USD 계좌라도 직접 환전 수수료를 아는 계좌(토스증권)는 모으기 회차만 달러가 모자라면 모자란 만큼 원화에서
+// 정규 시간 밖 우대율로 자동 환전한다 (Account.PlanAutoFx).
 // 지난 입금 기록이 없으면 계산 잔액이 실제와 다르므로 '잔액 맞추기'로 증권사 잔액을 넣어 차이를 조정 기록으로 남긴다.
 
 // CashInputError 는 입력이 잘못된 경우 (HTTP 400).
@@ -186,17 +188,18 @@ func (s *CashService) flowsOf(account *models.Account, entries []models.CashEntr
 	mode := account.ForeignSettle
 	settleKRW := mode == models.SettleKRW
 	fee := account.FxFeePct / 100
+	planFx := account.PlanAutoFx() // 모으기 회차만 자동 환전
 	var fxAt func(time.Time) float64
 	needFx := false
-	if settleKRW || mode == models.SettleAutoFX {
+	if settleKRW || mode == models.SettleAutoFX || planFx {
 		for _, t := range txs {
-			if tickerCurrency(t.Asset.Ticker) == "USD" {
+			if tickerCurrency(t.Asset.Ticker) == "USD" && (!planFx || t.PlanID != nil) {
 				needFx = true
 				break
 			}
 		}
 		for _, d := range divs {
-			if d.Currency == "USD" {
+			if d.Currency == "USD" && !planFx {
 				needFx = true
 				break
 			}
@@ -204,7 +207,7 @@ func (s *CashService) flowsOf(account *models.Account, entries []models.CashEntr
 	}
 	if needFx {
 		fxAt = s.fxLookup()
-		if fxAt == nil {
+		if fxAt == nil && !planFx {
 			return nil, errors.New("미국 주식을 원화로 바꿀 환율을 가져오지 못했습니다 (원화 결제·자동 환전 계좌)")
 		}
 	}
@@ -282,8 +285,16 @@ func (s *CashService) flowsOf(account *models.Account, entries []models.CashEntr
 		}
 		return out[i].seq < out[j].seq
 	})
-	if mode == models.SettleAutoFX && fxAt != nil {
-		out = autoExchange(out, fxAt, fee)
+	switch {
+	case mode == models.SettleAutoFX && fxAt != nil:
+		out, _ = autoExchange(out, fxAt, fee, nil)
+	case planFx:
+		// 환율을 못 가져와도 달러가 모자란 회차가 없으면 그대로 계산한다
+		var missing bool
+		out, missing = autoExchange(out, fxAt, account.PlanFxFeePct()/100, func(f CashFlow) bool { return f.PlanFill })
+		if missing {
+			return nil, errors.New("모으기 자동 환전에 쓸 환율을 가져오지 못했습니다")
+		}
 	}
 	bal := map[string]float64{}
 	for i := range out {
@@ -304,16 +315,27 @@ func withFxFee(fx, fee float64, paying bool) float64 {
 // autoExchange: 자동 환전(통합증거금) — 달러 매수에 외화예수금이 모자라면 모자란 만큼(센트 올림)을
 // 그날 환율(+수수료)로 원화예수금에서 바꾼다. 바꾼 기록은 그 매수 바로 앞에 '자동 환전' 두 줄(원화 −, 달러 +)로 넣는다.
 // 증권사가 주문 때 임시 환율로 더 잡아 두었다가 다음 날 정산해 돌려주는 차액은 넣지 않는다 (최종 금액만 남긴다).
-func autoExchange(in []CashFlow, fxAt func(time.Time) float64, fee float64) []CashFlow {
-	out := make([]CashFlow, 0, len(in)+4)
+// only 가 있으면 그 매수만 바꾼다 (모으기 회차). 바꿔야 하는데 환율이 없으면 missing.
+func autoExchange(in []CashFlow, fxAt func(time.Time) float64, fee float64, only func(CashFlow) bool) (out []CashFlow, missing bool) {
+	out = make([]CashFlow, 0, len(in)+4)
 	usd := 0.0
 	for _, f := range in {
-		if f.Currency == "USD" && f.Kind == "buy" && f.Amount < 0 {
+		if f.Currency == "USD" && f.Kind == "buy" && f.Amount < 0 && (only == nil || only(f)) {
 			short := math.Ceil((-f.Amount-math.Max(usd, 0))*100-1e-6) / 100
 			if d, ok := parseDay(f.Date); ok && short > 0 {
+				if fxAt == nil || fxAt(d) <= 0 {
+					missing = true
+					out = append(out, f)
+					usd += f.Amount
+					continue
+				}
 				fx := withFxFee(fxAt(d), fee, true)
 				krw := math.Round(short * fx)
-				detail := fmt.Sprintf("%s 매수에 모자란 %s", f.Label, fmtMoney(short, "USD"))
+				what := "매수"
+				if f.PlanFill {
+					what = "모으기"
+				}
+				detail := fmt.Sprintf("%s %s에 모자란 %s", f.Label, what, fmtMoney(short, "USD"))
 				out = append(out,
 					CashFlow{Date: f.Date, Kind: "autofx", Currency: "KRW", Amount: -krw, Label: "원화 → 달러", Detail: detail, Fx: fx, order: f.order, seq: f.seq},
 					CashFlow{Date: f.Date, Kind: "autofx", Currency: "USD", Amount: short, Label: "원화 → 달러", Detail: detail, Fx: fx, order: f.order, seq: f.seq},
@@ -326,7 +348,7 @@ func autoExchange(in []CashFlow, fxAt func(time.Time) float64, fee float64) []Ca
 		}
 		out = append(out, f)
 	}
-	return out
+	return out, missing
 }
 
 // ───────────────────────── 조회 ─────────────────────────

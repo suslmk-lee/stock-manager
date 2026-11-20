@@ -21,7 +21,10 @@ function MonthlyNeed({ needs }: { needs: Map<number, AccountCashNeed> }) {
   if (rows.length === 0) return null;
   const unknown = rows.filter((r) => !r.reconciled).length;
   return (
-    <div className="space-y-1.5" title={'조건을 늘 만족한다고 볼 때 한 달(거래일 21일)에 필요한 금액입니다.\n미국 주식은 원화 결제 계좌면 원화로 바꿔 셉니다.'}>
+    <div
+      className="space-y-1.5"
+      title={'조건을 늘 만족한다고 볼 때 한 달(거래일 21일)에 필요한 금액입니다.\n미국 주식은 원화 결제 계좌면 원화로 바꿔 셉니다.\n달러가 모자라면 원화에서 자동 환전하는 계좌(통합증거금, 토스증권 모으기)는 원화도 수수료를 얹어 달러로 바꿔 셉니다.'}
+    >
       <p className="label-mono">한 달 최대 필요 금액 · 예수금</p>
       {rows.map((r) => {
         const cash = cashText(r);
@@ -121,6 +124,7 @@ export default function PlanList({ plans, status, onStatus, counts, selectedId, 
                   <span className="mt-0.5 block truncate text-xs text-zinc-400">
                     {ruleText(p, ccy)}
                     {belowMinimum(p) && <span className="ml-1.5 text-amber-300">· 금액 부족</span>}
+                    {p.status === 'active' && p.cash_short_from && <span className="ml-1.5 text-rose-300">· 예수금 부족</span>}
                   </span>
                   <span className="mt-0.5 block truncate font-mono text-[10.5px] text-zinc-600">
                     {accountDisplayName(p.account)} · {p.rounds}회

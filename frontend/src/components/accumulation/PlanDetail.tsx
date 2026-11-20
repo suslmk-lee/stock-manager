@@ -6,6 +6,7 @@ import { accountLabel, assetTitle, belowMinimum, fmtAmount, fmtDay, fmtPrice, fm
 import FundReconcileModal from '../pension/FundReconcileModal';
 import { cashText, LOW_DAYS, type AccountCashNeed } from './cashNeed';
 import { askConfirm } from '../ui/confirmDialog';
+import { feeOff, fxRuleOf, pctText } from '../../utils/fxFee';
 
 interface PlanDetailProps {
   plan: AccumulationPlanView;
@@ -139,6 +140,9 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
 
   const next = plan.status === 'active' ? nextText(plan) : '';
   const ret = plan.holding_return_pct;
+  // 토스증권처럼 직접 환전 수수료를 아는 USD 계좌: 모으기는 달러가 모자라면 원화에서 그 외 시간 수수료로 자동 환전 (미국 주식만)
+  const fxRule = plan.account && !plan.account.no_cash && (plan.account.foreign_settle ?? 'USD') === 'USD' ? fxRuleOf(plan.account) : null;
+  const autoFxFee = fxRule && assetCcy === 'USD' ? feeOff(fxRule) : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -161,6 +165,7 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
             <p className="mt-0.5 text-[11px] text-zinc-500">
               {fund ? '앱 기준가로 좌수 계산 · 공휴일이면 다음 영업일' : stepLabel(plan.qty_step)}
               {plan.started_on ? ` · ${fmtDay(plan.started_on)} 시작` : ''}
+              {autoFxFee != null ? ` · 달러가 모자라면 원화에서 자동 환전 (수수료 ${pctText(autoFxFee)})` : ''}
               {plan.notes ? ` · ${plan.notes}` : ''}
             </p>
             {fund && (
@@ -194,7 +199,12 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
             지금 가격에서는 {stepLabel(plan.qty_step).replace(' 단위', '')}가 {fmtAmount(plan.min_amount!, ccy)}이라 {fmtAmount(plan.amount, ccy)}으로는 살 수 없어 회차가 건너뛰어집니다. 증권사 앱의 수량을 보고 수량 단위를 바꿔 주세요.
           </p>
         )}
-        {plan.status === 'active' && need?.days != null && need.days < LOW_DAYS && (
+        {plan.status === 'active' && plan.cash_short_from && (
+          <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs leading-relaxed text-rose-100">
+            {fmtDay(plan.cash_short_from)}부터 {assetCcy === 'KRW' ? '원화' : autoFxFee != null ? '달러·원화' : '달러'} 예수금이 모자라 회차를 기록하지 않았어요. 증권사에서도 이런 날은 사지 않습니다. 입금을 기록하면 그다음 회차부터 다시 기록합니다.
+          </p>
+        )}
+        {plan.status === 'active' && !plan.cash_short_from && need?.days != null && need.days < LOW_DAYS && (
           <p
             className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
               need.days <= 0 ? 'border-rose-400/30 bg-rose-500/10 text-rose-100' : 'border-amber-400/30 bg-amber-500/10 text-amber-100'

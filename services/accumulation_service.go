@@ -453,8 +453,9 @@ func (s *AccumulationService) UpdatePlan(id uint, req AccumulationPlanRequest) (
 	}
 
 	autoFrom := req.AutoFrom
+	resumed := plan.Status == models.PlanStatusPaused && req.Status == models.PlanStatusActive
 	// 중지했다가 다시 켜면 쉬던 기간은 채우지 않고 오늘부터 기록한다
-	if plan.Status == models.PlanStatusPaused && req.Status == models.PlanStatusActive {
+	if resumed {
 		if t := todayKST(now); t > autoFrom {
 			autoFrom = t
 		}
@@ -493,6 +494,9 @@ func (s *AccumulationService) UpdatePlan(id uint, req AccumulationPlanRequest) (
 		"status": req.Status, "started_on": req.StartedOn, "auto_from": autoFrom,
 		"opening_rounds": req.OpeningRounds, "opening_amount": req.OpeningAmount, "opening_quantity": req.OpeningQuantity,
 		"opening_tx_id": plan.OpeningTxID, "notes": strings.TrimSpace(req.Notes),
+	}
+	if resumed {
+		updates["cash_short_from"] = "" // 쉬기 전에 예수금이 모자랐던 표시는 지운다
 	}
 	if err := s.db.Model(&plan).Updates(updates).Error; err != nil {
 		return nil, fmt.Errorf("계획을 저장하지 못했습니다: %w", err)
@@ -809,7 +813,8 @@ func (s *AccumulationService) DeleteFill(txID uint) error {
 
 type AccumulationRunResult struct {
 	Created int      `json:"created"`
-	Skipped int      `json:"skipped"` // 조건을 못 맞췄거나 금액이 최소 단위보다 작아 건너뛴 회차
+	Skipped int      `json:"skipped"` // 조건을 못 맞췄거나 금액이 최소 단위보다 작거나 예수금이 모자라 건너뛴 회차
+	NoCash  int      `json:"no_cash"` // 그중 예수금이 모자라 건너뛴 회차 (모으기에서 자동 환전하는 계좌만 확인)
 	Plans   int      `json:"plans"`   // 확인한 계획 수
 	Errors  []string `json:"errors,omitempty"`
 }
@@ -825,7 +830,7 @@ func (s *AccumulationService) RunDue() (*AccumulationRunResult, error) {
 
 	now := s.clock()
 	var plans []models.AccumulationPlan
-	if err := s.db.Preload("Asset").Where("status = ?", models.PlanStatusActive).Order("id").Find(&plans).Error; err != nil {
+	if err := s.db.Preload("Asset").Preload("Account").Where("status = ?", models.PlanStatusActive).Order("id").Find(&plans).Error; err != nil {
 		return nil, err
 	}
 
@@ -915,6 +920,9 @@ func (s *AccumulationService) RunDue() (*AccumulationRunResult, error) {
 		}
 	}
 
+	// 계좌별로 묶는다: 모으기에서 자동 환전하는 계좌는 회차가 같은 예수금을 나눠 쓰므로 여러 계획을 날짜 순으로 함께 처리한다
+	var accOrder []uint
+	runsOf := map[uint][]*planRun{}
 	for i := range due {
 		p := &due[i]
 		h := hist[strings.ToUpper(p.Asset.Ticker)]
@@ -925,66 +933,243 @@ func (s *AccumulationService) RunDue() (*AccumulationRunResult, error) {
 			continue
 		}
 		res.Plans++
-		s.processPlan(p, sessionBars(h), fxAt, now, res)
+		if _, ok := runsOf[p.AccountID]; !ok {
+			accOrder = append(accOrder, p.AccountID)
+		}
+		runsOf[p.AccountID] = append(runsOf[p.AccountID], &planRun{p: p, bars: sessionBars(h), from: firstPending(p), shortWas: p.CashShortFrom})
+	}
+	for _, id := range accOrder {
+		runs := runsOf[id]
+		var w *planWallet
+		if acc := runs[0].p.Account; acc.ID == id && acc.PlanAutoFx() {
+			var err error
+			if w, err = s.newPlanWallet(acc); err != nil {
+				res.Errors = append(res.Errors, fmt.Sprintf("%s 예수금: %v", acc.Name, err))
+				w = nil // 예수금을 못 읽으면 예전처럼 확인 없이 기록한다
+			}
+		}
+		s.processRuns(runs, fxAt, now, res, w)
 	}
 	sort.Strings(res.Errors)
 	return res, nil
 }
 
-func (s *AccumulationService) processPlan(p *models.AccumulationPlan, bars []sessionBar, fxAt func(time.Time) float64, now time.Time, res *AccumulationRunResult) {
-	from := firstPending(p)
-	assetCcy := tickerCurrency(p.Asset.Ticker)
-	processed := ""
-	for _, b := range bars {
-		if b.day < from {
-			continue
-		}
-		if !sessionClosed(p.Asset.Ticker, b.day, now) {
-			break
-		}
-		if !scheduleHit(p, b.day) {
-			processed = b.day
-			continue
-		}
-		day, _ := parseDay(b.day)
+// planRun: 한 계획의 이번 처리 상태
+type planRun struct {
+	p         *models.AccumulationPlan
+	bars      []sessionBar
+	from      string // 이 거래일부터 처리
+	i         int    // 다음에 볼 봉
+	processed string // 처리를 끝낸 마지막 거래일
+	stopped   bool   // 장이 안 끝났거나 오류 — 이번에는 더 보지 않는다
+	shortWas  string // 처리 전 CashShortFrom
+}
 
-		if !s.conditionMet(p, b.close) {
-			res.Skipped++
-			processed = b.day
-			continue
+// processRuns: 같은 계좌의 계획들을 거래일 순서대로 (같은 날은 계획 번호 순) 처리한다.
+// w 가 있으면 그날 예수금으로 살 수 있는 회차만 기록한다.
+func (s *AccumulationService) processRuns(runs []*planRun, fxAt func(time.Time) float64, now time.Time, res *AccumulationRunResult, w *planWallet) {
+	for {
+		var next *planRun
+		for _, r := range runs {
+			if r.stopped {
+				continue
+			}
+			for r.i < len(r.bars) && r.bars[r.i].day < r.from {
+				r.i++
+			}
+			if r.i >= len(r.bars) {
+				continue
+			}
+			if next == nil || r.bars[r.i].day < next.bars[next.i].day {
+				next = r
+			}
 		}
-		fx := 0.0
-		if fxAt != nil {
-			fx = fxAt(day)
-		}
-		amount, ok := convertAmount(p.Amount, p.AmountCurrency, assetCcy, fx)
-		if !ok {
+		if next == nil {
 			break
 		}
-		qty := floorQty(amount, b.close, p.QtyStep)
-		if qty <= 0 {
-			res.Skipped++
-			processed = b.day
-			continue
-		}
-		_, err := s.txs.CreateTransaction(CreateTransactionRequest{
-			AccountID: p.AccountID, AssetID: p.AssetID, Type: models.TransactionTypeBuy,
-			Date: day, Price: b.close, Quantity: qty, Notes: accumulationNote, PlanID: &p.ID,
-		})
-		if err != nil {
-			if !isUniqueViolation(err) { // 고유 인덱스 충돌 = 다른 곳(서버/앱)이 이미 기록함
-				res.Errors = append(res.Errors, fmt.Sprintf("%s %s: %v", p.Asset.Ticker, b.day, err))
-				break
-			}
-		} else {
-			res.Created++
-		}
-		processed = b.day
+		b := next.bars[next.i]
+		next.i++
+		s.processDay(next, b, fxAt, now, res, w)
 	}
-	if processed != "" && processed > p.ProcessedThrough {
-		s.db.Model(&models.AccumulationPlan{}).Where("id = ?", p.ID).Update("processed_through", processed)
-		p.ProcessedThrough = processed
+	for _, r := range runs {
+		upd := map[string]any{}
+		if r.processed != "" && r.processed > r.p.ProcessedThrough {
+			upd["processed_through"] = r.processed
+			r.p.ProcessedThrough = r.processed
+		}
+		if r.p.CashShortFrom != r.shortWas {
+			upd["cash_short_from"] = r.p.CashShortFrom
+		}
+		if len(upd) > 0 {
+			s.db.Model(&models.AccumulationPlan{}).Where("id = ?", r.p.ID).Updates(upd)
+		}
 	}
+}
+
+// processDay: 한 계획의 한 거래일 — 예정일이고 조건을 맞추고 (확인하는 계좌면) 예수금이 있으면 그날 종가로 기록한다
+func (s *AccumulationService) processDay(r *planRun, b sessionBar, fxAt func(time.Time) float64, now time.Time, res *AccumulationRunResult, w *planWallet) {
+	p := r.p
+	if !sessionClosed(p.Asset.Ticker, b.day, now) {
+		r.stopped = true
+		return
+	}
+	if !scheduleHit(p, b.day) {
+		r.processed = b.day
+		return
+	}
+	day, _ := parseDay(b.day)
+	if !s.conditionMet(p, b.close) {
+		res.Skipped++
+		r.processed = b.day
+		return
+	}
+	fx := 0.0
+	if fxAt != nil {
+		fx = fxAt(day)
+	}
+	assetCcy := tickerCurrency(p.Asset.Ticker)
+	amount, ok := convertAmount(p.Amount, p.AmountCurrency, assetCcy, fx)
+	if !ok {
+		r.stopped = true
+		return
+	}
+	qty := floorQty(amount, b.close, p.QtyStep)
+	if qty <= 0 {
+		res.Skipped++
+		r.processed = b.day
+		return
+	}
+	if w != nil && !w.affordable(b.day, assetCcy, b.close*qty) {
+		res.Skipped++
+		res.NoCash++
+		if p.CashShortFrom == "" {
+			p.CashShortFrom = b.day
+		}
+		r.processed = b.day
+		return
+	}
+	tx, err := s.txs.CreateTransaction(CreateTransactionRequest{
+		AccountID: p.AccountID, AssetID: p.AssetID, Type: models.TransactionTypeBuy,
+		Date: day, Price: b.close, Quantity: qty, Notes: accumulationNote, PlanID: &p.ID,
+	})
+	if err != nil {
+		if !isUniqueViolation(err) { // 고유 인덱스 충돌 = 다른 곳(서버/앱)이 이미 기록함
+			res.Errors = append(res.Errors, fmt.Sprintf("%s %s: %v", p.Asset.Ticker, b.day, err))
+			r.stopped = true
+			return
+		}
+	} else {
+		res.Created++
+		if w != nil {
+			t := *tx
+			t.Asset = p.Asset
+			w.txs = append(w.txs, t)
+		}
+	}
+	p.CashShortFrom = ""
+	r.processed = b.day
+}
+
+// ───────────────────────── 모으기 예수금 (자동 환전 계좌) ─────────────────────────
+
+// planWallet: 모으기에서 자동 환전하는 계좌(토스증권)의 그날 예수금으로 회차를 살 수 있는지 본다.
+// 달러가 있으면 달러로, 모자라면 모자란 만큼 원화를 모으기 환전 수수료로 바꿔 사고, 원화까지 모자라면 사지 않는다.
+// 계좌의 현금 기록·매매·배당은 처음에 한 번 읽고, 이번에 남긴 회차는 메모리에 더한다.
+type planWallet struct {
+	cash    *CashService
+	acc     models.Account
+	start   string // 첫 '잔액 맞추기' 날 — 그 전 예수금은 지난 입금이 빠져 있을 수 있어 확인하지 않는다
+	entries []models.CashEntry
+	txs     []models.Transaction
+	divs    []models.Dividend
+	fxAt    func(time.Time) float64
+}
+
+// newPlanWallet: 잔액을 맞춘 적이 없는 계좌는 예수금을 믿을 수 없어 nil (확인 없이 기록)
+func (s *AccumulationService) newPlanWallet(acc models.Account) (*planWallet, error) {
+	w := &planWallet{cash: NewCashService(s.db, s.ticker), acc: acc}
+	w.cash.fxHistory = s.fxHistory
+	if err := s.db.Where("account_id = ?", acc.ID).Find(&w.entries).Error; err != nil {
+		return nil, err
+	}
+	for _, e := range w.entries {
+		if d := dayString(e.Date); e.Kind == models.CashAdjust && (w.start == "" || d < w.start) {
+			w.start = d
+		}
+	}
+	if w.start == "" {
+		return nil, nil
+	}
+	if err := s.db.Preload("Asset").Where("account_id = ?", acc.ID).Find(&w.txs).Error; err != nil {
+		return nil, err
+	}
+	if err := s.db.Preload("Asset").Where("account_id = ? AND is_received = ?", acc.ID, true).Find(&w.divs).Error; err != nil {
+		return nil, err
+	}
+	w.fxAt = w.cash.fxLookup()
+	return w, nil
+}
+
+// balanceAt: day 마감 예수금 (그날까지의 기록만, 앞선 모으기의 자동 환전 포함)
+func (w *planWallet) balanceAt(day string) (krw, usd float64, err error) {
+	var es []models.CashEntry
+	for _, e := range w.entries {
+		if dayString(e.Date) <= day {
+			es = append(es, e)
+		}
+	}
+	var ts []models.Transaction
+	for _, t := range w.txs {
+		if dayString(t.Date) <= day {
+			ts = append(ts, t)
+		}
+	}
+	var ds []models.Dividend
+	for _, d := range w.divs {
+		if dayString(d.Date) <= day {
+			ds = append(ds, d)
+		}
+	}
+	flows, err := w.cash.flowsOf(&w.acc, es, ts, ds)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, f := range flows {
+		switch f.Currency {
+		case "KRW":
+			krw += f.Amount
+		case "USD":
+			usd += f.Amount
+		}
+	}
+	return krw, usd, nil
+}
+
+// affordable: 그날 예수금으로 cost(종목 통화)를 살 수 있나. 계산하지 못하면 산다고 본다 (예전처럼 기록).
+func (w *planWallet) affordable(day, ccy string, cost float64) bool {
+	if day < w.start {
+		return true
+	}
+	krw, usd, err := w.balanceAt(day)
+	if err != nil {
+		log.Printf("[Accumulation] %s 예수금 확인 실패: %v", w.acc.Name, err)
+		return true
+	}
+	switch ccy {
+	case "USD":
+		short := math.Ceil((cost-math.Max(usd, 0))*100-1e-6) / 100 // autoExchange 와 같은 계산
+		if short <= 0 {
+			return true
+		}
+		d, ok := parseDay(day)
+		if !ok || w.fxAt == nil || w.fxAt(d) <= 0 {
+			return true
+		}
+		return krw >= math.Round(short*withFxFee(w.fxAt(d), w.acc.PlanFxFeePct()/100, true))
+	case "KRW":
+		return krw+1e-6 >= cost
+	}
+	return true
 }
 
 // conditionMet: 그날 종가로 조건을 판단한다. 수익률은 이 계좌 보유의 평균 단가(종목 통화) 기준.
@@ -1014,8 +1199,8 @@ func (s *AccumulationService) RunEvery(ctx context.Context, every time.Duration)
 			log.Printf("[Accumulation] 자동 기록 오류: %v", err)
 			return
 		}
-		if res.Created > 0 || len(res.Errors) > 0 {
-			log.Printf("[Accumulation] %d건 기록, %d건 건너뜀, 오류 %v", res.Created, res.Skipped, res.Errors)
+		if res.Created > 0 || res.NoCash > 0 || len(res.Errors) > 0 {
+			log.Printf("[Accumulation] %d건 기록, %d건 건너뜀 (예수금 부족 %d), 오류 %v", res.Created, res.Skipped, res.NoCash, res.Errors)
 		}
 	}
 	run()

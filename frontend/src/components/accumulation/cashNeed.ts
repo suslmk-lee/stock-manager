@@ -1,6 +1,7 @@
 import type { AccumulationPlanView, CashBalance, PlanCurrency } from '../../types/models';
 import { fmtAmount } from './planText';
 import { accountDisplayName } from '../../utils/accountLabel';
+import { feeOff, fxRuleOf } from '../../utils/fxFee';
 
 /** 거래일 기준 한 달 (monthly_max 와 같은 기준) */
 const TRADING_DAYS = 21;
@@ -17,8 +18,10 @@ export interface AccountCashNeed {
   cashUSD: number;
   /** 잔액 맞추기를 한 계좌만 예수금을 믿을 수 있다 */
   reconciled: boolean;
-  /** 자동 환전 계좌: 달러가 모자라면 원화로 사므로 원화·달러를 합쳐 본다 */
+  /** 자동 환전 계좌: 달러가 모자라면 원화로 사므로 원화·달러를 합쳐 본다 (통합증거금, 토스증권처럼 모으기만 자동 환전하는 계좌) */
   autoFx: boolean;
+  /** 자동 환전 수수료 (%) — 원화를 달러로 바꿀 때 환율에 얹는다 */
+  fxFeePct: number;
   /** 지금 예수금으로 버티는 거래일 수 (잔액을 맞추지 않았으면 null) */
   days: number | null;
 }
@@ -26,6 +29,14 @@ export interface AccountCashNeed {
 /** 모으기 금액이 빠지는 통화: 국내 주식은 원화, 미국 주식은 계좌 결제 통화 (원화 결제면 원화) */
 export const deductCurrency = (p: AccumulationPlanView): PlanCurrency =>
   p.asset_currency === 'KRW' || p.account?.foreign_settle === 'KRW' ? 'KRW' : 'USD';
+
+/** 달러가 모자라면 원화에서 자동 환전하는 계좌인지와 그 수수료 — 통합증거금(AFX)은 모든 매수, 직접 환전 수수료를 아는 USD 계좌(토스증권)는 모으기만 그 외 시간 수수료로 */
+function autoFxOf(p: AccumulationPlanView): { autoFx: boolean; fxFeePct: number } {
+  const a = p.account;
+  if (a?.foreign_settle === 'AFX') return { autoFx: true, fxFeePct: a.fx_fee_pct ?? 0 };
+  const rule = !a?.foreign_settle || a.foreign_settle === 'USD' ? fxRuleOf(a) : null;
+  return rule ? { autoFx: true, fxFeePct: feeOff(rule) } : { autoFx: false, fxFeePct: 0 };
+}
 
 /** 진행 중인 모으기를 계좌별로 묶어 한 달 필요 금액과 예수금으로 버티는 거래일 수를 계산한다 */
 export function cashNeeds(plans: AccumulationPlanView[], balances: CashBalance[] | null, usdKrw: number): Map<number, AccountCashNeed> {
@@ -44,7 +55,7 @@ export function cashNeeds(plans: AccumulationPlanView[], balances: CashBalance[]
         cashKRW: b?.krw ?? 0,
         cashUSD: b?.usd ?? 0,
         reconciled: !!b?.last_adjusted,
-        autoFx: p.account?.foreign_settle === 'AFX',
+        ...autoFxOf(p),
         days: null,
       };
       byAcc.set(p.account_id, r);
@@ -60,9 +71,10 @@ export function cashNeeds(plans: AccumulationPlanView[], balances: CashBalance[]
     if (!r.reconciled || !balances) continue;
     const ds: number[] = [];
     if (r.autoFx && usdKrw > 0) {
-      // 달러 먼저, 모자라면 원화에서 바꾸므로 둘을 원화로 합쳐서 본다
-      const need = r.needKRW + r.needUSD * usdKrw;
-      if (need > 0) ds.push(Math.max(0, r.cashKRW + r.cashUSD * usdKrw) / (need / TRADING_DAYS));
+      // 달러 먼저, 모자라면 원화에서 (수수료를 얹은 환율로) 바꾸므로 둘을 원화로 합쳐서 본다
+      const rate = usdKrw * (1 + r.fxFeePct / 100);
+      const need = r.needKRW + r.needUSD * rate;
+      if (need > 0) ds.push(Math.max(0, r.cashKRW + r.cashUSD * rate) / (need / TRADING_DAYS));
     } else {
       if (r.needKRW > 0) ds.push(Math.max(0, r.cashKRW) / (r.needKRW / TRADING_DAYS));
       if (r.needUSD > 0) ds.push(Math.max(0, r.cashUSD) / (r.needUSD / TRADING_DAYS));
