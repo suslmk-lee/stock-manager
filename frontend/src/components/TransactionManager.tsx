@@ -549,10 +549,19 @@ export default function TransactionManager({ selectedAccountId = 0, onAccountCha
         parseFloat(formData.fee || '0'),
         formData.notes,
       );
-      if (formData.type === 'Buy') await recordPendingCash(formData.accountId, formData.date, buyCash);
+      // 매수는 이미 기록됐다 — 입금·환전 기록이 실패해도 창을 닫고 따로 알린다 (다시 눌러 매수가 두 번 기록되지 않게)
+      let cashErr = '';
+      if (formData.type === 'Buy' && buyCash.length > 0) {
+        try {
+          await recordPendingCash(formData.accountId, formData.date, buyCash);
+        } catch (e) {
+          cashErr = e instanceof Error ? e.message : String(e);
+        }
+      }
       resetForm();
       setShowForm(false);
       await reloadAccountData(selectedAccount);
+      if (cashErr) setError(`매수는 기록했지만 입금·환전 기록을 남기지 못했습니다 (${cashErr}). 예수금 화면에서 직접 넣어 주세요.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '거래 기록에 실패했습니다.');
     } finally {

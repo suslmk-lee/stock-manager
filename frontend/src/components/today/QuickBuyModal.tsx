@@ -40,8 +40,16 @@ export default function QuickBuyModal({ pick: p, onClose, onSaved }: { pick: Tod
     setError(null);
     try {
       await apiClient.CreateTransaction(a.id, p.asset_id, 'Buy', date, pr, q, 0, '오늘 살 종목에서 기록');
-      await recordPendingCash(a.id, date, cashItems);
-      const dep = cashItems.length ? ` · ${cashItems.map(pendingText).join(' · ')}도 기록` : '';
+      // 매수는 이미 기록됐다 — 입금·환전 기록이 실패해도 닫고 알린다 (다시 눌러 매수가 두 번 기록되지 않게)
+      let dep = '';
+      if (cashItems.length > 0) {
+        try {
+          await recordPendingCash(a.id, date, cashItems);
+          dep = ` · ${cashItems.map(pendingText).join(' · ')}도 기록`;
+        } catch (e) {
+          dep = ` · 입금·환전 기록은 남기지 못했어요 (${errText(e)}) — 예수금 화면에서 넣어 주세요`;
+        }
+      }
       onSaved(`${t.primary} ${q.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}${unit} 매수를 기록했습니다${dep}.`);
     } catch (e) {
       setError(errText(e));
