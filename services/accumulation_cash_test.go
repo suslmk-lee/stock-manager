@@ -145,3 +145,68 @@ func TestAccumulationTossCashUnreconciled(t *testing.T) {
 		t.Fatalf("created %d no_cash %d, want 2 · 0", res.Created, res.NoCash)
 	}
 }
+
+// 메리츠·미래에셋처럼 달러로 사는 계좌(자동 환전 없음): 1,000원 회차를 그날 환율로 바꾼 달러가 모자라면 기록하지 않는다.
+// 원화가 있어도 쓰지 않는다. 직접 환전을 기록하면 그다음 회차부터 다시 산다.
+func TestAccumulationUSDAccountCash(t *testing.T) {
+	f := newAccFixture(t)
+	if err := f.db.AutoMigrate(&models.CashEntry{}, &models.Dividend{}); err != nil {
+		t.Fatal(err)
+	}
+	acc := models.Account{Name: "Super365", Broker: "메리츠증권", MarketType: models.MarketTypeInternational, Currency: "USD", ForeignSettle: models.SettleUSD}
+	f.db.Create(&acc)
+	cash := NewCashService(f.db, nil)
+	cash.fxHistory = f.svc.fxHistory
+	cash.Reconcile(acc.ID, CashReconcileRequest{Currency: "USD", Balance: 1.2, Date: "2026-11-06"})
+	cash.Reconcile(acc.ID, CashReconcileRequest{Currency: "KRW", Balance: 50000, Date: "2026-11-06"})
+	schd := f.asset(t, "SCHD")
+	f.hist["SCHD"] = usBars("SCHD", map[string]float64{"2026-11-09": 27, "2026-11-10": 27, "2026-11-11": 27})
+	plan, err := f.svc.CreatePlan(AccumulationPlanRequest{AccountID: acc.ID, AssetID: schd.ID, Amount: 1000, AmountCurrency: "KRW", Schedule: "daily", AutoFrom: "2026-11-09"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 1,000원 ÷ 1,450 = $0.69 → 11/09 산 뒤 $0.51 남아 11/10 부터 못 삼 (원화 5만 원은 쓰지 않음)
+	f.now = time.Date(2026, 11, 10, 23, 0, 0, 0, time.UTC)
+	if res := f.run(t); res.Created != 1 || res.NoCash != 1 {
+		t.Fatalf("created %d no_cash %d, want 1 · 1", res.Created, res.NoCash)
+	}
+	var p models.AccumulationPlan
+	f.db.First(&p, plan.ID)
+	if p.CashShortFrom != "2026-11-10" {
+		t.Fatalf("short from = %q", p.CashShortFrom)
+	}
+	// 11/11 원화 → 달러 환전을 기록하면 11/11 회차는 산다
+	if _, err := cash.CreateExchange(acc.ID, CashExchangeRequest{Date: "2026-11-11", FromCurrency: "KRW", FromAmount: 14500, ToAmount: 10}); err != nil {
+		t.Fatal(err)
+	}
+	f.now = time.Date(2026, 11, 11, 23, 0, 0, 0, time.UTC)
+	if res := f.run(t); res.Created != 1 || res.NoCash != 0 {
+		t.Fatalf("after exchange created %d no_cash %d", res.Created, res.NoCash)
+	}
+	f.db.First(&p, plan.ID)
+	if p.CashShortFrom != "" {
+		t.Fatalf("short from not cleared: %q", p.CashShortFrom)
+	}
+}
+
+// 미국 주식도 원화로 바로 사는 계좌(카카오페이 원화 모으기 등): 원화가 모자라면 기록하지 않는다
+func TestAccumulationKRWSettleCash(t *testing.T) {
+	f := newAccFixture(t)
+	if err := f.db.AutoMigrate(&models.CashEntry{}, &models.Dividend{}); err != nil {
+		t.Fatal(err)
+	}
+	f.db.Model(&f.acc).Update("foreign_settle", models.SettleKRW)
+	cash := NewCashService(f.db, nil)
+	cash.fxHistory = f.svc.fxHistory
+	cash.Reconcile(f.acc.ID, CashReconcileRequest{Currency: "KRW", Balance: 1500, Date: "2026-11-06"})
+	nvda := f.asset(t, "NVDA")
+	f.hist["NVDA"] = usBars("NVDA", map[string]float64{"2026-11-09": 180, "2026-11-10": 180})
+	if _, err := f.svc.CreatePlan(AccumulationPlanRequest{AccountID: f.acc.ID, AssetID: nvda.ID, Amount: 1000, AmountCurrency: "KRW", QtyStep: 0.001, Schedule: "daily", AutoFrom: "2026-11-09"}); err != nil {
+		t.Fatal(err)
+	}
+	// 0.003주 × $180 × 1,450 = 783원 → 11/09 산 뒤 717원 남아 11/10 은 못 삼
+	f.now = time.Date(2026, 11, 10, 23, 0, 0, 0, time.UTC)
+	if res := f.run(t); res.Created != 1 || res.NoCash != 1 {
+		t.Fatalf("created %d no_cash %d, want 1 · 1", res.Created, res.NoCash)
+	}
+}

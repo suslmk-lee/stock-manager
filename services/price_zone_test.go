@@ -96,14 +96,21 @@ type zoneFixture struct {
 
 func newZoneFixture(t *testing.T) *zoneFixture {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
+	f := &zoneFixture{data: map[string][]PricePoint{}}
+	// 기록 시각(updated_at)도 시험 시계로 — 실제 시계를 쓰면 시험 날짜와 오늘이 겹치는 날 '4시간 안에 새로 계산함'이 틀어진다
+	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{NowFunc: func() time.Time {
+		if f.now.IsZero() {
+			return time.Now()
+		}
+		return f.now
+	}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := db.AutoMigrate(&models.Account{}, &models.Asset{}, &models.Holding{}, &models.PriceZone{}, &models.SignalEvent{}); err != nil {
 		t.Fatal(err)
 	}
-	f := &zoneFixture{db: db, data: map[string][]PricePoint{}}
+	f.db = db
 	f.svc = NewPriceZoneService(db, nil)
 	f.svc.now = func() time.Time { return f.now }
 	f.svc.fetch = func(ticker string) (*PriceHistory, []DividendEvent, error) {
@@ -137,7 +144,7 @@ func TestPriceZoneRefreshAndAlerts(t *testing.T) {
 	f.hold(t, "SOLD", 0)       // 다 판 종목도 빼고
 	newco := f.hold(t, "NEWCO", 3)
 	f.data["JEPI"] = zoneSeries(1126, zoneWave) // 꼭대기 (비싼 편)
-	f.data["NEWCO"] = zoneSeries(100, zoneWave)  // 1년 미만 → 기록 없음
+	f.data["NEWCO"] = zoneSeries(100, zoneWave) // 1년 미만 → 기록 없음
 
 	// 지난 기록: 40일 전은 지우고 29일 전은 남긴다
 	f.db.Create(&models.PriceZone{AssetID: jepi.ID, Date: "2026-10-10", Level: models.ZoneLevelHigh})
@@ -242,7 +249,9 @@ func TestPriceZoneRefreshAndAlerts(t *testing.T) {
 
 func TestCombineAlerts(t *testing.T) {
 	a := func(bool, time.Time) ([]models.SignalEvent, error) { return []models.SignalEvent{{Name: "a"}}, nil }
-	b := func(bool, time.Time) ([]models.SignalEvent, error) { return []models.SignalEvent{{Name: "b"}}, gorm.ErrInvalidData }
+	b := func(bool, time.Time) ([]models.SignalEvent, error) {
+		return []models.SignalEvent{{Name: "b"}}, gorm.ErrInvalidData
+	}
 	evs, err := CombineAlerts(a, nil, b)(true, time.Now())
 	if len(evs) != 2 || err != gorm.ErrInvalidData {
 		t.Fatalf("합친 알림 = %v %v", evs, err)

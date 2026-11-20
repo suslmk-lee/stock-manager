@@ -201,7 +201,7 @@ export default function PlanDetail({ plan, need, onEdit, onChanged, onDeleted }:
         )}
         {plan.status === 'active' && plan.cash_short_from && (
           <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs leading-relaxed text-rose-100">
-            {fmtDay(plan.cash_short_from)}부터 {assetCcy === 'KRW' ? '원화' : autoFxFee != null ? '달러·원화' : '달러'} 예수금이 모자라 회차를 기록하지 않았어요. 증권사에서도 이런 날은 사지 않습니다. 입금을 기록하면 그다음 회차부터 다시 기록합니다.
+            {fmtDay(plan.cash_short_from)}부터 {assetCcy === 'KRW' || plan.account?.foreign_settle === 'KRW' ? '원화' : autoFxFee != null || plan.account?.foreign_settle === 'AFX' ? '달러·원화' : '달러'} 예수금이 모자라 회차를 기록하지 않았어요. 증권사에서도 이런 날은 사지 않습니다. 입금을 기록하면 그다음 회차부터 다시 기록합니다.
           </p>
         )}
         {plan.status === 'active' && !plan.cash_short_from && need?.days != null && need.days < LOW_DAYS && (
