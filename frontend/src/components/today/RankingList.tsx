@@ -3,7 +3,10 @@ import type { TodayRow } from '../../types/models';
 import { fmtCcy } from '../../utils/fx';
 import { ZONE_LEVEL, pickTitle } from './TodayCard';
 
-/** 보유 종목 전체 순위 — 위 Top 3 와 같은 오늘 점수. Top 3 에서 뺀 종목은 이유를 보여 준다. 누르면 신호 상세 */
+/**
+ * 보유 종목 순위 — 위 Top 3 와 같은 오늘 점수. Top 3 에서 뺀 종목은 이유를 보여 준다. 누르면 신호 상세.
+ * 계좌별로 볼 때(accountId)는 그 계좌의 순위·Top 3 와 함께 그 계좌에 담긴 수량, 전체 계좌 기준 순위를 보여 준다.
+ */
 
 const EXCLUDED: Record<string, string> = {
   sell: '매도 신호',
@@ -24,7 +27,17 @@ const SEGS: { key: 'price' | 'signal' | 'dividend' | 'weight'; cls: string }[] =
   { key: 'weight', cls: 'bg-sky-400' },
 ];
 
-export default function RankingList({ rows, onOpen }: { rows: TodayRow[]; onOpen: (assetId: number) => void }) {
+/** 계좌별 순위: 그 계좌에 담긴 종목만 같은 점수 순서로, 빠질 이유가 없는 앞의 3개가 그 계좌의 Top 3 */
+export function accountRanking(rows: TodayRow[], accountId: number): TodayRow[] {
+  let pick = 0;
+  return rows
+    .filter((r) => r.held?.some((h) => h.account_id === accountId))
+    .map((r, i) => ({ ...r, rank: i + 1, global_rank: r.rank, pick: !r.excluded && pick < 3 ? ++pick : undefined }));
+}
+
+const qtyText = (q: number, ticker: string) => `${q.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}${/^FUND:/i.test(ticker) ? '좌' : '주'}`;
+
+export default function RankingList({ rows, onOpen, accountId }: { rows: TodayRow[]; onOpen: (assetId: number) => void; accountId?: number | null }) {
   const [all, setAll] = useState(false);
   // 처음에는 Top 3 가 나올 때까지 + 몇 줄 (빠진 종목의 이유가 보이게), 최소 10줄
   const lastPick = rows.reduce((m, r, i) => (r.pick ? i : m), -1);
@@ -42,6 +55,7 @@ export default function RankingList({ rows, onOpen }: { rows: TodayRow[]; onOpen
         {shown.map((r) => {
           const t = pickTitle(r);
           const lv = r.has_zone && r.level ? ZONE_LEVEL[r.level as keyof typeof ZONE_LEVEL] : null;
+          const held = accountId ? r.held?.find((h) => h.account_id === accountId) : undefined;
           return (
             <button
               key={r.asset_id}
@@ -53,10 +67,11 @@ export default function RankingList({ rows, onOpen }: { rows: TodayRow[]; onOpen
               <span className="min-w-0">
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span className="truncate text-[13.5px] font-semibold text-white">{t.primary}</span>
-                  {r.pick ? <span className="shrink-0 rounded border border-mint-400/40 px-1 text-[10px] font-medium text-mint-300">Top 3 · {r.pick}위</span> : null}
+                  {r.pick ? <span className="shrink-0 rounded border border-mint-400/40 px-1 text-[10px] font-medium text-mint-300">{accountId ? '이 계좌' : 'Top 3'} · {r.pick}위</span> : null}
                 </span>
                 <span className="num block truncate text-[11px] text-zinc-500">
                   {r.has_zone && r.expect > 0 && <span className="text-emerald-300 sm:hidden">기대 +{r.expect.toFixed(1)}%p · </span>}
+                  {held ? `보유 ${qtyText(held.qty, r.ticker)}${r.global_rank ? ` · 전체 ${r.global_rank}위` : ''} · ` : ''}
                   {fmtCcy(r.price, r.currency)}
                   {r.has_zone ? ` · 1년 하위 ${Math.round(r.pos_1y)}% · 좋은 가격 ${fmtCcy(r.good, r.currency)}` : ' · 주가 이력 부족'}
                 </span>

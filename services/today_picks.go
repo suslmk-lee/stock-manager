@@ -86,23 +86,43 @@ type TodayParts struct {
 
 // TodayRow: 보유 종목 전체 순위 한 줄 (Top 3 와 같은 점수)
 type TodayRow struct {
-	Rank     int        `json:"rank"` // 오늘 점수 순위 (1부터)
-	AssetID  uint       `json:"asset_id"`
-	Ticker   string     `json:"ticker"`
-	Name     string     `json:"name"`
-	Currency string     `json:"currency"`
-	Price    float64    `json:"price"`
-	Score    float64    `json:"score"`
-	Parts    TodayParts `json:"parts"`
-	HasZone  bool       `json:"has_zone"`
-	Expect   float64    `json:"expect"` // 과거 기준 평소보다 1년 뒤 더 기대되는 수익 (%p)
-	Level    string     `json:"level,omitempty"`
-	Pos1y    float64    `json:"pos_1y"`
-	Good     float64    `json:"good"`
-	Verdict  string     `json:"verdict,omitempty"`
-	Falling  bool       `json:"falling"`
-	Excluded string     `json:"excluded,omitempty"` // Top 3 에서 뺀 이유
-	Pick     int        `json:"pick,omitempty"`     // Top 3 순위 (1~3)
+	Rank     int         `json:"rank"` // 오늘 점수 순위 (1부터)
+	AssetID  uint        `json:"asset_id"`
+	Ticker   string      `json:"ticker"`
+	Name     string      `json:"name"`
+	Currency string      `json:"currency"`
+	Price    float64     `json:"price"`
+	Score    float64     `json:"score"`
+	Parts    TodayParts  `json:"parts"`
+	HasZone  bool        `json:"has_zone"`
+	Expect   float64     `json:"expect"` // 과거 기준 평소보다 1년 뒤 더 기대되는 수익 (%p)
+	Level    string      `json:"level,omitempty"`
+	Pos1y    float64     `json:"pos_1y"`
+	Good     float64     `json:"good"`
+	Verdict  string      `json:"verdict,omitempty"`
+	Falling  bool        `json:"falling"`
+	Excluded string      `json:"excluded,omitempty"` // Top 3 에서 뺀 이유
+	Pick     int         `json:"pick,omitempty"`     // Top 3 순위 (1~3)
+	Held     []TodayHeld `json:"held,omitempty"`     // 이 종목을 가진 계좌 (계좌별 순위용)
+}
+
+// TodayHeld: 한 계좌에 담긴 수량과 평가금액 (원화)
+type TodayHeld struct {
+	AccountID uint    `json:"account_id"`
+	Qty       float64 `json:"qty"`
+	ValueKRW  float64 `json:"value_krw"`
+}
+
+// TodayAccountCash: 계좌별 순위에 쓰는 계좌와 예수금 (보유 종목이 있는 계좌만)
+type TodayAccountCash struct {
+	ID          uint    `json:"id"`
+	Name        string  `json:"name"`
+	Broker      string  `json:"broker"`
+	AccountType string  `json:"account_type"`
+	NoCash      bool    `json:"no_cash"`
+	KRW         float64 `json:"krw"`
+	USD         float64 `json:"usd"`
+	Count       int     `json:"count"` // 순위에 든 이 계좌의 종목 수
 }
 
 // TodayAccount: 이 종목을 살 계좌와 그 예수금 (종목 통화 기준)
@@ -165,6 +185,8 @@ type TodayPicks struct {
 	Considered int         `json:"considered"` // 점수를 매긴 보유 종목 수
 	Plans      []TodayPlan `json:"plans"`
 	Ranking    []TodayRow  `json:"ranking"` // 보유 종목 전체 순위 (오늘 점수 높은 순)
+	// 계좌별 순위: 종목을 담고 있는 계좌 (담은 종목 많은 순) — 화면이 Ranking 을 그 계좌 종목만 걸러 다시 순위를 매긴다
+	Accounts []TodayAccountCash `json:"accounts,omitempty"`
 	// 사기 좋은 가격: 마지막 계산 날짜·시각, 계산한 종목 수 / 보유 종목 수
 	ZoneDate      string     `json:"zone_date"`
 	ZoneUpdatedAt *time.Time `json:"zone_updated_at"`
@@ -271,6 +293,7 @@ func (s *TodayService) GetTodayPicks() (*TodayPicks, error) {
 	picks, rows := rankToday(report.Items, divRows, zones, planned, accounts, balances, fx, today)
 	out.Considered = len(rows)
 	out.Ranking = rows
+	out.Accounts = todayAccounts(rows, accounts, balances)
 	var sw sync.WaitGroup
 	for i := range picks {
 		sw.Add(1)
@@ -361,7 +384,6 @@ func (s *TodayService) WarmAfter(ctx context.Context, delay time.Duration) {
 	}
 }
 
-
 // rankToday: 보유 종목 전체에 오늘 점수를 매겨 순위(rows)를 내고, Top 3 에서 뺄 종목을 표시한 뒤 앞의 3개를 카드(picks)로 만든다 (미니 차트는 붙이지 않는다).
 func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]PriceZoneRow, planned map[uint]bool, accounts map[uint]models.Account, balances map[uint]CashBalance, fx float64, today string) ([]TodayPick, []TodayRow) {
 	type scored struct {
@@ -378,6 +400,11 @@ func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]
 	for _, it := range items {
 		x := scored{it: it}
 		r := TodayRow{AssetID: it.AssetID, Ticker: it.Ticker, Name: it.Name, Currency: it.Currency, Price: it.CurrentPrice}
+		for _, ab := range it.Accounts {
+			if ab.Quantity > 0 {
+				r.Held = append(r.Held, TodayHeld{AccountID: ab.AccountID, Qty: ab.Quantity, ValueKRW: math.Round(ab.MarketValueKRW)})
+			}
+		}
 		r.Parts = TodayParts{PriceMax: todayPriceMax, SignalMax: todaySignalMax, DividendMax: todayDivMax, WeightMax: todayWeightMax}
 		// 가격 매력
 		if z, ok := zones[it.AssetID]; ok {
@@ -468,6 +495,32 @@ func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]
 		rows = append(rows, x.row)
 	}
 	return picks, rows
+}
+
+// todayAccounts: 순위에 든 종목을 담고 있는 계좌와 예수금 — 담은 종목이 많은 순 (같으면 계좌 번호 순)
+func todayAccounts(rows []TodayRow, accounts map[uint]models.Account, balances map[uint]CashBalance) []TodayAccountCash {
+	count := map[uint]int{}
+	for _, r := range rows {
+		for _, h := range r.Held {
+			count[h.AccountID]++
+		}
+	}
+	var out []TodayAccountCash
+	for id, n := range count {
+		acc, ok := accounts[id]
+		if !ok {
+			continue
+		}
+		b := balances[id]
+		out = append(out, TodayAccountCash{ID: id, Name: acc.Name, Broker: acc.Broker, AccountType: string(acc.AccountType), NoCash: acc.NoCash, KRW: math.Round(b.KRW), USD: math.Round(b.USD*100) / 100, Count: n})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
 }
 
 // pickAccount: 이 종목을 가진 계좌 가운데 그 종목을 살 예수금이 가장 넉넉한 곳 (예수금 기록 안 하는 계좌는 늘 충분).

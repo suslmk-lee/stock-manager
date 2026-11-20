@@ -4,18 +4,30 @@ import { PageActions } from '../components/shell/PageSlots';
 import { apiClient } from '../api/client';
 import type { TodayPick, TodayPicks } from '../types/models';
 import TodayCard, { pickTitle } from '../components/today/TodayCard';
-import RankingList from '../components/today/RankingList';
+import RankingList, { accountRanking } from '../components/today/RankingList';
 import QuickBuyModal from '../components/today/QuickBuyModal';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import { fmtCcy } from '../utils/fx';
+import { accountDisplayName } from '../utils/accountLabel';
 
 /**
  * 오늘 살 종목 — 보유 종목 전체에 '오늘 점수'(가격 매력 70 · 매수 신호 15 · 배당 점수 10 · 비중 여유 5)를 매겨 아래에 순위로 보여 주고,
  * 그 순위에서 살 수 있는 앞의 3개를 위에 카드로 보여 준다 (위·아래가 같은 점수). 가격 매력은 백그라운드에서 날짜별로 계산해 둔 '사기 좋은 가격'을 쓴다.
  * 보여 주는 방식: 커버플로우 · 카드 스택 · 피크 캐러셀 (고른 방식을 이 PC에 기억)
+ * 아래 순위는 계좌를 골라 그 계좌에 담긴 종목만 볼 수 있다 (새 종목 말고 그 계좌에 있던 것 가운데 고르려는 사람 — 고른 계좌를 이 PC에 기억)
  * 계산은 시세를 받느라 몇 초 걸려서(앱을 막 켰을 때는 10초 넘게), 마지막 결과(앱을 새로 켰으면 DB 에 남긴 것)부터
  * 계산 시각과 함께 보여 주고 뒤에서 새로 계산해 바꾼다.
  */
+
+const RANK_ACCOUNT_KEY = 'today-ranking-account';
+const loadRankAccount = (): number | null => {
+  try {
+    const v = Number(localStorage.getItem(RANK_ACCOUNT_KEY));
+    return v > 0 ? v : null;
+  } catch {
+    return null;
+  }
+};
 
 // 이번 실행 동안 마지막 결과 (오늘 탭을 다시 열면 바로 보여 준다)
 let lastToday: TodayPicks | null = null;
@@ -82,6 +94,20 @@ export default function TodayPage() {
   const { focusAsset } = useAlerts();
   const picks = data?.picks ?? [];
   const n = picks.length;
+  // 아래 순위: 전체 계좌 또는 고른 계좌 (고른 계좌가 결과에 없으면 전체)
+  const [rankAccountId, setRankAccountId] = useState<number | null>(loadRankAccount);
+  const rankAccounts = data?.accounts ?? [];
+  const rankAcc = rankAccountId != null ? (rankAccounts.find((a) => a.id === rankAccountId) ?? null) : null;
+  const rankRows = rankAcc ? accountRanking(data?.ranking ?? [], rankAcc.id) : (data?.ranking ?? []);
+  const pickRankAccount = (id: number | null) => {
+    setRankAccountId(id);
+    try {
+      if (id) localStorage.setItem(RANK_ACCOUNT_KEY, String(id));
+      else localStorage.removeItem(RANK_ACCOUNT_KEY);
+    } catch {
+      /* 기억 못 해도 화면은 그대로 */
+    }
+  };
 
   // quiet: 보이는 결과는 그대로 두고 뒤에서 새로 계산
   const load = useCallback(async (quiet = false) => {
@@ -234,24 +260,53 @@ export default function TodayPage() {
 
       {data && (
         <div className="surface p-4 sm:p-5">
-          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <p className="text-[14px] font-semibold text-white">
-              보유 종목 전체 순위 <span className="num text-zinc-400">{(data.ranking ?? []).length}종목</span>
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <p className="min-w-0 text-[14px] font-semibold text-white">
+              {rankAcc ? `${accountDisplayName(rankAcc)} 순위` : '보유 종목 전체 순위'} <span className="num text-zinc-400">{rankRows.length}종목</span>
             </p>
-            <p className="num text-[11.5px] text-zinc-500">
-              {data.zone_count > 0 ? `가격대 ${clock(data.zone_updated_at)} 계산 · ${data.zone_count}종목 (1년 이력이 없는 종목·펀드는 가격 매력 0)` : ''}
-            </p>
+            {rankAccounts.length > 1 && (
+              <select
+                aria-label="순위를 볼 계좌"
+                value={rankAcc?.id ?? ''}
+                onChange={(e) => pickRankAccount(Number(e.target.value) || null)}
+                className="input-field !w-full !py-1.5 px-3 text-[12.5px] sm:!w-auto sm:min-w-[14rem]"
+              >
+                <option value="">전체 계좌 · {(data.ranking ?? []).length}종목</option>
+                {rankAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {accountDisplayName(a)} · {a.count}종목
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
-          <p className="mb-2 text-[12px] leading-relaxed text-zinc-500">
-            위 Top 3 와 같은 오늘 점수예요. 과거 기준 기대 = 그 종목을 과거에 이만큼 쌌을 때 샀다면 1년 뒤 평소보다 더 번 정도(배당 포함). 빠진 이유가 있는 종목은 Top 3 에서 건너뛰어요.
-          </p>
+          {rankAcc ? (
+            <p className="mb-2 text-[12px] leading-relaxed text-zinc-500">
+              이 계좌에 담긴 종목만 — 점수는 위와 같고 이 계좌 안에서 순위를 매겨요. 빠질 이유가 없는 앞의 3개가 이 계좌 Top 3 예요.
+              <span className="num block text-zinc-400">
+                {rankAcc.no_cash
+                  ? '예수금 기록 안 함 · 통장에서 바로'
+                  : `예수금 원화 ${fmtCcy(rankAcc.krw, 'KRW')}${rankAcc.usd !== 0 || rankRows.some((r) => r.currency === 'USD') ? ` · 달러 ${fmtCcy(rankAcc.usd, 'USD')}` : ''}`}
+              </span>
+            </p>
+          ) : (
+            <p className="mb-2 text-[12px] leading-relaxed text-zinc-500">
+              위 Top 3 와 같은 오늘 점수예요. 과거 기준 기대 = 그 종목을 과거에 이만큼 쌌을 때 샀다면 1년 뒤 평소보다 더 번 정도(배당 포함). 빠진 이유가 있는 종목은 Top 3 에서 건너뛰어요.
+            </p>
+          )}
+          {rankAcc && rankRows.length > 0 && !rankRows.some((r) => r.pick) && (
+            <p className="mb-2 rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] text-zinc-400">이 계좌에는 오늘 Top 3 에 넣을 종목이 없어요 (모두 빠질 이유가 있거나 20점 미만). 순서는 참고로 보세요.</p>
+          )}
+          {data.zone_count > 0 && (
+            <p className="num mb-2 text-[11.5px] text-zinc-500">가격대 {clock(data.zone_updated_at)} 계산 · {data.zone_count}종목 (1년 이력이 없는 종목·펀드는 가격 매력 0)</p>
+          )}
           {data.zone_count === 0 && (
             <p className="mb-2 rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] text-zinc-400">아직 가격대를 계산하지 않아 가격 매력이 0이에요. 앱이 켜져 있으면 백그라운드에서 보유 종목의 10년 주가를 받아 계산해요 (몇 분 걸려요).</p>
           )}
-          {(data.ranking ?? []).length === 0 ? (
+          {rankRows.length === 0 ? (
             <p className="py-6 text-center text-[13px] text-zinc-400">새로 계산하면 순위가 보여요.</p>
           ) : (
-            <RankingList rows={data.ranking ?? []} onOpen={focusAsset} />
+            <RankingList key={rankAcc?.id ?? 0} rows={rankRows} accountId={rankAcc?.id ?? null} onOpen={focusAsset} />
           )}
         </div>
       )}

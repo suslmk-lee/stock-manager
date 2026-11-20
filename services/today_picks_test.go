@@ -220,6 +220,39 @@ func TestPickAccountExchange(t *testing.T) {
 	}
 }
 
+// 계좌별 순위: 줄마다 그 종목을 담은 계좌(수량·평가금액), 계좌 목록은 담은 종목 많은 순 + 예수금
+func TestTodayAccounts(t *testing.T) {
+	items := []SignalItem{
+		{AssetID: 1, Ticker: "JEPQ", CurrentPrice: 53, Accounts: []SignalAccountBreakdown{{AccountID: 2, Quantity: 3, MarketValueKRW: 214500.4}, {AccountID: 1, Quantity: 1, MarketValueKRW: 71500}}},
+		{AssetID: 2, Ticker: "SCHD", CurrentPrice: 27, Accounts: []SignalAccountBreakdown{{AccountID: 2, Quantity: 10}, {AccountID: 3, Quantity: 0}}},
+		{AssetID: 3, Ticker: "005930.KS", CurrentPrice: 70000, Accounts: []SignalAccountBreakdown{{AccountID: 3, Quantity: 2}}},
+	}
+	accounts := map[uint]models.Account{
+		1: {ID: 1, Name: "Super365", Broker: "메리츠증권"},
+		2: {ID: 2, Name: "토스증권", Broker: "토스증권", AccountType: models.AccountTypeGeneral},
+		3: {ID: 3, Name: "종합", Broker: "카카오증권"},
+	}
+	balances := map[uint]CashBalance{2: {KRW: 49636.4, USD: -2.456}}
+	_, rows := rankToday(items, nil, nil, nil, accounts, balances, 1400, "2026-11-20")
+	held := map[string][]TodayHeld{}
+	for _, r := range rows {
+		held[r.Ticker] = r.Held
+	}
+	if h := held["JEPQ"]; len(h) != 2 || h[0].AccountID != 2 || h[0].Qty != 3 || h[0].ValueKRW != 214500 {
+		t.Fatalf("JEPQ 계좌 = %+v", h)
+	}
+	if h := held["SCHD"]; len(h) != 1 || h[0].AccountID != 2 {
+		t.Fatalf("수량 0 인 계좌는 빼야 함: %+v", h)
+	}
+	accs := todayAccounts(rows, accounts, balances)
+	if len(accs) != 3 || accs[0].ID != 2 || accs[0].Count != 2 || accs[0].KRW != 49636 || accs[0].USD != -2.46 || accs[0].AccountType != "General" {
+		t.Fatalf("계좌 목록 = %+v", accs)
+	}
+	if accs[1].ID != 1 || accs[2].ID != 3 || accs[1].Count != 1 || accs[2].Count != 1 {
+		t.Fatalf("같은 수면 계좌 번호 순: %+v", accs)
+	}
+}
+
 // 직접 환전 수수료: 평일 09:00~15:30(KST)은 정규 시간 우대, 그 외(밤·주말)는 그 외 우대
 func TestFxFeeWindow(t *testing.T) {
 	kst := time.FixedZone("KST", 9*3600)

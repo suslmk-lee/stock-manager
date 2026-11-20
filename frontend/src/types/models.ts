@@ -1165,8 +1165,25 @@ export interface TodayRow {
   falling: boolean;
   /** Top 3 에서 뺀 이유 */
   excluded?: string;
-  /** Top 3 순위 (1~3) */
+  /** Top 3 순위 (1~3) — 계좌별 순위에서는 그 계좌 안의 Top 3 */
   pick?: number;
+  /** 이 종목을 담은 계좌 (수량 · 원화 평가금액) */
+  held?: { account_id: number; qty: number; value_krw: number }[];
+  /** 화면에서만: 계좌별 순위로 볼 때 전체 계좌 기준 순위 */
+  global_rank?: number;
+}
+
+/** 계좌별 순위에 쓰는 계좌와 예수금 (종목을 담은 계좌만, 담은 종목 많은 순) */
+export interface TodayAccountCash {
+  id: number;
+  name: string;
+  broker: string;
+  account_type: string;
+  no_cash: boolean;
+  krw: number;
+  usd: number;
+  /** 순위에 든 이 계좌의 종목 수 */
+  count: number;
 }
 
 /** 이 종목을 살 계좌와 예수금 (예수금 통화 기준) */
@@ -1228,6 +1245,8 @@ export interface TodayPicks {
   plans: { asset_id: number; name: string; account: string; amount: number; currency: string }[];
   /** 보유 종목 전체 순위 (오늘 점수 높은 순, 예전 버전이 남긴 결과에는 없을 수 있음) */
   ranking?: TodayRow[];
+  /** 계좌별 순위용 계좌 (예전 결과에는 없을 수 있음) */
+  accounts?: TodayAccountCash[];
   /** 사기 좋은 가격: 마지막 계산 날짜·시각, 계산한 종목 수 / 보유 종목 수 */
   zone_date: string;
   zone_updated_at: string | null;
