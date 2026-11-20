@@ -4,7 +4,7 @@ import { fmtCcy } from '../../utils/fx';
 import { ZONE_LEVEL, pickTitle } from './TodayCard';
 
 /**
- * 보유 종목 순위 — 위 Top 3 와 같은 오늘 점수. Top 3 에서 뺀 종목은 이유를 보여 준다. 누르면 신호 상세.
+ * 보유 종목 순위 — 위 추천 카드와 같은 오늘 점수. 추천에서 뺀 종목은 이유를 보여 준다. 누르면 신호 상세.
  * 계좌별로 볼 때(accountId)는 그 계좌의 순위·Top 3 와 함께 그 계좌에 담긴 수량, 전체 계좌 기준 순위를 보여 준다.
  */
 
@@ -30,7 +30,7 @@ const SEGS: { key: 'price' | 'signal' | 'dividend' | 'weight'; cls: string }[] =
 /** 아직 내려가는 중 — 주의가 아니라 참고 (보유 종목 백테스트: 멈출 때까지 기다리면 보통 3거래일, 평균 0.4% 더 비쌌다) */
 export const FALLING_NOTE = '20일선 아래이고 최근 저점 근처예요.\n과거 보유 종목에서는 멈출 때까지 기다려도 더 싸게 산 경우가 30%뿐이었어요 (보통 3거래일 뒤, 평균 0.4% 더 비쌈).';
 
-/** 전체 Top 3 에 넣는 최소 점수 (서버 todayMinScore) */
+/** 전체 추천에 넣는 최소 점수 (서버 todayMinScore) */
 export const TODAY_MIN_SCORE = 20;
 
 /**
@@ -51,7 +51,7 @@ const qtyText = (q: number, ticker: string) => `${q.toLocaleString('ko-KR', { ma
 
 export default function RankingList({ rows, onOpen, accountId }: { rows: TodayRow[]; onOpen: (assetId: number) => void; accountId?: number | null }) {
   const [all, setAll] = useState(false);
-  // 처음에는 Top 3 가 나올 때까지 + 몇 줄 (빠진 종목의 이유가 보이게), 최소 10줄
+  // 처음에는 추천이 다 나올 때까지 + 몇 줄 (빠진 종목의 이유가 보이게), 최소 10줄
   const lastPick = rows.reduce((m, r, i) => (r.pick ? i : m), -1);
   const shown = all ? rows : rows.slice(0, Math.max(10, lastPick + 3));
   return (
@@ -79,7 +79,7 @@ export default function RankingList({ rows, onOpen, accountId }: { rows: TodayRo
               <span className="min-w-0">
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span className="truncate text-[13.5px] font-semibold text-white">{t.primary}</span>
-                  {r.pick ? <span className="shrink-0 rounded border border-mint-400/40 px-1 text-[10px] font-medium text-mint-300">{accountId ? '이 계좌' : 'Top 3'} · {r.pick}위</span> : null}
+                  {r.pick ? <span className="shrink-0 rounded border border-mint-400/40 px-1 text-[10px] font-medium text-mint-300">{accountId ? '이 계좌' : '추천'} · {r.pick}위</span> : null}
                 </span>
                 <span className="num block truncate text-[11px] text-zinc-500">
                   {r.has_zone && r.expect > 0 && <span className="text-emerald-300 sm:hidden">기대 +{r.expect.toFixed(1)}%p · </span>}

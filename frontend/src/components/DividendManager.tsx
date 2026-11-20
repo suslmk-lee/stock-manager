@@ -15,6 +15,9 @@ import AccountSelect from './ui/AccountSelect';
 import { assetPrimary, assetSecondary } from '../utils/assetLabel';
 import { accountDisplayName } from '../utils/accountLabel';
 
+/** 월별 배당금 추이 막대의 최소 기준 ($) — 작은 배당 한 번이 꽉 찬 막대로 보이지 않게 */
+const MIN_CHART_USD = 3;
+
 interface DividendManagerProps {
   selectedAccountId?: number;
   onAccountChange?: (accountId: number) => void;
@@ -822,7 +825,8 @@ export default function DividendManager({ selectedAccountId = 0, onAccountChange
                   <h4 className="text-sm font-medium text-white mb-4">월별 배당금 추이</h4>
                   <div className="flex items-end gap-1 h-32">
                     {(() => {
-                      const maxVal = Math.max(...assetDetailData.monthlyChart.map(m => m.total), 1);
+                      // 비교할 달이 없어도 막대가 부풀지 않게 최소 $3(원화로) 기준으로 높이를 잡는다
+                      const maxVal = Math.max(...assetDetailData.monthlyChart.map(m => m.total), MIN_CHART_USD * exchangeRate, 1);
                       return assetDetailData.monthlyChart.map((item, idx) => {
                         const height = item.total > 0 ? Math.max((item.total / maxVal) * 100, 4) : 0;
                         const [, month] = item.month.split('-');

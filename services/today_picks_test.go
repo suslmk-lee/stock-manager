@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -122,14 +123,19 @@ func TestRankToday(t *testing.T) {
 	if strings.Join(excluded, ",") != ",,,sell,,bought_today,planned,low_score,low_score" {
 		t.Fatalf("뺀 이유 = %v", excluded)
 	}
+	// 추천 = 순위에서 뺄 이유가 없는 앞의 (최대 7개) — 매도·오늘 산·오늘 모으기·20점 미만을 건너뛰고 쉬는 기간인 QQQI 는 넣는다
+	var pickOf []string
 	for i, r := range rows {
-		if r.Rank != i+1 || (i < 3) != (r.Pick == i+1) {
-			t.Fatalf("%d번째 줄 = 순위 %d, Top 3 %d", i, r.Rank, r.Pick)
+		if r.Rank != i+1 {
+			t.Fatalf("%d번째 줄 = 순위 %d", i, r.Rank)
 		}
+		pickOf = append(pickOf, fmt.Sprint(r.Pick))
 	}
-	// Top 3 = 순위에서 뺄 이유가 없는 앞의 3개 (위·아래가 같은 점수)
-	if len(picks) != 3 || picks[0].AssetID != 2 || picks[1].AssetID != 8 || picks[2].AssetID != 1 || picks[0].Score != rows[0].Score {
-		t.Fatalf("Top 3 = %+v", picks)
+	if strings.Join(pickOf, ",") != "1,2,3,0,4,0,0,0,0" {
+		t.Fatalf("추천 순위 = %v", pickOf)
+	}
+	if len(picks) != 4 || picks[0].AssetID != 2 || picks[1].AssetID != 8 || picks[2].AssetID != 1 || picks[3].AssetID != 5 || picks[0].Score != rows[0].Score {
+		t.Fatalf("추천 = %+v", picks)
 	}
 	// JEPQ: 가격 매력 70×0.8=56 · 신호 15×2/4=7.5 · 배당 10×0.7=7 · 비중 5×(1−10/15)=1.7 = 72.2
 	j := picks[0]

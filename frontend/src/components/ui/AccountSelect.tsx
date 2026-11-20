@@ -10,8 +10,11 @@ import BrokerLogo from './BrokerLogo';
  * 인출 가능 / 인출 제한(연금·IRP·DC)으로 나누고, 계좌가 많으면 위에 검색 칸을 둔다.
  * 키보드: ↑↓ 이동, Enter 선택, Esc 닫기. 목록은 body 에 띄워 모달 스크롤 영역에 잘리지 않는다.
  */
-interface AccountSelectProps {
-  accounts: Account[];
+/** 목록에 쓰는 계좌 정보 — Account 전체가 없어도 된다 (오늘 화면의 계좌별 순위 등) */
+export type SelectableAccount = Pick<Account, 'id' | 'name' | 'broker' | 'account_type'> & { currency?: string };
+
+interface AccountSelectProps<T extends SelectableAccount> {
+  accounts: T[];
   /** 고른 계좌 id (0 이나 없는 id = 고르지 않음) */
   value: number;
   onChange: (id: number) => void;
@@ -23,17 +26,19 @@ interface AccountSelectProps {
   /** sm = 상단 바용 낮은 높이 */
   size?: 'sm' | 'md';
   className?: string;
+  /** 목록 둘째 줄 (기본: 증권사 · 통화) */
+  detail?: (account: T) => string;
 }
 
 const SEARCH_FROM = 8; // 계좌가 이만큼 넘으면 검색 칸
 
-function TypeChip({ account }: { account: Account }) {
+function TypeChip({ account }: { account: SelectableAccount }) {
   const meta = getAccountTypeMeta(account);
   if (meta.value === 'General') return null;
   return <span className={`badge shrink-0 !px-1.5 !py-0 text-[10px] ${meta.badgeClass}`}>{meta.short}</span>;
 }
 
-export default function AccountSelect({ accounts, value, onChange, placeholder = '계좌 선택', emptyOption, ariaLabel = '계좌', size = 'md', className = '' }: AccountSelectProps) {
+export default function AccountSelect<T extends SelectableAccount>({ accounts, value, onChange, placeholder = '계좌 선택', emptyOption, ariaLabel = '계좌', size = 'md', className = '', detail }: AccountSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -46,10 +51,10 @@ export default function AccountSelect({ accounts, value, onChange, placeholder =
   const selected = accounts.find((a) => a.id === value) ?? null;
 
   // 목록: (고르지 않음) + 인출 가능 + 인출 제한. 검색어는 계좌 이름·증권사·유형에서 찾는다
-  type Row = { kind: 'empty' } | { kind: 'group'; label: string } | { kind: 'account'; account: Account };
+  type Row = { kind: 'empty' } | { kind: 'group'; label: string } | { kind: 'account'; account: T };
   const { rows, options } = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const hit = (a: Account) => !q || `${a.name} ${a.broker} ${getAccountTypeMeta(a).label}`.toLowerCase().includes(q);
+    const hit = (a: T) => !q || `${a.name} ${a.broker} ${getAccountTypeMeta(a).label}`.toLowerCase().includes(q);
     const liquid = accounts.filter((a) => !isRestrictedAccount(a) && hit(a));
     const restricted = accounts.filter((a) => isRestrictedAccount(a) && hit(a));
     const rows: Row[] = [];
@@ -190,7 +195,7 @@ export default function AccountSelect({ accounts, value, onChange, placeholder =
             </span>
           </>
         ) : (
-          <span className="flex-1 truncate px-1 text-sm text-zinc-500">{value === 0 && emptyOption ? emptyOption : placeholder}</span>
+          <span className={`flex-1 truncate px-1 text-sm ${value === 0 && emptyOption ? 'text-zinc-200' : 'text-zinc-500'}`}>{value === 0 && emptyOption ? emptyOption : placeholder}</span>
         )}
         <ChevronDown className={`h-4 w-4 shrink-0 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -255,8 +260,7 @@ export default function AccountSelect({ accounts, value, onChange, placeholder =
                             <TypeChip account={row.account} />
                           </span>
                           <span className="block truncate text-xs text-zinc-500">
-                            {row.account.broker}
-                            {row.account.currency ? ` · ${row.account.currency}` : ''}
+                            {detail ? detail(row.account) : `${row.account.broker}${row.account.currency ? ` · ${row.account.currency}` : ''}`}
                           </span>
                         </span>
                       </>

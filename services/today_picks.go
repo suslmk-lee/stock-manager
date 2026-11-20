@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// 오늘 살 종목 — 보유 종목 전체에 100점 만점 '오늘 점수'를 매겨 순위를 내고(아래 목록), 살 수 있는 앞의 3개가 Top 3.
+// 오늘 살 종목 — 보유 종목 전체에 100점 만점 '오늘 점수'를 매겨 순위를 내고(아래 목록), 살 수 있는 앞의 7개가 추천 카드.
 //   가격 매력 70 : 과거에 싸게 산 날이 평소보다 1년 뒤 더 번 정도(±30%p) × 지금 싼 정도 (price_zone.go)
 //                  — 보유 156종목 백테스트(2018년 말~2025년 매달, 1년 뒤 총수익)에서 종목을 고르는 힘이 가장 일관됐다. 이력이 없으면 0 (다른 항목으로 넘기지 않는다).
 //                  싸게 산 사례가 적은 종목(1년 하위 20%였던 날이 40일 미만 — 꾸준히 오른 종목·짧은 이력)은 0 대신 그날 다른 보유 종목의
@@ -26,12 +26,12 @@ import (
 //   배당 점수 10 : 배당 점수(종합 60% · 지금 수익률 매력 40%)
 //   비중 여유  5 : 매수 최대 비중(없으면 20%)보다 낮을수록
 //   예수금은 점수에 넣지 않는다 (살 계좌와 모자란 금액은 카드에 보여만 준다).
-// Top 3 에서 빼는 종목 (목록에는 이유와 함께 남는다): 매도·충돌·시세 없음, 매매 신호가 매수를 막은 종목(최대 비중·반등 미확인),
+// 추천에서 빼는 종목 (목록에는 이유와 함께 남는다): 매도·충돌·시세 없음, 매매 신호가 매수를 막은 종목(최대 비중·반등 미확인),
 // 오늘 이미 산 종목, 오늘 모으기로 사는 종목, 점수가 너무 낮은 종목. 최근에 사서 매수 신호가 쉬는 중(쉬는 기간)인 종목은 빼지 않는다.
 
 const (
-	todayPickCount   = 3
-	todayMinScore    = 20   // 이보다 낮으면 Top 3 에 넣지 않는다
+	todayPickCount   = 7    // 추천 카드 수 (넓은 화면의 커버플로우: 가운데 하나 + 양옆 셋씩)
+	todayMinScore    = 20   // 이보다 낮으면 추천에 넣지 않는다
 	todayDefaultMaxW = 20.0 // 매수 최대 비중을 정하지 않았을 때 비중 여유의 기준 (%)
 	todaySeriesLen   = 60   // 카드 미니 차트 점 수
 
@@ -41,7 +41,7 @@ const (
 	todayWeightMax = 5.0
 )
 
-// Top 3 에서 뺀 이유
+// 추천에서 뺀 이유
 const (
 	TodayExSell        = "sell"
 	TodayExConflict    = "conflict"
@@ -86,7 +86,7 @@ type TodayParts struct {
 	WeightMax   float64 `json:"weight_max"`
 }
 
-// TodayRow: 보유 종목 전체 순위 한 줄 (Top 3 와 같은 점수)
+// TodayRow: 보유 종목 전체 순위 한 줄 (추천 카드와 같은 점수)
 type TodayRow struct {
 	Rank     int        `json:"rank"` // 오늘 점수 순위 (1부터)
 	AssetID  uint       `json:"asset_id"`
@@ -103,8 +103,8 @@ type TodayRow struct {
 	Good     float64    `json:"good"`
 	Verdict  string     `json:"verdict,omitempty"`
 	Falling  bool       `json:"falling"`
-	Excluded string     `json:"excluded,omitempty"` // Top 3 에서 뺀 이유
-	Pick     int        `json:"pick,omitempty"`     // Top 3 순위 (1~3)
+	Excluded string     `json:"excluded,omitempty"` // 추천에서 뺀 이유
+	Pick     int        `json:"pick,omitempty"`     // 추천 순위 (1~todayPickCount)
 	// 싸게 산 사례가 적어 가격 매력을 보유 종목 중간값으로 매김
 	PriceNeutral bool        `json:"price_neutral,omitempty"`
 	Held         []TodayHeld `json:"held,omitempty"` // 이 종목을 가진 계좌 (계좌별 순위용)
@@ -214,7 +214,7 @@ func marketOf(ticker string) string {
 
 func clamp01(v float64) float64 { return math.Max(0, math.Min(1, v)) }
 
-// GetTodayPicks: 오늘 살 종목 Top 3
+// GetTodayPicks: 오늘 살 종목 (추천 카드 최대 todayPickCount 개)
 // 신호 리포트·배당 점수·모으기·계좌·예수금·가격대는 서로 기다릴 필요가 없어 동시에 읽는다 (처음 열 때 시세를 받느라 각각 몇 초씩 걸린다).
 func (s *TodayService) GetTodayPicks() (*TodayPicks, error) {
 	now := s.now()
@@ -389,7 +389,7 @@ func (s *TodayService) WarmAfter(ctx context.Context, delay time.Duration) {
 	}
 }
 
-// rankToday: 보유 종목 전체에 오늘 점수를 매겨 순위(rows)를 내고, Top 3 에서 뺄 종목을 표시한 뒤 앞의 3개를 카드(picks)로 만든다 (미니 차트는 붙이지 않는다).
+// rankToday: 보유 종목 전체에 오늘 점수를 매겨 순위(rows)를 내고, 추천에서 뺄 종목을 표시한 뒤 앞의 todayPickCount 개를 카드(picks)로 만든다 (미니 차트는 붙이지 않는다).
 func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]PriceZoneRow, planned map[uint]bool, accounts map[uint]models.Account, balances map[uint]CashBalance, fx float64, today string) ([]TodayPick, []TodayRow) {
 	type scored struct {
 		it        SignalItem
@@ -452,7 +452,7 @@ func rankToday(items []SignalItem, divRows map[uint]DivScoreRow, zones map[uint]
 			*v = math.Round(*v*10) / 10
 		}
 		r.Score = math.Round((r.Parts.Price+r.Parts.Signal+r.Parts.Dividend+r.Parts.Weight)*10) / 10
-		// Top 3 에서 뺄 이유
+		// 추천에서 뺄 이유
 		switch {
 		case it.Action == SignalSell:
 			r.Excluded = TodayExSell

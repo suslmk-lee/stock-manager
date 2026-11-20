@@ -1136,7 +1136,7 @@ export interface PriceZoneDetail {
   history: PriceZone[];
 }
 
-// ── 오늘 살 종목 Top 3 ──
+// ── 오늘 살 종목 (추천 카드 최대 7장) ──
 /** 오늘 점수 구성 (가격 매력 70 · 신호 15 · 배당 10 · 비중 5, 예수금은 점수에 안 넣음) */
 export interface TodayParts {
   price: number;
@@ -1149,7 +1149,7 @@ export interface TodayParts {
   weight_max: number;
 }
 
-/** 보유 종목 전체 순위 한 줄 (Top 3 와 같은 점수) */
+/** 보유 종목 전체 순위 한 줄 (추천 카드와 같은 점수) */
 export interface TodayRow {
   rank: number;
   asset_id: number;
@@ -1167,9 +1167,9 @@ export interface TodayRow {
   good: number;
   verdict?: ZoneVerdict;
   falling: boolean;
-  /** Top 3 에서 뺀 이유 */
+  /** 추천에서 뺀 이유 */
   excluded?: string;
-  /** Top 3 순위 (1~3) — 계좌별 순위에서는 그 계좌 안의 Top 3 */
+  /** 추천 순위 (1~7) — 계좌별 순위에서는 그 계좌 안의 Top 3 (1~3) */
   pick?: number;
   /** 싸게 산 사례가 적어(1년 하위 20% 날 40일 미만) 가격 매력을 보유 종목 중간값으로 매김 */
   price_neutral?: boolean;
@@ -1184,7 +1184,7 @@ export interface TodayAccountCash {
   id: number;
   name: string;
   broker: string;
-  account_type: string;
+  account_type: AccountType;
   no_cash: boolean;
   krw: number;
   usd: number;

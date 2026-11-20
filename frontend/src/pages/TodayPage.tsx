@@ -6,13 +6,14 @@ import type { TodayPick, TodayPicks } from '../types/models';
 import TodayCard, { pickTitle } from '../components/today/TodayCard';
 import RankingList, { accountRanking, TODAY_MIN_SCORE } from '../components/today/RankingList';
 import QuickBuyModal from '../components/today/QuickBuyModal';
+import AccountSelect from '../components/ui/AccountSelect';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import { fmtCcy } from '../utils/fx';
 import { accountDisplayName } from '../utils/accountLabel';
 
 /**
  * 오늘 살 종목 — 보유 종목 전체에 '오늘 점수'(가격 매력 70 · 매수 신호 15 · 배당 점수 10 · 비중 여유 5)를 매겨 아래에 순위로 보여 주고,
- * 그 순위에서 살 수 있는 앞의 3개를 위에 카드로 보여 준다 (위·아래가 같은 점수). 가격 매력은 백그라운드에서 날짜별로 계산해 둔 '사기 좋은 가격'을 쓴다.
+ * 그 순위에서 살 수 있는 앞의 7개(추천)를 위에 카드로 보여 준다 (위·아래가 같은 점수). 가격 매력은 백그라운드에서 날짜별로 계산해 둔 '사기 좋은 가격'을 쓴다.
  * 보여 주는 방식: 커버플로우 · 카드 스택 · 피크 캐러셀 (고른 방식을 이 PC에 기억)
  * 아래 순위는 계좌를 골라 그 계좌에 담긴 종목만 볼 수 있다 (새 종목 말고 그 계좌에 있던 것 가운데 고르려는 사람 — 고른 계좌를 이 PC에 기억)
  * 계산은 시세를 받느라 몇 초 걸려서(앱을 막 켰을 때는 10초 넘게), 마지막 결과(앱을 새로 켰으면 DB 에 남긴 것)부터
@@ -59,6 +60,8 @@ const STYLES: { key: Style; label: string; hint: string }[] = [
 ];
 const STYLE_KEY = 'today-style';
 const CARD_W = 'min(330px, 80vw)';
+/** 추천 카드 최대 수 (서버 todayPickCount) */
+const PICK_MAX = 7;
 
 const clock = (iso: string | null) => {
   if (!iso) return '';
@@ -201,7 +204,7 @@ export default function TodayPage() {
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-[13px] text-zinc-400">
-          {data ? `${dayLabel(data.date)} · ` : ''}보유 종목 전체를 오늘 점수로 매긴 순위에서 살 수 있는 앞의 3개
+          {data ? `${dayLabel(data.date)} · ` : ''}보유 종목 전체를 오늘 점수로 매긴 순위에서 살 수 있는 앞의 {PICK_MAX}개
           {data && data.considered > 0 ? ` (보유 ${data.considered}종목 중)` : ''}
           {data && (
             <span className="num ml-2 text-[12px] text-zinc-500">
@@ -210,7 +213,7 @@ export default function TodayPage() {
             </span>
           )}
         </p>
-        <span className="text-zinc-500" title={'오늘 점수 = 가격 매력 70 + 매수 신호 15 + 배당 점수 10 + 비중 여유 5 (예수금은 점수에 넣지 않음)\n가격 매력: 그 종목을 과거에 싸게 샀을 때 1년 뒤 평소보다 더 번 정도(최대 30%p) × 지금 얼마나 싼가 — 보유 종목 백테스트(2018년 말~2025년 매달, 1년 뒤 총수익)에서 가장 일관되게 맞은 조합. 싸게 산 사례가 적은 종목(꾸준히 오른 종목 등)은 보유 종목 중간값\nTop 3 는 아래 순위에서 매도·충돌, 매수를 막은 종목(최대 비중·반등 미확인), 오늘 산 종목, 오늘 모으기로 사는 종목, 20점 미만을 건너뛴 앞의 3개입니다. 최근에 사서 매수 신호가 쉬는 중인 종목은 빼지 않아요.\n과거 가격으로 계산한 참고값이며 투자 권유가 아닙니다.'} aria-label="안내">
+        <span className="text-zinc-500" title={'오늘 점수 = 가격 매력 70 + 매수 신호 15 + 배당 점수 10 + 비중 여유 5 (예수금은 점수에 넣지 않음)\n가격 매력: 그 종목을 과거에 싸게 샀을 때 1년 뒤 평소보다 더 번 정도(최대 30%p) × 지금 얼마나 싼가 — 보유 종목 백테스트(2018년 말~2025년 매달, 1년 뒤 총수익)에서 가장 일관되게 맞은 조합. 싸게 산 사례가 적은 종목(꾸준히 오른 종목 등)은 보유 종목 중간값\n추천 카드는 아래 순위에서 매도·충돌, 매수를 막은 종목(최대 비중·반등 미확인), 오늘 산 종목, 오늘 모으기로 사는 종목, 20점 미만을 건너뛴 앞의 7개입니다 (넓은 화면에서는 커버플로우 양옆에 셋씩). 최근에 사서 매수 신호가 쉬는 중인 종목은 빼지 않아요.\n과거 가격으로 계산한 참고값이며 투자 권유가 아닙니다.'} aria-label="안내">
           <Info className="h-4 w-4" />
         </span>
       </div>
@@ -265,19 +268,16 @@ export default function TodayPage() {
               {rankAcc ? `${accountDisplayName(rankAcc)} 순위` : '보유 종목 전체 순위'} <span className="num text-zinc-400">{rankRows.length}종목</span>
             </p>
             {rankAccounts.length > 1 && (
-              <select
-                aria-label="순위를 볼 계좌"
-                value={rankAcc?.id ?? ''}
-                onChange={(e) => pickRankAccount(Number(e.target.value) || null)}
-                className="input-field !w-full !py-1.5 px-3 text-[12.5px] sm:!w-auto sm:min-w-[14rem]"
-              >
-                <option value="">전체 계좌 · {(data.ranking ?? []).length}종목</option>
-                {rankAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {accountDisplayName(a)} · {a.count}종목
-                  </option>
-                ))}
-              </select>
+              <AccountSelect
+                accounts={rankAccounts}
+                value={rankAcc?.id ?? 0}
+                onChange={(id) => pickRankAccount(id || null)}
+                emptyOption={`전체 계좌 · ${(data.ranking ?? []).length}종목`}
+                detail={(a) => `${a.broker} · ${a.count}종목`}
+                ariaLabel="순위를 볼 계좌"
+                size="sm"
+                className="!w-full sm:!w-auto sm:min-w-[15rem]"
+              />
             )}
           </div>
           {rankAcc ? (
@@ -291,7 +291,7 @@ export default function TodayPage() {
             </p>
           ) : (
             <p className="mb-2 text-[12px] leading-relaxed text-zinc-500">
-              위 Top 3 와 같은 오늘 점수예요. 과거 기준 기대 = 그 종목을 과거에 이만큼 쌌을 때 샀다면 1년 뒤 평소보다 더 번 정도(배당 포함). 빠진 이유가 있는 종목은 Top 3 에서 건너뛰어요.
+              위 추천 카드와 같은 오늘 점수예요. 과거 기준 기대 = 그 종목을 과거에 이만큼 쌌을 때 샀다면 1년 뒤 평소보다 더 번 정도(배당 포함). 빠진 이유가 있는 종목은 추천에서 건너뛰어요.
             </p>
           )}
           {rankAcc && rankRows.length > 0 && !rankRows.some((r) => r.pick) && (
@@ -299,7 +299,7 @@ export default function TodayPage() {
           )}
           {rankAcc && rankRows.some((r) => r.pick && r.score < TODAY_MIN_SCORE) && (
             <p className="mb-2 rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] text-zinc-400">
-              이 계좌 Top 3 에 {TODAY_MIN_SCORE}점 미만인 종목이 있어요. 전체 Top 3 기준({TODAY_MIN_SCORE}점)에는 못 미치니 이 계좌 안에서 고를 때만 참고하세요.
+              이 계좌 Top 3 에 {TODAY_MIN_SCORE}점 미만인 종목이 있어요. 전체 추천 기준({TODAY_MIN_SCORE}점)에는 못 미치니 이 계좌 안에서 고를 때만 참고하세요.
             </p>
           )}
           {data.zone_count > 0 && (
@@ -362,12 +362,23 @@ export default function TodayPage() {
   );
 }
 
-/** 카드 3장을 고른 방식으로 보여 주는 무대 */
+/** 추천 카드(최대 7장)를 고른 방식으로 보여 주는 무대 */
 function Stage({ style, picks, active, go, card, onActive }: { style: Style; picks: TodayPick[]; active: number; go: (i: number) => void; card: (p: TodayPick) => JSX.Element; onActive: (i: number) => void }) {
   const n = picks.length;
   const hint = STYLES.find((s) => s.key === style)?.hint;
   const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const trans = reduce ? 'none' : 'transform 520ms cubic-bezier(.2,.8,.2,1), opacity 400ms ease, filter 400ms ease';
+
+  // 커버플로우: 무대 폭을 재서 양옆에 들어가는 만큼(최대 3장씩) 펼친다
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [frameW, setFrameW] = useState(0);
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([e]) => setFrameW(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [style]);
 
   // 카드 스택: 맨 위 카드를 옆으로 밀면 다음
   const drag = useRef<{ x: number; dx: number; el: HTMLElement } | null>(null);
@@ -429,7 +440,7 @@ function Stage({ style, picks, active, go, card, onActive }: { style: Style; pic
 
   if (style === 'peek') {
     return (
-      <div className={frame}>
+      <div ref={frameRef} className={frame}>
         <div ref={track} onScroll={onScroll} className="scrollbar-hide absolute inset-0 flex snap-x snap-mandatory gap-4 overflow-x-auto pt-8" style={{ paddingInline: `calc(50% - ${CARD_W} / 2)` }}>
           {picks.map((p, i) => (
             <article key={p.asset_id} className={`${cardCls} h-max shrink-0 snap-center`} style={{ width: CARD_W }} onClick={() => go(i)}>
@@ -447,20 +458,31 @@ function Stage({ style, picks, active, go, card, onActive }: { style: Style; pic
     );
   }
 
+  // 카드 폭(px)과 옆 카드 자리: 첫 장은 카드 폭의 72% 옆, 그다음은 남는 자리를 고르게 (카드 폭의 20~55%)
+  const cardW = Math.min(330, (typeof window !== 'undefined' ? window.innerWidth : 1200) * 0.8);
+  const ringHalf = n >= 3 ? Math.floor((n - 1) / 2) : 0; // 고리: 가운데 하나, 왼쪽 ringHalf 장, 나머지는 오른쪽
+  const first = cardW * 0.72;
+  const minStep = cardW * 0.2;
+  const room = frameW > 0 ? frameW / 2 - cardW * 0.38 - 16 : first; // 가장 바깥 카드의 가운데가 올 수 있는 자리 (기울어 좁아진 카드 반쯤 남김)
+  const sides = Math.max(1, Math.min(3, Math.max(ringHalf, n - 1 - ringHalf), 1 + Math.floor(Math.max(0, room - first) / minStep)));
+  const step = sides > 1 ? Math.min(cardW * 0.55, Math.max(minStep, (room - first) / (sides - 1))) : minStep;
+  const sideX = (ad: number) => (ad === 0 ? 0 : first + (Math.min(ad, sides + 1) - 1) * step);
+
   return (
-    <div className={frame} style={{ perspective: style === 'cover' ? '1400px' : undefined }}>
+    <div ref={frameRef} className={frame} style={{ perspective: style === 'cover' ? '1400px' : undefined }}>
       {picks.map((p, i) => {
         let transform: string;
         let z: number;
         let opacity = 1;
         let filter = 'none';
         if (style === 'cover') {
-          const d = n >= 3 ? ((i - active + n + 1) % n) - 1 : i - active; // 3장이면 고리처럼 가운데 하나, 양옆에 하나씩
+          const d = n >= 3 ? ((i - active + n + ringHalf) % n) - ringHalf : i - active; // 고리처럼 가운데 하나, 양옆에 펼침
           const ad = Math.abs(d);
-          transform = `translateX(${d * 72}%) translateZ(${ad ? -160 : 0}px) rotateY(${-d * 38}deg) scale(${ad ? 0.86 : 1})`;
+          const sign = Math.sign(d);
+          transform = `translateX(${sign * sideX(ad)}px) translateZ(${ad ? -160 - (ad - 1) * 60 : 0}px) rotateY(${-sign * 38}deg) scale(${ad ? 0.86 - (ad - 1) * 0.05 : 1})`;
           z = 10 - ad;
-          opacity = ad > 1 ? 0 : 1;
-          filter = ad ? 'brightness(0.7)' : 'none';
+          opacity = ad > sides ? 0 : 1;
+          filter = ad ? `brightness(${Math.max(0.4, 0.7 - (ad - 1) * 0.12)})` : 'none';
         } else {
           const o = (i - active + n) % n; // 0 = 맨 위
           transform = `translateY(${o * 16}px) scale(${1 - o * 0.05})`;
@@ -472,7 +494,7 @@ function Stage({ style, picks, active, go, card, onActive }: { style: Style; pic
           <article
             key={p.asset_id}
             className={`${cardCls} absolute top-8`}
-            style={{ left: '50%', width: CARD_W, marginLeft: `calc(${CARD_W} / -2)`, transform, zIndex: z, opacity, filter, transition: trans, touchAction: style === 'stack' ? 'pan-y' : undefined }}
+            style={{ left: '50%', width: CARD_W, marginLeft: `calc(${CARD_W} / -2)`, transform, zIndex: z, opacity, filter, transition: trans, touchAction: style === 'stack' ? 'pan-y' : undefined, pointerEvents: opacity ? undefined : 'none' }}
             onClick={() => (style === 'stack' && i === active ? undefined : go(i))}
             onPointerDown={(e) => onDown(e, i)}
             onPointerMove={onMove}
