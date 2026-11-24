@@ -259,7 +259,12 @@ func migrationModels() []interface{} {
 	}
 }
 
+// schemaMetaKey: 예전 방식 — 마지막으로 맞춘 지문 하나 (v1.1.54 까지). 이제 쓰지 않고, 이 값이 지금 지문과 같으면 맞춘 것으로 본다.
+// 하나만 두면 버전이 다른 앱과 서버가 켜질 때마다 서로 덮어써 매번 표 구조를 다시 맞췄다 (원격 DB 에서 1분 넘게).
 const schemaMetaKey = "schema_fingerprint"
+
+// schemaAppliedPrefix: 지문마다 '이 구조로 맞춘 적 있음' 기록 (schema_fp:<지문>) — 버전마다 처음 한 번만 맞춘다
+const schemaAppliedPrefix = "schema_fp:"
 
 // schemaFingerprint: 표로 쓰는 모델들의 필드 이름·타입·gorm 태그로 만든 지문
 func schemaFingerprint(ms []interface{}) string {
@@ -289,25 +294,19 @@ func schemaFingerprint(ms []interface{}) string {
 }
 
 // runMigrations: 표 구조를 맞춘다. 원격 DB 에서 AutoMigrate 는 표마다 구조를 하나씩 비교해 수십 초 걸려서,
-// 마지막으로 맞춘 구조의 지문이 지금과 같으면 건너뛴다 (앱이 켜질 때 창이 늦게 뜨던 원인).
+// 이 지문(지금 버전의 표 구조)으로 맞춘 적이 있으면 건너뛴다 (앱이 켜질 때 창이 늦게 뜨던 원인).
+// 지문마다 따로 기록하므로 버전이 다른 앱·서버가 번갈아 켜져도 서로 덮어쓰지 않는다 (AutoMigrate 는 칸을 지우지 않아 섞여도 안전).
 func runMigrations() error {
 	ms := migrationModels()
 	fp := schemaFingerprint(ms)
-	var stored []string
-	if err := DB.Raw("SELECT value FROM app_meta WHERE key = ?", schemaMetaKey).Scan(&stored).Error; err == nil && len(stored) == 1 && stored[0] == fp {
+	if schemaApplied(fp) {
 		log.Printf("DB 표 구조가 그대로라 맞추기를 건너뜁니다")
 	} else {
 		start := time.Now()
 		if err := DB.AutoMigrate(ms...); err != nil {
 			return err
 		}
-		meta := models.AppMeta{Key: schemaMetaKey, Value: fp}
-		if err := DB.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "key"}},
-			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
-		}).Create(&meta).Error; err != nil {
-			log.Printf("표 구조 지문 저장 실패 (다음에 다시 맞춘다): %v", err)
-		}
+		markSchemaApplied(fp)
 		log.Printf("DB 표 구조를 맞췄습니다 (%.1fs)", time.Since(start).Seconds())
 	}
 	if err := backfillAccountTypes(); err != nil {
@@ -315,6 +314,28 @@ func runMigrations() error {
 	}
 	applyFxPresets(DB)
 	return repairKoreanTickerPnLCurrency(DB)
+}
+
+// schemaApplied: 이 지문으로 맞춘 적이 있나 — 지문별 기록, 또는 예전 방식 기록이 지금 지문과 같으면 (그때는 지문별 기록을 남겨 둔다)
+func schemaApplied(fp string) bool {
+	var keys []string
+	if err := DB.Raw("SELECT key FROM app_meta WHERE key = ?", schemaAppliedPrefix+fp).Scan(&keys).Error; err == nil && len(keys) == 1 {
+		return true
+	}
+	var legacy []string
+	if err := DB.Raw("SELECT value FROM app_meta WHERE key = ?", schemaMetaKey).Scan(&legacy).Error; err == nil && len(legacy) == 1 && legacy[0] == fp {
+		markSchemaApplied(fp)
+		return true
+	}
+	return false
+}
+
+// markSchemaApplied: 이 지문으로 맞췄다고 남긴다 (실패하면 다음에 다시 맞춘다)
+func markSchemaApplied(fp string) {
+	meta := models.AppMeta{Key: schemaAppliedPrefix + fp, Value: time.Now().UTC().Format(time.RFC3339)}
+	if err := DB.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "key"}}, DoNothing: true}).Create(&meta).Error; err != nil {
+		log.Printf("표 구조 지문 저장 실패 (다음에 다시 맞춘다): %v", err)
+	}
 }
 
 const fxPresetMetaKey = "fx_preset_v1"
