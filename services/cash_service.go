@@ -534,41 +534,58 @@ func (s *CashService) GetBalances() ([]CashBalance, float64, error) {
 	}
 	fx := s.currentFx()
 	today := todayKST(s.clock())
-	// 모든 계좌의 기록을 한 번에 읽는다 (계좌마다 읽으면 원격 DB 왕복이 계좌 수 × 5번)
-	var entries []models.CashEntry
-	if err := s.db.Find(&entries).Error; err != nil {
+	recs, err := s.loadAllRecords()
+	if err != nil {
 		return nil, 0, err
-	}
-	var txs []models.Transaction
-	if err := s.db.Preload("Asset").Find(&txs).Error; err != nil {
-		return nil, 0, err
-	}
-	var divs []models.Dividend
-	if err := s.db.Preload("Asset").Where("is_received = ?", true).Find(&divs).Error; err != nil {
-		return nil, 0, err
-	}
-	entriesOf := map[uint][]models.CashEntry{}
-	for _, e := range entries {
-		entriesOf[e.AccountID] = append(entriesOf[e.AccountID], e)
-	}
-	txsOf := map[uint][]models.Transaction{}
-	for _, t := range txs {
-		txsOf[t.AccountID] = append(txsOf[t.AccountID], t)
-	}
-	divsOf := map[uint][]models.Dividend{}
-	for _, d := range divs {
-		divsOf[d.AccountID] = append(divsOf[d.AccountID], d)
 	}
 	out := make([]CashBalance, 0, len(accounts))
 	for i := range accounts {
-		id := accounts[i].ID
-		flows, err := s.flowsOf(&accounts[i], entriesOf[id], txsOf[id], divsOf[id])
+		flows, err := recs.flowsOf(s, &accounts[i])
 		if err != nil {
 			return nil, 0, err
 		}
-		out = append(out, balanceOf(id, flows, fx, today))
+		out = append(out, balanceOf(accounts[i].ID, flows, fx, today))
 	}
 	return out, fx, nil
+}
+
+// cashRecords 는 모든 계좌의 현금 기록·거래·받은 배당 (계좌별)
+type cashRecords struct {
+	entries map[uint][]models.CashEntry
+	txs     map[uint][]models.Transaction
+	divs    map[uint][]models.Dividend
+}
+
+// loadAllRecords: 모든 계좌의 기록을 한 번에 읽는다 (계좌마다 읽으면 원격 DB 왕복이 계좌 수 × 5번 — 17개 계좌면 운영에서 3초쯤)
+func (s *CashService) loadAllRecords() (*cashRecords, error) {
+	var entries []models.CashEntry
+	if err := s.db.Find(&entries).Error; err != nil {
+		return nil, err
+	}
+	var txs []models.Transaction
+	if err := s.db.Preload("Asset").Find(&txs).Error; err != nil {
+		return nil, err
+	}
+	var divs []models.Dividend
+	if err := s.db.Preload("Asset").Where("is_received = ?", true).Find(&divs).Error; err != nil {
+		return nil, err
+	}
+	r := &cashRecords{entries: map[uint][]models.CashEntry{}, txs: map[uint][]models.Transaction{}, divs: map[uint][]models.Dividend{}}
+	for _, e := range entries {
+		r.entries[e.AccountID] = append(r.entries[e.AccountID], e)
+	}
+	for _, t := range txs {
+		r.txs[t.AccountID] = append(r.txs[t.AccountID], t)
+	}
+	for _, d := range divs {
+		r.divs[d.AccountID] = append(r.divs[d.AccountID], d)
+	}
+	return r, nil
+}
+
+func (r *cashRecords) flowsOf(s *CashService, account *models.Account) ([]CashFlow, error) {
+	id := account.ID
+	return s.flowsOf(account, r.entries[id], r.txs[id], r.divs[id])
 }
 
 // ───────────────────────── 날짜별 잔액 (자산 추이 그래프) ─────────────────────────
@@ -646,9 +663,13 @@ func (s *CashService) Timelines() []CashTimeline {
 	if err := s.db.Find(&accounts).Error; err != nil {
 		return nil
 	}
+	recs, err := s.loadAllRecords()
+	if err != nil {
+		return nil
+	}
 	var out []CashTimeline
 	for i := range accounts {
-		flows, err := s.flows(&accounts[i])
+		flows, err := recs.flowsOf(s, &accounts[i])
 		if err != nil {
 			continue
 		}

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -278,6 +279,27 @@ func TestCashTimelines(t *testing.T) {
 	p := byID[plain.ID]
 	check(p, "2026-11-02", 0, false)
 	check(p, "2026-11-03", 50, true)
+
+	// 한 번에 읽어 계좌별로 나눈 결과가 계좌마다 따로 읽은 것과 같다
+	var accounts []models.Account
+	f.db.Find(&accounts)
+	for i := range accounts {
+		flows, err := f.svc.flows(&accounts[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := buildTimeline(accounts[i], flows)
+		got, ok := byID[accounts[i].ID]
+		if want == nil {
+			if ok {
+				t.Fatalf("계좌 %d: 따로 읽으면 없는 timeline 이 있다", accounts[i].ID)
+			}
+			continue
+		}
+		if !ok || got.Start != want.Start || fmt.Sprint(got.days, got.krw, got.usd) != fmt.Sprint(want.days, want.krw, want.usd) {
+			t.Fatalf("계좌 %d: 한 번에 읽은 것 %+v, 따로 읽은 것 %+v", accounts[i].ID, got, *want)
+		}
+	}
 }
 
 // 자산 추이: 예수금을 총자산·인출 가능/제한에 더한다 (달러는 그날 환율)
