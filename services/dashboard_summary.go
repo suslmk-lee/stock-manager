@@ -15,7 +15,7 @@ import (
 // 한 칸이 실패해도 나머지는 돌려준다 (그 칸은 null, errors[칸] 에 이유).
 //
 //   - portfolio  일별 총자산(최근 1개월)에서 실측(estimated=false) 마지막 두 점 — 오늘 점이 아직 없을 수 있다(last_real_date)
-//   - dividends  오늘 받은 배당 · 이번 달 · 올해 받은 배당(금액은 배당 통계와 같은 기준: 기록 금액 그대로, 원화는 지금 환율)
+//   - dividends  오늘 받은 배당 · 이번 달 · 올해 받은 배당(세후 = 기록 금액 − 세금 — 예수금·배당 화면과 같다, 원화는 지금 환율)
 //     · 앞으로 30일 예정 배당(예정 배당 API 와 같은 계산)
 //   - signals    읽지 않은 신호 수 (신호를 새로 계산하지 않는다)
 //
@@ -58,9 +58,10 @@ type DashboardDividend struct {
 	AssetName     string   `json:"asset_name"`
 	AccountName   string   `json:"account_name"`
 	AccountBroker string   `json:"account_broker"`
-	Amount        float64  `json:"amount"`
+	Amount        float64  `json:"amount"` // 세후 (기록 금액 − 세금)
+	Tax           float64  `json:"tax"`    // 기록된 세금
 	Currency      string   `json:"currency"`
-	AmountKRW     *float64 `json:"amount_krw"` // 그 통화 환율을 모르면 null
+	AmountKRW     *float64 `json:"amount_krw"` // 세후 원화 — 그 통화 환율을 모르면 null
 }
 
 type DashboardSignals struct {
@@ -224,7 +225,7 @@ func dashboardPortfolio(ser *DailySeries) (*DashboardPortfolio, float64) {
 	return out, last.UsdKrw
 }
 
-// dividends: 받은 배당(is_received) — 오늘 · 이번 달 · 올해 (KST 날짜). 금액은 기록 금액 그대로 (배당 통계와 같은 기준), 원화는 rate.
+// dividends: 받은 배당(is_received) — 오늘 · 이번 달 · 올해 (KST 날짜). 금액은 세후(기록 금액 − 세금 — 예수금·배당 화면과 같다), 원화는 rate.
 func (s *DashboardService) dividends(now time.Time, rate func(string) float64) (*DashboardDividends, error) {
 	today := todayKST(now)
 	day0, _ := parseKSTDate(today)
@@ -241,7 +242,7 @@ func (s *DashboardService) dividends(now time.Time, rate func(string) float64) (
 		if d > today || d[:4] != year {
 			continue
 		}
-		krw, ok := dashKRW(r.Amount, r.Currency, rate)
+		krw, ok := dashKRW(r.Amount-r.Tax, r.Currency, rate)
 		if !ok {
 			continue // 환율을 모르는 통화 — 합계에서 뺀다 (오늘 목록에는 원화 없이 넣는다)
 		}
@@ -283,9 +284,9 @@ func (s *DashboardService) dividends(now time.Time, rate func(string) float64) (
 		d := DashboardDividend{
 			DividendID: r.ID, Ticker: assetBy[r.AssetID].Ticker, AssetName: assetBy[r.AssetID].Name,
 			AccountName: accBy[r.AccountID].Name, AccountBroker: accBy[r.AccountID].Broker,
-			Amount: r.Amount, Currency: r.Currency,
+			Amount: math.Round((r.Amount-r.Tax)*100) / 100, Tax: r.Tax, Currency: r.Currency,
 		}
-		if krw, ok := dashKRW(r.Amount, r.Currency, rate); ok {
+		if krw, ok := dashKRW(r.Amount-r.Tax, r.Currency, rate); ok {
 			v := math.Round(krw)
 			d.AmountKRW = &v
 			out.TodayReceivedKRW += v

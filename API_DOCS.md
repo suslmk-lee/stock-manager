@@ -524,7 +524,7 @@ SignalProfile: `{ id, key, name, description, kind("standard"|"dividend"), built
   "dividends": {
     "today_received": [
       { "dividend_id": 1, "ticker": "O", "asset_name": "Realty Income", "account_name": "종합계좌", "account_broker": "미래에셋",
-        "amount": 10.2, "currency": "USD", "amount_krw": 14280 }
+        "amount": 10.2, "tax": 1.8, "currency": "USD", "amount_krw": 14280 }
     ],
     "today_received_krw": 14280,
     "mtd_krw": 182000,
@@ -540,7 +540,7 @@ SignalProfile: `{ id, key, name, description, kind("standard"|"dividend"), built
 
 - `portfolio`: 일별 총자산(`GET /api/snapshots/daily?range=1m`)에서 실측(`estimated=false`) 마지막 점의 총액·원금·예수금을 씁니다. 총액에는 예수금이 들어 있습니다. 전일 대비는 실측 마지막 두 점의 차이이고, 앞 점이 없으면 `null` 입니다. 일별 실측은 GitHub Actions cron 이 쌓으므로 오늘 점이 아직 없을 수 있습니다(`last_real_date`). 1개월 안에 실측이 없으면 마지막 추정 점을 쓰고 `estimated: true` 입니다.
 - `usd_krw`: 그 실측 점에 저장된 환율이고, 없으면 지금 시세입니다.
-- `dividends`: 받은 배당(`is_received=true`)을 KST 날짜로 오늘·이번 달·올해(오늘까지) 묶어 합칩니다. 금액은 배당 요약 통계(§5.6)처럼 기록 금액을 그대로 씁니다(세금을 빼지 않음). 원화는 달러면 `usd_krw`, 그 밖의 외화면 지금 환율이며, 환율을 모르는 통화는 합계에서 빠집니다. `upcoming_30d_*` 는 §11.1 을 `days=30` 으로 계산한 항목 수와 `total_expected_krw` 입니다.
+- `dividends`: 받은 배당(`is_received=true`)을 KST 날짜로 오늘·이번 달·올해(오늘까지) 묶어 합칩니다. 금액은 세후(기록 금액 − 세금)로, 예수금·배당 화면과 같은 기준입니다. 오늘 목록의 `amount`·`amount_krw` 도 세후이고, `tax` 는 기록된 세금입니다. 원화는 달러면 `usd_krw`, 그 밖의 외화면 지금 환율이며, 환율을 모르는 통화는 합계에서 빠집니다. `upcoming_30d_*` 는 §11.1 을 `days=30` 으로 계산한 항목 수와 `total_expected_krw` 입니다.
 - `signals.unread_count`: §9.3 과 같습니다. 신호를 새로 계산하지 않습니다.
 - 부분 실패: 한 칸이 실패해도 200 입니다. 그 칸은 `null` 이고 `errors` 에 이유가 들어갑니다. 키는 `portfolio`·`dividends`·`signals`·`upcoming` 입니다. 예정 배당만 실패하면 `upcoming_30d_*` 만 `null` 입니다. 예정 배당은 계산했지만 일부가 빠졌을 수 있으면 `errors.upcoming_warnings` 에 적힙니다.
 - 시세를 새로 받지 않습니다. 예외는 예정 배당에 필요한 시장 배당 이력(12시간 캐시)입니다. Fly 머신이 쉬다 깨어 캐시가 비어 있으면 이것을 받는데, 8초 안에 끝나지 않으면 `errors.upcoming` 에 적고 `upcoming_30d_*` 를 `null` 로 둡니다. 계산은 뒤에서 마저 해 캐시에 남기므로, 잠시 뒤 다시 부르면 바로 나옵니다.

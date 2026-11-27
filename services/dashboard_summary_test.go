@@ -35,14 +35,14 @@ func TestDashboardSummary(t *testing.T) {
 	db.Create(&kr)
 	utcDay := func(d string) time.Time { t, _ := time.Parse(dateLayout, d); return t } // 웹은 UTC 자정으로 저장한다
 	for _, d := range []models.Dividend{
-		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2026-11-27"), Amount: 10, Currency: "USD", IsReceived: true},    // 오늘
-		{AccountID: acc.ID, AssetID: kr.ID, Date: dsDay("2026-11-27"), Amount: 3610, Currency: "KRW", IsReceived: true},  // 오늘 (KST 자정 저장)
-		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2026-11-03"), Amount: 5, Currency: "USD", IsReceived: true},     // 이번 달
-		{AccountID: acc.ID, AssetID: kr.ID, Date: utcDay("2026-02-15"), Amount: 1000, Currency: "KRW", IsReceived: true}, // 올해
-		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2025-12-31"), Amount: 99, Currency: "USD", IsReceived: true},    // 작년
-		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2026-11-28"), Amount: 7, Currency: "USD", IsReceived: true},     // 내일 날짜
-		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2026-11-20"), Amount: 8, Currency: "USD", IsReceived: false},    // 받지 않음
-		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2026-11-10"), Amount: 100, Currency: "JPY", IsReceived: true},   // 환율 모름 → 합계에서 뺀다
+		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2026-11-27"), Amount: 12, Tax: 1.8, Currency: "USD", IsReceived: true},    // 오늘 (세후 10.2)
+		{AccountID: acc.ID, AssetID: kr.ID, Date: dsDay("2026-11-27"), Amount: 3610, Currency: "KRW", IsReceived: true},            // 오늘 (KST 자정 저장)
+		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2026-11-03"), Amount: 5, Tax: 0.75, Currency: "USD", IsReceived: true},    // 이번 달 (세후 4.25)
+		{AccountID: acc.ID, AssetID: kr.ID, Date: utcDay("2026-02-15"), Amount: 1000, Tax: 154, Currency: "KRW", IsReceived: true}, // 올해 (세후 846)
+		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2025-12-31"), Amount: 99, Currency: "USD", IsReceived: true},              // 작년
+		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2026-11-28"), Amount: 7, Currency: "USD", IsReceived: true},               // 내일 날짜
+		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2026-11-20"), Amount: 8, Currency: "USD", IsReceived: false},              // 받지 않음
+		{AccountID: acc.ID, AssetID: o.ID, Date: utcDay("2026-11-10"), Amount: 100, Currency: "JPY", IsReceived: true},             // 환율 모름 → 합계에서 뺀다
 	} {
 		db.Create(&d)
 	}
@@ -80,15 +80,19 @@ func TestDashboardSummary(t *testing.T) {
 		t.Fatalf("day change = %v %v", p.DayChangeKRW, p.DayChangePct)
 	}
 	d := r.Dividends
-	if d == nil || len(d.TodayReceived) != 2 || d.TodayReceivedKRW != 14000+3610 {
+	// 받은 배당은 세후 (기록 금액 − 세금): 오늘 $10.2·3610원, 이번 달 +$4.25, 올해 +846원 (환율 1400)
+	if d == nil || len(d.TodayReceived) != 2 || d.TodayReceivedKRW != 14280+3610 {
 		t.Fatalf("today = %+v", d)
 	}
 	for _, x := range d.TodayReceived {
 		if x.Ticker == "" || x.AccountName != "토스" || x.AmountKRW == nil {
 			t.Fatalf("today item = %+v", x)
 		}
+		if x.Ticker == "O" && (x.Amount != 10.2 || x.Tax != 1.8 || *x.AmountKRW != 14280) {
+			t.Fatalf("세후 금액·세금 = %+v (원화 %v)", x, *x.AmountKRW)
+		}
 	}
-	if d.MtdKRW != 14000+3610+7000 || d.YtdKRW != 14000+3610+7000+1000 {
+	if d.MtdKRW != 14280+3610+5950 || d.YtdKRW != 14280+3610+5950+846 {
 		t.Fatalf("mtd/ytd = %v / %v", d.MtdKRW, d.YtdKRW)
 	}
 	if d.Upcoming30dCount == nil || *d.Upcoming30dCount != 3 || d.Upcoming30dKRW == nil || *d.Upcoming30dKRW != 12345 {
