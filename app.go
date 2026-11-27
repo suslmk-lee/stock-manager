@@ -99,6 +99,7 @@ func (a *App) apiServices() *httpapi.Services {
 		Contribution:  a.contributionService,
 		Today:         a.todayService,
 		PriceZone:     a.zoneService,
+		Dashboard:     services.NewDashboardService(database.GetDB(), a.dailySnapService, a.dividendScoreService, a.signalService, a.tickerService),
 	}
 }
 

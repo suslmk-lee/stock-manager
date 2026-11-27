@@ -264,8 +264,9 @@ $fly = "$env:USERPROFILE\.fly\bin\flyctl.exe"
   DB_NAME="postgres" `
   DB_SSLMODE="require"
 
-# 4. API 인증 키 설정
+# 4. API 인증 키 설정 (읽기 전용 키는 선택 — 개인 대시보드처럼 읽기만 하는 곳에)
 & $fly secrets set API_KEY="YOUR_RANDOM_API_KEY"
+& $fly secrets set API_KEY_READONLY="YOUR_RANDOM_READONLY_KEY"
 
 # 5. 배포
 & $fly deploy
@@ -298,7 +299,9 @@ fly secrets set \
   DB_NAME="postgres" \
   DB_SSLMODE="require" \
   API_KEY="YOUR_RANDOM_API_KEY" \
+  API_KEY_READONLY="$(openssl rand -hex 32)" \
   -a "$APP"
+# API_KEY_READONLY 는 선택: GET·HEAD 만 되는 키 (개인 대시보드용)
 
 # 3) Google Sheets 연동 시 (권장: JSON 문자열을 secret으로 저장)
 # 서비스계정 JSON 파일을 1줄 JSON으로 변환
@@ -368,8 +371,10 @@ Authorization: Bearer <API_KEY>
 X-API-Key: <API_KEY>
 ```
 
-- `API_KEY` 미설정 시: 인증 없이 공개 접근 (경고 로그 출력)
+- `API_KEY` 미설정 시: 인증 없이 공개 접근 (경고 로그 출력, `API_KEY_READONLY` 만 있어도 공개)
 - `API_KEY` 설정 시: 키 없는 요청은 `401 Unauthorized` 반환
+- `API_KEY_READONLY` 설정 시: 그 키로는 `GET`·`HEAD` 만 허용, 다른 메서드는 `403 {"error":"read-only key"}` (개인 대시보드용 — `API_DOCS.md` §11)
+- 키는 상수 시간으로 비교합니다
 - `/health` 엔드포인트는 인증 불필요
 
 ### CORS 제어
@@ -387,6 +392,7 @@ X-API-Key: <API_KEY>
 | --- | --- | --- |
 | `DB_PASSWORD` | `.env` (로컬), Fly Secrets (클라우드) | DB 비밀번호 |
 | `API_KEY` | Fly Secrets | API 인증 키 |
+| `API_KEY_READONLY` | Fly Secrets (선택) | 읽기 전용 API 키 (GET·HEAD 만) — 개인 대시보드용 |
 | `CORS_ORIGINS` | Fly Secrets | 허용 Origin 목록 |
 | `VITE_API_KEY` | `frontend/.env` | 웹 프론트에서 API 호출 시 Authorization 헤더용 키 |
 | `GOOGLE_SHEETS_CREDENTIALS_FILE` | 로컬 파일 경로 / 서버 파일 경로 | Google 서비스계정 JSON 파일 경로 |

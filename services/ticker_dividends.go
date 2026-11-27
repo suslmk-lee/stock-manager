@@ -152,6 +152,19 @@ func (s *TickerService) dividendEventsLoad(ticker string) ([]DividendEvent, erro
 	return ev, nil
 }
 
+// dividendEventsKnown: 그 종목 배당 이벤트를 캐시 기간 안에 받아 두었는지 (배당이 없는 종목도 받았으면 true) — 받지 못한 종목을 알릴 때
+func (s *TickerService) dividendEventsKnown(ticker string) bool {
+	st := &s.divEvCache
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	now := time.Now
+	if st.now != nil {
+		now = st.now
+	}
+	e, ok := st.entries[strings.ToUpper(strings.TrimSpace(ticker))]
+	return ok && now().Sub(e.fetchedAt) <= dividendEventsTTL
+}
+
 // GetDividendEventsCachedMany 는 여러 종목을 동시에(최대 5개) 조회한다. 실패한 종목은 결과에서 빠진다.
 func (s *TickerService) GetDividendEventsCachedMany(tickers []string) map[string][]DividendEvent {
 	out := map[string][]DividendEvent{}

@@ -500,7 +500,7 @@ type DivScoreRanking struct {
 	Rows       []DivScoreRow               `json:"rows"`
 	NoDividend []models.Asset              `json:"no_dividend"` // 보유 중이지만 배당이 없는 종목 (이번 달만)
 	Missing    []MissingDividend           `json:"missing"`     // 이번 달만
-	Holding    []models.HoldingCheck        `json:"holding"`     // 배당 기록으로 본 수량이 앱과 다른 계좌 (계좌·종목마다 최근 기록, 이번 달만)
+	Holding    []models.HoldingCheck       `json:"holding"`     // 배당 기록으로 본 수량이 앱과 다른 계좌 (계좌·종목마다 최근 기록, 이번 달만)
 	Prev       []DivScorePrevRow           `json:"prev"`        // 지난달 순위 (화면에서 한국/미국만·항목별로 지난달 순위를 다시 매길 때)
 }
 
@@ -678,13 +678,9 @@ func (s *DividendScoreService) addCurrentExtras(out *DivScoreRanking) error {
 	for i, r := range out.Rows {
 		inRank[r.AssetID] = i
 	}
-	var accounts []models.Account
-	if err := s.db.Find(&accounts).Error; err != nil {
+	accByID, err := s.accountsByID()
+	if err != nil {
 		return err
-	}
-	accByID := map[uint]models.Account{}
-	for _, a := range accounts {
-		accByID[a.ID] = a
 	}
 	for id, a := range assets {
 		if a.heldNow <= 0 {
@@ -722,6 +718,31 @@ func (s *DividendScoreService) addCurrentExtras(out *DivScoreRanking) error {
 	return nil
 }
 
+// accountsByID: 모든 계좌 (기록 누락·예정 배당에 계좌 이름을 붙일 때)
+func (s *DividendScoreService) accountsByID() (map[uint]models.Account, error) {
+	var accounts []models.Account
+	if err := s.db.Find(&accounts).Error; err != nil {
+		return nil, err
+	}
+	out := make(map[uint]models.Account, len(accounts))
+	for _, a := range accounts {
+		out[a.ID] = a
+	}
+	return out, nil
+}
+
+// divRecordRule: 종목의 입금 기한(배당락 뒤 일수)·세율·통화 — 기록 누락과 예정 배당이 같은 기준을 쓴다
+func divRecordRule(ticker string) (window int, tax float64, ccy string) {
+	if isKRTicker(ticker) {
+		return divRecordWindowKR, divTaxKR, "KRW"
+	}
+	window, tax, ccy = divRecordWindowUS, divTaxUS, tickerCurrency(ticker) // 해외: 종목 통화 (달러·엔화 …)
+	if ccy == "JPY" {
+		tax = divTaxKR // 일본 원천 15.315% — 국내 추가분까지 보통 15.4%
+	}
+	return window, tax, ccy
+}
+
 // missingRecords: 최근 12개월 시장 배당락일마다, 그 전날 보유하던 계좌에 지급 기간 안의 내 배당 기록이 있는지 (한 기록은 한 회차에만)
 //   - 최근 회차부터 거꾸로, 회차마다 기간 안의 가장 늦은 기록을 짝으로 — 오래된 회차 하나가 비어도 뒤 회차들이 한 칸씩 밀리지 않는다
 //     (예전처럼 이른 회차부터 가장 이른 기록을 가져가면, 빈 회차가 다음 회차의 기록을 가져가 결국 마지막 회차가 누락으로 보였다)
@@ -730,13 +751,7 @@ func missingRecords(a *divScoreAsset, accounts map[uint]models.Account, now time
 	if len(a.market) == 0 {
 		return nil
 	}
-	kr := isKRTicker(a.asset.Ticker)
-	window, tax, ccy := divRecordWindowUS, divTaxUS, tickerCurrency(a.asset.Ticker) // 해외: 종목 통화 (달러·엔화 …)
-	if kr {
-		window, tax, ccy = divRecordWindowKR, divTaxKR, "KRW"
-	} else if ccy == "JPY" {
-		tax = divTaxKR // 일본 원천 15.315% — 국내 추가분까지 보통 15.4%
-	}
+	window, tax, ccy := divRecordRule(a.asset.Ticker)
 	from := now.AddDate(0, -divMissingLookback, 0)
 	market := append([]DividendEvent(nil), a.market...)
 	sort.Slice(market, func(i, j int) bool { return market[i].Time < market[j].Time })
@@ -850,7 +865,7 @@ type DivScoreDetail struct {
 	Currency string                 `json:"currency"`
 	History  []DivScoreHistoryPoint `json:"history"` // 오래된 달부터
 	Years    []DivYearDPS           `json:"years"`
-	Payments []DivPayment           `json:"payments"` // 최근 3년, 최근 것부터
+	Payments []DivPayment           `json:"payments"`           // 최근 3년, 최근 것부터
 	Position *DivScorePosition      `json:"position,omitempty"` // 지금 보유 (없으면 보유하지 않는 종목)
 	Holding  []models.HoldingCheck  `json:"holding"`            // 계좌마다 최근 배당 기록으로 본 수량 (앱과 맞는 것도)
 }

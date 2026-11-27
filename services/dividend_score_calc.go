@@ -165,6 +165,19 @@ func divCycleOf(n int) string {
 	}
 }
 
+// divNextRound: 마지막 정기 회차(last)와 최근 12개월 회차 수(n > 0)로 본, asOf 뒤 첫 회차 예상일과 회차 간격(일).
+// 지금 회차가 주기보다 늦었으면 missed (간격의 1.6배 + 20일이 지남) — 이때 예상일은 쓰지 않는다.
+func divNextRound(last time.Time, n int, asOf time.Time) (next time.Time, step int, missed bool) {
+	interval := 365.0 / float64(n)
+	missed = asOf.Sub(last).Hours()/24 > interval*1.6+20
+	step = max(1, int(math.Round(interval)))
+	next = last.AddDate(0, 0, step)
+	for !next.After(asOf) {
+		next = next.AddDate(0, 0, step)
+	}
+	return next, step, missed
+}
+
 var divCycleScore = map[string]float64{"월": 1, "격월": 0.85, "분기": 0.8, "반기": 0.5, "연": 0.4, "불규칙": 0.3}
 
 // computeDivScore: asOf 시점의 지표와 항목 점수. 최근 2년 안에 배당이 없으면 ok=false (배당주가 아님).
@@ -267,13 +280,8 @@ func computeDivScore(events []DivPerShare, closes []PricePoint, asOf time.Time, 
 	lastDate := reg[len(reg)-1].Date
 	m.LastPayment = lastDate.In(kst).Format(dateLayout)
 	if m.Payments12m > 0 && m.Cycle != "불규칙" {
-		interval := 365.0 / float64(m.Payments12m)
-		since := asOf.Sub(lastDate).Hours() / 24
-		m.MissedNow = since > interval*1.6+20
-		next := lastDate.AddDate(0, 0, int(math.Round(interval)))
-		for !next.After(asOf) {
-			next = next.AddDate(0, 0, int(math.Round(interval)))
-		}
+		var next time.Time
+		next, _, m.MissedNow = divNextRound(lastDate, m.Payments12m, asOf)
 		if !m.MissedNow {
 			m.NextExpected = next.In(kst).Format(dateLayout)
 		}

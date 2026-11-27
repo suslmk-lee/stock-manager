@@ -31,6 +31,8 @@ type Services struct {
 	Today *services.TodayService
 	// 사기 좋은 가격 (보유 종목 가격대, 날짜별 30일 보관)
 	PriceZone *services.PriceZoneService
+	// 개인 대시보드 요약 (HTTP 전용)
+	Dashboard *services.DashboardService
 }
 
 // NewServices 는 기본 서비스 묶음을 생성한다.
@@ -81,5 +83,6 @@ func NewServices() *Services {
 		Contribution:  contribution,
 		Today:         today,
 		PriceZone:     zones,
+		Dashboard:     services.NewDashboardService(database.GetDB(), dailySnap, divScore, signal, ticker),
 	}
 }

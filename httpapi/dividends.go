@@ -158,6 +158,25 @@ func registerDividendRoutes(api *gin.RouterGroup, s *Services) {
 			c.JSON(http.StatusOK, res)
 		})
 
+		// 예정 배당 (대시보드용, HTTP 전용): 입금 전 회차 · 미리 넣은 기록 · 배당락 추정. days 기본 45, 최대 120
+		dividends.GET("/upcoming", func(c *gin.Context) {
+			days := services.UpcomingDaysDefault
+			if v := c.Query("days"); v != "" {
+				n, err := strconv.Atoi(v)
+				if err != nil || n <= 0 {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "days 는 1 이상의 정수여야 합니다"})
+					return
+				}
+				days = n
+			}
+			res, err := s.DividendScore.GetUpcoming(days, nil)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, res)
+		})
+
 		dividends.GET("/all", func(c *gin.Context) {
 			res, err := s.Dividend.GetAllDividends()
 			if err != nil {

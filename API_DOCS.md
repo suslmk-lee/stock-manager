@@ -11,6 +11,8 @@ Authorization: Bearer <API_KEY>
 X-API-Key: <API_KEY>
 ```
 
+`API_KEY_READONLY` 도 설정돼 있으면 그 키로는 `GET`·`HEAD` 만 됩니다. 다른 메서드는 `403 {"error":"read-only key"}`. 키가 없거나 틀리면 `401 {"error":"unauthorized"}`. `API_KEY` 가 비어 있으면 읽기 전용 키와 상관없이 공개입니다(시작 때 경고 로그). 개인 대시보드처럼 읽기만 하는 곳에는 읽기 전용 키를 씁니다(§11).
+
 ---
 
 ## 1. 계좌 관리 (Accounts)
@@ -457,3 +459,88 @@ SignalProfile: `{ id, key, name, description, kind("standard"|"dividend"), built
 
 ### 10.5 마이그레이션 (추가 전용)
 새 테이블 `signal_profiles`(규칙 컬럼은 `rule_` 접두사), `asset_signal_profiles`, `profile_suggestions`; 기존 테이블에는 `signal_rules.crash_enabled/crash_pct`, `signal_events.kind/suggested_profile_id` 컬럼만 추가됩니다 (삭제/변경 없음).
+
+---
+
+## 11. 대시보드 (HTTP 전용)
+
+개인 대시보드(`~/workspace/my-dashboard`)가 부르는 읽기 전용 엔드포인트입니다. 읽기 전용 키(`API_KEY_READONLY`)로 부를 수 있습니다. 데스크톱 화면에서는 쓰지 않아 Wails 바인딩이 없습니다(데스크톱 내장 서버에도 같은 경로가 있습니다).
+
+### 11.1 예정 배당
+`GET /api/dividends/upcoming?days=45` (`days` 기본 45, 최대 120 — 넘으면 120, 0·음수·숫자가 아니면 400)
+
+세 출처를 합칩니다.
+
+| kind | 뜻 |
+|---|---|
+| `pending` | 배당락은 지났고 내 배당 기록이 없으며 입금 기한(`pay_by`) 전. 배당 점수의 기록 누락(`missing`) 중 `status="upcoming"` 과 같은 계산이며, 배당락 전날 들고 있었으면 그 뒤 판 종목도 넣습니다. `days` 와 상관없이 모두 넣습니다. |
+| `manual` | 미리 넣어 둔 예정 기록(`is_received=false`, 날짜가 오늘 ~ 오늘+`days`, KST). `dividend_id` 가 있습니다. |
+| `forecast` | 앞으로 올 배당락 추정. 최근 주기(배당 점수의 '다음 배당 예상'과 같은 계산)로 [오늘, 오늘+`days`] 안의 회차마다 계좌별로 하나씩 만듭니다. 금액은 최근 정기 회차 주당 배당 × 지금 보유 수량 × (1 − 세율)이고 `estimated: true` 입니다. 최근 12개월 회차가 없거나, 주기가 불규칙하거나, 지금 회차가 늦었으면 만들지 않습니다. 시장 배당 이력이 없는 종목은 내 배당 기록(입금일)으로 추정합니다. |
+
+- 세율·입금 기한은 배당 점수와 같습니다. 미국 등 해외는 15%·60일, 국내는 15.4%·130일, 일본은 15.4%입니다.
+- 중복 제거: 같은 (계좌, 종목)의 `manual` 이 `pending`·`forecast` 회차의 날짜 창(배당락 −10일 ~ +입금 기한) 안에 있으면 `manual` 만 남깁니다. 짝짓기는 최근 회차부터 하며, 회차마다 창 안의 가장 늦은 기록 하나를 씁니다.
+- 원화 환산: 통화별 지금 환율(`{통화}KRW=X`, 달러는 `KRW=X`)로 `expected_net_krw` 를 계산합니다. 환율을 모르는 통화는 `null` 이며 `total_expected_krw` 에서 빠지고 `warnings` 에 적힙니다.
+- 시장 배당 이력을 받지 못한 종목은 `warnings` 에 적힙니다. 이런 종목은 입금 전 회차와 시장 기준 추정이 빠집니다.
+- 정렬: 날짜 오름차순입니다. 기준 날짜는 `pending` 이 `pay_by`, `manual` 이 `date`, `forecast` 가 `ex_date` 입니다.
+
+```json
+{
+  "as_of": "2026-11-27",
+  "days": 45,
+  "items": [
+    {
+      "kind": "pending",
+      "asset_id": 12, "ticker": "SCHD", "asset_name": "Schwab US Dividend Equity ETF",
+      "account_id": 3, "account_name": "종합계좌", "account_broker": "미래에셋",
+      "ex_date": "2026-11-20", "pay_by": "2027-01-19",
+      "per_share": 0.27, "quantity": 120, "currency": "USD",
+      "expected_net": 27.54, "expected_net_krw": 38290,
+      "estimated": false, "dividend_id": null
+    },
+    {
+      "kind": "manual", "asset_id": 7, "ticker": "O", "asset_name": "Realty Income",
+      "account_id": 3, "account_name": "종합계좌", "account_broker": "미래에셋",
+      "date": "2026-12-15", "per_share": 0.27, "quantity": 40, "currency": "USD",
+      "expected_net": 9.18, "expected_net_krw": 12760, "estimated": false, "dividend_id": 581
+    }
+  ],
+  "total_expected_krw": 51050,
+  "warnings": []
+}
+```
+`manual` 의 `expected_net` 은 기록 금액 − 세금입니다. `quantity`·`per_share` 는 그 계좌의 지금 보유로 나눈 값이며, 보유가 없으면 0 입니다.
+
+### 11.2 대시보드 요약
+`GET /api/dashboard/summary` — 대시보드가 30분마다 **이것 하나만** 부릅니다.
+
+```json
+{
+  "as_of": "2026-11-27T12:00:00+09:00",
+  "portfolio": {
+    "total_krw": 152340000, "cost_krw": 131200000, "cash_krw": 2400000,
+    "day_change_krw": 820000, "day_change_pct": 0.54,
+    "last_real_date": "2026-11-26", "estimated": false
+  },
+  "dividends": {
+    "today_received": [
+      { "dividend_id": 1, "ticker": "O", "asset_name": "Realty Income", "account_name": "종합계좌", "account_broker": "미래에셋",
+        "amount": 10.2, "currency": "USD", "amount_krw": 14280 }
+    ],
+    "today_received_krw": 14280,
+    "mtd_krw": 182000,
+    "ytd_krw": 2140000,
+    "upcoming_30d_count": 6,
+    "upcoming_30d_krw": 96400
+  },
+  "signals": { "unread_count": 2 },
+  "usd_krw": 1400.5,
+  "errors": {}
+}
+```
+
+- `portfolio`: 일별 총자산(`GET /api/snapshots/daily?range=1m`)에서 실측(`estimated=false`) 마지막 점의 총액·원금·예수금을 씁니다. 총액에는 예수금이 들어 있습니다. 전일 대비는 실측 마지막 두 점의 차이이고, 앞 점이 없으면 `null` 입니다. 일별 실측은 GitHub Actions cron 이 쌓으므로 오늘 점이 아직 없을 수 있습니다(`last_real_date`). 1개월 안에 실측이 없으면 마지막 추정 점을 쓰고 `estimated: true` 입니다.
+- `usd_krw`: 그 실측 점에 저장된 환율이고, 없으면 지금 시세입니다.
+- `dividends`: 받은 배당(`is_received=true`)을 KST 날짜로 오늘·이번 달·올해(오늘까지) 묶어 합칩니다. 금액은 배당 요약 통계(§5.6)처럼 기록 금액을 그대로 씁니다(세금을 빼지 않음). 원화는 달러면 `usd_krw`, 그 밖의 외화면 지금 환율이며, 환율을 모르는 통화는 합계에서 빠집니다. `upcoming_30d_*` 는 §11.1 을 `days=30` 으로 계산한 항목 수와 `total_expected_krw` 입니다.
+- `signals.unread_count`: §9.3 과 같습니다. 신호를 새로 계산하지 않습니다.
+- 부분 실패: 한 칸이 실패해도 200 입니다. 그 칸은 `null` 이고 `errors` 에 이유가 들어갑니다. 키는 `portfolio`·`dividends`·`signals`·`upcoming` 입니다. 예정 배당만 실패하면 `upcoming_30d_*` 만 `null` 입니다. 예정 배당은 계산했지만 일부가 빠졌을 수 있으면 `errors.upcoming_warnings` 에 적힙니다.
+- 시세를 새로 받지 않습니다. 예외는 예정 배당에 필요한 시장 배당 이력(12시간 캐시)입니다. Fly 머신이 쉬다 깨어 캐시가 비어 있으면 이것을 받는데, 8초 안에 끝나지 않으면 `errors.upcoming` 에 적고 `upcoming_30d_*` 를 `null` 로 둡니다. 계산은 뒤에서 마저 해 캐시에 남기므로, 잠시 뒤 다시 부르면 바로 나옵니다.

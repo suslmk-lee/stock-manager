@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"log"
 	"net/http"
 	"os"
@@ -96,30 +98,56 @@ func setupRouter() *gin.Engine {
 }
 
 func apiKeyAuthMiddleware() gin.HandlerFunc {
-	expectedKey := strings.TrimSpace(os.Getenv("API_KEY"))
-	if expectedKey == "" {
-		log.Println("WARNING: API_KEY is not set; /api endpoints are publicly accessible")
+	return apiKeyAuth(strings.TrimSpace(os.Getenv("API_KEY")), strings.TrimSpace(os.Getenv("API_KEY_READONLY")))
+}
+
+// apiKeyAuth — fullKey(API_KEY)는 모든 요청을, readOnlyKey(API_KEY_READONLY)는 GET·HEAD 만 허용한다.
+// fullKey 가 비어 있으면 지금처럼 공개로 둔다(읽기 전용 키만 있는 설정도 쓰기까지 공개이므로 경고한다).
+func apiKeyAuth(fullKey, readOnlyKey string) gin.HandlerFunc {
+	if fullKey == "" {
+		if readOnlyKey != "" {
+			log.Println("WARNING: API_KEY_READONLY is set but API_KEY is not; /api endpoints (including writes) are publicly accessible")
+		} else {
+			log.Println("WARNING: API_KEY is not set; /api endpoints are publicly accessible")
+		}
 		return func(c *gin.Context) {
 			c.Next()
 		}
 	}
 
 	return func(c *gin.Context) {
-		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
-		providedKey := ""
-
-		if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
-			providedKey = strings.TrimSpace(authHeader[7:])
-		}
-		if providedKey == "" {
-			providedKey = strings.TrimSpace(c.GetHeader("X-API-Key"))
-		}
-
-		if providedKey == "" || providedKey != expectedKey {
+		provided := providedAPIKey(c)
+		switch {
+		case keyMatches(provided, fullKey):
+			c.Next()
+		case readOnlyKey != "" && keyMatches(provided, readOnlyKey):
+			if m := c.Request.Method; m != http.MethodGet && m != http.MethodHead {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "read-only key"})
+				return
+			}
+			c.Next()
+		default:
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-			return
 		}
-
-		c.Next()
 	}
+}
+
+// providedAPIKey — Authorization: Bearer <키>, 없으면 X-API-Key
+func providedAPIKey(c *gin.Context) string {
+	authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
+	if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
+		if k := strings.TrimSpace(authHeader[7:]); k != "" {
+			return k
+		}
+	}
+	return strings.TrimSpace(c.GetHeader("X-API-Key"))
+}
+
+// keyMatches — 길이가 달라도 시간이 새지 않게 해시를 상수 시간으로 비교한다
+func keyMatches(provided, expected string) bool {
+	if provided == "" || expected == "" {
+		return false
+	}
+	a, b := sha256.Sum256([]byte(provided)), sha256.Sum256([]byte(expected))
+	return subtle.ConstantTimeCompare(a[:], b[:]) == 1
 }
