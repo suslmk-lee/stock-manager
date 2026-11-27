@@ -368,6 +368,12 @@ export const apiClient = {
     return (await WailsApp.GetSignals()) as SignalReport;
   },
 
+  // 마지막으로 만든 신호 리포트 (없으면 null) — 화면이 먼저 보여 주고 GetSignals 로 새로 계산한다
+  GetSignalsLast: async (): Promise<SignalReport | null> => {
+    if (isWeb) return fetchApi<SignalReport | null>('/signals/last');
+    return ((await WailsApp.GetSignalsLast()) as SignalReport | null) ?? null;
+  },
+
   GetSignalRules: async (): Promise<SignalRulesResponse> => {
     if (isWeb) return fetchApi<SignalRulesResponse>('/signal-rules');
     return (await WailsApp.GetSignalRules()) as SignalRulesResponse;

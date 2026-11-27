@@ -4,6 +4,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 const dailyHistoryTTL = 6 * time.Hour
@@ -17,6 +19,8 @@ type dailyHistoryEntry struct {
 type dailyHistoryStore struct {
 	mu      sync.Mutex
 	entries map[string]dailyHistoryEntry
+	// 같은 종목·기간을 이미 받고 있으면 그 결과를 기다려 함께 쓴다 (앱을 켠 직후 신호·오늘·가격대·자산 추이가 한꺼번에 받을 때)
+	flight singleflight.Group
 	// test hooks (nil in production)
 	fetch func(ticker, rangeStr, interval string) (*PriceHistory, error)
 	now   func() time.Time
@@ -24,6 +28,18 @@ type dailyHistoryStore struct {
 
 func (s *TickerService) cachedHistory(ticker, rangeStr, interval string) (*PriceHistory, error) {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
+	v, err, _ := s.histCache2.flight.Do(ticker+"|"+rangeStr+"|"+interval, func() (any, error) {
+		return s.cachedHistoryLoad(ticker, rangeStr, interval)
+	})
+	if err != nil {
+		return nil, err
+	}
+	h, _ := v.(*PriceHistory)
+	return h, nil
+}
+
+// cachedHistoryLoad: 캐시에 있으면 그것, 없으면 받아서 넣는다 (같은 키는 한 번에 하나만 — cachedHistory)
+func (s *TickerService) cachedHistoryLoad(ticker, rangeStr, interval string) (*PriceHistory, error) {
 	if IsFundTicker(ticker) { // 펀드: 캐시하지 않고 앱 기준가로
 		return s.localHistory(ticker)
 	}

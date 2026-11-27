@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 // 펀더멘털(PER/PBR 등) 조회와 캐시.
@@ -56,6 +58,7 @@ type FundamentalsService struct {
 
 	mu      sync.Mutex
 	entries map[string]fundamentalsEntry
+	flight  singleflight.Group // 같은 종목을 이미 받고 있으면 그 결과를 함께 쓴다
 
 	crumbMu sync.Mutex
 	crumb   string
@@ -105,9 +108,18 @@ func (s *FundamentalsService) clock() time.Time {
 
 var naverKRXCode = regexp.MustCompile(`^([0-9A-Z]{6})\.(KS|KQ)$`)
 
-// Get 은 캐시를 우선해 펀더멘털을 조회한다. 실패는 오류로 돌려주되 캐시하지 않는다.
+// Get 은 캐시를 우선해 펀더멘털을 조회한다. 실패는 오류로 돌려주되 캐시하지 않는다. 같은 종목은 한 번에 하나만 받는다.
 func (s *FundamentalsService) Get(ticker string) (*Fundamentals, error) {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
+	v, err, _ := s.flight.Do(ticker, func() (any, error) { return s.load(ticker) })
+	if err != nil {
+		return nil, err
+	}
+	f, _ := v.(*Fundamentals)
+	return f, nil
+}
+
+func (s *FundamentalsService) load(ticker string) (*Fundamentals, error) {
 	if ticker == "" {
 		return nil, fmt.Errorf("ticker symbol is required")
 	}

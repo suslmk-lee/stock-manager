@@ -37,6 +37,28 @@ type SignalService struct {
 	onSettingsSaved func()
 	// 신호 점검 때 함께 돌리는 다른 알림 (배당 기록으로 본 보유 수량 확인)
 	extraAlerts func(enabled bool, now time.Time) ([]models.SignalEvent, error)
+
+	// 마지막으로 만든 리포트 — 매매 신호 화면을 열면 이것부터 보여 주고 새로 계산한다 (외부 시세가 느리면 수십 초 걸린다)
+	lastMu sync.Mutex
+	last   *SignalReport
+}
+
+// rememberReport: 새로 만든 리포트를 마지막 결과로 둔다
+func (s *SignalService) rememberReport(r *SignalReport) {
+	if r == nil {
+		return
+	}
+	s.lastMu.Lock()
+	s.last = r
+	s.lastMu.Unlock()
+}
+
+// GetSignalsLast: 마지막으로 만든 리포트 (신호 점검·오늘 화면·매매 신호 화면 어디서 만들었든). 없으면 nil.
+// 화면이 이것을 먼저 보여 주고 GetSignals 로 새로 계산한다 — 받은 쪽은 고치지 않는다.
+func (s *SignalService) GetSignalsLast() *SignalReport {
+	s.lastMu.Lock()
+	defer s.lastMu.Unlock()
+	return s.last
 }
 
 // SetExtraAlerts 는 신호 점검 때 함께 돌릴 알림을 등록한다 (enabled: 알림 설정이 켜져 있는지).
@@ -397,8 +419,16 @@ func (s *SignalService) GetSignals() (*SignalReport, error) {
 	return report, nil
 }
 
-// buildSignalReport 는 보유 종목별 지표를 집계해 규칙을 평가한 리포트를 만든다.
+// buildSignalReport 는 보유 종목별 지표를 집계해 규칙을 평가한 리포트를 만들고 마지막 결과로 기억한다.
 func (s *SignalService) buildSignalReport() (*SignalReport, error) {
+	r, err := s.buildSignalReportNow()
+	if err == nil {
+		s.rememberReport(r)
+	}
+	return r, err
+}
+
+func (s *SignalService) buildSignalReportNow() (*SignalReport, error) {
 	rules, err := s.GetSignalRules()
 	if err != nil {
 		return nil, fmt.Errorf("신호 규칙 조회 실패: %w", err)

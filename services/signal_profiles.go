@@ -470,10 +470,8 @@ func (s *SignalService) GetProfileCandidates() ([]DividendCandidate, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := report.Candidates
-	if out == nil {
-		out = []DividendCandidate{}
-	}
+	// 리포트는 마지막 결과로 다른 곳과 같이 쓰므로 복사해 정렬한다
+	out := append([]DividendCandidate{}, report.Candidates...)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Score > out[j].Score })
 	return out, nil
 }

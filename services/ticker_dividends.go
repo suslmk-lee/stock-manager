@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 // 시장(Yahoo) 주당 배당 이벤트 조회와 캐시.
@@ -31,6 +33,7 @@ type dividendEventsEntry struct {
 type dividendEventsStore struct {
 	mu      sync.Mutex
 	entries map[string]dividendEventsEntry
+	flight  singleflight.Group // 같은 종목을 이미 받고 있으면 그 결과를 함께 쓴다
 	// 테스트 훅 (운영에서는 nil)
 	fetch func(ticker string) ([]DividendEvent, error)
 	now   func() time.Time
@@ -111,6 +114,16 @@ func (s *TickerService) GetDividendEvents(ticker string) ([]DividendEvent, error
 // 배당이 없는 종목(빈 결과)은 정상 응답으로 캐시한다.
 func (s *TickerService) GetDividendEventsCached(ticker string) ([]DividendEvent, error) {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
+	v, err, _ := s.divEvCache.flight.Do(ticker, func() (any, error) { return s.dividendEventsLoad(ticker) })
+	if err != nil {
+		return nil, err
+	}
+	ev, _ := v.([]DividendEvent)
+	return ev, nil
+}
+
+// dividendEventsLoad: 캐시에 있으면 그것, 없으면 받아서 넣는다 (같은 종목은 한 번에 하나만 — GetDividendEventsCached)
+func (s *TickerService) dividendEventsLoad(ticker string) ([]DividendEvent, error) {
 	st := &s.divEvCache
 	st.mu.Lock()
 	now := time.Now

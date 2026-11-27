@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type priceCacheEntry struct {
@@ -26,6 +28,28 @@ type TickerService struct {
 	monthlyCache monthlySeriesStore  // see ticker_monthly.go (zero value usable)
 
 	local LocalPriceSource // 펀드처럼 거래소 시세가 없는 자산 (nil 이면 없음)
+
+	priceFlight singleflight.Group // 같은 종목의 현재가를 이미 받고 있으면 그 결과를 함께 쓴다
+}
+
+// sharedPrice: 캐시에 없을 때 현재가를 받아 캐시에 넣는다 — 같은 종목은 한 번에 하나만 받는다
+func (s *TickerService) sharedPrice(ticker string) (*CurrentPrice, error) {
+	v, err, _ := s.priceFlight.Do(ticker, func() (any, error) {
+		if c, ok := s.getCached(ticker); ok {
+			return c, nil
+		}
+		p, err := s.fetchPrice(ticker)
+		if err != nil {
+			return nil, err
+		}
+		s.setCache(ticker, p)
+		return p, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	p, _ := v.(*CurrentPrice)
+	return p, nil
 }
 
 // LocalPriceSource: 거래소 시세가 없는 자산(펀드 FUND:…)의 가격을 앱 데이터(기준가)로 답한다.
@@ -228,11 +252,10 @@ func (s *TickerService) GetCurrentPrices(tickers []string) map[string]*CurrentPr
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			price, err := s.fetchPrice(tk)
-			if err != nil {
+			price, err := s.sharedPrice(tk)
+			if err != nil || price == nil {
 				return
 			}
-			s.setCache(tk, price)
 			mu.Lock()
 			result[tk] = price
 			mu.Unlock()

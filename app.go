@@ -496,6 +496,14 @@ func (a *App) GetSignals() (interface{}, error) {
 	return a.signalService.GetSignals()
 }
 
+// GetSignalsLast: 마지막으로 만든 신호 리포트 (없으면 nil) — 매매 신호 화면이 먼저 보여 주고 새로 계산한다
+func (a *App) GetSignalsLast() (interface{}, error) {
+	if r := a.signalService.GetSignalsLast(); r != nil {
+		return r, nil
+	}
+	return nil, nil
+}
+
 // ===== 전략 프로필 =====
 
 func (a *App) GetSignalProfiles() (interface{}, error) {

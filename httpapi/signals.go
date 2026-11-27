@@ -79,6 +79,15 @@ func registerSignalRoutes(api *gin.RouterGroup, s *Services) {
 		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	})
 
+	// 마지막으로 만든 신호 리포트 (없으면 null) — 화면이 먼저 보여 주고 /signals 로 새로 계산한다
+	api.GET("/signals/last", func(c *gin.Context) {
+		if r := s.Signal.GetSignalsLast(); r != nil {
+			c.JSON(http.StatusOK, r)
+			return
+		}
+		c.JSON(http.StatusOK, nil)
+	})
+
 	api.GET("/signals", func(c *gin.Context) {
 		res, err := s.Signal.GetSignals()
 		if err != nil {

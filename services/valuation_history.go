@@ -10,6 +10,7 @@ import (
 
 	"stock-manager/models"
 
+	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 )
 
@@ -324,6 +325,7 @@ type ValuationService struct {
 
 	mu      sync.Mutex
 	entries map[string]valuationEntry
+	flight  singleflight.Group // 같은 종목을 이미 계산하고 있으면 그 결과를 함께 쓴다
 
 	// 테스트 훅 (운영에서는 nil)
 	fetchPrices   func(ticker string) (*PriceHistory, error)
@@ -383,6 +385,16 @@ func (s *ValuationService) Get(ticker string) (*ValuationSeries, error) {
 	if ticker == "" {
 		return nil, fmt.Errorf("ticker symbol is required")
 	}
+	v, err, _ := s.flight.Do(ticker, func() (any, error) { return s.load(ticker) })
+	if err != nil {
+		return nil, err
+	}
+	series, _ := v.(*ValuationSeries)
+	return series, nil
+}
+
+// load: 캐시에 있으면 그것, 없으면 받아 계산해 넣는다 (같은 종목은 한 번에 하나만 — Get)
+func (s *ValuationService) load(ticker string) (*ValuationSeries, error) {
 	now := s.clock()
 	s.mu.Lock()
 	if e, ok := s.entries[ticker]; ok && now.Sub(e.fetchedAt) <= valuationTTL {

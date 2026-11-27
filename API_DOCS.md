@@ -373,6 +373,9 @@ SignalItem 추가 필드:
 "tax": { "year": 2026, "realized_gain_krw": 0, "realized_loss_krw": 0, "net_krw": 0, "exemption_krw": 2500000, "remaining_krw": 2500000, "estimated_tax_krw": 0, "harvest_window": false, "count": 0 }
 ```
 
+### 8.5 마지막 신호 리포트
+`GET /api/signals/last` → 이 서버가 마지막으로 만든 신호 리포트(§8.4 와 같은 모양)를 계산 없이 돌려줍니다. 아직 만든 적이 없으면(서버를 켠 뒤 처음) `null` 입니다. 매매 신호 화면이 이것을 먼저 보여 주고 `GET /api/signals` 로 새로 계산합니다(외부 시세가 느리면 수십 초 걸린다). 신호 이벤트를 기록하지 않습니다. Wails: `GetSignalsLast()`.
+
 ---
 
 ## 9. 신호 알림 (Signal Alerts)

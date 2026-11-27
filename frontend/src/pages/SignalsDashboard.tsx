@@ -5,7 +5,7 @@ import SplitView from '../components/shell/SplitView';
 import { useAlerts } from '../components/alerts/AlertsProvider';
 import SignalHistory from '../components/alerts/SignalHistory';
 import { apiClient } from '../api/client';
-import { SignalItem, SignalProfile, SignalReport, SignalRule, SignalRulesResponse } from '../types/models';
+import { SignalItem, SignalProfile, SignalProfilesResponse, SignalReport, SignalRule, SignalRulesResponse } from '../types/models';
 import SignalList, { sortItems, type SortKey, type SortState } from '../components/signals/SignalList';
 import SignalDetail, { type DetailTab } from '../components/signals/SignalDetail';
 import { type FilterValue } from '../components/signals/SignalCard';
@@ -65,19 +65,39 @@ export default function SignalsDashboard({ focusAssetId, focusNonce }: SignalsDa
   };
 
   const load = useCallback(async (initial = false) => {
+    const applyMeta = (ru: SignalRulesResponse | null, pr: SignalProfilesResponse | null) => {
+      setRules(ru);
+      setProfiles(pr ? [...(pr.profiles ?? [])].sort((a, b) => Number(b.built_in) - Number(a.built_in) || a.sort_order - b.sort_order || a.id - b.id) : null);
+      setProfileFilter((cur) => (cur !== 'all' && pr && !(pr.profiles ?? []).some((p) => p.id === cur) ? 'all' : cur));
+    };
     try {
-      if (initial) setLoading(true);
-      else setRefreshing(true);
       setError(null);
+      if (initial) {
+        // 마지막으로 만든 리포트(신호 점검·오늘 화면이 만든 것)가 있으면 먼저 보여 주고 뒤에서 새로 계산한다 — 외부 시세가 느리면 수십 초 걸린다
+        const [last, ru, pr] = await Promise.all([
+          apiClient.GetSignalsLast().catch(() => null),
+          apiClient.GetSignalRules().catch(() => null),
+          apiClient.GetSignalProfiles().catch(() => null),
+        ]);
+        applyMeta(ru, pr);
+        if (last) {
+          setReport(last);
+          setLoading(false);
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+        setReport(await apiClient.GetSignals());
+        return;
+      }
+      setRefreshing(true);
       const [r, ru, pr] = await Promise.all([
         apiClient.GetSignals(),
         apiClient.GetSignalRules().catch(() => null),
         apiClient.GetSignalProfiles().catch(() => null),
       ]);
       setReport(r);
-      setRules(ru);
-      setProfiles(pr ? [...(pr.profiles ?? [])].sort((a, b) => Number(b.built_in) - Number(a.built_in) || a.sort_order - b.sort_order || a.id - b.id) : null);
-      setProfileFilter((cur) => (cur !== 'all' && pr && !(pr.profiles ?? []).some((p) => p.id === cur) ? 'all' : cur));
+      applyMeta(ru, pr);
     } catch (err) {
       console.error('Failed to load signals:', err);
       // Wails 는 Go 오류를 문자열로 reject 한다
